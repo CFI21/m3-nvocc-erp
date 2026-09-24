@@ -1,0 +1,22 @@
+{
+  "modules": [
+    {"key":"identity-dashboard","name":"Identity & Access Dashboard","group":"overview","route":"/admin/identity/dashboard"},
+    {"key":"users","name":"Users","group":"identity","route":"/admin/identity/users"},
+    {"key":"roles","name":"Roles","group":"identity","route":"/admin/identity/roles"},
+    {"key":"permission-matrix","name":"Permission Matrix","group":"identity","route":"/admin/identity/permissions"},
+    {"key":"role-assignments","name":"User Role Assignments","group":"identity","route":"/admin/identity/assignments"},
+    {"key":"sessions","name":"Sessions","group":"security","route":"/admin/security/sessions"},
+    {"key":"mfa-policy","name":"MFA Policy","group":"security","route":"/admin/security/mfa"},
+    {"key":"password-policy","name":"Password Policy","group":"security","route":"/admin/security/password-policy"},
+    {"key":"login-audit","name":"Login Audit","group":"security","route":"/admin/security/login-audit"},
+    {"key":"organizations","name":"Organizations","group":"organization","route":"/admin/organization/organizations"},
+    {"key":"countries","name":"Countries","group":"organization","route":"/admin/organization/countries"},
+    {"key":"offices","name":"Offices","group":"organization","route":"/admin/organization/offices"},
+    {"key":"office-membership","name":"Office Membership","group":"organization","route":"/admin/organization/membership"},
+    {"key":"data-scope-rules","name":"Data Scope Rules","group":"governance","route":"/admin/governance/data-scope"},
+    {"key":"approval-delegations","name":"Approval Delegations","group":"governance","route":"/admin/governance/delegations"},
+    {"key":"access-reviews","name":"Access Reviews","group":"governance","route":"/admin/governance/access-reviews"},
+    {"key":"service-accounts","name":"Service Accounts","group":"security","route":"/admin/security/service-accounts"},
+    {"key":"api-clients","name":"API Clients","group":"security","route":"/admin/security/api-clients"}
+  ]
+}
