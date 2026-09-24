@@ -1,0 +1,1000 @@
+{
+  "setup": [
+    {
+      "key": "chart-of-accounts",
+      "name": "Chart of Accounts",
+      "route": "/gl/setup/chart-of-accounts",
+      "columns": [
+        "Account Code",
+        "Account Name",
+        "Type",
+        "Parent",
+        "Currency",
+        "Active"
+      ],
+      "fields": [
+        "Account Code",
+        "Account Name",
+        "Type",
+        "Parent",
+        "Currency",
+        "Active"
+      ]
+    },
+    {
+      "key": "currency",
+      "name": "Currency",
+      "route": "/gl/setup/currency",
+      "columns": [
+        "Currency",
+        "Name",
+        "Decimals",
+        "Rate Type",
+        "Active"
+      ],
+      "fields": [
+        "Currency",
+        "Name",
+        "Decimals",
+        "Rate Type",
+        "Active"
+      ]
+    },
+    {
+      "key": "voucher-properties",
+      "name": "Voucher Properties",
+      "route": "/gl/setup/voucher-properties",
+      "columns": [
+        "Voucher Type",
+        "Prefix",
+        "Next Number",
+        "Approval Required",
+        "Active"
+      ],
+      "fields": [
+        "Voucher Type",
+        "Prefix",
+        "Next Number",
+        "Approval Required",
+        "Active"
+      ]
+    },
+    {
+      "key": "opening-balance",
+      "name": "Opening Balance",
+      "route": "/gl/setup/opening-balance",
+      "columns": [
+        "Period",
+        "Account Code",
+        "Account Name",
+        "Debit",
+        "Credit",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Period",
+        "Account Code",
+        "Account Name",
+        "Debit",
+        "Credit",
+        "Currency",
+        "Status"
+      ]
+    },
+    {
+      "key": "account-integration",
+      "name": "Account Integration",
+      "route": "/gl/setup/account-integration",
+      "columns": [
+        "Source Module",
+        "Event",
+        "Debit Account",
+        "Credit Account",
+        "Tax Account",
+        "Active"
+      ],
+      "fields": [
+        "Source Module",
+        "Event",
+        "Debit Account",
+        "Credit Account",
+        "Tax Account",
+        "Active"
+      ]
+    },
+    {
+      "key": "reconciliation-date-setup",
+      "name": "Reconciliation Date Setup",
+      "route": "/gl/setup/reconciliation-date-setup",
+      "columns": [
+        "Bank Account",
+        "Cut-off Date",
+        "Last Reconciled",
+        "Status"
+      ],
+      "fields": [
+        "Bank Account",
+        "Cut-off Date",
+        "Last Reconciled",
+        "Status"
+      ]
+    },
+    {
+      "key": "payment-requisition-setup",
+      "name": "Payment Requisition Setup",
+      "route": "/gl/setup/payment-requisition-setup",
+      "columns": [
+        "Rule",
+        "Min Amount",
+        "Max Amount",
+        "Approver Role",
+        "Levels",
+        "Active"
+      ],
+      "fields": [
+        "Rule",
+        "Min Amount",
+        "Max Amount",
+        "Approver Role",
+        "Levels",
+        "Active"
+      ]
+    },
+    {
+      "key": "cheque-book-stock",
+      "name": "Cheque Book Stock",
+      "route": "/gl/setup/cheque-book-stock",
+      "columns": [
+        "Book No.",
+        "Bank Account",
+        "Start No.",
+        "End No.",
+        "Next No.",
+        "Status"
+      ],
+      "fields": [
+        "Book No.",
+        "Bank Account",
+        "Start No.",
+        "End No.",
+        "Next No.",
+        "Status"
+      ]
+    },
+    {
+      "key": "cash-denomination-record",
+      "name": "Cash Denomination Record",
+      "route": "/gl/setup/cash-denomination-record",
+      "columns": [
+        "Currency",
+        "Denomination",
+        "Type",
+        "Active"
+      ],
+      "fields": [
+        "Currency",
+        "Denomination",
+        "Type",
+        "Active"
+      ]
+    },
+    {
+      "key": "budget",
+      "name": "Budget",
+      "route": "/gl/setup/budget",
+      "columns": [
+        "Fiscal Year",
+        "Period",
+        "Account Code",
+        "Budget Amount",
+        "Actual Amount",
+        "Variance",
+        "Status"
+      ],
+      "fields": [
+        "Fiscal Year",
+        "Period",
+        "Account Code",
+        "Budget Amount",
+        "Actual Amount",
+        "Variance",
+        "Status"
+      ]
+    }
+  ],
+  "transactions": [
+    {
+      "key": "voucher",
+      "name": "Voucher",
+      "route": "/gl/transactions/voucher",
+      "columns": [
+        "Voucher No.",
+        "Date",
+        "Voucher Type",
+        "Source",
+        "Job Ref",
+        "Debit",
+        "Credit",
+        "Status"
+      ],
+      "fields": [
+        "Voucher No.",
+        "Date",
+        "Voucher Type",
+        "Source",
+        "Source Ref",
+        "Job Ref",
+        "Currency",
+        "Debit Account",
+        "Credit Account",
+        "Amount",
+        "Debit",
+        "Credit",
+        "Narration",
+        "Status"
+      ]
+    },
+    {
+      "key": "invoice",
+      "name": "Invoice",
+      "route": "/gl/transactions/invoice",
+      "columns": [
+        "Invoice No.",
+        "Date",
+        "Customer",
+        "Job Ref",
+        "Currency",
+        "Amount",
+        "Tax",
+        "Outstanding",
+        "Status"
+      ],
+      "fields": [
+        "Invoice No.",
+        "Date",
+        "Customer",
+        "Job Ref",
+        "Booking Ref",
+        "Currency",
+        "Amount",
+        "Tax",
+        "Outstanding",
+        "Due Date",
+        "Status"
+      ]
+    },
+    {
+      "key": "bills",
+      "name": "Bills",
+      "route": "/gl/transactions/bills",
+      "columns": [
+        "Bill No.",
+        "Date",
+        "Supplier",
+        "Job Ref",
+        "Currency",
+        "Amount",
+        "Tax",
+        "Outstanding",
+        "Status"
+      ],
+      "fields": [
+        "Bill No.",
+        "Date",
+        "Supplier",
+        "Job Ref",
+        "Booking Ref",
+        "Currency",
+        "Amount",
+        "Tax",
+        "Outstanding",
+        "Due Date",
+        "Status"
+      ]
+    },
+    {
+      "key": "receipt",
+      "name": "Receipt",
+      "route": "/gl/transactions/receipt",
+      "columns": [
+        "Receipt No.",
+        "Date",
+        "Payer",
+        "Job Ref",
+        "Currency",
+        "Amount",
+        "Bank/Cash",
+        "Status"
+      ],
+      "fields": [
+        "Receipt No.",
+        "Date",
+        "Payer",
+        "Job Ref",
+        "SOA Ref",
+        "Invoice Ref",
+        "Currency",
+        "Amount",
+        "Bank/Cash",
+        "Reference",
+        "Status"
+      ]
+    },
+    {
+      "key": "payment",
+      "name": "Payment",
+      "route": "/gl/transactions/payment",
+      "columns": [
+        "Payment No.",
+        "Date",
+        "Payee",
+        "Job Ref",
+        "Currency",
+        "Amount",
+        "Bank/Cash",
+        "Status"
+      ],
+      "fields": [
+        "Payment No.",
+        "Date",
+        "Payee",
+        "Job Ref",
+        "SOA Ref",
+        "Bill Ref",
+        "Currency",
+        "Amount",
+        "Bank/Cash",
+        "Reference",
+        "Status"
+      ]
+    },
+    {
+      "key": "payment-requisition",
+      "name": "Payment Requisition",
+      "route": "/gl/transactions/payment-requisition",
+      "columns": [
+        "Requisition No.",
+        "Date",
+        "Payee",
+        "Job Ref",
+        "Amount",
+        "Approval Level",
+        "Status"
+      ],
+      "fields": [
+        "Requisition No.",
+        "Date",
+        "Payee",
+        "Job Ref",
+        "Bill Ref",
+        "Currency",
+        "Amount",
+        "Purpose",
+        "Approval Level",
+        "Requested By",
+        "Status"
+      ]
+    },
+    {
+      "key": "bank-reconciliation",
+      "name": "Bank Reconciliation",
+      "route": "/gl/transactions/bank-reconciliation",
+      "columns": [
+        "Recon No.",
+        "Bank Account",
+        "Period",
+        "Book Balance",
+        "Bank Balance",
+        "Difference",
+        "Status"
+      ],
+      "fields": [
+        "Recon No.",
+        "Bank Account",
+        "Period",
+        "Book Balance",
+        "Bank Balance",
+        "Difference",
+        "Statement Ref",
+        "Reconciled Date",
+        "Status"
+      ]
+    },
+    {
+      "key": "cheques-opening",
+      "name": "Cheques Opening",
+      "route": "/gl/transactions/cheques-opening",
+      "columns": [
+        "Cheque No.",
+        "Book No.",
+        "Payee",
+        "Amount",
+        "Opening Date",
+        "Status"
+      ],
+      "fields": [
+        "Cheque No.",
+        "Book No.",
+        "Payee",
+        "Amount",
+        "Currency",
+        "Opening Date",
+        "Payment Ref",
+        "Status"
+      ]
+    },
+    {
+      "key": "cheque-delivery-marking",
+      "name": "Cheque Delivery Marking",
+      "route": "/gl/transactions/cheque-delivery-marking",
+      "columns": [
+        "Cheque No.",
+        "Payee",
+        "Delivery Date",
+        "Received By",
+        "Status"
+      ],
+      "fields": [
+        "Cheque No.",
+        "Payee",
+        "Delivery Date",
+        "Received By",
+        "ID / Reference",
+        "Payment Ref",
+        "Status"
+      ]
+    },
+    {
+      "key": "cheque-deposit-marking",
+      "name": "Cheque Deposit Marking",
+      "route": "/gl/transactions/cheque-deposit-marking",
+      "columns": [
+        "Cheque No.",
+        "Bank Account",
+        "Deposit Date",
+        "Amount",
+        "Status"
+      ],
+      "fields": [
+        "Cheque No.",
+        "Bank Account",
+        "Deposit Date",
+        "Amount",
+        "Currency",
+        "Receipt Ref",
+        "Deposit Slip",
+        "Status"
+      ]
+    },
+    {
+      "key": "recall-memo-voucher",
+      "name": "Recall Memo Voucher",
+      "route": "/gl/transactions/recall-memo-voucher",
+      "columns": [
+        "Memo No.",
+        "Voucher No.",
+        "Reason",
+        "Date",
+        "Amount",
+        "Status"
+      ],
+      "fields": [
+        "Memo No.",
+        "Voucher No.",
+        "Reason",
+        "Date",
+        "Amount",
+        "Currency",
+        "Recalled By",
+        "Status"
+      ]
+    },
+    {
+      "key": "voucher-approval-dashboard",
+      "name": "Voucher Approval Dashboard",
+      "route": "/gl/transactions/voucher-approval-dashboard",
+      "columns": [
+        "Voucher No.",
+        "Type",
+        "Date",
+        "Amount",
+        "Requested By",
+        "Approver",
+        "Status"
+      ],
+      "fields": [
+        "Voucher No.",
+        "Type",
+        "Date",
+        "Amount",
+        "Requested By",
+        "Approver",
+        "Approval Date",
+        "Comments",
+        "Status"
+      ]
+    },
+    {
+      "key": "voucher-history",
+      "name": "Voucher History",
+      "route": "/gl/transactions/voucher-history",
+      "columns": [
+        "Voucher No.",
+        "Version",
+        "Action",
+        "Actor",
+        "Timestamp",
+        "Status"
+      ],
+      "fields": [
+        "Voucher No.",
+        "Version",
+        "Action",
+        "Actor",
+        "Timestamp",
+        "Before Hash",
+        "After Hash",
+        "Status"
+      ]
+    },
+    {
+      "key": "wht-deposits",
+      "name": "WHT Deposits",
+      "route": "/gl/transactions/wht-deposits",
+      "columns": [
+        "Deposit No.",
+        "Tax Type",
+        "Period",
+        "Authority",
+        "Amount",
+        "Reference",
+        "Status"
+      ],
+      "fields": [
+        "Deposit No.",
+        "Tax Type",
+        "Period",
+        "Authority",
+        "Amount",
+        "Currency",
+        "Reference",
+        "Deposit Date",
+        "Status"
+      ]
+    },
+    {
+      "key": "tax-tool",
+      "name": "Tax Tool",
+      "route": "/gl/transactions/tax-tool",
+      "columns": [
+        "Calculation Ref",
+        "Tax Type",
+        "Base Amount",
+        "Rate",
+        "Tax Amount",
+        "Job Ref",
+        "Status"
+      ],
+      "fields": [
+        "Calculation Ref",
+        "Tax Type",
+        "Base Amount",
+        "Rate",
+        "Tax Amount",
+        "Currency",
+        "Job Ref",
+        "Document Ref",
+        "Status"
+      ]
+    }
+  ],
+  "controls": [
+    {
+      "key": "fiscal-year",
+      "name": "Fiscal Year",
+      "route": "/gl/control/fiscal-year",
+      "columns": [
+        "Fiscal Year",
+        "Start Date",
+        "End Date",
+        "Status",
+        "Version"
+      ],
+      "fields": [
+        "Fiscal Year",
+        "Start Date",
+        "End Date",
+        "Status",
+        "Version"
+      ]
+    },
+    {
+      "key": "accounting-periods",
+      "name": "Accounting Periods",
+      "route": "/gl/control/accounting-periods",
+      "columns": [
+        "Fiscal Year",
+        "Period",
+        "Start Date",
+        "End Date",
+        "Status",
+        "Backdate From"
+      ],
+      "fields": [
+        "Fiscal Year",
+        "Period",
+        "Start Date",
+        "End Date",
+        "Status",
+        "Backdate From"
+      ]
+    },
+    {
+      "key": "journal-approval-levels",
+      "name": "Journal Approval Levels",
+      "route": "/gl/control/journal-approval-levels",
+      "columns": [
+        "Voucher Type",
+        "Min Amount",
+        "Max Amount",
+        "Required Levels",
+        "Checker Role",
+        "Maker/Checker",
+        "Active"
+      ],
+      "fields": [
+        "Voucher Type",
+        "Min Amount",
+        "Max Amount",
+        "Required Levels",
+        "Checker Role",
+        "Maker/Checker",
+        "Active"
+      ]
+    },
+    {
+      "key": "credit-note",
+      "name": "Credit Note",
+      "route": "/gl/control/credit-note",
+      "columns": [
+        "Credit Note No.",
+        "Date",
+        "Customer",
+        "Job Ref",
+        "Currency",
+        "Amount",
+        "Status"
+      ],
+      "fields": [
+        "Credit Note No.",
+        "Date",
+        "Customer",
+        "Job Ref",
+        "Invoice Ref",
+        "Currency",
+        "Amount",
+        "Reason",
+        "Status"
+      ]
+    },
+    {
+      "key": "debit-note",
+      "name": "Debit Note",
+      "route": "/gl/control/debit-note",
+      "columns": [
+        "Debit Note No.",
+        "Date",
+        "Supplier",
+        "Job Ref",
+        "Currency",
+        "Amount",
+        "Status"
+      ],
+      "fields": [
+        "Debit Note No.",
+        "Date",
+        "Supplier",
+        "Job Ref",
+        "Bill Ref",
+        "Currency",
+        "Amount",
+        "Reason",
+        "Status"
+      ]
+    },
+    {
+      "key": "customer-credit-control",
+      "name": "Customer Credit Control",
+      "route": "/gl/control/customer-credit-control",
+      "columns": [
+        "Customer",
+        "Credit Limit",
+        "Exposure",
+        "Available",
+        "Hold",
+        "Status"
+      ],
+      "fields": [
+        "Customer",
+        "Credit Limit",
+        "Exposure",
+        "Available",
+        "Hold",
+        "Status"
+      ]
+    },
+    {
+      "key": "supplier-payable-control",
+      "name": "Supplier / Carrier Payable Control",
+      "route": "/gl/control/supplier-payable-control",
+      "columns": [
+        "Supplier / Carrier",
+        "Outstanding",
+        "Due",
+        "Overdue",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Supplier / Carrier",
+        "Outstanding",
+        "Due",
+        "Overdue",
+        "Currency",
+        "Status"
+      ]
+    },
+    {
+      "key": "fx-revaluation",
+      "name": "FX Revaluation",
+      "route": "/gl/control/fx-revaluation",
+      "columns": [
+        "Period",
+        "Currency",
+        "Rate",
+        "Exposure",
+        "Unrealized Gain/Loss",
+        "Status"
+      ],
+      "fields": [
+        "Period",
+        "Currency",
+        "Rate",
+        "Exposure",
+        "Unrealized Gain/Loss",
+        "Voucher Ref",
+        "Status"
+      ]
+    },
+    {
+      "key": "bank-matching",
+      "name": "Bank Matching",
+      "route": "/gl/control/bank-matching",
+      "columns": [
+        "Statement Ref",
+        "Book Ref",
+        "Date",
+        "Bank Amount",
+        "Book Amount",
+        "Difference",
+        "Match Type",
+        "Status"
+      ],
+      "fields": [
+        "Statement Ref",
+        "Book Ref",
+        "Date",
+        "Bank Amount",
+        "Book Amount",
+        "Difference",
+        "Match Type",
+        "Status"
+      ]
+    },
+    {
+      "key": "accruals",
+      "name": "Accruals",
+      "route": "/gl/control/accruals",
+      "columns": [
+        "Accrual No.",
+        "Period",
+        "Job Ref",
+        "Account",
+        "Amount",
+        "Reverse Date",
+        "Status"
+      ],
+      "fields": [
+        "Accrual No.",
+        "Period",
+        "Job Ref",
+        "Account",
+        "Offset Account",
+        "Amount",
+        "Reverse Date",
+        "Narration",
+        "Status"
+      ]
+    },
+    {
+      "key": "prepayments",
+      "name": "Prepayments",
+      "route": "/gl/control/prepayments",
+      "columns": [
+        "Prepayment No.",
+        "Period",
+        "Job Ref",
+        "Account",
+        "Amount",
+        "Amortized",
+        "Balance",
+        "Status"
+      ],
+      "fields": [
+        "Prepayment No.",
+        "Period",
+        "Job Ref",
+        "Account",
+        "Expense Account",
+        "Amount",
+        "Amortized",
+        "Balance",
+        "Status"
+      ]
+    },
+    {
+      "key": "month-end-journals",
+      "name": "Month-End Journals",
+      "route": "/gl/control/month-end-journals",
+      "columns": [
+        "Journal No.",
+        "Period",
+        "Type",
+        "Job Ref",
+        "Debit",
+        "Credit",
+        "Approval",
+        "Status"
+      ],
+      "fields": [
+        "Journal No.",
+        "Period",
+        "Type",
+        "Job Ref",
+        "Debit Account",
+        "Credit Account",
+        "Amount",
+        "Debit",
+        "Credit",
+        "Approval",
+        "Status"
+      ]
+    },
+    {
+      "key": "period-close-checklist",
+      "name": "Period Close Checklist",
+      "route": "/gl/control/period-close-checklist",
+      "columns": [
+        "Period",
+        "Check",
+        "Owner",
+        "Status",
+        "Evidence"
+      ],
+      "fields": [
+        "Period",
+        "Check",
+        "Owner",
+        "Status",
+        "Evidence"
+      ]
+    }
+  ],
+  "reports": [
+    {
+      "key": "ar-aging",
+      "name": "AR Aging",
+      "route": "/gl/reports/ar-aging",
+      "columns": [
+        "Customer",
+        "Current",
+        "1-30",
+        "31-60",
+        "61-90",
+        "90+",
+        "Total"
+      ],
+      "fields": [
+        "Customer",
+        "Current",
+        "1-30",
+        "31-60",
+        "61-90",
+        "90+",
+        "Total"
+      ]
+    },
+    {
+      "key": "ap-aging",
+      "name": "AP Aging",
+      "route": "/gl/reports/ap-aging",
+      "columns": [
+        "Supplier / Carrier",
+        "Current",
+        "1-30",
+        "31-60",
+        "61-90",
+        "90+",
+        "Total"
+      ],
+      "fields": [
+        "Supplier / Carrier",
+        "Current",
+        "1-30",
+        "31-60",
+        "61-90",
+        "90+",
+        "Total"
+      ]
+    },
+    {
+      "key": "unmatched-bank-items",
+      "name": "Unmatched Bank Items",
+      "route": "/gl/reports/unmatched-bank-items",
+      "columns": [
+        "Statement Ref",
+        "Date",
+        "Description",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Statement Ref",
+        "Date",
+        "Description",
+        "Amount",
+        "Currency",
+        "Status"
+      ]
+    },
+    {
+      "key": "job-profitability-reconciliation",
+      "name": "Job Profitability Reconciliation",
+      "route": "/gl/reports/job-profitability-reconciliation",
+      "columns": [
+        "Job Ref",
+        "Revenue",
+        "Cost",
+        "Margin",
+        "Operational Margin",
+        "Difference",
+        "Status"
+      ],
+      "fields": [
+        "Job Ref",
+        "Revenue",
+        "Cost",
+        "Margin",
+        "Operational Margin",
+        "Difference",
+        "Status"
+      ]
+    },
+    {
+      "key": "trial-balance-report",
+      "name": "Trial Balance",
+      "route": "/gl/reports/trial-balance",
+      "columns": [
+        "Account Code",
+        "Account Name",
+        "Debit",
+        "Credit",
+        "Balance"
+      ],
+      "fields": [
+        "Account Code",
+        "Account Name",
+        "Debit",
+        "Credit",
