@@ -1,0 +1,1000 @@
+{
+  "modules": [
+    {
+      "key": "treasury-dashboard",
+      "name": "Treasury Dashboard",
+      "group": "overview",
+      "route": "/treasury/overview/treasury-dashboard",
+      "columns": [
+        "Metric",
+        "Value",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Metric",
+        "Value",
+        "Currency",
+        "Status"
+      ]
+    },
+    {
+      "key": "bank-accounts",
+      "name": "Bank Accounts",
+      "group": "setup",
+      "route": "/treasury/setup/bank-accounts",
+      "columns": [
+        "Account Ref",
+        "Bank",
+        "Account Name",
+        "Currency",
+        "Balance",
+        "Status"
+      ],
+      "fields": [
+        "Account Ref",
+        "Bank",
+        "Account Name",
+        "IBAN / Account No.",
+        "Currency",
+        "Opening Balance",
+        "Balance",
+        "Status"
+      ]
+    },
+    {
+      "key": "cash-accounts",
+      "name": "Cash Accounts",
+      "group": "setup",
+      "route": "/treasury/setup/cash-accounts",
+      "columns": [
+        "Account Ref",
+        "Cash Account",
+        "Office",
+        "Currency",
+        "Balance",
+        "Status"
+      ],
+      "fields": [
+        "Account Ref",
+        "Cash Account",
+        "Office",
+        "Currency",
+        "Opening Balance",
+        "Balance",
+        "Status"
+      ]
+    },
+    {
+      "key": "cashbook",
+      "name": "Cashbook",
+      "group": "cash-bank",
+      "route": "/treasury/cash-bank/cashbook",
+      "columns": [
+        "Transaction Ref",
+        "Date",
+        "Account Ref",
+        "Type",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Transaction Ref",
+        "Date",
+        "Account Ref",
+        "Type",
+        "Job Ref",
+        "Party",
+        "Source Ref",
+        "Amount",
+        "Currency",
+        "Narration",
+        "Status"
+      ]
+    },
+    {
+      "key": "bankbook",
+      "name": "Bankbook",
+      "group": "cash-bank",
+      "route": "/treasury/cash-bank/bankbook",
+      "columns": [
+        "Transaction Ref",
+        "Date",
+        "Bank Account",
+        "Type",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Transaction Ref",
+        "Date",
+        "Bank Account",
+        "Type",
+        "Job Ref",
+        "Party",
+        "Source Ref",
+        "Amount",
+        "Currency",
+        "Bank Ref",
+        "Narration",
+        "Status"
+      ]
+    },
+    {
+      "key": "customer-receipt-allocation",
+      "name": "Customer Receipt Allocation",
+      "group": "settlement",
+      "route": "/treasury/settlement/customer-receipt-allocation",
+      "columns": [
+        "Allocation Ref",
+        "Customer",
+        "Receipt Ref",
+        "Invoice Ref",
+        "Job Ref",
+        "Allocated Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Allocation Ref",
+        "Date",
+        "Customer",
+        "Receipt Ref",
+        "Invoice Ref",
+        "Job Ref",
+        "Allocated Amount",
+        "Currency",
+        "FX Rate",
+        "Status"
+      ]
+    },
+    {
+      "key": "supplier-carrier-payment-allocation",
+      "name": "Supplier / Carrier Payment Allocation",
+      "group": "settlement",
+      "route": "/treasury/settlement/supplier-carrier-payment-allocation",
+      "columns": [
+        "Allocation Ref",
+        "Supplier / Carrier",
+        "Payment Ref",
+        "Bill Ref",
+        "Job Ref",
+        "Allocated Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Allocation Ref",
+        "Date",
+        "Supplier / Carrier",
+        "Payment Ref",
+        "Bill Ref",
+        "Job Ref",
+        "Allocated Amount",
+        "Currency",
+        "FX Rate",
+        "Status"
+      ]
+    },
+    {
+      "key": "agent-settlement",
+      "name": "Agent Settlement",
+      "group": "settlement",
+      "route": "/treasury/settlement/agent-settlement",
+      "columns": [
+        "Settlement Ref",
+        "Agent",
+        "SOA Ref",
+        "Job Ref",
+        "Net Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Settlement Ref",
+        "Date",
+        "Agent",
+        "SOA Ref",
+        "Job Ref",
+        "Debit",
+        "Credit",
+        "Net Amount",
+        "Currency",
+        "Payment / Receipt Ref",
+        "Status"
+      ]
+    },
+    {
+      "key": "advance-receipts",
+      "name": "Advance Receipts",
+      "group": "settlement",
+      "route": "/treasury/settlement/advance-receipts",
+      "columns": [
+        "Advance Ref",
+        "Customer / Agent",
+        "Date",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Unallocated Amount",
+        "Status"
+      ],
+      "fields": [
+        "Advance Ref",
+        "Date",
+        "Customer / Agent",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Bank / Cash",
+        "Reference",
+        "Unallocated Amount",
+        "Status"
+      ]
+    },
+    {
+      "key": "advance-payments",
+      "name": "Advance Payments",
+      "group": "settlement",
+      "route": "/treasury/settlement/advance-payments",
+      "columns": [
+        "Advance Ref",
+        "Supplier / Carrier",
+        "Date",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Unapplied Amount",
+        "Status"
+      ],
+      "fields": [
+        "Advance Ref",
+        "Date",
+        "Supplier / Carrier",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Bank / Cash",
+        "Reference",
+        "Unapplied Amount",
+        "Status"
+      ]
+    },
+    {
+      "key": "on-account-receipts-payments",
+      "name": "On-Account Receipts / Payments",
+      "group": "settlement",
+      "route": "/treasury/settlement/on-account-receipts-payments",
+      "columns": [
+        "Reference",
+        "Type",
+        "Party",
+        "Date",
+        "Amount",
+        "Currency",
+        "Unapplied Amount",
+        "Status"
+      ],
+      "fields": [
+        "Reference",
+        "Type",
+        "Party",
+        "Date",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Bank / Cash",
+        "Unapplied Amount",
+        "Status"
+      ]
+    },
+    {
+      "key": "partial-settlement",
+      "name": "Partial Settlement",
+      "group": "settlement",
+      "route": "/treasury/settlement/partial-settlement",
+      "columns": [
+        "Settlement Ref",
+        "Source Type",
+        "Source Ref",
+        "Job Ref",
+        "Source Amount",
+        "Settlement Amount",
+        "Balance",
+        "Status"
+      ],
+      "fields": [
+        "Settlement Ref",
+        "Date",
+        "Source Type",
+        "Source Ref",
+        "Job Ref",
+        "Source Amount",
+        "Settlement Amount",
+        "Balance",
+        "Currency",
+        "Status"
+      ]
+    },
+    {
+      "key": "multi-invoice-settlement",
+      "name": "Multi-Invoice Settlement",
+      "group": "settlement",
+      "route": "/treasury/settlement/multi-invoice-settlement",
+      "columns": [
+        "Settlement Ref",
+        "Party",
+        "Invoice / Bill Refs",
+        "Job Ref",
+        "Settlement Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Settlement Ref",
+        "Date",
+        "Party",
+        "Invoice / Bill Refs",
+        "Job Ref",
+        "Total Source Amount",
+        "Settlement Amount",
+        "Currency",
+        "Allocation Count",
+        "Status"
+      ]
+    },
+    {
+      "key": "multi-currency-settlement",
+      "name": "Multi-Currency Settlement",
+      "group": "settlement",
+      "route": "/treasury/settlement/multi-currency-settlement",
+      "columns": [
+        "Settlement Ref",
+        "Party",
+        "Source Currency",
+        "Settlement Currency",
+        "FX Rate",
+        "Settlement Amount",
+        "Status"
+      ],
+      "fields": [
+        "Settlement Ref",
+        "Date",
+        "Party",
+        "Job Ref",
+        "Source Ref",
+        "Source Currency",
+        "Source Amount",
+        "Settlement Currency",
+        "FX Rate",
+        "Settlement Amount",
+        "FX Difference",
+        "Status"
+      ]
+    },
+    {
+      "key": "customer-refunds",
+      "name": "Customer Refunds",
+      "group": "settlement",
+      "route": "/treasury/settlement/customer-refunds",
+      "columns": [
+        "Refund Ref",
+        "Customer",
+        "Receipt / Credit Ref",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Refund Ref",
+        "Date",
+        "Customer",
+        "Receipt / Credit Ref",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Bank Account",
+        "Reason",
+        "Status"
+      ]
+    },
+    {
+      "key": "supplier-refunds",
+      "name": "Supplier Refunds",
+      "group": "settlement",
+      "route": "/treasury/settlement/supplier-refunds",
+      "columns": [
+        "Refund Ref",
+        "Supplier",
+        "Payment / Debit Ref",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Refund Ref",
+        "Date",
+        "Supplier",
+        "Payment / Debit Ref",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Bank Account",
+        "Reason",
+        "Status"
+      ]
+    },
+    {
+      "key": "payment-batches",
+      "name": "Payment Batches",
+      "group": "payments",
+      "route": "/treasury/payments/payment-batches",
+      "columns": [
+        "Batch No.",
+        "Date",
+        "Payments",
+        "Currency",
+        "Total Amount",
+        "Maker",
+        "Status"
+      ],
+      "fields": [
+        "Batch No.",
+        "Date",
+        "Payments",
+        "Currency",
+        "Total Amount",
+        "Maker",
+        "Checker",
+        "Release Ref",
+        "Status"
+      ]
+    },
+    {
+      "key": "payment-approval",
+      "name": "Payment Approval",
+      "group": "payments",
+      "route": "/treasury/payments/payment-approval",
+      "columns": [
+        "Approval Ref",
+        "Batch / Payment Ref",
+        "Amount",
+        "Currency",
+        "Maker",
+        "Checker",
+        "Status"
+      ],
+      "fields": [
+        "Approval Ref",
+        "Date",
+        "Batch / Payment Ref",
+        "Amount",
+        "Currency",
+        "Maker",
+        "Checker",
+        "Approval Level",
+        "Comments",
+        "Status"
+      ]
+    },
+    {
+      "key": "payment-release-control",
+      "name": "Payment Release Control",
+      "group": "payments",
+      "route": "/treasury/payments/payment-release-control",
+      "columns": [
+        "Release Ref",
+        "Batch / Payment Ref",
+        "Bank Account",
+        "Amount",
+        "Currency",
+        "Release Date",
+        "Status"
+      ],
+      "fields": [
+        "Release Ref",
+        "Batch / Payment Ref",
+        "Bank Account",
+        "Amount",
+        "Currency",
+        "Release Date",
+        "Approval Ref",
+        "Released By",
+        "Status"
+      ]
+    },
+    {
+      "key": "bank-transfer",
+      "name": "Bank Transfer",
+      "group": "payments",
+      "route": "/treasury/payments/bank-transfer",
+      "columns": [
+        "Transfer Ref",
+        "From Account",
+        "To Account",
+        "Date",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Transfer Ref",
+        "Date",
+        "From Account",
+        "To Account",
+        "Amount",
+        "Currency",
+        "FX Rate",
+        "Bank Reference",
+        "Narration",
+        "Status"
+      ]
+    },
+    {
+      "key": "inter-bank-transfer",
+      "name": "Inter-Bank Transfer",
+      "group": "payments",
+      "route": "/treasury/payments/inter-bank-transfer",
+      "columns": [
+        "Transfer Ref",
+        "From Bank",
+        "To Bank",
+        "Date",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Transfer Ref",
+        "Date",
+        "From Bank",
+        "To Bank",
+        "Amount",
+        "Currency",
+        "FX Rate",
+        "Bank Reference",
+        "Charges",
+        "Status"
+      ]
+    },
+    {
+      "key": "petty-cash",
+      "name": "Petty Cash",
+      "group": "cash-bank",
+      "route": "/treasury/cash-bank/petty-cash",
+      "columns": [
+        "Petty Cash Ref",
+        "Date",
+        "Office",
+        "Payee",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Petty Cash Ref",
+        "Date",
+        "Office",
+        "Payee",
+        "Job Ref",
+        "Purpose",
+        "Amount",
+        "Currency",
+        "Cash Account",
+        "Status"
+      ]
+    },
+    {
+      "key": "cash-denomination",
+      "name": "Cash Denomination",
+      "group": "cash-bank",
+      "route": "/treasury/cash-bank/cash-denomination",
+      "columns": [
+        "Count Ref",
+        "Date",
+        "Cash Account",
+        "Currency",
+        "Counted Total",
+        "Book Balance",
+        "Difference",
+        "Status"
+      ],
+      "fields": [
+        "Count Ref",
+        "Date",
+        "Cash Account",
+        "Currency",
+        "Denomination Detail",
+        "Counted Total",
+        "Book Balance",
+        "Difference",
+        "Counted By",
+        "Status"
+      ]
+    },
+    {
+      "key": "cheque-lifecycle",
+      "name": "Cheque Lifecycle",
+      "group": "cheques",
+      "route": "/treasury/cheques/cheque-lifecycle",
+      "columns": [
+        "Cheque No.",
+        "Bank Account",
+        "Party",
+        "Amount",
+        "Issue Date",
+        "Stage",
+        "Status"
+      ],
+      "fields": [
+        "Cheque No.",
+        "Bank Account",
+        "Party",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Issue Date",
+        "Delivery Date",
+        "Deposit Date",
+        "Clear Date",
+        "Stage",
+        "Status"
+      ]
+    },
+    {
+      "key": "post-dated-cheques",
+      "name": "Post-Dated Cheques",
+      "group": "cheques",
+      "route": "/treasury/cheques/post-dated-cheques",
+      "columns": [
+        "Cheque No.",
+        "Party",
+        "Cheque Date",
+        "Amount",
+        "Currency",
+        "Maturity Action",
+        "Status"
+      ],
+      "fields": [
+        "Cheque No.",
+        "Party",
+        "Job Ref",
+        "Cheque Date",
+        "Received / Issued",
+        "Bank",
+        "Amount",
+        "Currency",
+        "Maturity Action",
+        "Status"
+      ]
+    },
+    {
+      "key": "bounced-returned-cheques",
+      "name": "Bounced / Returned Cheques",
+      "group": "cheques",
+      "route": "/treasury/cheques/bounced-returned-cheques",
+      "columns": [
+        "Return Ref",
+        "Cheque No.",
+        "Party",
+        "Return Date",
+        "Amount",
+        "Reason",
+        "Status"
+      ],
+      "fields": [
+        "Return Ref",
+        "Cheque No.",
+        "Party",
+        "Job Ref",
+        "Return Date",
+        "Amount",
+        "Currency",
+        "Reason",
+        "Charge Amount",
+        "Recovery Status",
+        "Status"
+      ]
+    },
+    {
+      "key": "bank-charges",
+      "name": "Bank Charges",
+      "group": "cash-bank",
+      "route": "/treasury/cash-bank/bank-charges",
+      "columns": [
+        "Charge Ref",
+        "Date",
+        "Bank Account",
+        "Bank Ref",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Charge Ref",
+        "Date",
+        "Bank Account",
+        "Bank Ref",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Expense Account",
+        "Narration",
+        "Status"
+      ]
+    },
+    {
+      "key": "bank-interest",
+      "name": "Bank Interest",
+      "group": "cash-bank",
+      "route": "/treasury/cash-bank/bank-interest",
+      "columns": [
+        "Interest Ref",
+        "Date",
+        "Bank Account",
+        "Type",
+        "Amount",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Interest Ref",
+        "Date",
+        "Bank Account",
+        "Type",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Income / Expense Account",
+        "Narration",
+        "Status"
+      ]
+    },
+    {
+      "key": "cash-bank-position",
+      "name": "Cash / Bank Position",
+      "group": "reports",
+      "route": "/treasury/reports/cash-bank-position",
+      "columns": [
+        "Account Ref",
+        "Type",
+        "Currency",
+        "Available Balance",
+        "Reserved",
+        "Net Available",
+        "Status"
+      ],
+      "fields": [
+        "Account Ref",
+        "Type",
+        "Currency",
+        "Available Balance",
+        "Reserved",
+        "Net Available",
+        "Status"
+      ]
+    },
+    {
+      "key": "daily-liquidity",
+      "name": "Daily Liquidity",
+      "group": "reports",
+      "route": "/treasury/reports/daily-liquidity",
+      "columns": [
+        "Date",
+        "Currency",
+        "Opening",
+        "Expected Inflows",
+        "Expected Outflows",
+        "Closing",
+        "Status"
+      ],
+      "fields": [
+        "Date",
+        "Currency",
+        "Opening",
+        "Expected Inflows",
+        "Expected Outflows",
+        "Closing",
+        "Minimum Buffer",
+        "Variance To Buffer",
+        "Status"
+      ]
+    },
+    {
+      "key": "aging-collection-work-queue",
+      "name": "Aging-to-Collection Work Queue",
+      "group": "work-queues",
+      "route": "/treasury/work-queues/aging-collection-work-queue",
+      "columns": [
+        "Customer",
+        "Invoice Ref",
+        "Due Date",
+        "Days Overdue",
+        "Outstanding",
+        "Priority",
+        "Status"
+      ],
+      "fields": [
+        "Customer",
+        "Invoice Ref",
+        "Job Ref",
+        "Due Date",
+        "Days Overdue",
+        "Outstanding",
+        "Currency",
+        "Collector",
+        "Next Action",
+        "Priority",
+        "Status"
+      ]
+    },
+    {
+      "key": "payable-due-date-work-queue",
+      "name": "Payable Due-Date Work Queue",
+      "group": "work-queues",
+      "route": "/treasury/work-queues/payable-due-date-work-queue",
+      "columns": [
+        "Supplier",
+        "Bill Ref",
+        "Due Date",
+        "Days To Due",
+        "Outstanding",
+        "Priority",
+        "Status"
+      ],
+      "fields": [
+        "Supplier",
+        "Bill Ref",
+        "Job Ref",
+        "Due Date",
+        "Days To Due",
+        "Outstanding",
+        "Currency",
+        "Owner",
+        "Next Action",
+        "Priority",
+        "Status"
+      ]
+    },
+    {
+      "key": "customer-supplier-statement",
+      "name": "Customer / Supplier Statement",
+      "group": "reports",
+      "route": "/treasury/reports/customer-supplier-statement",
+      "columns": [
+        "Statement Ref",
+        "Party Type",
+        "Party",
+        "Period From",
+        "Period To",
+        "Balance",
+        "Status"
+      ],
+      "fields": [
+        "Statement Ref",
+        "Party Type",
+        "Party",
+        "Period From",
+        "Period To",
+        "Opening",
+        "Debit",
+        "Credit",
+        "Balance",
+        "Currency",
+        "Status"
+      ]
+    },
+    {
+      "key": "settlement-history",
+      "name": "Settlement History",
+      "group": "reports",
+      "route": "/treasury/reports/settlement-history",
+      "columns": [
+        "Settlement Ref",
+        "Type",
+        "Party",
+        "Job Ref",
+        "Amount",
+        "Currency",
+        "Date",
+        "Status"
+      ],
+      "fields": [
+        "Settlement Ref",
+        "Type",
+        "Party",
+        "Job Ref",
+        "Source Ref",
+        "Amount",
+        "Currency",
+        "FX Rate",
+        "Date",
+        "Voucher Ref",
+        "Status"
+      ]
+    },
+    {
+      "key": "unallocated-cash",
+      "name": "Unallocated Cash",
+      "group": "reports",
+      "route": "/treasury/reports/unallocated-cash",
+      "columns": [
+        "Receipt Ref",
+        "Party",
+        "Date",
+        "Amount",
+        "Allocated",
+        "Unallocated",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Receipt Ref",
+        "Party",
+        "Job Ref",
+        "Date",
+        "Amount",
+        "Allocated",
+        "Unallocated",
+        "Currency",
+        "Age Days",
+        "Status"
+      ]
+    },
+    {
+      "key": "unapplied-payments",
+      "name": "Unapplied Payments",
+      "group": "reports",
+      "route": "/treasury/reports/unapplied-payments",
+      "columns": [
+        "Payment Ref",
+        "Party",
+        "Date",
+        "Amount",
+        "Applied",
+        "Unapplied",
+        "Currency",
+        "Status"
+      ],
+      "fields": [
+        "Payment Ref",
+        "Party",
+        "Job Ref",
+        "Date",
+        "Amount",
+        "Applied",
+        "Unapplied",
+        "Currency",
+        "Age Days",
+        "Status"
+      ]
+    },
+    {
+      "key": "bank-reconciliation-exception-queue",
+      "name": "Bank Reconciliation Exception Queue",
+      "group": "work-queues",
+      "route": "/treasury/work-queues/bank-reconciliation-exception-queue",
+      "columns": [
+        "Exception Ref",
+        "Bank Account",
+        "Statement Ref",
+        "Date",
+        "Amount",
+        "Reason",
+        "Priority",
+        "Status"
+      ],
+      "fields": [
+        "Exception Ref",
+        "Bank Account",
+        "Statement Ref",
+        "Date",
+        "Amount",
+        "Currency",
+        "Reason",
