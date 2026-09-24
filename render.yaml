@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: m3-nvocc-api-prod
+    runtime: python
+    plan: free
+    region: frankfurt
+    autoDeploy: false
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: M3_ENV
+        value: production
+      - key: M3_PRODUCTION_TRAFFIC
+        value: "OFF"
+      - key: M3_LIVE_PROVIDERS
+        value: "OFF"
+      - key: REAL_MONEY
+        value: "OFF"
+      - key: DATABASE_URL
+        sync: false
+  - type: web
+    name: m3-nvocc-web-prod
+    runtime: python
+    plan: free
+    region: frankfurt
+    autoDeploy: false
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m http.server $PORT --directory app/static
+    envVars:
+      - key: M3_API_BASE_URL
+        sync: false
