@@ -1,0 +1,24 @@
+{
+  "modules": [
+    {"key":"integration-dashboard","name":"Integration Dashboard","route":"/finance-integration/dashboard","group":"OVERVIEW"},
+    {"key":"provider-adapters","name":"Provider Adapters","route":"/finance-integration/providers","group":"PROVIDERS"},
+    {"key":"connection-status","name":"Connection Status","route":"/finance-integration/connections","group":"PROVIDERS"},
+    {"key":"health-checks","name":"Health Checks","route":"/finance-integration/health","group":"PROVIDERS"},
+    {"key":"bank-statement-import","name":"Bank Statement Import","route":"/finance-integration/bank-statements","group":"SANDBOX FLOWS"},
+    {"key":"payment-files","name":"Payment Files","route":"/finance-integration/payment-files","group":"SANDBOX FLOWS"},
+    {"key":"payment-status-callbacks","name":"Payment Status Callbacks","route":"/finance-integration/payment-callbacks","group":"SANDBOX FLOWS"},
+    {"key":"fx-rate-feed","name":"FX Rate Feed","route":"/finance-integration/fx-feed","group":"SANDBOX FLOWS"},
+    {"key":"tax-wht-feed","name":"Tax / WHT Feed","route":"/finance-integration/tax-wht-feed","group":"SANDBOX FLOWS"},
+    {"key":"webhook-events","name":"Webhook Events","route":"/finance-integration/webhooks","group":"EVENT CONTROL"},
+    {"key":"retry-queue","name":"Retry Queue","route":"/finance-integration/retry-queue","group":"EVENT CONTROL"},
+    {"key":"dead-letter-queue","name":"Dead-Letter Queue","route":"/finance-integration/dead-letter","group":"EVENT CONTROL"},
+    {"key":"request-response-audit","name":"Request / Response Audit","route":"/finance-integration/audit","group":"EVENT CONTROL"},
+    {"key":"bank-reconciliation-import","name":"Bank Reconciliation Import","route":"/finance-integration/bank-reconciliation","group":"RECONCILIATION"},
+    {"key":"unmatched-bank-items","name":"Unmatched Bank Items","route":"/finance-integration/unmatched-bank","group":"RECONCILIATION"},
+    {"key":"failed-import-queue","name":"Failed Import Queue","route":"/finance-integration/failed-imports","group":"RECONCILIATION"},
+    {"key":"payment-release-safety","name":"Payment Release Safety","route":"/finance-integration/payment-safety","group":"SECURITY / CONTROL"},
+    {"key":"security-policies","name":"Security Policies","route":"/finance-integration/security-policies","group":"SECURITY / CONTROL"},
+    {"key":"security-audit-events","name":"Security Audit Events","route":"/finance-integration/security-audit","group":"SECURITY / CONTROL"},
+    {"key":"data-masking-secrets","name":"Data Masking / Secrets","route":"/finance-integration/data-masking","group":"SECURITY / CONTROL"}
+  ]
+}
