@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-030",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX029-IAM-FAILED-LOGIN-LOCKOUT-ENFORCEMENT-ACCEPTED",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "Disabled-User Session Revocation",
+    "defect": "Existing sessions remained valid after a user account was suspended or inactivated, and session validation did not check the current user status.",
+    "fix": "Session validation now rejects non-ACTIVE users and revokes that session immediately. Changing a user to SUSPENDED or INACTIVE revokes all of that user's active sessions and records the revoked-session count in the audit payload.",
+    "error_code": "USER_NOT_ACTIVE"
+  },
+  "evidence": {
+    "development_guard_run": 36185183241,
+    "tests_passed": 44,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
