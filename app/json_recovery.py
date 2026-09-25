@@ -7,12 +7,8 @@ from typing import Any
 
 
 def extract_array_objects(text: str, key: str) -> list[dict[str, Any]]:
-    """Recover complete object items from a named array in truncated JSON.
-
-    Only individually valid JSON objects that are fully present before the
-    truncation point are returned. Missing tail content is never invented.
-    """
-    m = re.search(r'"' + '"' + r'{}' + '"' + r'\s*:\s*\['.format(re.escape(key)), text)
+    """Recover only fully present object items from a named JSON array."""
+    m = re.search(rf'"{re.escape(key)}"\s*:\s*\[', text)
     if not m:
         return []
     i = m.end()
@@ -20,7 +16,7 @@ def extract_array_objects(text: str, key: str) -> list[dict[str, Any]]:
     in_string = False
     escape = False
     depth = 0
-    start = None
+    start: int | None = None
 
     while i < len(text):
         ch = text[i]
@@ -57,7 +53,11 @@ def extract_array_objects(text: str, key: str) -> list[dict[str, Any]]:
     return out
 
 
-def load_json_or_recover_arrays(path: Path, keys: list[str], scalars: dict[str, Any] | None = None) -> tuple[dict[str, Any], bool]:
+def load_json_or_recover_arrays(
+    path: Path,
+    keys: list[str],
+    scalars: dict[str, Any] | None = None,
+) -> tuple[dict[str, Any], bool]:
     text = path.read_text()
     try:
         value = json.loads(text)
@@ -72,10 +72,10 @@ def load_json_or_recover_arrays(path: Path, keys: list[str], scalars: dict[str, 
 
 
 def recover_string_scalar(text: str, key: str, default: str = '') -> str:
-    m = re.search(r'"' + '"' + r'{}' + '"' + r'\s*:\s*"([^"]*)"'.format(re.escape(key)), text)
+    m = re.search(rf'"{re.escape(key)}"\s*:\s*"([^"]*)"', text)
     return m.group(1) if m else default
 
 
 def recover_int_scalar(text: str, key: str, default: int = 0) -> int:
-    m = re.search(r'"' + '"' + r'{}' + '"' + r'\s*:\s*(\d+)'.format(re.escape(key)), text)
+    m = re.search(rf'"{re.escape(key)}"\s*:\s*(\d+)', text)
     return int(m.group(1)) if m else default
