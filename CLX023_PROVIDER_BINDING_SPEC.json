@@ -1,0 +1,71 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-023",
+  "status": "PROVIDER_CREDENTIAL_BINDING_PREP",
+  "parent_baseline": "M3-CLX022-LIVE-PROVIDER-CORE-READY-20260925-025",
+  "selected_technical_targets": {
+    "bank": {
+      "vendor": "TrueLayer",
+      "product": "Data API v3",
+      "sandbox_base_url": "https://api.truelayer-sandbox.com",
+      "production_base_url": "https://api.truelayer.com",
+      "auth": "OAuth2 client_credentials",
+      "required_env": [
+        "M3_TRUELAYER_CLIENT_ID",
+        "M3_TRUELAYER_CLIENT_SECRET",
+        "M3_TRUELAYER_DATA_BASE_URL"
+      ],
+      "notes": "Account/balance/transaction connectivity. No credentials stored in source."
+    },
+    "payment": {
+      "vendor": "TrueLayer",
+      "product": "Payments API v3",
+      "sandbox_base_url": "https://api.truelayer-sandbox.com",
+      "production_base_url": "https://api.truelayer.com",
+      "auth": "OAuth2 bearer plus signed POST requests",
+      "webhook": "TL-Signature JWS verified using allowlisted JWKS",
+      "required_env": [
+        "M3_TRUELAYER_CLIENT_ID",
+        "M3_TRUELAYER_CLIENT_SECRET",
+        "M3_TRUELAYER_SIGNING_PRIVATE_KEY",
+        "M3_TRUELAYER_SIGNING_KEY_ID",
+        "M3_TRUELAYER_PAYMENTS_BASE_URL",
+        "M3_TRUELAYER_WEBHOOK_JWKS_URL"
+      ],
+      "notes": "Real-money capable; activation remains blocked."
+    },
+    "fx": {
+      "vendor": "Open Exchange Rates",
+      "product": "Exchange Rates API",
+      "base_url": "https://openexchangerates.org/api",
+      "auth": "Authorization Token App ID",
+      "required_env": [
+        "M3_OXR_APP_ID",
+        "M3_OXR_BASE_URL"
+      ],
+      "notes": "Read-only reference rates; no funds movement."
+    },
+    "tax": {
+      "vendor": "Avalara",
+      "product": "AvaTax REST v2",
+      "sandbox_base_url": "https://sandbox-rest.avatax.com",
+      "production_base_url": "https://rest.avatax.com",
+      "auth": "Basic/provider credential authentication",
+      "health_path": "/api/v2/utilities/ping",
+      "required_env": [
+        "M3_AVALARA_ACCOUNT_ID",
+        "M3_AVALARA_LICENSE_KEY",
+        "M3_AVALARA_CLIENT_HEADER",
+        "M3_AVALARA_BASE_URL"
+      ],
+      "notes": "Transaction tax/VAT. General WHT remains internal/governed until jurisdiction-specific WHT API is selected."
+    }
+  },
+  "policy": {
+    "production_traffic": "ON",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "store_secret_values_in_repo": false,
+    "activate_external_providers": false
+  }
+}
