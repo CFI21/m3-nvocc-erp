@@ -1,4 +1,5 @@
 name: M3 CLX022 Live Provider Readiness
+# Router registration complete; this workflow validates the integrated runtime code.
 
 on:
   workflow_dispatch:
