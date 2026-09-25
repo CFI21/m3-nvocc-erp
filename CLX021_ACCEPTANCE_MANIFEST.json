@@ -1,0 +1,54 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-021",
+  "status": "FINAL_RELEASE_CANDIDATE",
+  "date": "2026-09-25",
+  "parent_baseline": "M3-CLX020-OPERATIONAL-HARDENING-ACCEPTED-20260925-022",
+  "safety": {
+    "production_traffic": "OFF",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "live_cutover_authorized": false
+  },
+  "web": {
+    "render_service_id": "srv-darbgkvlk1mc738rohng",
+    "url": "https://m3-nvocc-web-latest.onrender.com",
+    "image": "ghcr.io/cfi21/m3-nvocc-web:latest",
+    "image_digest": "sha256:cf5cf670585198275853d22077eec33b983c5cd4ce1416a2cb0482930bffa9ab",
+    "source_commit": "089b4e53f549bce8cadab32b5c471b88ab14ef68",
+    "region": "frankfurt",
+    "plan": "free",
+    "health_endpoint": "/healthz"
+  },
+  "api": {
+    "render_service_id": "srv-dar9fh17lnhs73ahlh60",
+    "url": "https://m3-nvocc-api-latest-1.onrender.com",
+    "image": "ghcr.io/cfi21/m3-nvocc-api:latest",
+    "image_digest": "sha256:8dea48fe4fae0e821304cabffa4224e1ec77a511e2d44984b377ee5a07197c43",
+    "source_commit": "23c4703a31bd86ea5164e4e24155ba6e11413122",
+    "region": "frankfurt",
+    "plan": "free",
+    "health_endpoint": "/api/v1/health"
+  },
+  "database": {
+    "provider": "Supabase",
+    "project_name": "M3-NVOCC-PROD",
+    "project_ref": "ozupgknqaqgvprliewxe",
+    "backend": "postgres",
+    "jobs": ["50001", "50002", "50003", "50004", "50005"]
+  },
+  "screens": {
+    "total": 193,
+    "agent_tasks": 19,
+    "gl_accounts": 47,
+    "treasury_ar_ap": 37,
+    "integration_security": 20,
+    "administration": 28,
+    "master_data": 42
+  },
+  "acceptance_runs": {
+    "clx018": 36172430108,
+    "clx019": 36172845049,
+    "clx020": 36172993041
+  }
+}
