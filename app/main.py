@@ -302,9 +302,14 @@ def clx016_readiness():
     return result
 @app.get('/api/clx010/health')
 def clx010_health(): return {'project':'M3 NVOCC ERP','baseline':'M3-CLX010-ACCEPTED-20260924-012F','parent':'M3-CLX009-ACCEPTED-20260924-011','database':backend_name(),'production_promoted':False,'sandbox_only':True,'live_credentials':False,'real_money_movement':False,'admin_screens':28,'master_domains':29}
+def test_data_reset_allowed():
+    return backend_name()!='postgres' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='ON'
+
 @app.post('/api/v1/admin/reset-test-data')
 def reset(x_role:str=Header('VIEWER')):
     if x_role.upper()!='ADMIN': raise HTTPException(403,'ADMIN only')
+    if not test_data_reset_allowed():
+        raise HTTPException(403,'TEST_DATA_RESET_DISABLED_IN_PRODUCTION')
     seed_run(True); admin_seed_run(); masterdata_seed_run(); return {'ok':True}
 @app.get('/api/v1/modules')
 def modules(): return list(MODULES.values())
