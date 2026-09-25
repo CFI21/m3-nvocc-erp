@@ -144,7 +144,7 @@ def validate_fields(module,job,fields):
             if not fields.get('Child B/L 1') or not fields.get('Child B/L 2') or fields.get('Child B/L 1')==fields.get('Child B/L 2'): errs.append('INVALID_CHILD_BL_SET')
         except Exception: errs.append('INVALID_SPLIT_ALLOCATION')
     if module=='container-activity' and fields.get('Container') and fields.get('Container')!=job.get('container_no',fields.get('Container')):
-        pass
+        errs.append('CONTAINER_JOB_MISMATCH')
     return errs
 
 def job_context(conn,jr):
