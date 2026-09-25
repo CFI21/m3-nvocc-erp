@@ -64,6 +64,19 @@ def register_failed_login(c,user,ts):
     c.execute('UPDATE iam_users SET failed_attempts=?,locked_until=? WHERE id=?',(attempts,locked_until,user['id']))
     return attempts,locked_until
 
+def parse_ts(value):
+    dt=datetime.datetime.fromisoformat(str(value).replace('Z','+00:00'))
+    return dt if dt.tzinfo else dt.replace(tzinfo=datetime.timezone.utc)
+
+def session_expiry_reason(c,s,at=None):
+    at=at or datetime.datetime.now(datetime.timezone.utc)
+    if parse_ts(s['expires_at'])<=at:
+        return 'ABSOLUTE_TIMEOUT'
+    idle_minutes=max(1,int(policy(c,'session_idle_minutes','30')))
+    if parse_ts(s['last_seen_at'])+datetime.timedelta(minutes=idle_minutes)<=at:
+        return 'IDLE_TIMEOUT'
+    return None
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','screens':ADMIN_SCREENS,'screen_count':len(ADMIN_SCREENS),'deny_by_default':True,'mfa_sso_readiness':True}
 @router.get('/overview')
@@ -99,7 +112,11 @@ def login(b:Login):
 def session(c,token):
     if not token:raise HTTPException(401,{'code':'SESSION_REQUIRED'})
     s=c.execute('''SELECT s.*,u.user_ref,u.username,u.status user_status,u.home_office_id,o.office_code FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id WHERE s.session_token=?''',(token,)).fetchone()
-    if not s or s['status']!='ACTIVE' or s['revoked_at'] or s['expires_at']<now():raise HTTPException(401,{'code':'SESSION_INVALID'})
+    if not s or s['status']!='ACTIVE' or s['revoked_at']:raise HTTPException(401,{'code':'SESSION_INVALID'})
+    expiry=session_expiry_reason(c,s)
+    if expiry:
+        c.execute("UPDATE iam_sessions SET status='EXPIRED',revoked_at=? WHERE id=? AND status='ACTIVE'",(now(),s['id']))
+        raise HTTPException(401,{'code':'SESSION_EXPIRED','reason':expiry})
     if s['user_status']!='ACTIVE':
         c.execute("UPDATE iam_sessions SET status='REVOKED',revoked_at=? WHERE id=? AND status='ACTIVE'",(now(),s['id']))
         raise HTTPException(401,{'code':'USER_NOT_ACTIVE'})
