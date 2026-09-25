@@ -41,6 +41,29 @@ def sandbox_mfa_valid(code):
     expected=os.getenv('M3_SANDBOX_MFA_CODE','123456')
     return bool(code and secrets.compare_digest(code,expected))
 
+def account_locked(user, at=None):
+    locked_until=user.get('locked_until') if hasattr(user,'get') else user['locked_until']
+    if not locked_until: return False
+    at=at or datetime.datetime.now(datetime.timezone.utc)
+    try:
+        until=datetime.datetime.fromisoformat(str(locked_until).replace('Z','+00:00'))
+        if until.tzinfo is None: until=until.replace(tzinfo=datetime.timezone.utc)
+        return until>at
+    except Exception:
+        return True
+
+def register_failed_login(c,user,ts):
+    attempts=int(user['failed_attempts'] or 0)+1
+    max_attempts=max(1,int(policy(c,'max_failed_attempts','5')))
+    locked_until=None
+    if attempts>=max_attempts:
+        minutes=max(1,int(policy(c,'lockout_minutes','15')))
+        base=datetime.datetime.fromisoformat(ts.replace('Z','+00:00'))
+        if base.tzinfo is None: base=base.replace(tzinfo=datetime.timezone.utc)
+        locked_until=(base+datetime.timedelta(minutes=minutes)).isoformat()
+    c.execute('UPDATE iam_users SET failed_attempts=?,locked_until=? WHERE id=?',(attempts,locked_until,user['id']))
+    return attempts,locked_until
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','screens':ADMIN_SCREENS,'screen_count':len(ADMIN_SCREENS),'deny_by_default':True,'mfa_sso_readiness':True}
 @router.get('/overview')
@@ -49,9 +72,20 @@ def overview():
 @router.post('/auth/login')
 def login(b:Login):
     c=connect(); u=c.execute('SELECT u.*,o.office_code FROM iam_users u JOIN iam_offices o ON o.id=u.home_office_id WHERE username=?',(b.username,)).fetchone(); ts=now(); event=str(uuid.uuid4())
+    if u and account_locked(u):
+        h=ih(event+ts+b.username+'LOCKED')
+        c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','FAIL','{"reason":"ACCOUNT_LOCKED"}',h))
+        c.close()
+        raise HTTPException(423,{'code':'ACCOUNT_LOCKED'})
     if not u or u['status']!='ACTIVE' or u['password_hash']!=phash(b.password):
-        if u:c.execute('UPDATE iam_users SET failed_attempts=failed_attempts+1 WHERE id=?',(u['id'],))
-        h=ih(event+ts+b.username+'FAIL'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'] if u else None,'LOGIN','FAIL','{"reason":"INVALID_CREDENTIALS"}',h)); c.close(); raise HTTPException(401,{'code':'INVALID_CREDENTIALS'})
+        if u:
+            attempts,locked_until=register_failed_login(c,u,ts)
+            detail=json.dumps({'reason':'INVALID_CREDENTIALS','attempts':attempts,'locked':bool(locked_until)})
+        else:
+            detail='{"reason":"INVALID_CREDENTIALS"}'
+        h=ih(event+ts+b.username+'FAIL'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'] if u else None,'LOGIN','FAIL',detail,h)); c.close()
+        if u and locked_until: raise HTTPException(423,{'code':'ACCOUNT_LOCKED'})
+        raise HTTPException(401,{'code':'INVALID_CREDENTIALS'})
     if u['mfa_required']:
         if not sandbox_mfa_allowed():
             h=ih(event+ts+b.username+'MFA_BLOCKED')
@@ -61,7 +95,7 @@ def login(b:Login):
         if not sandbox_mfa_valid(b.mfa_code):
             c.close()
             raise HTTPException(401,{'code':'MFA_REQUIRED'})
-    token=secrets.token_urlsafe(24); exp=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=int(policy(c,'session_minutes','60')))).isoformat(); c.execute('INSERT INTO iam_sessions(session_token,user_id,created_at,expires_at,last_seen_at,mfa_verified,status) VALUES(?,?,?,?,?,?,?)',(token,u['id'],ts,exp,ts,1,'ACTIVE')); c.execute('UPDATE iam_users SET failed_attempts=0,last_login_at=? WHERE id=?',(ts,u['id'])); h=ih(event+ts+b.username+'PASS'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','PASS','{}',h)); out={'session_token':token,'user_ref':u['user_ref'],'username':u['username'],'office':u['office_code'],'roles':[x['role_code'] for x in roles_for(c,u['id'])],'mfa_verified':True,'expires_at':exp}; c.close(); return out
+    token=secrets.token_urlsafe(24); exp=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=int(policy(c,'session_minutes','60')))).isoformat(); c.execute('INSERT INTO iam_sessions(session_token,user_id,created_at,expires_at,last_seen_at,mfa_verified,status) VALUES(?,?,?,?,?,?,?)',(token,u['id'],ts,exp,ts,1,'ACTIVE')); c.execute('UPDATE iam_users SET failed_attempts=0,locked_until=NULL,last_login_at=? WHERE id=?',(ts,u['id'])); h=ih(event+ts+b.username+'PASS'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','PASS','{}',h)); out={'session_token':token,'user_ref':u['user_ref'],'username':u['username'],'office':u['office_code'],'roles':[x['role_code'] for x in roles_for(c,u['id'])],'mfa_verified':True,'expires_at':exp}; c.close(); return out
 def session(c,token):
     if not token:raise HTTPException(401,{'code':'SESSION_REQUIRED'})
     s=c.execute('''SELECT s.*,u.user_ref,u.username,u.home_office_id,o.office_code FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id WHERE s.session_token=?''',(token,)).fetchone()
