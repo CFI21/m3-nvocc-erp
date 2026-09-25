@@ -1,0 +1,18 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-022",
+  "status": "AUTONOMOUS_DEVELOPMENT_BASELINE",
+  "branch": "develop/clx022-autonomous",
+  "parent_production_baseline": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "production": {
+    "traffic": "ON",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "release_branch": "release/clx021-final-20260925",
+    "release_commit": "a94d1002c7d9d41a21c6e4e9a7be8b2939179fc5",
+    "api_digest": "sha256:8dea48fe4fae0e821304cabffa4224e1ec77a511e2d44984b377ee5a07197c43",
+    "web_digest": "sha256:cf5cf670585198275853d22077eec33b983c5cd4ce1416a2cb0482930bffa9ab"
+  },
+  "promotion": "MANUAL_CONTROLLED_ONLY",
+  "ancline": "DO_NOT_TOUCH"
+}
