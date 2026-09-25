@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-031",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX030-DISABLED-USER-SESSION-REVOCATION-ACCEPTED",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "IAM Idle and Absolute Session Timeout Enforcement",
+    "defect": "IAM tracked last_seen_at and absolute expires_at, but only absolute expiry was enforced and stale sessions could remain ACTIVE.",
+    "fix": "Enforce both absolute session expiry and a configurable session_idle_minutes policy, mark timed-out sessions EXPIRED, and reject stale tokens with an explicit timeout reason.",
+    "error_code": "SESSION_EXPIRED"
+  },
+  "evidence": {
+    "development_guard_run": 36185462145,
+    "tests_passed": 48,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
