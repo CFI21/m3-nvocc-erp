@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-027",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX026-PRODUCTION-TEST-DATA-RESET-GUARD-ACCEPTED",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "Production Hard-Delete Guard",
+    "defect": "An ADMIN could permanently delete transaction_records through the primary API while production traffic was live.",
+    "fix": "Disable hard transaction deletion whenever the backend is PostgreSQL or production traffic is ON. Preserve cancel/reverse actions as the production-safe lifecycle path.",
+    "error_code": "HARD_DELETE_DISABLED_IN_PRODUCTION"
+  },
+  "evidence": {
+    "development_guard_run": 36181341306,
+    "tests_passed": 30,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
