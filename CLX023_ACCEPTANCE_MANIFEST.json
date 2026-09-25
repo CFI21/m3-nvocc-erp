@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-023",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX022-AUTONOMOUS-DEVELOPMENT-BASELINE",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "Container Activity Job-Container Integrity",
+    "defect": "Container mismatch condition was detected but silently ignored.",
+    "fix": "Reject container-activity payloads whose explicit Container does not match the container bound to the selected job.",
+    "error_code": "CONTAINER_JOB_MISMATCH"
+  },
+  "evidence": {
+    "development_guard_run": 36178963338,
+    "tests_passed": 14,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
