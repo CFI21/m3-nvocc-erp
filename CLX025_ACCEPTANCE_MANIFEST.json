@@ -35,8 +35,9 @@
   "runtime": {
     "api_deploy": "dep-daretul9fdbs739as230",
     "api_image": "sha256:79022958dfe92c96debe6ae572f5c311c601707e1af61df89cf52640f805c86f",
-    "web_deploy": "dep-dareu3d9fdbs739asqhg",
-    "web_image": "sha256:78ab70f4b8b858674b098fd55559e76273254f12bb818efc242fa787467d40f0"
+    "web_deploy": "dep-darev7p7lnhs73d4ib1g",
+    "web_image": "sha256:db7e20240794929cad48ea8ff4822b09e6796f44bf61e479d707f6a334dd264b",
+    "web_ui_uat_token_prompt_removed": true
   },
   "uat": {
     "workflow_run": 36194621523,
@@ -56,5 +57,6 @@
     "treasury_records": 185,
     "integration_records": 100
   },
-  "screen_catalog_preserved": 193
+  "screen_catalog_preserved": 193,
+  "final_web_commit": "8b3ef96ed16c09df2e543c9d4cd82dcac5af328a"
 }
