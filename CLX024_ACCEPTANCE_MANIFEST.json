@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-024",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX023-CONTAINER-INTEGRITY-ACCEPTED",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "Runtime Health State Accuracy",
+    "defect": "The primary /api/v1/health endpoint still hard-coded the old pre-production state even after controlled production traffic cutover.",
+    "fix": "Report production traffic, provider state, real-money state, production_promoted, sandbox_only and external execution flags dynamically from runtime environment controls while preserving the existing health keys.",
+    "api_contract": "Additive/compatible: existing keys retained; stale values corrected; production_traffic/live_providers/real_money exposed explicitly."
+  },
+  "evidence": {
+    "development_guard_run": 36179287684,
+    "tests_passed": 17,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
