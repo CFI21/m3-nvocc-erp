@@ -98,8 +98,11 @@ def login(b:Login):
     token=secrets.token_urlsafe(24); exp=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=int(policy(c,'session_minutes','60')))).isoformat(); c.execute('INSERT INTO iam_sessions(session_token,user_id,created_at,expires_at,last_seen_at,mfa_verified,status) VALUES(?,?,?,?,?,?,?)',(token,u['id'],ts,exp,ts,1,'ACTIVE')); c.execute('UPDATE iam_users SET failed_attempts=0,locked_until=NULL,last_login_at=? WHERE id=?',(ts,u['id'])); h=ih(event+ts+b.username+'PASS'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','PASS','{}',h)); out={'session_token':token,'user_ref':u['user_ref'],'username':u['username'],'office':u['office_code'],'roles':[x['role_code'] for x in roles_for(c,u['id'])],'mfa_verified':True,'expires_at':exp}; c.close(); return out
 def session(c,token):
     if not token:raise HTTPException(401,{'code':'SESSION_REQUIRED'})
-    s=c.execute('''SELECT s.*,u.user_ref,u.username,u.home_office_id,o.office_code FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id WHERE s.session_token=?''',(token,)).fetchone()
+    s=c.execute('''SELECT s.*,u.user_ref,u.username,u.status user_status,u.home_office_id,o.office_code FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id WHERE s.session_token=?''',(token,)).fetchone()
     if not s or s['status']!='ACTIVE' or s['revoked_at'] or s['expires_at']<now():raise HTTPException(401,{'code':'SESSION_INVALID'})
+    if s['user_status']!='ACTIVE':
+        c.execute("UPDATE iam_sessions SET status='REVOKED',revoked_at=? WHERE id=? AND status='ACTIVE'",(now(),s['id']))
+        raise HTTPException(401,{'code':'USER_NOT_ACTIVE'})
     c.execute('UPDATE iam_sessions SET last_seen_at=? WHERE id=?',(now(),s['id'])); return s
 
 @router.get('/users')
@@ -111,7 +114,12 @@ def set_user_status(username:str,b:UserStatus,x_m3_session:Optional[str]=Header(
     if not permission(c,s['user_id'],'identity','admin',s['office_code']): c.close(); raise HTTPException(403,{'code':'PERMISSION_DENIED'})
     u=c.execute('SELECT * FROM iam_users WHERE username=?',(username,)).fetchone()
     if not u: c.close(); raise HTTPException(404,'User not found')
-    before={'status':u['status'],'version':u['version']}; c.execute('UPDATE iam_users SET status=?,version=version+1 WHERE id=?',(b.status,u['id'])); audit(c,s['user_ref'],'USER_STATUS','USER',u['user_ref'],before,{'status':b.status}); c.close(); return {'status':b.status,'user_ref':u['user_ref']}
+    before={'status':u['status'],'version':u['version']}; c.execute('UPDATE iam_users SET status=?,version=version+1 WHERE id=?',(b.status,u['id']))
+    revoked=0
+    if b.status!='ACTIVE':
+        cur=c.execute("UPDATE iam_sessions SET status='REVOKED',revoked_at=? WHERE user_id=? AND status='ACTIVE' AND revoked_at IS NULL",(now(),u['id']))
+        revoked=cur.rowcount
+    audit(c,s['user_ref'],'USER_STATUS','USER',u['user_ref'],before,{'status':b.status,'sessions_revoked':revoked}); c.close(); return {'status':b.status,'user_ref':u['user_ref'],'sessions_revoked':revoked}
 @router.get('/roles')
 def roles(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_roles ORDER BY id')];c.close();return x
 @router.get('/permissions')
