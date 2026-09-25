@@ -1,0 +1,97 @@
+name: M3 CLX022 Runtime UAT
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx022-runtime-uat.yml"
+
+jobs:
+  runtime-uat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Live-provider gated runtime UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          curl --fail --silent --show-error "$API/api/v1/live-providers/readiness"             -H "X-Role: AUDITOR" -o /tmp/readiness.json
+
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/readiness.json'))
+          assert d['project']=='M3 NVOCC ERP'
+          assert d['phase']=='CLX-022'
+          assert d['production_traffic']=='ON'
+          assert d['live_providers']=='OFF'
+          assert d['real_money']=='OFF'
+          assert d['live_credentials_exposed'] is False
+          assert d['external_activation_performed'] is False
+          assert d['all_provider_cores_ready'] is True
+          assert len(d['providers'])==4
+          for p in d['providers']:
+              assert p['enabled'] is False
+              assert p['activation_ready'] is False
+              assert 'LIVE_PROVIDERS_SWITCH_OFF' in p['activation_blockers']
+          print('CLX022_READINESS_GATE_PASS')
+          PY
+
+          curl --fail --silent --show-error -X POST "$API/api/v1/live-providers/fx-primary/sandbox-test"             -H "X-Role: ADMIN" -H "Content-Type: application/json"             -d '{"mode":"failure","event_type":"CLX022_FAILURE_UAT","payload":{"token":"never-store-me","amount":123.45},"idempotency_key":"clx022-uat-dlq-001"}'             -o /tmp/failure.json
+
+          EVENT_REF="$(python - <<'PY'
+          import json
+          d=json.load(open('/tmp/failure.json'))
+          assert d['status']=='RETRY'
+          assert d['sandbox_only'] is True
+          print(d['event_ref'])
+          PY
+          )"
+
+          curl --fail --silent --show-error -X POST "$API/api/v1/live-providers/fx-primary/sandbox-retry/$EVENT_REF?force_success=false"             -H "X-Role: ADMIN" -o /tmp/retry2.json
+          curl --fail --silent --show-error -X POST "$API/api/v1/live-providers/fx-primary/sandbox-retry/$EVENT_REF?force_success=false"             -H "X-Role: ADMIN" -o /tmp/retry3.json
+
+          python - <<'PY'
+          import json
+          a=json.load(open('/tmp/retry2.json'))
+          b=json.load(open('/tmp/retry3.json'))
+          assert a['status']=='RETRY'
+          assert b['status']=='DEAD_LETTER'
+          assert b['attempt_count']==3
+          print('CLX022_RETRY_DLQ_PASS')
+          PY
+
+          curl --fail --silent --show-error -X POST "$API/api/v1/live-providers/fx-primary/sandbox-test"             -H "X-Role: ADMIN" -H "Content-Type: application/json"             -d '{"mode":"success","event_type":"CLX022_IDEMPOTENCY_UAT","payload":{"reference":"same"},"idempotency_key":"clx022-uat-idem-001"}'             -o /tmp/idem1.json
+          curl --fail --silent --show-error -X POST "$API/api/v1/live-providers/fx-primary/sandbox-test"             -H "X-Role: ADMIN" -H "Content-Type: application/json"             -d '{"mode":"success","event_type":"CLX022_IDEMPOTENCY_UAT","payload":{"reference":"same"},"idempotency_key":"clx022-uat-idem-001"}'             -o /tmp/idem2.json
+
+          python - <<'PY'
+          import json
+          a=json.load(open('/tmp/idem1.json'))
+          b=json.load(open('/tmp/idem2.json'))
+          assert a['status']=='DELIVERED'
+          assert b['duplicate'] is True
+          assert b['event_ref']==a['event_ref']
+          print('CLX022_IDEMPOTENCY_PASS')
+          PY
+
+          code="$(curl --silent --output /tmp/callback.json --write-out '%{http_code}' -X POST             "$API/api/v1/live-providers/callbacks/fx-primary"             -H "X-Provider-Event-Id: clx022-callback-001"             -H "X-Provider-Signature: deliberately-invalid"             -H "Content-Type: application/json"             -d '{"event":"test"}')"
+          test "$code" = "423"
+
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/callback.json'))
+          assert d['detail']['code']=='LIVE_PROVIDER_CALLBACK_LOCKED'
+          assert 'LIVE_PROVIDERS_SWITCH_OFF' in d['detail']['blockers']
+          print('CLX022_CALLBACK_HARD_STOP_PASS')
+          PY
+
+          curl --fail --silent --show-error "$API/api/v1/live-providers/fx-primary/activation-gate"             -H "X-Role: AUDITOR" -o /tmp/gate.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/gate.json'))
+          assert d['ready'] is False
+          assert d['external_call_performed'] is False
+          assert d['real_money_movement'] is False
+          print('CLX022_ACTIVATION_GATE_PASS')
+          PY
