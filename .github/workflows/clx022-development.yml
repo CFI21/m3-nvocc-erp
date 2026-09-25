@@ -24,7 +24,7 @@ jobs:
           PYTHONPATH: .
         run: |
           python -m py_compile app/*.py
-          pytest -q tests/test_clx016_postgres_adapter.py tests/test_clx019_catalog_roles.py
+          pytest -q tests
 
       - name: Enforce production isolation
         shell: bash
