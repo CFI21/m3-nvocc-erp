@@ -11,16 +11,18 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify web, proxy, API readiness and traffic lock
+      - name: Verify web, direct API, CORS, PostgreSQL readiness and traffic lock
         shell: bash
         run: |
           set -euo pipefail
           WEB="https://m3-nvocc-web-latest.onrender.com"
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          ORIGIN="https://m3-nvocc-web-latest.onrender.com"
 
-          curl --fail --silent --show-error "$WEB/healthz" -o /tmp/web-health.json
-          curl --fail --silent --show-error "$WEB/api/v1/health" -o /tmp/api-health.json
-          curl --fail --silent --show-error "$WEB/api/clx016/readiness" -o /tmp/readiness.json
-          curl --fail --silent --show-error "$WEB/" -o /tmp/index.html
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$WEB/healthz" -o /tmp/web-health.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$API/api/v1/health" -o /tmp/api-health.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$API/api/clx016/readiness" -o /tmp/readiness.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$WEB/" -o /tmp/index.html
 
           python - <<'PY'
           import json
@@ -43,13 +45,25 @@ jobs:
           assert r['real_money']=='OFF', r
           assert r['ready'] is True, r
           assert 'CLX-018' in html
-          assert "const M3_API_BASE='';" in html
+          assert "const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';" in html
           print('WEB_HEALTH_PASS')
-          print('WEB_API_PROXY_PASS')
+          print('DIRECT_API_PASS')
           print('POSTGRES_READINESS_PASS')
           PY
 
-          code="$(curl --silent --output /tmp/locked.json --write-out '%{http_code}' "$WEB/api/v1/modules")"
+          curl --silent --show-error --fail -D /tmp/cors.headers -o /tmp/cors.body \
+            -X OPTIONS "$API/api/v1/modules" \
+            -H "Origin: $ORIGIN" \
+            -H "Access-Control-Request-Method: GET" \
+            -H "Access-Control-Request-Headers: x-m3-uat-token,x-role"
+
+          python - <<'PY'
+          h=open('/tmp/cors.headers').read().lower()
+          assert 'access-control-allow-origin: https://m3-nvocc-web-latest.onrender.com' in h, h
+          print('CORS_EXACT_ORIGIN_PASS')
+          PY
+
+          code="$(curl --silent --output /tmp/locked.json --write-out '%{http_code}' "$API/api/v1/modules")"
           test "$code" = "503"
           python - <<'PY'
           import json
