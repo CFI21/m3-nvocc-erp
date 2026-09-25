@@ -105,6 +105,7 @@ _LASTROWID_TABLES = {
     'gl_bank_statement_items', 'treasury_records', 'treasury_batches',
     'treasury_payment_batches',
     'integration_events', 'bank_import_batches', 'sandbox_payment_requests',
+    'provider_live_events', 'provider_live_attempts', 'provider_callback_receipts',
     'clx012_runs', 'clx012_stage_events', 'clx012_exceptions',
     'clx012_action_queue', 'clx012_events',
 }
