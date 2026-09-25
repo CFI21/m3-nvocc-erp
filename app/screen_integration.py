@@ -4,23 +4,11 @@ from pathlib import Path
 from typing import Optional, Any
 import json, datetime, uuid
 from .db import connect
-from .json_recovery import load_json_or_recover_arrays, recover_string_scalar, recover_int_scalar
+from .screen_catalog import build_catalog
 
 HERE=Path(__file__).resolve().parent
-_SCREEN_META_PATH=HERE/'screen_integration_meta.json'
-_SCREEN_META_TEXT=_SCREEN_META_PATH.read_text()
-CATALOG, META_RECOVERED = load_json_or_recover_arrays(
-    _SCREEN_META_PATH,
-    ['screens','menu'],
-    scalars={
-        'project': recover_string_scalar(_SCREEN_META_TEXT,'project','M3 NVOCC ERP'),
-        'baseline': recover_string_scalar(_SCREEN_META_TEXT,'baseline',''),
-        'parent': recover_string_scalar(_SCREEN_META_TEXT,'parent',''),
-        'screen_count': recover_int_scalar(_SCREEN_META_TEXT,'screen_count',0),
-    },
-)
-CATALOG.setdefault('screens',[])
-CATALOG.setdefault('menu',[])
+CATALOG=build_catalog()
+META_RECOVERED=True
 SCREENS={s['screen_id']:s for s in CATALOG['screens']}
 BASELINE=CATALOG['baseline']
 PARENT=CATALOG['parent']
@@ -112,7 +100,7 @@ def health():
 
 @router.get('/menu')
 def menu(q:Optional[str]=None):
-    if not q: return {'screen_count':193,'menu':CATALOG['menu']}
+    if not q: return {'screen_count':len(SCREENS),'menu':CATALOG['menu']}
     q=q.lower().strip();screen_ids={s['screen_id'] for s in CATALOG['screens'] if q in s['name'].lower() or q in s['domain'].lower() or q in s['submenu'].lower()}
     out=[]
     for d in CATALOG['menu']:
