@@ -56,3 +56,28 @@ Supabase project ref: `ozupgknqaqgvprliewxe`
 **READY FOR CONTROLLED RENDER API DEPLOYMENT / UAT.**
 
 This is not a production cutover approval. Production traffic, live providers and real-money execution remain OFF.
+
+
+## Final pre-deploy verification update — 2026-09-25
+
+Additional compatibility defect found and fixed before Render deployment:
+- PostgreSQL rejects SQLite-style `ROUND(real, 2)`; adapter now casts 2-argument ROUND values to `numeric` while preserving scale.
+- Direct M3 PostgreSQL checks PASS for AR aging, AP aging, supplier payables, credit control, GL trial balance and Treasury net-available calculations.
+- GL `json_set` write-through equivalent tested inside a transaction; rollback confirmed **0** persisted CLX016 test rows.
+- `ON CONFLICT DO NOTHING` compatibility tested under rollback.
+
+Traffic protection added:
+- With `M3_PRODUCTION_TRAFFIC=OFF`, normal ERP requests return `PRODUCTION_TRAFFIC_LOCKED`.
+- Health/readiness endpoints remain available.
+- Controlled UAT can be enabled only with a matching secret `X-M3-UAT-Token` / `M3_UAT_TOKEN`.
+- New `/api/clx016/readiness` checks approved project ref, database health, jobs 50001–50005 and all safety flags.
+
+GitHub pre-deploy CI:
+- Workflow: **CLX016 Predeploy Gate**
+- Run: **36105225026**
+- Application compilation: **PASS**
+- Dependency installation including psycopg: **PASS**
+- PostgreSQL adapter gate tests: **PASS**
+- Job conclusion: **SUCCESS**
+
+**Pre-deploy source gate: PASS.**
