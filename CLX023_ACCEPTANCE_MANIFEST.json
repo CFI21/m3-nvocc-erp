@@ -1,0 +1,37 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-023",
+  "status": "PROVIDER_BINDING_READY",
+  "date": "2026-09-25",
+  "parent_baseline": "M3-CLX022-LIVE-PROVIDER-CORE-READY-20260925-025",
+  "selected_technical_targets": {
+    "bank": "TrueLayer Data API v3",
+    "payment": "TrueLayer Payments API v3",
+    "fx": "Open Exchange Rates",
+    "tax": "Avalara AvaTax REST v2",
+    "wht": "M3 internal governed WHT logic until a jurisdiction-specific external WHT provider is selected"
+  },
+  "safety": {
+    "production_traffic": "ON",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "enabled_live_providers": 0,
+    "secret_values_committed": false,
+    "external_provider_activation_performed": false,
+    "real_money_movement": false
+  },
+  "acceptance": {
+    "provider_mapping_connectivity_run": 36189505965,
+    "runtime_acceptance_run": 36189581498,
+    "provider_configs": 4,
+    "jobs_50001_50005": 5,
+    "transaction_records": 95,
+    "gl_records": 280,
+    "treasury_records": 185,
+    "integration_records": 100,
+    "jobs_hash": "07e0b3c7dfa25c6ac6e9aa70d99ec272",
+    "transaction_hash": "eb640e1a5ce29844dd7dd1ed6ad750fd",
+    "critical_runtime_errors": 0
+  },
+  "next_gate": "BIND USER-OWNED SANDBOX CREDENTIALS/ACCOUNT IDS WITHOUT EXPOSING VALUES; RUN AUTHENTICATED SANDBOX TESTS; DO NOT ACTIVATE LIVE PROVIDERS OR REAL MONEY"
+}
