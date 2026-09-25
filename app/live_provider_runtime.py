@@ -96,7 +96,7 @@ def activation_blockers(row: dict[str, Any]) -> list[str]:
         blockers.append("ENDPOINT_NOT_CONFIGURED")
     if not env_present(row["credential_env"]):
         blockers.append("CREDENTIAL_NOT_CONFIGURED")
-    if not env_present(row["webhook_secret_env"]):
+    if row.get("webhook_secret_env") and not env_present(row["webhook_secret_env"]):
         blockers.append("WEBHOOK_SECRET_NOT_CONFIGURED")
     if int(row["real_money_capable"]) and not real_money_on():
         blockers.append("REAL_MONEY_SWITCH_OFF")
@@ -139,7 +139,7 @@ def readiness(x_role: str = Header("VIEWER")):
                 "health_status": d["health_status"],
                 "endpoint_configured": env_present(d["endpoint_env"]),
                 "credential_configured": env_present(d["credential_env"]),
-                "webhook_secret_configured": env_present(d["webhook_secret_env"]),
+                "webhook_secret_configured": (not d.get("webhook_secret_env")) or env_present(d["webhook_secret_env"]),
                 "activation_blockers": blockers,
                 "activation_ready": not blockers,
             })
