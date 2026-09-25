@@ -4,8 +4,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel,Field
 from pathlib import Path
 from typing import Any,Optional
-import json,hashlib,uuid,datetime,sqlite3,time,re
-from .db import connect,tx,DB_PATH,IntegrityError,backend_name
+import json,hashlib,uuid,datetime,sqlite3,time,re,os,hmac
+from .db import connect,tx,DB_PATH,IntegrityError,backend_name,approved_database_target,APPROVED_PROJECT_REF,database_health
 from .seed import run as seed_run
 from .gl import router as gl_router
 from .hardening import router as hardening_router
@@ -194,11 +194,17 @@ async def security_headers(request, call_next):
     correlation_id=request.headers.get('X-Correlation-Id') or request_id
     error_class=None
     runtime_mode=get_runtime_mode_value()
-    exempt=request.url.path in {'/api/clx013/runtime-mode','/api/clx013/health','/api/clx013/readiness'}
+    health_exempt=request.url.path in {'/api/v1/health','/api/clx013/runtime-mode','/api/clx013/health','/api/clx013/readiness','/api/clx016/readiness'}
+    production_traffic=os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()
+    uat_token=os.getenv('M3_UAT_TOKEN','')
+    supplied_uat=request.headers.get('X-M3-UAT-Token','')
+    uat_allowed=bool(uat_token and supplied_uat and hmac.compare_digest(uat_token,supplied_uat))
     try:
-        if not exempt and runtime_mode=='MAINTENANCE':
+        if production_traffic!='ON' and not health_exempt and not uat_allowed:
+            response=JSONResponse({'detail':{'code':'PRODUCTION_TRAFFIC_LOCKED','uat_header':'X-M3-UAT-Token'}},status_code=503)
+        elif not health_exempt and runtime_mode=='MAINTENANCE':
             response=JSONResponse({'detail':{'code':'MAINTENANCE_MODE'}},status_code=503)
-        elif not exempt and runtime_mode=='READ_ONLY' and request.method.upper() in {'POST','PUT','PATCH','DELETE'}:
+        elif not health_exempt and runtime_mode=='READ_ONLY' and request.method.upper() in {'POST','PUT','PATCH','DELETE'}:
             response=JSONResponse({'detail':{'code':'READ_ONLY_MODE'}},status_code=423)
         else:
             response=await call_next(request)
@@ -223,6 +229,39 @@ async def security_headers(request, call_next):
 def root(): return (HERE/'static/M3_NVOCC_ERP_CLX-015_LIVE_ENVIRONMENT_PREP_20260924.html').read_text()
 @app.get('/api/v1/health')
 def health(): return {'project':'M3 NVOCC ERP','baseline':'M3-CLX009-ACCEPTED-20260924-011','database':backend_name(),'production_promoted':False,'sandbox_only':True,'live_credentials':False,'live_bank_api':False,'live_tax_api':False,'live_carrier_api':False,'real_payment_execution':False}
+@app.get('/api/clx016/readiness')
+def clx016_readiness():
+    result={
+      'project':'M3 NVOCC ERP',
+      'phase':'CLX-016',
+      'approved_project_ref':APPROVED_PROJECT_REF,
+      'configured_project_ref':os.getenv('M3_SUPABASE_PROJECT_REF',''),
+      'database_target_approved':approved_database_target(),
+      'database':backend_name(),
+      'production_traffic':os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper(),
+      'live_providers':os.getenv('M3_LIVE_PROVIDERS','OFF').upper(),
+      'real_money':os.getenv('REAL_MONEY','OFF').upper(),
+      'uat_token_configured':bool(os.getenv('M3_UAT_TOKEN','')),
+      'ready':False,
+    }
+    try:
+        c=connect()
+        health=database_health(c)
+        jobs=c.execute("SELECT COUNT(*) n FROM jobs WHERE job_ref IN ('50001','50002','50003','50004','50005')").fetchone()['n']
+        c.close()
+        result['database_health']=health['status']
+        result['jobs_50001_50005']=jobs
+        result['ready']=bool(
+          health['status']=='ok' and jobs==5 and result['database_target_approved']
+          and result['configured_project_ref']==APPROVED_PROJECT_REF
+          and result['production_traffic']=='OFF'
+          and result['live_providers']=='OFF'
+          and result['real_money']=='OFF'
+        )
+    except Exception as exc:
+        result['database_health']='fail'
+        result['error_class']=exc.__class__.__name__
+    return result
 @app.get('/api/clx010/health')
 def clx010_health(): return {'project':'M3 NVOCC ERP','baseline':'M3-CLX010-ACCEPTED-20260924-012F','parent':'M3-CLX009-ACCEPTED-20260924-011','database':backend_name(),'production_promoted':False,'sandbox_only':True,'live_credentials':False,'real_money_movement':False,'admin_screens':28,'master_domains':29}
 @app.post('/api/v1/admin/reset-test-data')
