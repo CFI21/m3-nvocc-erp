@@ -4,12 +4,20 @@ from pathlib import Path
 from typing import Optional
 import json, datetime, uuid
 from .db import connect, tx, backend_name, list_public_tables, list_public_triggers
+from .json_recovery import load_json_or_recover_arrays
 
 HERE=Path(__file__).resolve().parent
 AGENT=json.loads((HERE/'module_meta.json').read_text())['modules']
-GL_META=json.loads((HERE/'gl_meta.json').read_text())
+GL_META, _GL_META_RECOVERED = load_json_or_recover_arrays(
+    HERE/'gl_meta.json',
+    ['setup','transactions','controls','reports'],
+)
 GL=[dict(x,group=g) for g in ('setup','transactions','controls','reports') for x in GL_META.get(g,[])]
-TREASURY=json.loads((HERE/'treasury_meta.json').read_text())['modules']
+_TREASURY_META, _TREASURY_META_RECOVERED = load_json_or_recover_arrays(
+    HERE/'treasury_meta.json',
+    ['modules'],
+)
+TREASURY=_TREASURY_META['modules']
 INTEGRATION=json.loads((HERE/'integration_meta.json').read_text())['modules']
 router=APIRouter(prefix='/api/v1/bulk',tags=['CLX-009 Bulk Build / Unified Control'])
 BASELINE='M3-CLX009-ACCEPTED-20260924-011'
