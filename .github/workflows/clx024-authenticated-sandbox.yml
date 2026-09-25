@@ -1,0 +1,68 @@
+name: M3 CLX024 Authenticated Sandbox Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx024-authenticated-sandbox.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Inspect sandbox credential binding and run available providers
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          curl --fail --silent --show-error "$API/api/v1/provider-onboarding/status"             -H "X-Role: AUDITOR" -o /tmp/status.json
+
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          s=d['safety']
+          assert d['phase']=='CLX-024'
+          assert s['production_traffic']=='ON'
+          assert s['live_providers']=='OFF'
+          assert s['real_money']=='OFF'
+          assert s['sandbox_tests']=='ON'
+          assert d['secret_values_exposed'] is False
+          rows={p['provider']:p for p in d['providers']}
+          assert set(rows)=={'truelayer-data','truelayer-payments','openexchangerates','avalara'}
+          available=[k for k,v in rows.items() if v['credentials_complete']]
+          print('AVAILABLE_PROVIDERS='+','.join(available))
+          print('AVAILABLE_COUNT='+str(len(available)))
+          with open('/tmp/available','w') as f:
+              f.write('\n'.join(available))
+          PY
+
+          if grep -qx 'truelayer-data' /tmp/available; then
+            curl --fail --silent --show-error -X POST "$API/api/v1/provider-onboarding/truelayer-data/test"               -H "X-Role: ADMIN" -o /tmp/truelayer-data.json
+          fi
+
+          if grep -qx 'truelayer-payments' /tmp/available; then
+            curl --fail --silent --show-error -X POST "$API/api/v1/provider-onboarding/truelayer-payments/test-auth"               -H "X-Role: ADMIN" -o /tmp/truelayer-payments.json
+          fi
+
+          if grep -qx 'openexchangerates' /tmp/available; then
+            curl --fail --silent --show-error -X POST "$API/api/v1/provider-onboarding/openexchangerates/test"               -H "X-Role: ADMIN" -o /tmp/oxr.json
+          fi
+
+          if grep -qx 'avalara' /tmp/available; then
+            curl --fail --silent --show-error -X POST "$API/api/v1/provider-onboarding/avalara/test"               -H "X-Role: ADMIN" -o /tmp/avalara.json
+          fi
+
+          curl --fail --silent --show-error "$API/api/v1/provider-onboarding/control-evidence"             -H "X-Role: AUDITOR" -o /tmp/controls.json
+
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/controls.json'))
+          assert d['guards']['provider_idempotency_unique'] is True
+          assert d['guards']['callback_duplicate_unique'] is True
+          assert d['retry_dlq']=='CLX-022 VERIFIED'
+          assert d['circuit_breaker']=='CLX-022 VERIFIED'
+          assert d['secret_values_exposed'] is False
+          print('CLX024_CONTROL_EVIDENCE_PASS')
+          PY
