@@ -1,0 +1,53 @@
+name: M3 CLX023 Provider Binding Prep
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "migrations/CLX023_001_provider_binding_prep.sql"
+      - "CLX023_PROVIDER_BINDING_SPEC.json"
+      - ".github/workflows/clx023-provider-binding-prep.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate provider mapping and credential-free connectivity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          d=json.load(open('CLX023_PROVIDER_BINDING_SPEC.json'))
+          assert d['policy']['live_providers']=='OFF'
+          assert d['policy']['real_money']=='OFF'
+          assert d['policy']['activate_external_providers'] is False
+          assert set(d['selected_technical_targets'])=={'bank','payment','fx','tax'}
+          for k,v in d['selected_technical_targets'].items():
+              assert v['vendor']
+              assert v['required_env']
+          print('CLX023_PROVIDER_MAPPING_PASS')
+          PY
+
+          # Credential-free network/TLS checks only. Never send secrets.
+          curl --fail --silent --show-error --max-time 15             https://webhooks.truelayer-sandbox.com/.well-known/jwks >/tmp/truelayer-jwks.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/truelayer-jwks.json'))
+          assert isinstance(d.get('keys'),list) and d['keys']
+          print('TRUELAYER_SANDBOX_JWKS_CONNECTIVITY_PASS')
+          PY
+
+          code="$(curl --silent --show-error --max-time 15 --output /tmp/oxr.txt --write-out '%{http_code}'             https://openexchangerates.org/api/latest.json)"
+          test "$code" = "401" -o "$code" = "403" -o "$code" = "400"
+          echo OPENEXCHANGERATES_ENDPOINT_CONNECTIVITY_PASS
+
+          curl --fail --silent --show-error --max-time 15             https://sandbox-rest.avatax.com/api/v2/utilities/ping >/tmp/avalara-ping.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/avalara-ping.json'))
+          assert isinstance(d,dict)
+          print('AVALARA_SANDBOX_CONNECTIVITY_PASS')
+          PY
