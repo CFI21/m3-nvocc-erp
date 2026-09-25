@@ -7,7 +7,10 @@ services:
     autoDeploy: false
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/v1/health
     envVars:
+      - key: M3_SUPABASE_PROJECT_REF
+        value: ozupgknqaqgvprliewxe
       - key: M3_ENV
         value: production
       - key: M3_PRODUCTION_TRAFFIC
