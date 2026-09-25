@@ -1,0 +1,60 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-025",
+  "status": "ACCEPTED",
+  "baseline": "M3-CLX025-OPERATIONS-WORKBENCH-ACCEPTED-20260925-027",
+  "parent_baseline": "M3-CLX023-PROVIDER-BINDING-READY-20260925-026",
+  "clx024_status": "DEFERRED_NOT_ACCEPTED",
+  "scope": [
+    "Unified Operations Workbench",
+    "action-required jobs",
+    "cut-off risks",
+    "document gaps",
+    "payment/release blocks",
+    "failed integrations",
+    "milestone delays",
+    "reconciliation exceptions",
+    "task ownership",
+    "aging/SLA",
+    "search/filter/priority/owner/status",
+    "safe bulk assign/acknowledge",
+    "direct related action links"
+  ],
+  "controls": {
+    "source_data_only": true,
+    "existing_business_tables_unchanged": true,
+    "role_scope_enforced": true,
+    "maker_checker_preserved": true,
+    "four_eyes_preserved": true,
+    "audit_preserved": true,
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "production_traffic": "ON",
+    "ancline_touched": false
+  },
+  "runtime": {
+    "api_deploy": "dep-daretul9fdbs739as230",
+    "api_image": "sha256:79022958dfe92c96debe6ae572f5c311c601707e1af61df89cf52640f805c86f",
+    "web_deploy": "dep-dareu3d9fdbs739asqhg",
+    "web_image": "sha256:78ab70f4b8b858674b098fd55559e76273254f12bb818efc242fa787467d40f0"
+  },
+  "uat": {
+    "workflow_run": 36194621523,
+    "result": "PASS",
+    "active_derived_items": 9,
+    "agent_scope_without_scope_header": "DENIED",
+    "viewer_bulk_write": "DENIED",
+    "ops_bulk_assign": "PASS",
+    "ops_bulk_acknowledge": "PASS",
+    "control_status": "PASS",
+    "residual_uat_rows": 0
+  },
+  "preserved_counts": {
+    "jobs": 5,
+    "transaction_records": 95,
+    "gl_records": 280,
+    "treasury_records": 185,
+    "integration_records": 100
+  },
+  "screen_catalog_preserved": 193
+}
