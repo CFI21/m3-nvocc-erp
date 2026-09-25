@@ -1,0 +1,32 @@
+name: M3 CLX022 Live Provider Readiness
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app/live_provider_runtime.py"
+      - "tests/test_live_provider_runtime.py"
+      - "migrations/CLX022_001_live_provider_integration.sql"
+      - ".github/workflows/clx022-live-provider-readiness.yml"
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Unit and safety gates
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          PYTHONPATH=. pytest -q tests/test_live_provider_runtime.py tests/test_clx019_catalog_roles.py tests/test_clx016_postgres_adapter.py
+          python - <<'PY'
+          import os
+          from app.live_provider_runtime import live_switch_on, real_money_on
+          assert live_switch_on() is False
+          assert real_money_on() is False
+          print("CLX022_CODE_SAFETY_PASS")
+          PY
