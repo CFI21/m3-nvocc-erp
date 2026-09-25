@@ -24,6 +24,7 @@ from .prodprep import router as prodprep_router
 from .liveprep import router as liveprep_router
 from .live_provider_runtime import router as live_provider_router
 from .provider_onboarding import router as provider_onboarding_router
+from .operations_workbench import router as operations_workbench_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -39,6 +40,7 @@ app.add_middleware(
     expose_headers=['X-Request-Id','X-Correlation-Id'],
 )
 app.mount('/static',StaticFiles(directory=HERE/'static'),name='static')
+app.include_router(operations_workbench_router)
 app.include_router(provider_onboarding_router)
 app.include_router(live_provider_router)
 app.include_router(liveprep_router)
