@@ -1,0 +1,78 @@
+name: CLX021 Final Release Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "CLX021_FINAL_HANDOVER.md"
+      - "CLX021_ACCEPTANCE_MANIFEST.json"
+      - ".github/workflows/clx021-final.yml"
+
+jobs:
+  final:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate manifest and catalog
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          PYTHONPATH=. pytest -q tests/test_clx016_postgres_adapter.py tests/test_clx019_catalog_roles.py
+          python - <<'PY'
+          import json
+          m=json.load(open('CLX021_ACCEPTANCE_MANIFEST.json'))
+          assert m['project']=='M3 NVOCC ERP'
+          assert m['phase']=='CLX-021'
+          assert m['status']=='FINAL_RELEASE_CANDIDATE'
+          assert m['safety']=={
+              'production_traffic':'OFF',
+              'live_providers':'OFF',
+              'real_money':'OFF',
+              'live_cutover_authorized':False,
+          }
+          assert m['screens']['total']==193
+          assert m['database']['project_ref']=='ozupgknqaqgvprliewxe'
+          print('MANIFEST_PASS')
+          PY
+      - name: Verify final live release candidate
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$WEB/healthz" -o /tmp/web.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$API/api/v1/health" -o /tmp/api.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$API/api/clx016/readiness" -o /tmp/ready.json
+
+          python - <<'PY'
+          import json
+          w=json.load(open('/tmp/web.json'))
+          a=json.load(open('/tmp/api.json'))
+          r=json.load(open('/tmp/ready.json'))
+          assert w['status']=='ok'
+          assert a['project']=='M3 NVOCC ERP'
+          assert a['database']=='postgres'
+          assert r['database_health']=='ok'
+          assert r['jobs_50001_50005']==5
+          assert r['production_traffic']=='OFF'
+          assert r['live_providers']=='OFF'
+          assert r['real_money']=='OFF'
+          assert r['ready'] is True
+          print('FINAL_RUNTIME_PASS')
+          PY
+
+          code="$(curl --silent --output /tmp/locked.json --write-out '%{http_code}' "$API/api/v1/modules")"
+          test "$code" = "503"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/locked.json'))
+          assert d['detail']['code']=='PRODUCTION_TRAFFIC_LOCKED'
+          print('FINAL_TRAFFIC_LOCK_PASS')
+          PY
