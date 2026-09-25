@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-025",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX024-RUNTIME-HEALTH-ACCURACY-ACCEPTED",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "Production Readiness Semantics",
+    "defect": "The CLX-016 readiness endpoint required production traffic to be OFF, causing a healthy controlled live runtime to report ready=false after traffic cutover.",
+    "fix": "Separate infrastructure readiness, external-execution safety, and traffic mode. Readiness now remains true for a healthy approved database with live providers and real money OFF whether traffic is LOCKED or LIVE.",
+    "api_contract": "Additive/compatible: existing readiness keys retained; infrastructure_ready, external_execution_safe and traffic_mode added."
+  },
+  "evidence": {
+    "development_guard_run": 36179452122,
+    "tests_passed": 20,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
