@@ -10,12 +10,7 @@
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
 const __m3NativeFetch=window.fetch.bind(window);
 function m3UatToken(){
-  let token=sessionStorage.getItem('M3_UAT_TOKEN')||'';
-  if(!token){
-    token=window.prompt('M3 controlled UAT access token (kept only in this browser tab):')||'';
-    if(token) sessionStorage.setItem('M3_UAT_TOKEN',token);
-  }
-  return token;
+  return sessionStorage.getItem('M3_UAT_TOKEN')||'';
 }
 window.fetch=(input,init={})=>{
   const raw=typeof input==='string'?input:input.url;
