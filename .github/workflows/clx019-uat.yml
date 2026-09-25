@@ -1,0 +1,46 @@
+name: CLX019 Catalog Role UAT
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "tests/test_clx019_catalog_roles.py"
+      - ".github/workflows/clx019-uat.yml"
+      - "app/screen_catalog.py"
+      - "app/screen_integration.py"
+
+jobs:
+  uat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Run 193-screen role and data-scope UAT
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx019_catalog_roles.py
+      - name: Verify production web browser shell
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$WEB/" -o /tmp/index.html
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$WEB/healthz" -o /tmp/health.json
+          grep -q "M3 NVOCC ERP" /tmp/index.html
+          grep -q "ADMIN" /tmp/index.html
+          grep -q "OPS" /tmp/index.html
+          grep -q "DOCS" /tmp/index.html
+          grep -q "FINANCE" /tmp/index.html
+          grep -q "AGENT" /tmp/index.html
+          grep -q "VIEWER" /tmp/index.html
+          python - <<'PY'
+          import json
+          h=json.load(open('/tmp/health.json'))
+          assert h['status']=='ok', h
+          print('BROWSER_SHELL_PASS')
+          PY
