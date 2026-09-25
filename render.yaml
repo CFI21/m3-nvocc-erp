@@ -21,6 +21,8 @@ services:
         value: "OFF"
       - key: DATABASE_URL
         sync: false
+      - key: M3_UAT_TOKEN
+        sync: false
   - type: web
     name: m3-nvocc-web-prod
     runtime: python
