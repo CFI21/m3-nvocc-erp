@@ -284,13 +284,18 @@ def clx016_readiness():
         c.close()
         result['database_health']=health['status']
         result['jobs_50001_50005']=jobs
-        result['ready']=bool(
+        infrastructure_ready=bool(
           health['status']=='ok' and jobs==5 and result['database_target_approved']
           and result['configured_project_ref']==APPROVED_PROJECT_REF
-          and result['production_traffic']=='OFF'
-          and result['live_providers']=='OFF'
+        )
+        external_execution_safe=bool(
+          result['live_providers']=='OFF'
           and result['real_money']=='OFF'
         )
+        result['infrastructure_ready']=infrastructure_ready
+        result['external_execution_safe']=external_execution_safe
+        result['traffic_mode']='LIVE' if result['production_traffic']=='ON' else 'LOCKED'
+        result['ready']=bool(infrastructure_ready and external_execution_safe)
     except Exception as exc:
         result['database_health']='fail'
         result['error_class']=exc.__class__.__name__
