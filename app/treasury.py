@@ -4,10 +4,15 @@ from typing import Any,Optional
 from pathlib import Path
 import json,datetime,hashlib,uuid
 from .db import connect,tx,backend_name
+from .json_recovery import load_json_or_recover_arrays
 from .gl import assert_period_postable,next_voucher
 
 HERE=Path(__file__).resolve().parent
-META=json.loads((HERE/'treasury_meta.json').read_text())['modules']
+_TREASURY_META, META_RECOVERED = load_json_or_recover_arrays(
+    HERE/'treasury_meta.json',
+    ['modules'],
+)
+META=_TREASURY_META['modules']
 MODULES={x['key']:x for x in META}
 router=APIRouter(prefix='/api/v1/treasury',tags=['Treasury / AR-AP Settlement'])
 ROLE_PERMS={
