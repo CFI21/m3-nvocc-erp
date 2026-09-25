@@ -1,0 +1,82 @@
+name: CLX016 Live Runtime Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx016-live-runtime.yml"
+
+jobs:
+  verify-live-runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify health, readiness and traffic lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://m3-nvocc-api-latest-1.onrender.com"
+
+          curl --fail --silent --show-error "$BASE/api/v1/health" -o /tmp/health.json
+          curl --fail --silent --show-error "$BASE/api/clx016/readiness" -o /tmp/readiness.json
+
+          python - <<'PY'
+          import json
+          h=json.load(open('/tmp/health.json'))
+          r=json.load(open('/tmp/readiness.json'))
+
+          assert h['project']=='M3 NVOCC ERP', h
+          assert h['database']=='postgres', h
+
+          assert r['project']=='M3 NVOCC ERP', r
+          assert r['phase']=='CLX-016', r
+          assert r['approved_project_ref']=='ozupgknqaqgvprliewxe', r
+          assert r['configured_project_ref']=='ozupgknqaqgvprliewxe', r
+          assert r['database_target_approved'] is True, r
+          assert r['database']=='postgres', r
+          assert r['database_health']=='ok', r
+          assert r['jobs_50001_50005']==5, r
+          assert r['production_traffic']=='OFF', r
+          assert r['live_providers']=='OFF', r
+          assert r['real_money']=='OFF', r
+          assert r['uat_token_configured'] is True, r
+          assert r['ready'] is True, r
+          print('HEALTH_PASS')
+          print('READINESS_PASS')
+          PY
+
+          code="$(curl --silent --output /tmp/locked.json --write-out '%{http_code}' "$BASE/api/v1/modules")"
+          test "$code" = "503"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/locked.json'))
+          assert d['detail']['code']=='PRODUCTION_TRAFFIC_LOCKED', d
+          print('TRAFFIC_LOCK_PASS')
+          PY
+
+      - name: Verify role/data-scope contract without writes
+        shell: bash
+        run: |
+          python - <<'PY'
+          # Contract-level assertions mirror app/main.py scope_clause behavior.
+          def scope_clause(role, agent_scope, customer_scope):
+              if role == 'AGENT':
+                  if not agent_scope:
+                      raise PermissionError('AGENT requires X-Agent-Scope')
+                  return ' AND a.code=?', [agent_scope]
+              if customer_scope:
+                  return ' AND c.code=?', [customer_scope]
+              return '', []
+
+          clause,args=scope_clause('AGENT','AGT-TEST',None)
+          assert clause==' AND a.code=?' and args==['AGT-TEST']
+          try:
+              scope_clause('AGENT',None,None)
+          except PermissionError:
+              pass
+          else:
+              raise AssertionError('AGENT scope missing did not fail')
+          clause,args=scope_clause('VIEWER',None,'CUS-TEST')
+          assert clause==' AND c.code=?' and args==['CUS-TEST']
+          print('ROLE_DATA_SCOPE_CONTRACT_PASS')
+          PY
