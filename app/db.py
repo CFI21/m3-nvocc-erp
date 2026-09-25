@@ -8,6 +8,7 @@ from typing import Any, Iterable
 
 DB_PATH = Path(__file__).resolve().parent.parent / 'm3_clx013_test.db'
 DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
+APPROVED_PROJECT_REF = 'ozupgknqaqgvprliewxe'
 
 try:
     import psycopg
@@ -19,6 +20,15 @@ except Exception:  # pragma: no cover - sqlite test/dev fallback
 
 def using_postgres() -> bool:
     return bool(DATABASE_URL)
+
+
+def approved_database_target() -> bool:
+    return (not DATABASE_URL) or (APPROVED_PROJECT_REF in DATABASE_URL)
+
+
+def assert_approved_database_target() -> None:
+    if DATABASE_URL and APPROVED_PROJECT_REF not in DATABASE_URL:
+        raise RuntimeError('DATABASE_URL_TARGET_REJECTED: only M3-NVOCC-PROD ozupgknqaqgvprliewxe is approved for CLX-016')
 
 
 def backend_name() -> str:
@@ -93,6 +103,7 @@ def _qmark_to_pyformat(sql: str) -> str:
 _LASTROWID_TABLES = {
     'transaction_records', 'gl_records', 'gl_vouchers', 'gl_bank_statements',
     'gl_bank_statement_items', 'treasury_records', 'treasury_batches',
+    'treasury_payment_batches',
     'integration_events', 'bank_import_batches', 'sandbox_payment_requests',
     'clx012_runs', 'clx012_stage_events', 'clx012_exceptions',
     'clx012_action_queue', 'clx012_events',
@@ -124,8 +135,22 @@ def _translate_sql(sql: str) -> tuple[str, bool]:
         s = re.sub(r'^INSERT\s+OR\s+IGNORE\s+INTO\b', 'INSERT INTO', s, count=1, flags=re.I)
         if not re.search(r'\bON\s+CONFLICT\b', s, flags=re.I):
             s += ' ON CONFLICT DO NOTHING'
-    # Translate the small set of SQLite date() calls used by the frozen runtime.
-    # PostgreSQL has no SQLite-style date(expr) scalar; CAST(expr AS date) is equivalent here.
+    # SQLite date arithmetic used by AR/AP aging.
+    s = re.sub(
+        r"julianday\('([^']+)'\)\s*-\s*julianday\(([^)]+)\)",
+        r"(CAST('\1' AS date)-CAST(\2 AS date))",
+        s,
+        flags=re.I,
+    )
+    # SQLite json_set used by the GL voucher write-through. payload_json is TEXT
+    # in the preserved M3 PostgreSQL schema, so cast through jsonb and back to text.
+    s = re.sub(
+        r"json_set\(payload_json,\s*'\$\.\"Voucher No\.\"',\s*\?\)",
+        "jsonb_set(COALESCE(payload_json::jsonb,'{}'::jsonb), '{Voucher No.}', to_jsonb(?::text), true)::text",
+        s,
+        flags=re.I,
+    )
+    # Translate the remaining SQLite date(expr) calls used by the frozen runtime.
     s = re.sub(r'\bdate\(([^()]+)\)', r'CAST(\1 AS date)', s, flags=re.I)
     s = _qmark_to_pyformat(s)
 
@@ -208,6 +233,7 @@ class PostgresConnectionCompat:
 
 def connect():
     if using_postgres():
+        assert_approved_database_target()
         return PostgresConnectionCompat(DATABASE_URL)
     c = sqlite3.connect(DB_PATH, timeout=15, isolation_level=None, check_same_thread=False)
     c.row_factory = sqlite3.Row
