@@ -1,0 +1,35 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-024",
+  "status": "WAITING_FOR_SANDBOX_CREDENTIALS",
+  "date": "2026-09-25",
+  "parent_baseline": "M3-CLX023-PROVIDER-BINDING-READY-20260925-026",
+  "runtime": {
+    "api_service_id": "srv-dar9fh17lnhs73ahlh60",
+    "api_image_digest": "sha256:d0acd2896906b86d4b729e2018754d19cc63883219bff35af8f3a4ebd5301ca0",
+    "sandbox_tests": "ON",
+    "production_traffic": "ON",
+    "live_providers": "OFF",
+    "real_money": "OFF"
+  },
+  "provider_credential_status": {
+    "truelayer_data": "MISSING",
+    "truelayer_payments": "MISSING",
+    "open_exchange_rates": "MISSING",
+    "avalara": "MISSING",
+    "available_provider_count": 0
+  },
+  "completed": [
+    "authenticated sandbox runtime added",
+    "safe non-secret sandbox endpoints configured",
+    "provider credential presence checks added",
+    "bank data read test path added",
+    "payments auth/signing-material validation path added",
+    "FX authenticated rate retrieval path added",
+    "Avalara authenticated sandbox ping path added",
+    "idempotency/callback duplicate/retry/DLQ/circuit controls revalidated"
+  ],
+  "acceptance_run": 36190456447,
+  "authenticated_sandbox_accepted": false,
+  "blocker": "User-owned sandbox credentials are not present in Render; no authenticated provider test can be executed without fabricating or exposing secrets."
+}
