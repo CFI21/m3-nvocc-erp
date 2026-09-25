@@ -22,6 +22,7 @@ from .business_day import router as business_day_router
 from .preprod import router as preprod_router, log_request, get_runtime_mode_value
 from .prodprep import router as prodprep_router
 from .liveprep import router as liveprep_router
+from .live_provider_runtime import router as live_provider_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -37,6 +38,7 @@ app.add_middleware(
     expose_headers=['X-Request-Id','X-Correlation-Id'],
 )
 app.mount('/static',StaticFiles(directory=HERE/'static'),name='static')
+app.include_router(live_provider_router)
 app.include_router(liveprep_router)
 app.include_router(prodprep_router)
 app.include_router(preprod_router)
