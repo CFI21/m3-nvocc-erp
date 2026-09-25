@@ -1,0 +1,59 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-022",
+  "status": "LIVE_PROVIDER_CORE_READY",
+  "date": "2026-09-25",
+  "parent_baseline": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "safety": {
+    "production_traffic": "ON",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "external_provider_activation_performed": false,
+    "live_credentials_inserted": false,
+    "real_money_movement": false
+  },
+  "architecture": {
+    "provider_types": [
+      "BANK",
+      "PAYMENT",
+      "FX",
+      "TAX"
+    ],
+    "secret_binding": "environment-variable references only; no values stored",
+    "controls": [
+      "health/readiness",
+      "timeout",
+      "retry",
+      "circuit breaker",
+      "HMAC callback validation",
+      "duplicate callback protection",
+      "idempotency",
+      "dead-letter handling",
+      "redaction"
+    ],
+    "mock_providers_preserved": true,
+    "live_provider_configs": 4,
+    "enabled_live_providers": 0
+  },
+  "runtime": {
+    "api_service_id": "srv-dar9fh17lnhs73ahlh60",
+    "api_url": "https://m3-nvocc-api-latest-1.onrender.com",
+    "api_image_digest": "sha256:d9504c9490c7673c0fb718811115b48701683e064e8aa5708e5b3ec74af96bac",
+    "runtime_source_commit": "45b1d11b84ccc423be7a9bc63d5425735530c177",
+    "database_project_ref": "ozupgknqaqgvprliewxe"
+  },
+  "acceptance": {
+    "code_readiness_run": 36187097954,
+    "runtime_uat_run": 36187219372,
+    "runtime_uat": "PASS",
+    "residual_uat_events": 0,
+    "residual_uat_callbacks": 0,
+    "critical_runtime_errors": 0,
+    "jobs_50001_50005": 5,
+    "transaction_records": 95,
+    "gl_records": 280,
+    "treasury_records": 185,
+    "integration_records": 100
+  },
+  "next_gate": "SELECT REAL PROVIDERS + BIND ENDPOINT/CREDENTIAL/WEBHOOK SECRET VALUES; KEEP LIVE_PROVIDERS AND REAL_MONEY OFF UNTIL EXPLICIT APPROVAL"
+}
