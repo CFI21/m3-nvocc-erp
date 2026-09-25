@@ -127,6 +127,60 @@ def _translate_insert_or_replace(sql: str) -> str:
     return f"INSERT INTO {table} ({','.join(columns)}) VALUES ({values_raw}) ON CONFLICT (id) DO UPDATE SET {updates}"
 
 
+
+def _translate_round_scale(sql: str) -> str:
+    """Translate SQLite ROUND(real, scale) to PostgreSQL-compatible numeric ROUND."""
+    lower = sql.lower()
+    out: list[str] = []
+    pos = 0
+    while True:
+        start = lower.find('round(', pos)
+        if start < 0:
+            out.append(sql[pos:])
+            break
+        out.append(sql[pos:start])
+        open_idx = start + len('round')
+        depth = 0
+        quote: str | None = None
+        comma_idx: int | None = None
+        close_idx: int | None = None
+        i = open_idx
+        while i < len(sql):
+            ch = sql[i]
+            if quote:
+                if ch == quote:
+                    if i + 1 < len(sql) and sql[i + 1] == quote:
+                        i += 1
+                    else:
+                        quote = None
+            else:
+                if ch in ("'", '"'):
+                    quote = ch
+                elif ch == '(':
+                    depth += 1
+                elif ch == ')':
+                    depth -= 1
+                    if depth == 0:
+                        close_idx = i
+                        break
+                elif ch == ',' and depth == 1 and comma_idx is None:
+                    comma_idx = i
+            i += 1
+        if close_idx is None:
+            out.append(sql[start:])
+            break
+        if comma_idx is None:
+            out.append(sql[start:close_idx + 1])
+        else:
+            expr = sql[open_idx + 1:comma_idx].strip()
+            scale = sql[comma_idx + 1:close_idx].strip()
+            if re.fullmatch(r'[+-]?\d+', scale):
+                out.append(f'ROUND(CAST(({expr}) AS numeric),{scale})')
+            else:
+                out.append(sql[start:close_idx + 1])
+        pos = close_idx + 1
+    return ''.join(out)
+
 def _translate_sql(sql: str) -> tuple[str, bool]:
     s = sql.strip().rstrip(';')
     s = _translate_insert_or_replace(s)
@@ -152,6 +206,8 @@ def _translate_sql(sql: str) -> tuple[str, bool]:
     )
     # Translate the remaining SQLite date(expr) calls used by the frozen runtime.
     s = re.sub(r'\bdate\(([^()]+)\)', r'CAST(\1 AS date)', s, flags=re.I)
+    # PostgreSQL requires numeric for ROUND(value, scale).
+    s = _translate_round_scale(s)
     s = _qmark_to_pyformat(s)
 
     wants_lastrowid = False
