@@ -4,9 +4,23 @@ from pathlib import Path
 from typing import Optional, Any
 import json, datetime, uuid
 from .db import connect
+from .json_recovery import load_json_or_recover_arrays, recover_string_scalar, recover_int_scalar
 
 HERE=Path(__file__).resolve().parent
-CATALOG=json.loads((HERE/'screen_integration_meta.json').read_text())
+_SCREEN_META_PATH=HERE/'screen_integration_meta.json'
+_SCREEN_META_TEXT=_SCREEN_META_PATH.read_text()
+CATALOG, META_RECOVERED = load_json_or_recover_arrays(
+    _SCREEN_META_PATH,
+    ['screens','menu'],
+    scalars={
+        'project': recover_string_scalar(_SCREEN_META_TEXT,'project','M3 NVOCC ERP'),
+        'baseline': recover_string_scalar(_SCREEN_META_TEXT,'baseline',''),
+        'parent': recover_string_scalar(_SCREEN_META_TEXT,'parent',''),
+        'screen_count': recover_int_scalar(_SCREEN_META_TEXT,'screen_count',0),
+    },
+)
+CATALOG.setdefault('screens',[])
+CATALOG.setdefault('menu',[])
 SCREENS={s['screen_id']:s for s in CATALOG['screens']}
 BASELINE=CATALOG['baseline']
 PARENT=CATALOG['parent']
