@@ -1,6 +1,7 @@
 from fastapi import FastAPI,HTTPException,Header,Query,Request
 from fastapi.responses import HTMLResponse,JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel,Field
 from pathlib import Path
 from typing import Any,Optional
@@ -26,7 +27,15 @@ HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
 MODULES={m['key']:m for m in META['modules']}
 PRIMARY=META['primary_keys']
-app=FastAPI(title='M3 NVOCC ERP CLX-015 Live Environment Preparation API',version='0.15.0',description='Live-environment preparation and final cutover gate. Production traffic, live credentials and live providers remain blocked.')
+app=FastAPI(title='M3 NVOCC ERP CLX-018 Production Web/API Integration',version='0.18.0',description='Dedicated M3 production web/API integration. Production traffic, live providers and real money remain blocked.')
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['https://m3-nvocc-web-prod.onrender.com'],
+    allow_credentials=False,
+    allow_methods=['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
+    allow_headers=['*'],
+    expose_headers=['X-Request-Id','X-Correlation-Id'],
+)
 app.mount('/static',StaticFiles(directory=HERE/'static'),name='static')
 app.include_router(liveprep_router)
 app.include_router(prodprep_router)
@@ -194,7 +203,7 @@ async def security_headers(request, call_next):
     correlation_id=request.headers.get('X-Correlation-Id') or request_id
     error_class=None
     runtime_mode=get_runtime_mode_value()
-    health_exempt=request.url.path in {'/api/v1/health','/api/clx013/runtime-mode','/api/clx013/health','/api/clx013/readiness','/api/clx016/readiness'}
+    health_exempt=request.method.upper()=='OPTIONS' or request.url.path in {'/api/v1/health','/api/clx013/runtime-mode','/api/clx013/health','/api/clx013/readiness','/api/clx016/readiness'}
     production_traffic=os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()
     uat_token=os.getenv('M3_UAT_TOKEN','')
     supplied_uat=request.headers.get('X-M3-UAT-Token','')
