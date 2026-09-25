@@ -1,0 +1,45 @@
+name: M3 Production Cutover Verification
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/m3-cutover-verify.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify controlled production traffic cutover
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$WEB/healthz" -o /tmp/web.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$API/api/v1/health" -o /tmp/api.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$API/api/clx016/readiness" -o /tmp/ready.json
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors "$API/api/v1/modules" -o /tmp/modules.json
+
+          python - <<'PY'
+          import json
+          w=json.load(open('/tmp/web.json'))
+          a=json.load(open('/tmp/api.json'))
+          r=json.load(open('/tmp/ready.json'))
+          m=json.load(open('/tmp/modules.json'))
+
+          assert w['status']=='ok', w
+          assert a['project']=='M3 NVOCC ERP', a
+          assert a['database']=='postgres', a
+          assert r['database_health']=='ok', r
+          assert r['jobs_50001_50005']==5, r
+          assert r['production_traffic']=='ON', r
+          assert r['live_providers']=='OFF', r
+          assert r['real_money']=='OFF', r
+          assert isinstance(m, (dict,list)), type(m)
+          print('CONTROLLED_PRODUCTION_TRAFFIC_PASS')
+          print('LIVE_PROVIDERS_STILL_OFF')
+          print('REAL_MONEY_STILL_OFF')
+          PY
