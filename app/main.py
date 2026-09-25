@@ -384,10 +384,15 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
     except HTTPException: conn.execute('ROLLBACK'); raise
     finally: conn.close()
 
+def hard_delete_allowed():
+    return backend_name()!='postgres' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='ON'
+
 @app.delete('/api/v1/{module}/{tid}')
 def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
     require_module(module); role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
     if role!='ADMIN': raise HTTPException(403,'ADMIN only delete')
+    if not hard_delete_allowed():
+        raise HTTPException(403,{'code':'HARD_DELETE_DISABLED_IN_PRODUCTION','use_actions':['cancel','reverse']})
     conn=connect(); tx(conn)
     try:
         r=get_tx(conn,module,tid,role,ascope,cscope)
