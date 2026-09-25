@@ -30,7 +30,7 @@ PRIMARY=META['primary_keys']
 app=FastAPI(title='M3 NVOCC ERP CLX-018 Production Web/API Integration',version='0.18.0',description='Dedicated M3 production web/API integration. Production traffic, live providers and real money remain blocked.')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://m3-nvocc-web-prod.onrender.com'],
+    allow_origins=['https://m3-nvocc-web-latest.onrender.com'],
     allow_credentials=False,
     allow_methods=['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
     allow_headers=['*'],
