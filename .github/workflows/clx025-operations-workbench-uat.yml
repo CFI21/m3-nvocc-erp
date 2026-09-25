@@ -1,0 +1,53 @@
+name: M3 CLX025 Operations Workbench UAT
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx025-operations-workbench-uat.yml"
+jobs:
+  uat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runtime UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          curl --fail --silent "$API/api/v1/operations-workbench" -H "X-Role: VIEWER" -o /tmp/wb.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/wb.json'))
+          assert d['phase']=='CLX-025'
+          assert d['source_data_only'] is True
+          assert d['maker_checker_preserved'] is True
+          assert d['live_providers']=='OFF'
+          assert d['real_money']=='OFF'
+          assert d['summary']['total'] >= 1
+          cats={x['category'] for x in d['items']}
+          assert 'DOCUMENT_GAP' in cats or 'MILESTONE_DELAY' in cats or 'PAYMENT_RELEASE_BLOCK' in cats
+          assert all(x.get('target_url') for x in d['items'])
+          print('WORKBENCH_READ_PASS total='+str(d['summary']['total']))
+          PY
+          code=$(curl -s -o /tmp/agent.json -w "%{http_code}" "$API/api/v1/operations-workbench" -H "X-Role: AGENT")
+          test "$code" = "403"
+          code=$(curl -s -o /tmp/deny.json -w "%{http_code}" -X POST "$API/api/v1/operations-workbench/bulk-assign" -H "Content-Type: application/json" -H "X-Role: VIEWER" --data '{"exception_keys":["UAT:CLX025"],"owner":"uat-owner"}')
+          test "$code" = "403"
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/bulk-assign" -H "Content-Type: application/json" -H "X-Role: OPS" -H "X-Actor-Id: clx025-uat-maker" --data '{"exception_keys":["UAT:CLX025"],"owner":"uat-owner"}' -o /tmp/assign.json
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/bulk-acknowledge" -H "Content-Type: application/json" -H "X-Role: OPS" -H "X-Actor-Id: clx025-uat-checker" --data '{"exception_keys":["UAT:CLX025"],"note":"runtime uat"}' -o /tmp/ack.json
+          curl --fail --silent "$API/api/v1/operations-workbench/control-status" -H "X-Role: AUDITOR" -o /tmp/control.json
+          python - <<'PY'
+          import json
+          for fn in ('assign','ack'):
+              d=json.load(open('/tmp/'+fn+'.json'))
+              assert d['ok'] is True and d['changed']==1
+              assert d['underlying_business_records_changed'] is False
+          c=json.load(open('/tmp/control.json'))
+          assert c['role_scope_enforced'] is True
+          assert c['maker_checker_preserved'] is True
+          assert c['four_eyes_preserved'] is True
+          assert c['audit_enabled'] is True
+          assert c['live_provider_activation'] is False
+          assert c['real_money'] is False
+          print('CLX025_CONTROL_PASS')
+          PY
