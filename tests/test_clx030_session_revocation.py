@@ -19,7 +19,7 @@ def test_session_rejects_suspended_user_and_revokes_session():
             if 'FROM iam_sessions' in sql:
                 return Result({
                     'id':11,'user_id':3,'status':'ACTIVE','revoked_at':None,
-                    'expires_at':'2999-01-01T00:00:00+00:00','user_status':'SUSPENDED',
+                    'expires_at':'2999-01-01T00:00:00+00:00','last_seen_at':'2998-12-31T23:50:00+00:00','user_status':'SUSPENDED',
                     'user_ref':'USR-003','username':'finance.dxb','home_office_id':2,'office_code':'DXB'
                 })
             if "UPDATE iam_sessions SET status='REVOKED'" in sql:
@@ -40,7 +40,7 @@ def test_session_allows_active_user_and_updates_last_seen():
             if 'FROM iam_sessions' in sql:
                 return Result({
                     'id':12,'user_id':2,'status':'ACTIVE','revoked_at':None,
-                    'expires_at':'2999-01-01T00:00:00+00:00','user_status':'ACTIVE',
+                    'expires_at':'2999-01-01T00:00:00+00:00','last_seen_at':'2998-12-31T23:50:00+00:00','user_status':'ACTIVE',
                     'user_ref':'USR-002','username':'ops.rtm','home_office_id':1,'office_code':'RTM'
                 })
             return Result(rowcount=1)
@@ -57,7 +57,7 @@ def test_status_change_to_suspended_revokes_active_sessions(monkeypatch):
             if 'FROM iam_sessions' in sql:
                 return Result({
                     'id':1,'user_id':1,'status':'ACTIVE','revoked_at':None,
-                    'expires_at':'2999-01-01T00:00:00+00:00','user_status':'ACTIVE',
+                    'expires_at':'2999-01-01T00:00:00+00:00','last_seen_at':'2998-12-31T23:50:00+00:00','user_status':'ACTIVE',
                     'user_ref':'USR-001','username':'admin','home_office_id':1,'office_code':'RTM'
                 })
             if 'SELECT * FROM iam_users WHERE username=' in sql:
@@ -82,7 +82,7 @@ def test_status_change_to_active_does_not_revoke_sessions(monkeypatch):
             if 'FROM iam_sessions' in sql:
                 return Result({
                     'id':1,'user_id':1,'status':'ACTIVE','revoked_at':None,
-                    'expires_at':'2999-01-01T00:00:00+00:00','user_status':'ACTIVE',
+                    'expires_at':'2999-01-01T00:00:00+00:00','last_seen_at':'2998-12-31T23:50:00+00:00','user_status':'ACTIVE',
                     'user_ref':'USR-001','username':'admin','home_office_id':1,'office_code':'RTM'
                 })
             if 'SELECT * FROM iam_users WHERE username=' in sql:
