@@ -1,8 +1,8 @@
 from fastapi import APIRouter,HTTPException,Header
 from pydantic import BaseModel,Field
 from typing import Optional
-import hashlib,uuid,json,datetime,secrets
-from .db import connect
+import hashlib,uuid,json,datetime,secrets,os
+from .db import connect,backend_name
 
 router=APIRouter(prefix='/api/admin',tags=['CLX-010 Identity & Administration'])
 
@@ -33,6 +33,14 @@ class TempAccess(BaseModel): username:str; permission_code:str; valid_from:str; 
 
 ADMIN_SCREENS=['dashboard','users','user-status','roles','permission-matrix','role-assignments','organizations','countries','legal-entities','offices','branches','departments','office-membership','data-scope-rules','customer-agent-access','approval-limits','maker-checker','approval-delegations','temporary-access','access-reviews','sessions','password-policy','mfa-policy','sso-readiness','login-audit','service-accounts','api-clients','audit']
 
+def sandbox_mfa_allowed():
+    return backend_name()!='postgres' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='ON'
+
+def sandbox_mfa_valid(code):
+    if not sandbox_mfa_allowed(): return False
+    expected=os.getenv('M3_SANDBOX_MFA_CODE','123456')
+    return bool(code and secrets.compare_digest(code,expected))
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','screens':ADMIN_SCREENS,'screen_count':len(ADMIN_SCREENS),'deny_by_default':True,'mfa_sso_readiness':True}
 @router.get('/overview')
@@ -44,7 +52,15 @@ def login(b:Login):
     if not u or u['status']!='ACTIVE' or u['password_hash']!=phash(b.password):
         if u:c.execute('UPDATE iam_users SET failed_attempts=failed_attempts+1 WHERE id=?',(u['id'],))
         h=ih(event+ts+b.username+'FAIL'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'] if u else None,'LOGIN','FAIL','{"reason":"INVALID_CREDENTIALS"}',h)); c.close(); raise HTTPException(401,{'code':'INVALID_CREDENTIALS'})
-    if u['mfa_required'] and b.mfa_code!='123456': c.close(); raise HTTPException(401,{'code':'MFA_REQUIRED','sandbox_code':'123456'})
+    if u['mfa_required']:
+        if not sandbox_mfa_allowed():
+            h=ih(event+ts+b.username+'MFA_BLOCKED')
+            c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','FAIL','{"reason":"PRODUCTION_MFA_PROVIDER_REQUIRED"}',h))
+            c.close()
+            raise HTTPException(503,{'code':'PRODUCTION_MFA_PROVIDER_REQUIRED'})
+        if not sandbox_mfa_valid(b.mfa_code):
+            c.close()
+            raise HTTPException(401,{'code':'MFA_REQUIRED'})
     token=secrets.token_urlsafe(24); exp=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=int(policy(c,'session_minutes','60')))).isoformat(); c.execute('INSERT INTO iam_sessions(session_token,user_id,created_at,expires_at,last_seen_at,mfa_verified,status) VALUES(?,?,?,?,?,?,?)',(token,u['id'],ts,exp,ts,1,'ACTIVE')); c.execute('UPDATE iam_users SET failed_attempts=0,last_login_at=? WHERE id=?',(ts,u['id'])); h=ih(event+ts+b.username+'PASS'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','PASS','{}',h)); out={'session_token':token,'user_ref':u['user_ref'],'username':u['username'],'office':u['office_code'],'roles':[x['role_code'] for x in roles_for(c,u['id'])],'mfa_verified':True,'expires_at':exp}; c.close(); return out
 def session(c,token):
     if not token:raise HTTPException(401,{'code':'SESSION_REQUIRED'})
