@@ -27,7 +27,7 @@ HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
 MODULES={m['key']:m for m in META['modules']}
 PRIMARY=META['primary_keys']
-app=FastAPI(title='M3 NVOCC ERP CLX-018 Production Web/API Integration',version='0.18.0',description='Dedicated M3 production web/API integration. Production traffic, live providers and real money remain blocked.')
+app=FastAPI(title='M3 NVOCC ERP',version='0.24.0',description='M3 NVOCC ERP runtime. Production traffic state and external execution controls are reported dynamically.')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['https://m3-nvocc-web-latest.onrender.com'],
@@ -236,8 +236,32 @@ async def security_headers(request, call_next):
 
 @app.get('/',response_class=HTMLResponse)
 def root(): return (HERE/'static/M3_NVOCC_ERP_CLX-015_LIVE_ENVIRONMENT_PREP_20260924.html').read_text()
+def runtime_flags():
+    production_traffic=os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()
+    live_providers=os.getenv('M3_LIVE_PROVIDERS','OFF').upper()
+    real_money=os.getenv('REAL_MONEY','OFF').upper()
+    return {
+      'production_traffic':production_traffic,
+      'live_providers':live_providers,
+      'real_money':real_money,
+      'production_promoted':production_traffic=='ON',
+      'sandbox_only':production_traffic!='ON',
+      'live_credentials':live_providers=='ON',
+      'live_bank_api':live_providers=='ON',
+      'live_tax_api':live_providers=='ON',
+      'live_carrier_api':live_providers=='ON',
+      'real_payment_execution':real_money=='ON',
+    }
+
 @app.get('/api/v1/health')
-def health(): return {'project':'M3 NVOCC ERP','baseline':'M3-CLX009-ACCEPTED-20260924-011','database':backend_name(),'production_promoted':False,'sandbox_only':True,'live_credentials':False,'live_bank_api':False,'live_tax_api':False,'live_carrier_api':False,'real_payment_execution':False}
+def health():
+    flags=runtime_flags()
+    return {
+      'project':'M3 NVOCC ERP',
+      'baseline':os.getenv('M3_RUNTIME_BASELINE','M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024'),
+      'database':backend_name(),
+      **flags,
+    }
 @app.get('/api/clx016/readiness')
 def clx016_readiness():
     result={
