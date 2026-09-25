@@ -21,7 +21,8 @@ jobs:
       - name: Validate web shell
         shell: bash
         run: |
-          grep -q "M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com'" web/index.html
+          grep -q "M3_API_BASE=''" web/index.html
+          grep -q "proxy_pass https://m3-nvocc-api-latest-1.onrender.com" web/nginx.conf
           grep -q "X-M3-UAT-Token" web/index.html
           grep -q "CLX-018" web/index.html
       - uses: docker/setup-buildx-action@v3
