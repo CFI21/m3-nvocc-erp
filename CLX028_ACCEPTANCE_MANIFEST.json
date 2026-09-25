@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-028",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX027-PRODUCTION-HARD-DELETE-GUARD-ACCEPTED",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "Production MFA Sandbox Bypass Guard",
+    "defect": "The IAM login flow contained a hard-coded sandbox MFA code and disclosed that code in authentication errors.",
+    "fix": "Sandbox MFA is now permitted only in isolated non-production sqlite-test mode, the test code is configurable, authentication errors no longer disclose the code, and PostgreSQL/live-traffic runtimes fail closed with PRODUCTION_MFA_PROVIDER_REQUIRED.",
+    "error_code": "PRODUCTION_MFA_PROVIDER_REQUIRED"
+  },
+  "evidence": {
+    "development_guard_run": 36182260955,
+    "tests_passed": 35,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
