@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-029",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX028-PRODUCTION-MFA-SANDBOX-BYPASS-GUARD-ACCEPTED",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "IAM Failed-Login Lockout Enforcement",
+    "defect": "IAM policy and schema defined max_failed_attempts, lockout_minutes and locked_until, but login only incremented failed_attempts and never enforced account lockout.",
+    "fix": "Enforce configured failed-login threshold, set locked_until for the configured lockout duration, reject currently locked accounts before password/MFA processing, audit lockout events, and clear lockout state after successful authentication.",
+    "error_code": "ACCOUNT_LOCKED"
+  },
+  "evidence": {
+    "development_guard_run": 36184989303,
+    "tests_passed": 40,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
