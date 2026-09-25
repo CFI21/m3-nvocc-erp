@@ -1,0 +1,82 @@
+name: CLX020 Hardening Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx020-hardening.yml"
+
+jobs:
+  hardening:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Security headers, CORS, lock and concurrent health load
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          ORIGIN="$WEB"
+
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 --retry-all-errors -D /tmp/web.headers "$WEB/" -o /tmp/index.html
+          python - <<'PY'
+          h=open('/tmp/web.headers').read().lower()
+          required=[
+            'x-content-type-options: nosniff',
+            'x-frame-options: deny',
+            'referrer-policy: no-referrer',
+            'permissions-policy: camera=(), microphone=(), geolocation=()',
+            'cache-control: no-store',
+          ]
+          for x in required:
+              assert x in h, (x,h)
+          print('SECURITY_HEADERS_PASS')
+          PY
+
+          curl --silent --show-error --fail -D /tmp/cors.headers -o /tmp/cors.body \
+            -X OPTIONS "$API/api/v1/modules" \
+            -H "Origin: $ORIGIN" \
+            -H "Access-Control-Request-Method: GET" \
+            -H "Access-Control-Request-Headers: x-m3-uat-token,x-role"
+          python - <<'PY'
+          h=open('/tmp/cors.headers').read().lower()
+          assert 'access-control-allow-origin: https://m3-nvocc-web-latest.onrender.com' in h
+          assert 'access-control-allow-credentials: true' not in h
+          print('CORS_POLICY_PASS')
+          PY
+
+          code="$(curl --silent --output /tmp/locked.json --write-out '%{http_code}' "$API/api/v1/modules")"
+          test "$code" = "503"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/locked.json'))
+          assert d['detail']['code']=='PRODUCTION_TRAFFIC_LOCKED'
+          print('TRAFFIC_LOCK_PASS')
+          PY
+
+          python - <<'PY'
+          import concurrent.futures, json, statistics, time, urllib.request
+          urls=[
+            'https://m3-nvocc-web-latest.onrender.com/healthz',
+            'https://m3-nvocc-api-latest-1.onrender.com/api/v1/health',
+            'https://m3-nvocc-api-latest-1.onrender.com/api/clx016/readiness',
+          ]
+          def hit(url):
+              t=time.perf_counter()
+              with urllib.request.urlopen(url, timeout=30) as r:
+                  body=r.read()
+                  code=r.status
+              return url,code,time.perf_counter()-t,body
+          results=[]
+          with concurrent.futures.ThreadPoolExecutor(max_workers=10) as ex:
+              futs=[ex.submit(hit,urls[i%len(urls)]) for i in range(30)]
+              for f in concurrent.futures.as_completed(futs):
+                  results.append(f.result())
+          assert len(results)==30
+          assert all(code==200 for _,code,_,_ in results)
+          times=sorted(x[2] for x in results)
+          p95=times[int(len(times)*0.95)-1]
+          assert p95 < 15, p95
+          print('CONCURRENT_HEALTH_PASS',{'requests':len(results),'p95_seconds':round(p95,3),'max_seconds':round(max(times),3)})
+          PY
