@@ -1,0 +1,34 @@
+name: M3 CLX023 Runtime Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx023-runtime-acceptance.yml"
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify mapped providers remain gated
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          curl --fail --silent --show-error "$API/api/v1/live-providers/readiness"             -H "X-Role: AUDITOR" -o /tmp/r.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/r.json'))
+          assert d['production_traffic']=='ON'
+          assert d['live_providers']=='OFF'
+          assert d['real_money']=='OFF'
+          assert d['live_credentials_exposed'] is False
+          assert d['external_activation_performed'] is False
+          rows={p['provider_key']:p for p in d['providers']}
+          assert set(rows)=={'truelayer-bank','truelayer-payments','openexchangerates-fx','avalara-avatax'}
+          assert all(p['enabled'] is False for p in rows.values())
+          assert all(p['activation_ready'] is False for p in rows.values())
+          assert all('LIVE_PROVIDERS_SWITCH_OFF' in p['activation_blockers'] for p in rows.values())
+          print('CLX023_RUNTIME_PROVIDER_MAPPING_PASS')
+          PY
