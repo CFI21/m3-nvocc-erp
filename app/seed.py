@@ -5,7 +5,7 @@ from .gl_seed import run as gl_seed_run
 from .treasury_seed import run as treasury_seed_run
 from .integration_seed import run as integration_seed_run
 HERE=Path(__file__).resolve().parent
-META=json.loads((HERE/'module_meta.json').read_text()); SEED=json.loads((HERE/'seed.json').read_text()); PRIMARY=META['primary_keys']
+META=json.loads((HERE/'module_meta.json').read_text()); PRIMARY=META['primary_keys']
 def extref(module,row,i,job):
     k=PRIMARY.get(module); v=str(row.get(k,'')).strip() if k else ''
     if module=='vessel-lock': v=f"{row.get('Vessel','VSL')}-{row.get('Voyage',job)}"
@@ -25,6 +25,7 @@ def seed_support(conn,module,tid,row,jr,jid,container_id,now):
         raw=f"{tid}|{row.get('Original B/L')}|{row.get('Switch B/L')}|{jr}|seed"; h=hashlib.sha256(raw.encode()).hexdigest()
         conn.execute('INSERT INTO switch_bl_history(transaction_id,job_id,ts,original_bill_no,switch_bill_no,original_parties_json,new_parties_json,approved_by,confidentiality,immutable_hash) VALUES(?,?,?,?,?,?,?,?,1,?)',(tid,jid,now,row.get('Original B/L'),row.get('Switch B/L'),json.dumps({'shipper':row.get('Original Shipper'),'consignee':row.get('Original Consignee')}),json.dumps({'shipper':row.get('New Shipper'),'consignee':row.get('New Consignee'),'notify':row.get('New Notify')}),row.get('Approved By') or 'CLX Supervisor',h))
 def run(reset=True):
+    SEED=json.loads((HERE/'seed.json').read_text())
     if reset and DB_PATH.exists(): DB_PATH.unlink()
     conn=connect(); conn.executescript((HERE/'schema.sql').read_text()); now='2026-09-23T20:00:00Z'; jobs=SEED['jobs']
     for jr,j in jobs.items():
