@@ -1,0 +1,59 @@
+name: CLX018 Web API Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx018-web-api.yml"
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify web, proxy, API readiness and traffic lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+
+          curl --fail --silent --show-error "$WEB/healthz" -o /tmp/web-health.json
+          curl --fail --silent --show-error "$WEB/api/v1/health" -o /tmp/api-health.json
+          curl --fail --silent --show-error "$WEB/api/clx016/readiness" -o /tmp/readiness.json
+          curl --fail --silent --show-error "$WEB/" -o /tmp/index.html
+
+          python - <<'PY'
+          import json
+          wh=json.load(open('/tmp/web-health.json'))
+          ah=json.load(open('/tmp/api-health.json'))
+          r=json.load(open('/tmp/readiness.json'))
+          html=open('/tmp/index.html').read()
+
+          assert wh['status']=='ok', wh
+          assert wh['service']=='m3-nvocc-web-prod', wh
+          assert ah['project']=='M3 NVOCC ERP', ah
+          assert ah['database']=='postgres', ah
+          assert r['database']=='postgres', r
+          assert r['database_health']=='ok', r
+          assert r['database_target_approved'] is True, r
+          assert r['approved_project_ref']=='ozupgknqaqgvprliewxe', r
+          assert r['jobs_50001_50005']==5, r
+          assert r['production_traffic']=='OFF', r
+          assert r['live_providers']=='OFF', r
+          assert r['real_money']=='OFF', r
+          assert r['ready'] is True, r
+          assert 'CLX-018' in html
+          assert "const M3_API_BASE='';" in html
+          print('WEB_HEALTH_PASS')
+          print('WEB_API_PROXY_PASS')
+          print('POSTGRES_READINESS_PASS')
+          PY
+
+          code="$(curl --silent --output /tmp/locked.json --write-out '%{http_code}' "$WEB/api/v1/modules")"
+          test "$code" = "503"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/locked.json'))
+          assert d['detail']['code']=='PRODUCTION_TRAFFIC_LOCKED', d
+          print('PRODUCTION_TRAFFIC_LOCK_PASS')
+          PY
