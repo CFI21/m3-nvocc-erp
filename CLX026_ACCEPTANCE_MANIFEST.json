@@ -1,0 +1,26 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-026",
+  "status": "ACCEPTED_DEVELOPMENT_CHANGE",
+  "parent_development_baseline": "M3-CLX025-PRODUCTION-READINESS-SEMANTICS-ACCEPTED",
+  "production_baseline_preserved": "M3-PRODUCTION-TRAFFIC-CUTOVER-ACCEPTED-20260925-024",
+  "branch": "develop/clx022-autonomous",
+  "change": {
+    "title": "Production Test-Data Reset Guard",
+    "defect": "The admin reset-test-data endpoint could invoke synthetic reset/seed routines whenever the caller had ADMIN, including against a PostgreSQL production runtime.",
+    "fix": "Disable test-data reset whenever the backend is PostgreSQL or production traffic is ON. Keep the endpoint available only for isolated non-production sqlite-test runtimes.",
+    "error_code": "TEST_DATA_RESET_DISABLED_IN_PRODUCTION"
+  },
+  "evidence": {
+    "development_guard_run": 36180498028,
+    "tests_passed": 25,
+    "production_deploy": false,
+    "production_database_mutation": false
+  },
+  "safety": {
+    "production_traffic": "ON_UNCHANGED",
+    "live_providers": "OFF_UNCHANGED",
+    "real_money": "OFF_UNCHANGED",
+    "ancline": "NOT_TOUCHED"
+  }
+}
