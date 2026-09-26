@@ -7,7 +7,6 @@ from fastapi import HTTPException
 
 from app import db
 from app.seed import run as seed_run
-from app.gl_seed import run as gl_seed_run
 from app.masterdata_seed import run as masterdata_seed_run
 from app.admin_seed import run as admin_seed_run
 from app.screen_catalog import build_catalog
@@ -24,9 +23,6 @@ class FakeRequest:
 def isolated_db(tmp_path,monkeypatch):
     monkeypatch.setattr(db,'DB_PATH',tmp_path/'clx044.db')
     seed_run(True)
-    conn=db.connect()
-    try: gl_seed_run(conn)
-    finally: conn.close()
     masterdata_seed_run()
     admin_seed_run()
     return db.DB_PATH
