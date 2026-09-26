@@ -15,16 +15,17 @@ META, META_RECOVERED = load_json_or_recover_arrays(
 ALL=[dict(x,group='setup') for x in META['setup']]+[dict(x,group='transactions') for x in META['transactions']]+[dict(x,group='controls') for x in META.get('controls',[])]+[dict(x,group='reports') for x in META.get('reports',[])]
 MODULES={x['key']:x for x in ALL}
 SETUP={x['key'] for x in META['setup']}; TRANSACTIONS={x['key'] for x in META['transactions']}; CONTROLS={x['key'] for x in META.get('controls',[])}; REPORTS={x['key'] for x in META.get('reports',[])}
-router=APIRouter(prefix='/api/v1/gl',tags=['GL / Accounts'])
+router=APIRouter(prefix='/api/v1/gl',tags=['General / Administration · Finance & Accounting Setup'])
 ROLE_PERMS={
  'ADMIN':set('view create edit approve post reverse cancel reconcile'.split()),
- 'FINANCE':set('view create edit approve post reverse cancel reconcile'.split()),
  'GL_MANAGER':set('view create edit approve post reverse cancel reconcile'.split()),
- 'GL_ACCOUNTANT':set('view create edit approve post reconcile'.split()),
+ 'GL_ACCOUNTANT':set('view create edit post reconcile'.split()),
  'AUDITOR':set('view'.split()),
- 'VIEWER':set('view'.split()),
- 'OPS':set('view'.split()),
- 'DOCS':set(), 'AGENT':set()
+ 'FINANCE':set(),
+ 'VIEWER':set(),
+ 'OPS':set(),
+ 'DOCS':set(),
+ 'AGENT':set()
 }
 class CreateBody(BaseModel):
     job_ref:Optional[str]=Field(default=None,pattern=r'^\d{5}$')
@@ -143,7 +144,7 @@ def voucher_balanced(conn,vid):
     return abs(r['d']-r['c'])<0.0001 and r['d']>0,r['d'],r['c']
 
 @router.get('/health')
-def health():return {'project':'M3 NVOCC ERP','baseline':'M3-CLX006-REBRAND-20260923-001','module':'GL / ACCOUNTS','database':backend_name(),'production_promoted':False,'live_integrations':False}
+def health():return {'project':'M3 NVOCC ERP','baseline':'M3-CLX006-REBRAND-20260923-001','module':'GENERAL / ADMINISTRATION · FINANCE & ACCOUNTING SETUP','database':backend_name(),'production_promoted':False,'live_integrations':False}
 @router.get('/modules')
 def modules():return ALL
 @router.get('/trial-balance')
