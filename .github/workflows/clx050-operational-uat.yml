@@ -1,0 +1,24 @@
+name: M3 CLX050 Full ERP Operational UAT
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  clx050-operational-uat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Lightweight compile
+        run: python -m py_compile app/*.py
+      - name: CLX-050 role-by-role realistic UAT
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx050_operational_uat.py
+      - name: Targeted inherited operational gates
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx049_booking_bl_workspace.py tests/test_build_first_fast_track.py
