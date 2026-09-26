@@ -8,12 +8,14 @@ from .db import connect,tx,IntegrityError,backend_name
 from .json_recovery import load_json_or_recover_arrays
 from .admin import session as iam_session, permission_code as iam_permission_code
 from .clx034_smart_approval_fast_track import enforce_gl_action
+from .clx044_gl_exact_flow import apply_gl_exact_flow
 
 HERE=Path(__file__).resolve().parent
 META, META_RECOVERED = load_json_or_recover_arrays(
     HERE/'gl_meta.json',
     ['setup','transactions','controls','reports'],
 )
+META = apply_gl_exact_flow(META)
 ALL=[dict(x,group='setup') for x in META['setup']]+[dict(x,group='transactions') for x in META['transactions']]+[dict(x,group='controls') for x in META.get('controls',[])]+[dict(x,group='reports') for x in META.get('reports',[])]
 MODULES={x['key']:x for x in ALL}
 SETUP={x['key'] for x in META['setup']}; TRANSACTIONS={x['key'] for x in META['transactions']}; CONTROLS={x['key'] for x in META.get('controls',[])}; REPORTS={x['key'] for x in META.get('reports',[])}
