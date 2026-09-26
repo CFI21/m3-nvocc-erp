@@ -13,7 +13,7 @@ def test_gl_is_general_administration_finance_setup_not_agent_tasks():
     assert all(s['domain']=='General / Administration' for s in gl)
     assert all(s['submenu'].startswith('Finance & Accounting Setup · ') for s in gl)
     assert not any(s['domain']=='Agent Tasks' and s['screen_id'].startswith('gl-accounts::') for s in catalog['screens'])
-    assert len(catalog['screens'])==193
+    assert len(catalog['screens'])==196
 
 
 def test_gl_runtime_requires_explicit_accounting_role():
