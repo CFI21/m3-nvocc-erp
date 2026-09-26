@@ -29,7 +29,11 @@ def run():
       ('COST_PROFIT_CENTER_MANAGE','finance-entitlement','cost-profit-center-manage',1),
       ('TAX_CURRENCY_MANAGE','finance-entitlement','tax-currency-manage',1),
       ('PERIOD_CLOSE','finance-entitlement','period-close',1),
-      ('FINANCE_CONFIG_ADMIN','finance-entitlement','finance-config-admin',1)
+      ('FINANCE_CONFIG_ADMIN','finance-entitlement','finance-config-admin',1),
+      ('AR_APPROVE','finance-execution','ar-approve',1),('AR_WRITE_OFF','finance-execution','ar-write-off',1),
+      ('AP_APPROVE','finance-execution','ap-approve',1),('AP_WRITE_OFF','finance-execution','ap-write-off',1),
+      ('TREASURY_APPROVE','finance-execution','treasury-approve',1),('TREASURY_RELEASE','finance-execution','treasury-release',1),
+      ('TREASURY_PAY','finance-execution','treasury-pay',1),('TREASURY_REVERSE','finance-execution','treasury-reverse',1)
     ]
     for code,module,action,sensitive in gl_entitlements:
         c.execute('INSERT OR IGNORE INTO iam_permissions(permission_code,module,action,sensitive) VALUES(?,?,?,?)',(code,module,action,sensitive))
@@ -45,7 +49,9 @@ def run():
             if allow:c.execute('INSERT OR IGNORE INTO iam_role_permissions(role_id,permission_id,effect) VALUES(?,?,?)',(rolesq[role],p['id'],'ALLOW'))
     entitlement_grants={
       'GL_ACCOUNTANT':['GL_VIEW','GL_CREATE','GL_EDIT','JOURNAL_CREATE'],
-      'GL_MANAGER':['GL_VIEW','GL_CREATE','GL_EDIT','GL_DISABLE','GL_POST','JOURNAL_CREATE','JOURNAL_APPROVE','ACCOUNT_MAPPING_MANAGE','COST_PROFIT_CENTER_MANAGE','TAX_CURRENCY_MANAGE','PERIOD_CLOSE','FINANCE_CONFIG_ADMIN']
+      'GL_MANAGER':['GL_VIEW','GL_CREATE','GL_EDIT','GL_DISABLE','GL_POST','JOURNAL_CREATE','JOURNAL_APPROVE','ACCOUNT_MAPPING_MANAGE','COST_PROFIT_CENTER_MANAGE','TAX_CURRENCY_MANAGE','PERIOD_CLOSE','FINANCE_CONFIG_ADMIN'],
+      'FINANCE':['AR_APPROVE','AR_WRITE_OFF','AP_APPROVE','AP_WRITE_OFF'],
+      'TREASURY':['TREASURY_APPROVE','TREASURY_RELEASE','TREASURY_PAY','TREASURY_REVERSE']
     }
     for role,codes in entitlement_grants.items():
         for code in codes:
