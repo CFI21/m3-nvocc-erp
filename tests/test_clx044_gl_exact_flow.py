@@ -24,7 +24,9 @@ class FakeRequest:
 def isolated_db(tmp_path,monkeypatch):
     monkeypatch.setattr(db,'DB_PATH',tmp_path/'clx044.db')
     seed_run(True)
-    gl_seed_run()
+    conn=db.connect()
+    try: gl_seed_run(conn)
+    finally: conn.close()
     masterdata_seed_run()
     admin_seed_run()
     return db.DB_PATH
@@ -41,13 +43,14 @@ def test_gl_exact_setup_transaction_reports_order():
     c=build_catalog()
     general=next(x for x in c['menu'] if x['domain']=='General / Administration')
     by_name={x['name']:x for x in general['submenus']}
-    assert 'Setup' in by_name and 'Transaction' in by_name and 'Reports' in by_name
-    setup=[x.split('::',1)[1] for x in by_name['Setup']['screens']]
-    tx=[x.split('::',1)[1] for x in by_name['Transaction']['screens']]
+    setup_name='Finance & Accounting Setup · Setup'; tx_name='Finance & Accounting Setup · Transaction'; reports_name='Finance & Accounting Setup · Reports'
+    assert setup_name in by_name and tx_name in by_name and reports_name in by_name
+    setup=[x.split('::',1)[1] for x in by_name[setup_name]['screens']]
+    tx=[x.split('::',1)[1] for x in by_name[tx_name]['screens']]
     assert setup==GL_SETUP_ORDER
     assert tx==GL_TRANSACTION_ORDER
     names=[x['name'] for x in general['submenus']]
-    assert names.index('Setup') < names.index('Transaction') < names.index('Reports')
+    assert names.index(setup_name) < names.index(tx_name) < names.index(reports_name)
 
 def test_gl_module_keys_routes_and_screen_count_not_renamed():
     for key in GL_SETUP_ORDER+GL_TRANSACTION_ORDER:
