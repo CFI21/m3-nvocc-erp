@@ -60,6 +60,12 @@ def run():
     policies={'password_min_length':'10','max_failed_attempts':'5','lockout_minutes':'15','session_minutes':'60','mfa_required_sensitive':'true','reauth_minutes_sensitive':'10','deny_by_default':'true','sso_mode':'READINESS_ONLY'}
     for k,v in policies.items():c.execute('INSERT OR IGNORE INTO iam_security_policies(policy_key,policy_value,updated_at,updated_by) VALUES(?,?,?,?)',(k,v,now(),'seed'))
     for a,b,reason in [('FINANCE','TREASURY','Posting and payment release must be independently controlled'),('OPS','FINANCE','Operational maker cannot self-approve financial posting'),('MASTER_DATA','MASTER_DATA_MANAGER','Master-data maker/checker four-eyes control')]:c.execute('INSERT OR IGNORE INTO iam_sod_conflicts(conflict_code,role_a,role_b,reason,severity) VALUES(?,?,?,?,?)',(f'SOD-{a}-{b}',a,b,reason,'HIGH'))
+    for code,a,b,reason,severity in [
+      ('SOD-JOURNAL-MAKER-CHECKER','PERM:JOURNAL_CREATE','PERM:JOURNAL_APPROVE','Journal maker cannot hold checker capability','CRITICAL'),
+      ('SOD-POSTER-APPROVER','PERM:GL_POST','PERM:JOURNAL_APPROVE','Posting and approval capabilities must remain segregated','CRITICAL'),
+      ('SOD-PAYMENT-MAKER-RELEASER','CAP:PAYMENT_MAKER','CAP:PAYMENT_RELEASER','Payment maker cannot release the same payment','CRITICAL')
+    ]:
+        c.execute('INSERT OR IGNORE INTO iam_sod_conflicts(conflict_code,role_a,role_b,reason,severity,status) VALUES(?,?,?,?,?,?)',(code,a,b,reason,severity,'ACTIVE'))
     for rc,scope,res,act in [('SUPER_ADMIN','GLOBAL','*','*'),('OPS','OFFICE','agent-tasks','*'),('FINANCE','OFFICE','finance','view'),('GL_ACCOUNTANT','OFFICE','gl','create'),('GL_MANAGER','OFFICE','gl','*'),('TREASURY','OFFICE','treasury','*'),('AUDITOR','GLOBAL','*','view'),('MASTER_DATA_MANAGER','GLOBAL','masterdata','*'),('MASTER_DATA','GLOBAL','masterdata','create')]:c.execute('INSERT OR IGNORE INTO iam_scope_rules(rule_ref,role_code,scope_type,scope_value,resource,action,effect,priority) VALUES(?,?,?,?,?,?,?,?)',(f'RULE-{rc}',rc,scope,None,res,act,'ALLOW',100))
     for role,cur,limit,action in [('FINANCE','USD',100000,'APPROVE_VOUCHER'),('TREASURY','USD',75000,'RELEASE_PAYMENT'),('OFFICE_ADMIN','USD',10000,'APPROVE_EXPENSE')]:c.execute('INSERT OR IGNORE INTO iam_approval_limits(role_code,currency,amount_limit,action) VALUES(?,?,?,?)',(role,cur,limit,action))
     c.execute('INSERT OR IGNORE INTO iam_party_access(user_id,party_type,party_key,access_level) VALUES(?,?,?,?)',(uq['ops.rtm'],'CUSTOMER','CLX-CUS-001','EDIT'))
