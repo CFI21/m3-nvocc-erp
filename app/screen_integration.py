@@ -80,6 +80,7 @@ def require_screen(screen_id):
 def screen_role_allowed(s,role):
     r=role.upper()
     if r=='SUPER_ADMIN': r='ADMIN'
+    if r=='TREASURY': r='TREASURY_MANAGER'
     allowed={str(x).upper() for x in s.get('roles',[])}
     return not allowed or r in allowed
 
