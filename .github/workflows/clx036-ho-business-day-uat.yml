@@ -1,0 +1,45 @@
+name: M3 CLX036 HO Business Day UAT
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/clx036_ho_business_day.py"
+      - "app/main.py"
+      - "tests/test_clx036_ho_business_day.py"
+      - ".github/workflows/clx036-ho-business-day-uat.yml"
+  workflow_dispatch:
+
+jobs:
+  clx036-ho-business-day:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt pytest
+      - name: Compile
+        run: python -m py_compile app/*.py
+      - name: CLX-036 HO business day E2E
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx036_ho_business_day.py
+      - name: Preserve CLX-035 + finance governance + operations baseline
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx035_ho_completion.py
+          tests/test_clx031_ho_tasks_navigation.py
+          tests/test_clx019_catalog_roles.py
+          tests/test_clx034_smart_approval_fast_track.py
+          tests/test_clx033_finance_transaction_governance.py
+          tests/test_clx032_finance_controls.py
+          tests/test_clx030_finance_entitlements.py
+          tests/test_clx029_accounting_navigation_access.py
+          tests/test_clx025_operations_workbench.py
+          tests/test_clx026_exception_workflow.py
+          tests/test_clx027_control_tower.py
+          tests/test_clx028_management_kpi.py
+          tests/test_live_provider_runtime.py
