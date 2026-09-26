@@ -6,6 +6,8 @@ import json,datetime,hashlib,uuid
 from .db import connect,tx,backend_name
 from .json_recovery import load_json_or_recover_arrays
 from .gl import assert_period_postable,next_voucher
+from .admin import session as iam_session
+from .clx033_finance_transaction_governance import enforce_treasury_action
 
 HERE=Path(__file__).resolve().parent
 _TREASURY_META, META_RECOVERED = load_json_or_recover_arrays(
@@ -16,12 +18,12 @@ META=_TREASURY_META['modules']
 MODULES={x['key']:x for x in META}
 router=APIRouter(prefix='/api/v1/treasury',tags=['Treasury / AR-AP Settlement'])
 ROLE_PERMS={
- 'ADMIN':set('view create edit approve release reverse reconcile'.split()),
- 'FINANCE':set('view create edit approve release reverse reconcile'.split()),
+ 'ADMIN':set('view create edit approve release reverse reconcile write_off'.split()),
+ 'FINANCE':set('view create edit approve release reverse reconcile write_off'.split()),
  'GL_MANAGER':set('view create edit approve release reverse reconcile'.split()),
  'TREASURY_MANAGER':set('view create edit approve release reverse reconcile'.split()),
- 'AR_ACCOUNTANT':set('view create edit approve'.split()),
- 'AP_ACCOUNTANT':set('view create edit approve'.split()),
+ 'AR_ACCOUNTANT':set('view create edit approve write_off'.split()),
+ 'AP_ACCOUNTANT':set('view create edit approve write_off'.split()),
  'GL_ACCOUNTANT':set('view create edit'.split()),
  'AUDITOR':set('view'.split()), 'VIEWER':set('view'.split()),
  'OPS':set('view'.split()), 'DOCS':set(), 'AGENT':set()
@@ -166,8 +168,11 @@ def list_records(module:str,q:str=Query(''),status:str=Query(''),job_ref:str=Que
 def one(module:str,rid:int,x_role:str=Header('VIEWER')):
     require(module);actor(x_role);c=connect();r=getrec(c,module,rid);d=ser(r);c.close();return d
 @router.post('/{module}',status_code=201)
-def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_role:str=Header('VIEWER'),x_actor_id:str=Header('maker-user',alias='X-Actor-Id')):
-    require(module);role=actor(x_role,'create');errs=validate(module,b.fields)
+def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_role:str=Header('VIEWER'),x_actor_id:str=Header('maker-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require(module);role=actor(x_role,'create')
+    if x_m3_session:
+        c0=connect();s0=iam_session(c0,x_m3_session);x_actor_id=s0['user_ref'];c0.close()
+    errs=validate(module,b.fields)
     if errs:raise HTTPException(422,{'code':'VALIDATION_FAILED','errors':errs})
     c=connect();tx(c)
     try:
@@ -184,8 +189,11 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
     except Exception as e:c.execute('ROLLBACK');raise HTTPException(409,{'code':'DUPLICATE_OR_CONSTRAINT','detail':str(e)})
     finally:c.close()
 @router.put('/{module}/{rid}')
-def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_id:str=Header('maker-user',alias='X-Actor-Id')):
-    require(module);role=actor(x_role,'edit');errs=validate(module,b.fields)
+def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_id:str=Header('maker-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require(module);role=actor(x_role,'edit')
+    if x_m3_session:
+        c0=connect();s0=iam_session(c0,x_m3_session);x_actor_id=s0['user_ref'];c0.close()
+    errs=validate(module,b.fields)
     if errs:raise HTTPException(422,{'code':'VALIDATION_FAILED','errors':errs})
     c=connect();tx(c)
     try:
@@ -198,8 +206,12 @@ def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_i
     except HTTPException:c.execute('ROLLBACK');raise
     finally:c.close()
 @router.post('/{module}/{rid}/actions/{action}')
-def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'),x_actor_id:str=Header('actor-user',alias='X-Actor-Id')):
-    require(module);role=actor(x_role,action if action in {'approve','release','reverse','reconcile'} else 'edit');c=connect();tx(c);r=None
+def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'),x_actor_id:str=Header('actor-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require(module);action=action.lower().replace('-','_');role=actor(x_role,action if action in {'approve','release','reverse','reconcile','write_off'} else 'edit')
+    if action in {'approve','release','reverse','write_off'}: enforce_treasury_action(module,rid,action,x_m3_session,b.version)
+    if x_m3_session:
+        c0=connect();s0=iam_session(c0,x_m3_session);x_actor_id=s0['user_ref'];c0.close()
+    c=connect();tx(c);r=None
     try:
         r=getrec(c,module,rid)
         if r['version']!=b.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
@@ -220,6 +232,9 @@ def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'
             rev_ext=r['external_ref']+'-REV';rev_payload=dict(p);rev_payload['Status']='Reversal';rev_payload['Reversal Of']=r['external_ref']
             cur=c.execute('INSERT INTO treasury_records(module,external_ref,job_id,party_type,party_name,currency,amount,status,version,maker_id,checker_id,source_type,source_ref,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?)',(module,rev_ext,r['job_id'],r['party_type'],r['party_name'],r['currency'],-abs(r['amount']),'Reversal',x_actor_id,x_actor_id,'REVERSAL',r['external_ref'],json.dumps(rev_payload),now(),now()))
             c.execute('INSERT INTO treasury_reversals(original_record_id,reversal_record_id,original_voucher_id,reversal_voucher_id,reason,ts) VALUES(?,?,?,?,?,?)',(rid,cur.lastrowid,link['voucher_id'],rev_vid,b.reason or 'Treasury reversal',now()))
+        elif action=='write_off':
+            if not ('customer' in module or 'supplier' in module or 'carrier' in module):raise HTTPException(422,{'code':'WRITE_OFF_ONLY_AR_AP'})
+            new='Written Off'
         elif action=='reconcile':new='Reconciled'
         else:raise HTTPException(422,{'code':'UNSUPPORTED_ACTION'})
         p['Status']=new;cur=c.execute('UPDATE treasury_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?',(new,json.dumps(p),now(),rid,b.version))
