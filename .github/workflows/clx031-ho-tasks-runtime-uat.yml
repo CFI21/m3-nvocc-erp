@@ -1,0 +1,72 @@
+name: M3 CLX031 HO Tasks Runtime UAT
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx031-ho-tasks-runtime-uat.yml"
+  workflow_dispatch:
+
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Live HO Tasks menu route data quick-action UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, urllib.parse, urllib.request, urllib.error
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          def get(path, headers=None):
+              req=urllib.request.Request(API+path, headers=headers or {})
+              try:
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      return r.status, json.loads(r.read().decode())
+              except urllib.error.HTTPError as e:
+                  raw=e.read().decode()
+                  try: body=json.loads(raw)
+                  except: body={"raw":raw}
+                  return e.code, body
+
+          st,m=get("/api/clx011/menu")
+          assert st==200 and m["screen_count"]==193
+          ho=next(x for x in m["menu"] if x["domain"]=="HO Tasks")
+          assert ho["navigation_only"] is True
+          assert [x["name"] for x in ho["submenus"]]==["Transaction","Utilities"]
+          tx=ho["submenus"][0]["items"]; ut=ho["submenus"][1]["items"]
+          expected=[
+            "Agent Opening","Vendor Opening","Customer Opening","Container Purchase","Container Sale",
+            "Purchase Invoice","Purchase Invoice Slot","Sale Invoice","Payment","Receipt",
+            "Purchase Invoice Storage","Sale Invoice Detention","Sale Invoice Import","Lease Rental Transaction",
+            "Container Exchange","Exchange Rate Update","Third Party Deal Info","Third Party Tracking Info"
+          ]
+          assert [x["label"] for x in tx]==expected
+          assert len(ut)>=10
+
+          # Every alias target must be a real existing screen with real route/data/quick actions.
+          for item in tx+ut:
+              sid=item["target"]
+              q=urllib.parse.quote(sid,safe="")
+              s1,screen=get("/api/clx011/screen?screen_id="+q)
+              assert s1==200 and screen["screen_id"]==sid and screen["route"]
+              s2,data=get("/api/clx011/screen-data?screen_id="+q,{"X-Role":"ADMIN"})
+              assert s2==200, (item,s2,data)
+              s3,qa=get("/api/clx011/quick-actions?screen_id="+q+"&role=ADMIN")
+              assert s3==200 and "visible_actions" in qa and "quick-view" in qa["visible_actions"]
+
+          # Existing related-record chain remains available.
+          sr,related=get("/api/clx011/related/50001")
+          assert sr==200 and related["identity"]["job_ref"]=="50001"
+
+          # Least privilege: finance screen reused by HO aliases remains hidden from VIEWER at server level.
+          sid=urllib.parse.quote("gl-accounts::bills",safe="")
+          denied,_=get("/api/clx011/screen-data?screen_id="+sid,{"X-Role":"VIEWER"})
+          assert denied==403
+
+          # Search exposes legacy labels without creating screens.
+          ss,res=get("/api/clx011/menu?q="+urllib.parse.quote("Third Party"))
+          assert ss==200 and res["screen_count"]==0 and res["navigation_alias_count"]==2
+
+          print("CLX031_RUNTIME_PASS aliases=",len(tx)+len(ut),"screens=193")
+          PY
