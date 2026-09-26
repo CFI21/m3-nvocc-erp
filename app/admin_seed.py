@@ -22,10 +22,14 @@ def run():
         for a in ['view','create','edit','approve','release','admin']:
             c.execute('INSERT OR IGNORE INTO iam_permissions(permission_code,module,action,sensitive) VALUES(?,?,?,?)',(f'{m}:{a}',m,a,1 if a in ('approve','release','admin') else 0))
     gl_entitlements=[
-      ('GL_VIEW','gl','view',0),('GL_CREATE','gl','create',0),('GL_EDIT','gl','edit',0),('GL_DISABLE','gl','disable',1),('GL_POST','gl','post',1),
-      ('JOURNAL_CREATE','journal','create',0),('JOURNAL_APPROVE','journal','approve',1),('ACCOUNT_MAPPING_MANAGE','gl-config','account-mapping',1),
-      ('COST_PROFIT_CENTER_MANAGE','gl-config','cost-profit-center',1),('TAX_CURRENCY_MANAGE','gl-config','tax-currency',1),('PERIOD_CLOSE','gl-config','period-close',1),
-      ('FINANCE_CONFIG_ADMIN','gl-config','admin',1)
+      ('GL_VIEW','finance-entitlement','gl-view',0),('GL_CREATE','finance-entitlement','gl-create',0),('GL_EDIT','finance-entitlement','gl-edit',0),
+      ('GL_DISABLE','finance-entitlement','gl-disable',1),('GL_POST','finance-entitlement','gl-post',1),
+      ('JOURNAL_CREATE','finance-entitlement','journal-create',0),('JOURNAL_APPROVE','finance-entitlement','journal-approve',1),
+      ('ACCOUNT_MAPPING_MANAGE','finance-entitlement','account-mapping-manage',1),
+      ('COST_PROFIT_CENTER_MANAGE','finance-entitlement','cost-profit-center-manage',1),
+      ('TAX_CURRENCY_MANAGE','finance-entitlement','tax-currency-manage',1),
+      ('PERIOD_CLOSE','finance-entitlement','period-close',1),
+      ('FINANCE_CONFIG_ADMIN','finance-entitlement','finance-config-admin',1)
     ]
     for code,module,action,sensitive in gl_entitlements:
         c.execute('INSERT OR IGNORE INTO iam_permissions(permission_code,module,action,sensitive) VALUES(?,?,?,?)',(code,module,action,sensitive))
