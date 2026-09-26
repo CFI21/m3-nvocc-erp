@@ -45,8 +45,7 @@ def test_writeoff_and_reverse_always_require_manual_approval(isolated_db):
 
 
 def test_treasury_payment_release_stays_four_eyes(isolated_db):
-    treasury=token('treasury1','Treasury123!')
-    add_limit('treasury1',1,amount=100000,action='RELEASE',tx='TREASURY',office='*',country='*')
+    treasury=token('admin','Admin123!')
     with pytest.raises(HTTPException) as exc:
         enforce_execution(
             'TREASURY','bank-payment',704,'RELEASE',treasury,1,2500,'USD','TREASURY',
