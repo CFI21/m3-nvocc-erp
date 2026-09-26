@@ -1,0 +1,77 @@
+name: M3 CLX026 Exception Workflow UAT
+on:
+  workflow_dispatch:
+jobs:
+  uat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runtime lifecycle and queue UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/refresh"             -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-system" -o /tmp/refresh.json
+
+          curl --fail --silent "$API/api/v1/operations-workbench"             -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner" -H "X-Team: OPS" -o /tmp/all.json
+
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/all.json'))
+          assert d['phase']=='CLX-026'
+          assert d['lifecycle']==['OPEN','ACKNOWLEDGED','IN_PROGRESS','RESOLVED','CLOSED']
+          assert set(d['views'])=={'my','team','overdue','critical'}
+          assert d['maker_checker_preserved'] is True
+          assert d['live_providers']=='OFF'
+          assert d['real_money']=='OFF'
+          assert d['summary']['total'] >= 1
+          keys=[x['exception_key'] for x in d['items'] if x['status']=='OPEN']
+          assert keys
+          open('/tmp/key','w').write(keys[0])
+          print('CLX026_DERIVED_PASS total='+str(d['summary']['total']))
+          PY
+
+          KEY=$(cat /tmp/key)
+
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/$KEY/assign"             -H "Content-Type: application/json" -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-manager"             --data '{"owner":"clx026-uat-owner","team":"OPS","comment":"assign uat"}' -o /tmp/assign.json
+
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/$KEY/lifecycle"             -H "Content-Type: application/json" -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner"             --data '{"action":"ACKNOWLEDGE","comment":"ack uat"}' -o /tmp/ack.json
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/$KEY/lifecycle"             -H "Content-Type: application/json" -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner"             --data '{"action":"START","comment":"start uat"}' -o /tmp/start.json
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/$KEY/lifecycle"             -H "Content-Type: application/json" -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner"             --data '{"action":"RESOLVE","resolution_code":"UAT_VERIFIED","comment":"resolve uat"}' -o /tmp/resolve.json
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/$KEY/lifecycle"             -H "Content-Type: application/json" -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner"             --data '{"action":"CLOSE","comment":"close uat"}' -o /tmp/close.json
+
+          curl --fail --silent "$API/api/v1/operations-workbench/$KEY/history" -H "X-Role: AUDITOR" -o /tmp/history.json
+          curl --fail --silent "$API/api/v1/operations-workbench?view=my"             -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner" -H "X-Team: OPS" -o /tmp/my.json
+          curl --fail --silent "$API/api/v1/operations-workbench?view=team"             -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner" -H "X-Team: OPS" -o /tmp/team.json
+          curl --fail --silent "$API/api/v1/operations-workbench?view=overdue"             -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner" -H "X-Team: OPS" -o /tmp/overdue.json
+          curl --fail --silent "$API/api/v1/operations-workbench?view=critical"             -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-owner" -H "X-Team: OPS" -o /tmp/critical.json
+          curl --fail --silent "$API/api/v1/operations-workbench/UAT:CLX026:AUTO_CLOSE/history" -H "X-Role: AUDITOR" -o /tmp/autoclose.json
+          curl --fail --silent "$API/api/v1/operations-workbench/control-status" -H "X-Role: AUDITOR" -o /tmp/control.json
+
+          python - <<'PY'
+          import json
+          for fn,target in [('ack','ACKNOWLEDGED'),('start','IN_PROGRESS'),('resolve','RESOLVED'),('close','CLOSED')]:
+              d=json.load(open('/tmp/'+fn+'.json'))
+              assert d['ok'] is True and d['to']==target
+          h=json.load(open('/tmp/history.json'))['history']
+          transitions=[x.get('to_status') for x in h if x.get('action')=='LIFECYCLE']
+          assert transitions[-4:]==['ACKNOWLEDGED','IN_PROGRESS','RESOLVED','CLOSED']
+          a=json.load(open('/tmp/autoclose.json'))['history']
+          assert any(x.get('action')=='AUTO_CLOSE' and x.get('resolution_code')=='AUTO_SOURCE_CLEARED' for x in a)
+          c=json.load(open('/tmp/control.json'))
+          assert c['phase']=='CLX-026'
+          assert c['auto_refresh'] is True and c['auto_close_when_source_cleared'] is True
+          assert c['maker_checker_preserved'] is True and c['four_eyes_preserved'] is True
+          assert c['live_provider_activation'] is False and c['real_money'] is False
+          print('CLX026_LIFECYCLE_CONTROL_PASS')
+          PY
+
+          # Active source must reopen after a controlled refresh.
+          curl --fail --silent -X POST "$API/api/v1/operations-workbench/refresh"             -H "X-Role: OPS" -H "X-Actor-Id: clx026-uat-system" -o /tmp/refresh2.json
+          curl --fail --silent "$API/api/v1/operations-workbench/$KEY/history" -H "X-Role: AUDITOR" -o /tmp/history2.json
+          python - <<'PY'
+          import json
+          h=json.load(open('/tmp/history2.json'))['history']
+          assert any(x.get('action')=='AUTO_REOPEN' and x.get('to_status')=='OPEN' for x in h)
+          print('CLX026_AUTO_REFRESH_REOPEN_PASS')
+          PY
