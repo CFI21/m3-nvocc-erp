@@ -131,9 +131,9 @@ DOMAIN_SUBMENU_ORDER = {
     },
     'General / Administration': {
         'Overview': 0, 'Organization': 10, 'Identity': 20,
-        'Setup': 30,
-        'Transaction': 40,
-        'Reports': 45,
+        'Finance & Accounting Setup · Setup': 30,
+        'Finance & Accounting Setup · Transaction': 40,
+        'Finance & Accounting Setup · Reports': 45,
         'Governance': 50, 'Security': 60,
     },
     'Master Data': {'Master Records': 10, 'Governance': 20},
@@ -193,7 +193,7 @@ def build_catalog() -> dict[str, Any]:
     gl_modules += [(g,m) for g,m in gl_extra if m['key'] not in seen]
     for group,m in gl_modules:
         s=_base_screen(
-            'gl-accounts','General / Administration',gl_groups[group],m['key'],m['name'],m['route'],
+            'gl-accounts','General / Administration','Finance & Accounting Setup · '+gl_groups[group],m['key'],m['name'],m['route'],
             COMMON_MUTATE + COMMON_READ + ['approve','release','reverse']
         )
         s['roles']=['ADMIN','GL_MANAGER','GL_ACCOUNTANT','AUDITOR']
