@@ -32,8 +32,16 @@ def permission(c,uid,module,action,office_code=None):
 
 def permission_code(c,uid,permission_code,office_code=None):
     ts=now()
-    direct=c.execute('''SELECT 1 FROM iam_temporary_access WHERE user_id=? AND permission_code=? AND status='ACTIVE'
-      AND valid_from<=? AND valid_to>=? LIMIT 1''',(uid,permission_code,ts,ts)).fetchone()
+    if office_code:
+        direct=c.execute('''SELECT 1 FROM iam_temporary_access t JOIN iam_users u ON u.id=t.user_id
+          JOIN iam_offices o ON o.id=u.home_office_id
+          WHERE t.user_id=? AND t.permission_code=? AND t.status='ACTIVE'
+          AND t.valid_from<=? AND t.valid_to>=? AND o.office_code=? LIMIT 1''',
+          (uid,permission_code,ts,ts,office_code)).fetchone()
+    else:
+        direct=c.execute('''SELECT 1 FROM iam_temporary_access t WHERE t.user_id=? AND t.permission_code=?
+          AND t.status='ACTIVE' AND t.valid_from<=? AND t.valid_to>=? LIMIT 1''',
+          (uid,permission_code,ts,ts)).fetchone()
     if direct:return True
     for r in roles_for(c,uid):
         q=c.execute('''SELECT 1 FROM iam_role_permissions rp JOIN iam_permissions p ON p.id=rp.permission_id
