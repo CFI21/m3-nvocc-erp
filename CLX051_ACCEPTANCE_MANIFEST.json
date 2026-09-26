@@ -1,0 +1,145 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX051-PRODUCTION-READINESS-ACCEPTED-20260926",
+  "phase": "CLX-051",
+  "title": "Bulk Production Readiness Consolidation + Controlled Cutover Drill",
+  "status": "ACCEPTED",
+  "production_ready": true,
+  "accepted_code_commit": "3f71b83e30a066c397e92808062ae9d4f05ce5c8",
+  "parentBaseline": "M3-CLX050-FULL-ERP-OPERATIONAL-UAT-ACCEPTED-20260926",
+  "scope": {
+    "screenBaseline": 196,
+    "screenCountChange": 0,
+    "menuOrder": "PRESERVED",
+    "businessLogic": "PRESERVED",
+    "dataModelBusinessChange": false,
+    "apiContractBreak": false,
+    "roleDataScope": "PRESERVED",
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "sod": "PRESERVED",
+    "audit": "PRESERVED",
+    "newBusinessModules": false
+  },
+  "security": {
+    "serverOnlyRlsTables": [
+      "provider_live_configs",
+      "provider_live_events",
+      "provider_live_attempts",
+      "provider_callback_receipts",
+      "operations_work_items",
+      "operations_work_history",
+      "management_daily_snapshots",
+      "management_alert_rules",
+      "management_alert_events"
+    ],
+    "serverOnlyRlsEnabled": true,
+    "anonAuthenticatedPoliciesAdded": false,
+    "denyByDefault": true,
+    "managementSnapshotFunctionSearchPathHardened": true,
+    "explicitLogoutSessionRevocation": true,
+    "webCspHsts": true,
+    "apiCspHsts": true,
+    "supabaseSecurityAdvisor": "INFO_ONLY_RLS_ENABLED_NO_POLICY_INTENTIONAL"
+  },
+  "database": {
+    "provider": "Supabase",
+    "project": "M3-NVOCC-PROD",
+    "projectRef": "ozupgknqaqgvprliewxe",
+    "backend": "PostgreSQL 17.6",
+    "approvedTargetLock": "PASS",
+    "sqliteProductionFallback": "BLOCKED_WHEN_DATABASE_URL_SET",
+    "jobs50001to50005": [
+      "50001",
+      "50002",
+      "50003",
+      "50004",
+      "50005"
+    ],
+    "orphanCounts": {
+      "transactions": 0,
+      "gl": 0,
+      "treasury": 0,
+      "integration": 0
+    },
+    "duplicateCounts": {
+      "transactions": 0,
+      "gl": 0,
+      "treasury": 0,
+      "integration": 0
+    },
+    "isolatedRestoreDrill": {
+      "status": "PASS",
+      "source": "m3_backup_clx016",
+      "restoredJobs": 5,
+      "transactionRecords": 95,
+      "glRecords": 280,
+      "treasuryRecords": 185,
+      "integrationRecords": 100,
+      "liveBusinessTablesChanged": false
+    }
+  },
+  "regression": {
+    "clx051ProductionReadiness": "PASS",
+    "clx050OperationalUat": "PASS",
+    "buildFirst": "PASS",
+    "clx030": "PASS",
+    "clx032": "PASS",
+    "clx033": "PASS",
+    "clx034": "PASS",
+    "clx035": "PASS",
+    "clx036": "PASS",
+    "clx042": "PASS",
+    "clx043": "PASS",
+    "clx044": "PASS",
+    "clx045": "PASS",
+    "clx046": "PASS",
+    "clx047": "PASS",
+    "clx048": "PASS",
+    "clx049": "PASS"
+  },
+  "evidence": {
+    "pullRequest": 35,
+    "clx051Head": "8cf23e44573702c2c739ed06ba7f5bb024b5d796",
+    "mergeCommit": "3f71b83e30a066c397e92808062ae9d4f05ce5c8",
+    "clx051RunId": "36272428167",
+    "mainPredeployRunId": "36272507843",
+    "webGhcrBuildRunId": "36272507836",
+    "apiGhcrBuildRunId": "36272507823",
+    "candidateWebImageDigest": "sha256:069beaca63368729f10a5ab5be57824963b40ff25331a8a4f8574cf9a59aa00b",
+    "candidateApiImageDigest": "sha256:bbc746f1317f5eec88addfb040acb94f2d7e33760c57dcd965cd3b013d050c31",
+    "initialCandidateWebDeployId": "dep-das3e0rbc2fs7395jve0",
+    "initialCandidateApiDeployId": "dep-das3e1h7lnhs73fet6og",
+    "rollbackRetagRunId": "36272621530",
+    "rollbackTarget": {
+      "baseline": "CLX-050",
+      "webDigest": "sha256:081bbee4a60f9b1e39b23153f0e517793ce0203dd4edb96a982d668231c2c4ee",
+      "apiDigest": "sha256:fe00e3155ce75a44acc1a3cec879ac143cc158699b843123fb6c0a24aff77381",
+      "webDeployId": "dep-das3emrbc2fs7395n0eg",
+      "apiDeployId": "dep-das3enjbc2fs7395n2k0",
+      "webStatus": "LIVE",
+      "apiStatus": "LIVE",
+      "apiStartup": "COMPLETE",
+      "status": "PASS"
+    },
+    "restoreRetagRunId": "36272688214",
+    "restoredCandidate": {
+      "webDeployId": "dep-das3f797lnhs73ff1qb0",
+      "apiDeployId": "dep-das3f80jo6nc73a21qq0",
+      "webDigest": "sha256:069beaca63368729f10a5ab5be57824963b40ff25331a8a4f8574cf9a59aa00b",
+      "apiDigest": "sha256:bbc746f1317f5eec88addfb040acb94f2d7e33760c57dcd965cd3b013d050c31",
+      "webStatus": "LIVE",
+      "apiStatus": "LIVE",
+      "apiStartup": "COMPLETE",
+      "apiHealth": "HTTP_200_REPEATED",
+      "status": "PASS"
+    },
+    "controlledRollbackRestoreDrill": "PASS"
+  },
+  "controls": {
+    "productionTraffic": false,
+    "liveProviders": false,
+    "realMoney": false
+  },
+  "freeze": true
+}
