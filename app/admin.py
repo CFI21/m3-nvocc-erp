@@ -90,6 +90,7 @@ def set_user_status(username:str,b:UserStatus,x_m3_session:Optional[str]=Header(
     if not permission(c,s['user_id'],'identity','admin',s['office_code']): c.close(); raise HTTPException(403,{'code':'PERMISSION_DENIED'})
     u=c.execute('SELECT * FROM iam_users WHERE username=?',(username,)).fetchone()
     if not u: c.close(); raise HTTPException(404,'User not found')
+    if u['id']==s['user_id'] and b.status!='ACTIVE': c.close(); raise HTTPException(409,{'code':'SELF_DEACTIVATION_BLOCKED'})
     before={'status':u['status'],'version':u['version']}; c.execute('UPDATE iam_users SET status=?,version=version+1 WHERE id=?',(b.status,u['id'])); audit(c,s['user_ref'],'USER_STATUS','USER',u['user_ref'],before,{'status':b.status}); c.close(); return {'status':b.status,'user_ref':u['user_ref']}
 @router.get('/roles')
 def roles(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_roles ORDER BY id')];c.close();return x
@@ -125,9 +126,11 @@ def temporary_access(): c=connect();x=[dict(r) for r in c.execute('''SELECT t.*,
 def create_temp(b:TempAccess,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect(); s=session(c,x_m3_session)
     if not permission(c,s['user_id'],'identity','admin',s['office_code']): c.close(); raise HTTPException(403,{'code':'PERMISSION_DENIED'})
-    u=c.execute('SELECT * FROM iam_users WHERE username=?',(b.username,)).fetchone(); p=c.execute('SELECT 1 FROM iam_permissions WHERE permission_code=?',(b.permission_code,)).fetchone()
+    u=c.execute('SELECT * FROM iam_users WHERE username=?',(b.username,)).fetchone(); p=c.execute('SELECT sensitive FROM iam_permissions WHERE permission_code=?',(b.permission_code,)).fetchone()
     if not u or not p: c.close(); raise HTTPException(404,'User or permission not found')
-    if b.valid_to<=b.valid_from: c.close(); raise HTTPException(422,{'code':'INVALID_EFFECTIVE_DATES'})
+    if u['status']!='ACTIVE': c.close(); raise HTTPException(409,{'code':'USER_NOT_ACTIVE'})
+    if b.valid_to<=b.valid_from or b.valid_to<=now(): c.close(); raise HTTPException(422,{'code':'INVALID_EFFECTIVE_DATES'})
+    if u['id']==s['user_id'] and p['sensitive']: c.close(); raise HTTPException(409,{'code':'FOUR_EYES_SELF_TEMP_ACCESS_BLOCKED'})
     ref='TMP-'+uuid.uuid4().hex[:8].upper(); c.execute('INSERT INTO iam_temporary_access(temp_ref,user_id,permission_code,valid_from,valid_to,reason,approved_by) VALUES(?,?,?,?,?,?,?)',(ref,u['id'],b.permission_code,b.valid_from,b.valid_to,b.reason,s['user_ref'])); audit(c,s['user_ref'],'TEMP_ACCESS_CREATE','USER',u['user_ref'],after={'permission':b.permission_code,'valid_to':b.valid_to}); c.close(); return {'temp_ref':ref,'status':'ACTIVE'}
 @router.get('/access-reviews')
 def reviews(): c=connect();x=[dict(r) for r in c.execute('''SELECT ar.*,u.user_ref,u.username FROM iam_access_reviews ar JOIN iam_users u ON u.id=ar.user_id ORDER BY ar.id''')];c.close();return x
@@ -151,6 +154,11 @@ def assign(b:Assign,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')
     if not permission(c,s['user_id'],'identity','admin',s['office_code']):c.close();raise HTTPException(403,{'code':'PERMISSION_DENIED'})
     u=c.execute('SELECT * FROM iam_users WHERE username=?',(b.username,)).fetchone();r=c.execute('SELECT * FROM iam_roles WHERE role_code=?',(b.role_code,)).fetchone();o=c.execute('SELECT * FROM iam_offices WHERE office_code=?',(b.office_code or s['office_code'],)).fetchone()
     if not u or not r or not o:c.close();raise HTTPException(404,'User/role/office not found')
+    if u['status']!='ACTIVE':c.close();raise HTTPException(409,{'code':'USER_NOT_ACTIVE'})
+    if r['status']!='ACTIVE':c.close();raise HTTPException(409,{'code':'ROLE_NOT_ACTIVE'})
+    if o['status']!='ACTIVE':c.close();raise HTTPException(409,{'code':'OFFICE_NOT_ACTIVE'})
+    if b.valid_to and b.valid_to<=now():c.close();raise HTTPException(422,{'code':'INVALID_EFFECTIVE_DATES'})
+    if u['id']==s['user_id'] and r['sensitive']:c.close();raise HTTPException(409,{'code':'FOUR_EYES_SELF_ROLE_ASSIGNMENT_BLOCKED'})
     existing={x['role_code'] for x in roles_for(c,u['id'])}
     for er in existing:
         conf=c.execute("SELECT * FROM iam_sod_conflicts WHERE status='ACTIVE' AND ((role_a=? AND role_b=?) OR (role_b=? AND role_a=?))",(b.role_code,er,b.role_code,er)).fetchone()
