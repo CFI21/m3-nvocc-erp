@@ -6,6 +6,7 @@ from pathlib import Path
 import json,hashlib,uuid,datetime,sqlite3
 from .db import connect,tx,IntegrityError,backend_name
 from .json_recovery import load_json_or_recover_arrays
+from .admin import session as iam_session, permission_code as iam_permission_code
 
 HERE=Path(__file__).resolve().parent
 META, META_RECOVERED = load_json_or_recover_arrays(
@@ -44,7 +45,25 @@ def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def jdump(x):return json.dumps(x,sort_keys=True,separators=(',',':'))
 def require_module(m):
     if m not in MODULES: raise HTTPException(404,'Unknown GL module')
-def actor(role,action='view'):
+def actor(role,action='view',session_token=None,module=None):
+    if session_token:
+        c=connect()
+        try:
+            s=iam_session(c,session_token)
+            code='GL_VIEW'
+            if action=='create': code='JOURNAL_CREATE' if module=='voucher' else 'GL_CREATE'
+            elif action=='edit': code='GL_EDIT'
+            elif action=='approve': code='JOURNAL_APPROVE'
+            elif action=='post': code='GL_POST'
+            elif action=='reverse': code='GL_POST'
+            elif action=='cancel': code='GL_EDIT'
+            elif action=='reconcile': code='GL_EDIT'
+            if module=='account-integration' and action in {'create','edit'}: code='ACCOUNT_MAPPING_MANAGE'
+            if module in {'currency','fx-rates'} and action in {'create','edit'}: code='TAX_CURRENCY_MANAGE'
+            if module in {'accounting-periods','fiscal-year'} and action in {'create','edit'}: code='PERIOD_CLOSE'
+            if not iam_permission_code(c,s['user_id'],code,s['office_code']): raise HTTPException(403,{'code':'GL_ENTITLEMENT_REQUIRED','permission':code})
+            return s['user_ref']
+        finally:c.close()
     role=role.upper()
     if role not in ROLE_PERMS: raise HTTPException(403,'Unknown role')
     if action not in ROLE_PERMS[role]: raise HTTPException(403,f'Role cannot {action} GL')
@@ -148,35 +167,35 @@ def health():return {'project':'M3 NVOCC ERP','baseline':'M3-CLX006-REBRAND-2026
 @router.get('/modules')
 def modules():return ALL
 @router.get('/trial-balance')
-def trial_balance(x_role:str=Header('VIEWER')):
-    actor(x_role,'view'); conn=connect(); rows=[dict(r) for r in conn.execute('''SELECT a.account_code,a.account_name,a.account_type,ROUND(COALESCE(SUM(l.debit),0),2) debit,ROUND(COALESCE(SUM(l.credit),0),2) credit,ROUND(COALESCE(SUM(l.debit-l.credit),0),2) balance FROM gl_accounts a LEFT JOIN gl_voucher_lines l ON l.account_code=a.account_code LEFT JOIN gl_vouchers v ON v.id=l.voucher_id AND v.status IN ('Posted','Approved') GROUP BY a.id ORDER BY a.account_code''')]; conn.close(); return rows
+def trial_balance(x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    actor(x_role,'view',x_m3_session); conn=connect(); rows=[dict(r) for r in conn.execute('''SELECT a.account_code,a.account_name,a.account_type,ROUND(COALESCE(SUM(l.debit),0),2) debit,ROUND(COALESCE(SUM(l.credit),0),2) credit,ROUND(COALESCE(SUM(l.debit-l.credit),0),2) balance FROM gl_accounts a LEFT JOIN gl_voucher_lines l ON l.account_code=a.account_code LEFT JOIN gl_vouchers v ON v.id=l.voucher_id AND v.status IN ('Posted','Approved') GROUP BY a.id ORDER BY a.account_code''')]; conn.close(); return rows
 @router.get('/job/{job_ref}/links')
-def job_links(job_ref:str,x_role:str=Header('VIEWER')):
-    actor(x_role,'view'); conn=connect(); j=conn.execute('SELECT id,booking_id FROM jobs WHERE job_ref=?',(job_ref,)).fetchone()
+def job_links(job_ref:str,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    actor(x_role,'view',x_m3_session); conn=connect(); j=conn.execute('SELECT id,booking_id FROM jobs WHERE job_ref=?',(job_ref,)).fetchone()
     if not j: conn.close(); raise HTTPException(404,'Unknown job')
     rows=[dict(r) for r in conn.execute('''SELECT l.*,g.module,g.external_ref,v.voucher_no,v.status voucher_status FROM gl_source_links l LEFT JOIN gl_records g ON g.id=l.gl_record_id LEFT JOIN gl_vouchers v ON v.id=l.voucher_id WHERE l.job_id=? ORDER BY l.id''',(j['id'],))]
     ops=[dict(r) for r in conn.execute("SELECT module,external_ref,status FROM transaction_records WHERE job_id=? AND module IN ('soa','agent-receipt-pay','detention-collection','storage-cost','booking') ORDER BY module",(j['id'],))]
     conn.close();return {'job_ref':job_ref,'count':len(rows),'links':rows,'operational_sources':ops}
 @router.get('/voucher/{rid}/lines')
-def voucher_lines(rid:int,x_role:str=Header('VIEWER')):
-    actor(x_role,'view'); conn=connect(); v=voucher_for(conn,rid)
+def voucher_lines(rid:int,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    actor(x_role,'view',x_m3_session,'voucher'); conn=connect(); v=voucher_for(conn,rid)
     if not v:conn.close();raise HTTPException(404,'Voucher backing record not found')
     rows=[dict(r) for r in conn.execute('SELECT * FROM gl_voucher_lines WHERE voucher_id=? ORDER BY line_no',(v['id'],))]; ok,d,c=voucher_balanced(conn,v['id']); out={'voucher':dict(v),'balanced':ok,'debit':d,'credit':c,'lines':rows};conn.close();return out
 
 @router.get('/{module}')
-def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None,q:Optional[str]=None,x_role:str=Header('VIEWER')):
-    require_module(module);actor(x_role,'view');conn=connect();sql='''SELECT g.*,j.job_ref FROM gl_records g LEFT JOIN jobs j ON j.id=g.job_id WHERE g.module=?''';args=[module]
+def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None,q:Optional[str]=None,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module);actor(x_role,'view',x_m3_session,module);conn=connect();sql='''SELECT g.*,j.job_ref FROM gl_records g LEFT JOIN jobs j ON j.id=g.job_id WHERE g.module=?''';args=[module]
     if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
     if status:sql+=' AND g.status=?';args.append(status)
     sql+=' ORDER BY g.id';out=[serialize(r) for r in conn.execute(sql,args)];conn.close()
     if q:out=[r for r in out if q.lower() in json.dumps(r).lower()]
     return {'module':module,'count':len(out),'records':out}
 @router.get('/{module}/{rid}')
-def one(module:str,rid:int,x_role:str=Header('VIEWER')):
-    require_module(module);actor(x_role,'view');conn=connect();r=get_record(conn,module,rid);out=serialize(r);conn.close();return out
+def one(module:str,rid:int,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module);actor(x_role,'view',x_m3_session,module);conn=connect();r=get_record(conn,module,rid);out=serialize(r);conn.close();return out
 @router.post('/{module}',status_code=201)
-async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key')):
-    require_module(module);role=actor(x_role,'create');raw=await request.body();rh=hashlib.sha256(raw).hexdigest();conn=connect();tx(conn)
+async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key')):
+    require_module(module);role=actor(x_role,'create',x_m3_session,module);raw=await request.body();rh=hashlib.sha256(raw).hexdigest();conn=connect();tx(conn)
     try:
         if idempotency_key:
             prior=conn.execute('SELECT * FROM idempotency_keys WHERE actor_role=? AND idem_key=?',(role,'GL:'+idempotency_key)).fetchone()
@@ -196,8 +215,8 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
     except IntegrityError as e:conn.execute('ROLLBACK');raise HTTPException(409,'GL_INTEGRITY_CONFLICT')
     finally:conn.close()
 @router.put('/{module}/{rid}')
-def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER')):
-    require_module(module);role=actor(x_role,'edit');conn=connect();tx(conn)
+def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module);role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
@@ -210,8 +229,8 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER')):
     except HTTPException:conn.execute('ROLLBACK');raise
     finally:conn.close()
 @router.post('/{module}/{rid}/actions/{action}')
-def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER')):
-    require_module(module);action=action.lower();role=actor(x_role,action);conn=connect();tx(conn)
+def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module);action=action.lower();role=actor(x_role,action,x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
