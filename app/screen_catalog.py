@@ -38,19 +38,19 @@ HO_TRANSACTION_ALIASES = [
 ]
 
 HO_UTILITY_ALIASES = [
-    {'label':'User Management','target':'administration::users'},
-    {'label':'Security Policy','target':'integration-security::security-policies'},
-    {'label':'Password Policy','target':'administration::password-policy'},
-    {'label':'MFA Policy','target':'administration::mfa-policy'},
-    {'label':'Data Scope / Policy','target':'administration::data-scope-rules'},
+    {'label':'User Management','target':'administration::users','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
+    {'label':'Security Policy','target':'integration-security::security-policies','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
+    {'label':'Password Policy','target':'administration::password-policy','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
+    {'label':'MFA Policy','target':'administration::mfa-policy','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
+    {'label':'Data Scope / Policy','target':'administration::data-scope-rules','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
     {'label':'Detention Collection','target':'agent-tasks::detention-collection'},
     {'label':'Storage Cost','target':'agent-tasks::storage-cost'},
     {'label':'Template / Document Setup','target':'master-data::document-types'},
     {'label':'Configuration','target':'master-data::configurations'},
-    {'label':'Audit History','target':'administration::audit'},
-    {'label':'Integration Audit','target':'integration-security::request-response-audit'},
-    {'label':'Approval Limits','target':'administration::approval-limits'},
-    {'label':'Approval Queue','target':'master-data::approval-queue'},
+    {'label':'Audit History','target':'administration::audit','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
+    {'label':'Integration Audit','target':'integration-security::request-response-audit','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
+    {'label':'Approval Limits','target':'administration::approval-limits','roles':['ADMIN','FINANCE','GL_MANAGER','AUDITOR']},
+    {'label':'Approval Queue','target':'master-data::approval-queue','roles':['ADMIN','MASTER_DATA_MANAGER','AUDITOR']},
     {'label':'Fiscal Year','target':'gl-accounts::fiscal-year'},
     {'label':'Voucher Viewer','target':'gl-accounts::voucher-history'},
 ]
