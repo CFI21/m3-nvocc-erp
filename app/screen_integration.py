@@ -197,7 +197,7 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
 def functional_actions(s):
     common={'quick-view','related-records','print','export','email','audit-history'}
     sid=s['screen_id']; domain=s['domain']; key=s['key']; submenu=s.get('submenu','')
-    if domain=='Agent Tasks': return set(s['quick_actions'])
+    if domain=='Agent Tasks': return common|{'create','edit','approve','release','hold','cancel','amend','reissue','reverse','advance'}
     if sid.startswith('gl-accounts::'):
         if 'Reports & Reconciliation' in submenu: return common
         return common|{'create','edit','approve','reverse'}
@@ -236,9 +236,10 @@ def action_route(screen_id:str=Query(...),action:str=Query(...),record_id:Option
     s=require_screen(screen_id);a=action.lower();domain=s['domain'];key=s['key']
     if a in {'quick-view','print','export','related-records','audit-history'}:return {'mode':'CLIENT_OR_CLX011','action':a}
     if a=='email':return {'mode':'CLX011_SIMULATED','method':'POST','path':'/api/clx011/simulate-email'}
-    if domain=='Agent Tasks' and record_id:
-        if a in {'approve','release','hold','cancel','amend','reissue','reverse','advance'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/{key}/{record_id}/actions/{a}','requires':['version']}
-        if a=='edit':return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/{key}/{record_id}','requires':['version','fields']}
+    if domain=='Agent Tasks':
+        if a=='create': return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/{key}','requires':['fields']}
+        if record_id and a in {'approve','release','hold','cancel','amend','reissue','reverse','advance'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/{key}/{record_id}/actions/{a}','requires':['version']}
+        if record_id and a=='edit':return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/{key}/{record_id}','requires':['version','fields']}
     if screen_id.startswith('gl-accounts::'):
         if a=='create': return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/gl/{key}','requires':['fields']}
         if record_id and a=='edit': return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/gl/{key}/{record_id}','requires':['version','fields']}
