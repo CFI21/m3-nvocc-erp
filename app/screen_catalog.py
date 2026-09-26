@@ -7,6 +7,7 @@ from typing import Any
 from .json_recovery import load_json_or_recover_arrays
 from .admin import ADMIN_SCREENS
 from .masterdata import DOMAIN_SPECS, SCREENS as MASTER_SCREENS
+from .clx044_gl_exact_flow import apply_gl_exact_flow
 
 HERE = Path(__file__).resolve().parent
 
@@ -131,10 +132,9 @@ DOMAIN_SUBMENU_ORDER = {
     'General / Administration': {
         'Overview': 0, 'Organization': 10, 'Identity': 20,
         'Finance & Accounting Setup · Setup': 30,
-        'Finance & Accounting Setup · Transactions': 40,
+        'Finance & Accounting Setup · Transaction': 40,
+        'Finance & Accounting Setup · Reports': 45,
         'Governance': 50, 'Security': 60,
-        'Finance & Accounting Setup · Controls & Month End': 70,
-        'Finance & Accounting Setup · Reports & Reconciliation': 90,
     },
     'Master Data': {'Master Records': 10, 'Governance': 20},
 }
@@ -173,9 +173,10 @@ def build_catalog() -> dict[str, Any]:
     # GL: recover all complete entries from the truncated accepted file, then restore
     # only the persisted modules proven by the accepted PostgreSQL dataset/hardening API.
     gl,_=load_json_or_recover_arrays(HERE/'gl_meta.json',['setup','transactions','controls','reports'])
+    gl=apply_gl_exact_flow(gl)
     gl_groups={
-        'setup':'Setup','transactions':'Transactions',
-        'controls':'Controls & Month End','reports':'Reports & Reconciliation'
+        'setup':'Setup','transactions':'Transaction',
+        'controls':'Reports','reports':'Reports'
     }
     gl_modules=[]
     for group in ('setup','transactions','controls','reports'):
