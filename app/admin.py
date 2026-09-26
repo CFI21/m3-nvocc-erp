@@ -16,6 +16,10 @@ def policy(c,k,default):
     r=c.execute('SELECT policy_value FROM iam_security_policies WHERE policy_key=?',(k,)).fetchone(); return r['policy_value'] if r else default
 def roles_for(c,uid): return [dict(r) for r in c.execute('''SELECT r.role_code,ur.office_id,ur.country_id,ur.organization_id FROM iam_user_roles ur JOIN iam_roles r ON r.id=ur.role_id WHERE ur.user_id=? AND ur.status='ACTIVE' AND (ur.valid_to IS NULL OR ur.valid_to>=?)''',(uid,now()))]
 def permission(c,uid,module,action,office_code=None):
+    ts=now()
+    direct=c.execute('''SELECT 1 FROM iam_temporary_access t JOIN iam_permissions p ON p.permission_code=t.permission_code
+      WHERE t.user_id=? AND p.module=? AND p.action=? AND t.status='ACTIVE' AND t.valid_from<=? AND t.valid_to>=? LIMIT 1''',(uid,module,action,ts,ts)).fetchone()
+    if direct:return True
     for r in roles_for(c,uid):
         q=c.execute('''SELECT 1 FROM iam_role_permissions rp JOIN iam_permissions p ON p.id=rp.permission_id WHERE rp.role_id=(SELECT id FROM iam_roles WHERE role_code=?) AND p.module=? AND p.action=? AND rp.effect='ALLOW' ''',(r['role_code'],module,action)).fetchone()
         if q:
