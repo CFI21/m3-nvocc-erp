@@ -1,0 +1,36 @@
+name: M3 CLX038 Agent Tasks Menu UAT
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/masterdata.py"
+      - "app/masterdata_seed.py"
+      - "app/screen_catalog.py"
+      - "app/screen_integration.py"
+      - "tests/test_clx038_agent_tasks_menu.py"
+      - ".github/workflows/clx038-agent-tasks-menu-uat.yml"
+  workflow_dispatch:
+jobs:
+  clx038-agent-menu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Compile
+        run: python -m py_compile app/*.py
+      - name: Agent Tasks setup/transaction menu
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx038_agent_tasks_menu.py
+      - name: Preserve CLX-037 + HO + finance governance
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx037_ui_polish.py
+          tests/test_clx035_ho_completion.py
+          tests/test_clx034_smart_approval_fast_track.py
+          tests/test_clx033_finance_transaction_governance.py
