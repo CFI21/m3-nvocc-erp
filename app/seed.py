@@ -62,6 +62,10 @@ def _load_seed():
                 row=dict(by_job.get(jr) or {})
                 row.setdefault('Job Ref',jr)
                 row.setdefault('Status','Open')
+                if key=='split-bl':
+                    row.setdefault('Child B/L 1',f'CLXHBL{jr}-A')
+                    row.setdefault('Child B/L 2',f'CLXHBL{jr}-B')
+                    row.setdefault('Container',jobs[jr]['container'])
                 recovered.append(row)
             data[key]=recovered
         return {'modules':modules,'jobs':jobs,'data':data}
