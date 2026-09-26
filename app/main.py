@@ -270,7 +270,8 @@ async def security_headers(request, call_next):
     response.headers['X-Content-Type-Options']='nosniff'
     response.headers['X-Frame-Options']='DENY'
     response.headers['Referrer-Policy']='no-referrer'
-    response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://m3.test"
+    response.headers['Strict-Transport-Security']='max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://m3-nvocc-web-latest.onrender.com https://m3-nvocc-api-latest-1.onrender.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     response.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=()'
     response.headers['Cache-Control']='no-store' if request.url.path.startswith('/api/') else 'no-cache'
     return response
