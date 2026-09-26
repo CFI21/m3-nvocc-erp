@@ -7,6 +7,7 @@ import json,hashlib,uuid,datetime,sqlite3
 from .db import connect,tx,IntegrityError,backend_name
 from .json_recovery import load_json_or_recover_arrays
 from .admin import session as iam_session, permission_code as iam_permission_code
+from .clx033_finance_transaction_governance import enforce_gl_action
 
 HERE=Path(__file__).resolve().parent
 META, META_RECOVERED = load_json_or_recover_arrays(
@@ -18,8 +19,8 @@ MODULES={x['key']:x for x in ALL}
 SETUP={x['key'] for x in META['setup']}; TRANSACTIONS={x['key'] for x in META['transactions']}; CONTROLS={x['key'] for x in META.get('controls',[])}; REPORTS={x['key'] for x in META.get('reports',[])}
 router=APIRouter(prefix='/api/v1/gl',tags=['General / Administration · Finance & Accounting Setup'])
 ROLE_PERMS={
- 'ADMIN':set('view create edit approve post reverse cancel reconcile'.split()),
- 'GL_MANAGER':set('view create edit approve post reverse cancel reconcile'.split()),
+ 'ADMIN':set('view create edit approve post reverse cancel reconcile close'.split()),
+ 'GL_MANAGER':set('view create edit approve post reverse cancel reconcile close'.split()),
  'GL_ACCOUNTANT':set('view create edit post reconcile'.split()),
  'AUDITOR':set('view'.split()),
  'FINANCE':set(),
@@ -58,6 +59,7 @@ def actor(role,action='view',session_token=None,module=None):
             elif action=='reverse': code='GL_POST'
             elif action=='cancel': code='GL_EDIT'
             elif action=='reconcile': code='GL_EDIT'
+            elif action=='close': code='PERIOD_CLOSE'
             if module=='account-integration' and action in {'create','edit'}: code='ACCOUNT_MAPPING_MANAGE'
             if module in {'currency','fx-rates'} and action in {'create','edit'}: code='TAX_CURRENCY_MANAGE'
             if module in {'accounting-periods','fiscal-year'} and action in {'create','edit'}: code='PERIOD_CLOSE'
@@ -230,7 +232,9 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
     finally:conn.close()
 @router.post('/{module}/{rid}/actions/{action}')
 def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_module(module);action=action.lower();role=actor(x_role,action,x_m3_session,module);conn=connect();tx(conn)
+    require_module(module);action=action.lower();role=actor(x_role,action,x_m3_session,module)
+    if action in {'approve','post','reverse','close'}: enforce_gl_action(module,rid,action,x_m3_session,body.version,body.reason)
+    conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
@@ -266,6 +270,13 @@ def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEW
             done=approval_count(conn,v['id'])
             if v['status']!='Approved' or done<needed: raise HTTPException(422,{'code':'APPROVAL_REQUIRED_BEFORE_POSTING','approvals':done,'required':needed})
             conn.execute("UPDATE gl_vouchers SET status='Posted',posted_at=?,version=version+1 WHERE id=?",(now(),v['id']));st='Posted';p['Status']=st;meta.update({'balanced':True,'period_open':True,'approvals':done})
+        elif action=='close':
+            if module!='accounting-periods':raise HTTPException(422,{'code':'CLOSE_ONLY_ACCOUNTING_PERIOD'})
+            period_no=int(p.get('Period') or 0)
+            if period_no<1 or period_no>12:raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_NUMBER_REQUIRED'})
+            period=conn.execute('SELECT * FROM gl_periods WHERE period_no=? ORDER BY id DESC LIMIT 1',(period_no,)).fetchone()
+            if not period:raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_ENGINE_RECORD_MISSING'})
+            conn.execute("UPDATE gl_periods SET status='CLOSED' WHERE id=?",(period['id'],));st='CLOSED';p['Status']=st;meta.update({'period_no':period_no,'period_closed':True})
         elif action=='reverse':
             if module!='voucher':raise HTTPException(422,{'code':'REVERSE_ONLY_VOUCHER'})
             v=voucher_for(conn,rid)
