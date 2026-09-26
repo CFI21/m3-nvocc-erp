@@ -46,7 +46,7 @@ ADMIN_TABLE={
  'password-policy':'iam_security_policies','mfa-policy':'iam_security_policies','sso-readiness':'iam_sso_readiness'
 }
 MASTER_TABLE={
- 'change-requests':'md_change_requests','approval-queue':'md_change_requests','versions':'md_versions','duplicate-review':'md_records','aliases-merges':'md_aliases','data-quality':'md_quality_issues','reference-usage':'md_usage','effective-dates':'md_records','sequence-control':'md_sequences','integrity-scan':'md_quality_issues','hardcoded-scan':'md_config','master-audit':'md_audit'
+ 'change-requests':'md_change_requests','approval-queue':'md_change_requests','versions':'md_versions','duplicate-review':'md_records','aliases-merges':'md_aliases','data-quality':'md_quality_issues','reference-usage':'md_usage','effective-dates':'md_records','sequence-control':'md_sequences','integrity-scan':'md_quality_issues','hardcoded-scan':'md_config','audit':'md_audit'
 }
 
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -165,7 +165,7 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
             if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
             rows=safe_rows(c,sql,args)
         elif s['screen_id'].startswith('administration::'):
-            if s['key']=='identity-dashboard':
+            if s['screen_id']=='administration::dashboard':
                 rows=[{'Metric':'Users','Value':c.execute('SELECT COUNT(*) n FROM iam_users').fetchone()['n']},{'Metric':'Roles','Value':c.execute('SELECT COUNT(*) n FROM iam_roles').fetchone()['n']},{'Metric':'Open Access Reviews','Value':c.execute("SELECT COUNT(*) n FROM iam_access_reviews WHERE status!='COMPLETED'").fetchone()['n']}]
             else:
                 table=ADMIN_TABLE.get(s['key'])
@@ -173,7 +173,7 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
         else:
             if s['key'] in MD_DOMAIN_MAP:
                 rows=safe_rows(c,'SELECT * FROM md_records WHERE domain=? ORDER BY id DESC',(MD_DOMAIN_MAP[s['key']],))
-            elif s['key']=='master-dashboard':
+            elif s['screen_id']=='master-data::dashboard':
                 rows=[{'Metric':'Master Records','Value':c.execute('SELECT COUNT(*) n FROM md_records').fetchone()['n']},{'Metric':'Pending Changes','Value':c.execute("SELECT COUNT(*) n FROM md_change_requests WHERE status='PENDING'").fetchone()['n']},{'Metric':'Quality Issues','Value':c.execute("SELECT COUNT(*) n FROM md_quality_issues WHERE status!='RESOLVED'").fetchone()['n']}]
             elif s['key']=='approval-queue': rows=safe_rows(c,"SELECT * FROM md_change_requests WHERE status='PENDING' ORDER BY id DESC")
             elif s['key']=='duplicate-review': rows=safe_rows(c,"SELECT domain,lower(display_name) normalized_name,COUNT(*) n,GROUP_CONCAT(record_key) record_keys FROM md_records WHERE status='ACTIVE' GROUP BY domain,lower(display_name) HAVING COUNT(*)>1")
