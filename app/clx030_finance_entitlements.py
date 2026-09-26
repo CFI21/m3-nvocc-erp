@@ -204,8 +204,8 @@ def create_review(c,user_id,kind,payload,maker):
 
 @router.get('/matrix')
 def matrix(
-    q:Optional[str]=Query(None),
-    status:Optional[str]=Query(None),
+    q:Optional[str]=None,
+    status:Optional[str]=None,
     x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),
 ):
     c=connect()
