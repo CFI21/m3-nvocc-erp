@@ -249,7 +249,7 @@ def workflow(job_ref:str):
 
 @router.get('/search')
 def search(q:str=Query(...,min_length=2,max_length=80),role:str=Query('VIEWER')):
-    needle=q.lower();screen_hits=[{'type':'screen','screen_id':s['screen_id'],'name':s['name'],'domain':s['domain'],'submenu':s['submenu']} for s in CATALOG['screens'] if needle in json.dumps(s).lower()][:50]
+    needle=q.lower();r=role.upper();screen_hits=[{'type':'screen','screen_id':s['screen_id'],'name':s['name'],'domain':s['domain'],'submenu':s['submenu']} for s in CATALOG['screens'] if screen_role_allowed(s,r) and needle in json.dumps(s).lower()][:50]
     c=connect();record_hits=[];like='%'+needle+'%'
     try:
         for table,typ in [('transaction_records','agent'),('gl_records','gl'),('treasury_records','treasury'),('integration_records','integration')]:
