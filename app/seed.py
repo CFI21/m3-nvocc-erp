@@ -94,6 +94,24 @@ def _load_seed():
 
 def run(reset=True):
     SEED=_load_seed()
+    # CLX-049 build-first normalization: preserve existing Switch B/L test records,
+    # but guarantee their source relationship resolves to the authoritative HBL.
+    switch_rows=SEED.get('data',{}).get('switch-bl',[])
+    for i,row in enumerate(switch_rows):
+        raw=json.dumps(row,sort_keys=True)
+        hit=re.search(r'5000[1-5]',raw)
+        jr=hit.group(0) if hit else (list(SEED['jobs'])[i] if i < len(SEED['jobs']) else None)
+        if jr and jr in SEED['jobs']:
+            row.setdefault('Job Ref',jr)
+            row.setdefault('Original B/L',SEED['jobs'][jr]['bl'])
+            row.setdefault('Switch B/L',f'CLXSWBL{jr}')
+            row.setdefault('Original Shipper',f'Original Shipper {jr}')
+            row.setdefault('Original Consignee',SEED['jobs'][jr]['customer'])
+            row.setdefault('New Shipper',f'Switch Shipper {jr}')
+            row.setdefault('New Consignee',f'Switch Consignee {jr}')
+            row.setdefault('Reason','Synthetic switch B/L UAT')
+            row.setdefault('Confidentiality','Yes')
+            row.setdefault('Original B/L Preserved','Yes')
     if reset and DB_PATH.exists(): DB_PATH.unlink()
     conn=connect(); conn.executescript((HERE/'schema.sql').read_text()); now='2026-09-23T20:00:00Z'; jobs=SEED['jobs']
     for jr,j in jobs.items():
