@@ -191,11 +191,11 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
         j=jid(c,b.job_ref);ext=b.external_ref or b.fields.get(MODULES[module]['fields'][0]) or f'M3-{module[:8].upper()}-{uuid.uuid4().hex[:8].upper()}'
         amt=amount_from(b.fields);curr=b.fields.get('Currency') or b.fields.get('Settlement Currency') or 'USD';stat=b.fields.get('Status') or 'Draft'
         sensitive={'supplier-carrier-payment-allocation','payment-batches','advance-payments','customer-refunds','bank-transfer','inter-bank-transfer'}
-        source_ref=b.fields.get('Payment Ref') or b.fields.get('Bill Ref') or b.fields.get('Batch / Payment Ref') or b.fields.get('Reference') or b.source_ref
+        source_ref=b.fields.get('Payment Ref') or b.fields.get('Bill Ref') or b.fields.get('Batch / Payment Ref') or b.fields.get('Reference')
         if module in sensitive and source_ref:
             duplicate=c.execute("SELECT id,external_ref FROM treasury_records WHERE module=? AND source_ref=? AND ABS(amount-?)<0.005 AND currency=? AND status NOT IN ('Reversed','Cancelled') ORDER BY id LIMIT 1",(module,source_ref,amt,curr)).fetchone()
             if duplicate:raise HTTPException(409,{'code':'DUPLICATE_TREASURY_SOURCE','existing_ref':duplicate['external_ref']})
-        cur=c.execute('INSERT INTO treasury_records(module,external_ref,job_id,party_type,party_name,currency,amount,status,version,maker_id,source_type,source_ref,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)',(module,ext,j,None,b.fields.get('Party') or b.fields.get('Customer') or b.fields.get('Supplier / Carrier'),curr,amt,stat,x_actor_id,b.source_type,source_ref,json.dumps(b.fields),now(),now()))
+        cur=c.execute('INSERT INTO treasury_records(module,external_ref,job_id,party_type,party_name,currency,amount,status,version,maker_id,source_type,source_ref,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)',(module,ext,j,None,b.fields.get('Party') or b.fields.get('Customer') or b.fields.get('Supplier / Carrier'),curr,amt,stat,x_actor_id,None,source_ref,json.dumps(b.fields),now(),now()))
         r=getrec(c,module,cur.lastrowid);out=ser(r);audit(c,role,x_actor_id,'CREATE',module,r['id'],j,None,out)
         if idempotency_key:c.execute('INSERT INTO idempotency_keys(actor_role,idem_key,request_hash,response_json,status_code,created_at) VALUES(?,?,?,?,201,?)',(role,idempotency_key,hashlib.sha256(json.dumps(b.model_dump(),sort_keys=True).encode()).hexdigest(),json.dumps(out),now()))
         c.execute('COMMIT');return out
