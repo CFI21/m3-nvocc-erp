@@ -1,0 +1,24 @@
+name: M3 Build-First Fast Track
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+jobs:
+  build-first:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Lightweight compile
+        run: python -m py_compile app/*.py
+      - name: Current CLX-049 operational block
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx049_booking_bl_workspace.py
+      - name: One 196-screen completion sweep + one cross-domain business day
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_build_first_fast_track.py
