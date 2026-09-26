@@ -268,6 +268,8 @@ def _bulk(body:BulkAction,action:str,role:str,actor_id:str):
         stamp=now();changed=0
         for key in body.exception_keys:
             old=_state(c,key)
+            if not old:
+                raise HTTPException(404,{"code":"WORK_ITEM_NOT_FOUND","exception_key":key})
             if action=="assign":
                 if not body.owner:raise HTTPException(422,{"code":"OWNER_REQUIRED"})
                 c.execute("""INSERT INTO operations_work_items(exception_key,owner,team,work_status,created_at,updated_at)
