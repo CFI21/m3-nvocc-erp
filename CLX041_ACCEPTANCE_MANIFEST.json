@@ -1,0 +1,78 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX041-FULL-MENU-RATIONALIZATION-ACCEPTED-20260926",
+  "phase": "CLX-041",
+  "title": "Full Menu Hierarchy + Business Navigation Rationalization",
+  "status": "ACCEPTED",
+  "accepted_commit": "842a84471f3d7b289f6302de8c48c353e42020e0",
+  "parentBaseline": "M3-CLX040-TOP-LEVEL-MENU-ORDER-ACCEPTED-20260926",
+  "accepted_at": "2026-09-26T12:06:00Z",
+  "scope": {
+    "topLevelOrder": [
+      "Agent Tasks",
+      "HO Tasks",
+      "Treasury / AR-AP",
+      "Integration & Security",
+      "General / Administration",
+      "Master Data"
+    ],
+    "agentTasks": {
+      "submenus": ["Setup","Transaction"],
+      "setup": ["Agent","Common Parties","Vessel","Voyage Registration","Commodity","Units","Sales Person"],
+      "transactionScreens": 19
+    },
+    "hoTasks": {
+      "submenus": ["Transaction","Utilities"],
+      "utilitiesOrder": [
+        "Template / Document Setup","Configuration","User Management","Security Policy",
+        "Password Policy","MFA Policy","Data Scope / Policy","Fiscal Year",
+        "Detention Collection","Storage Cost","Approval Limits","Approval Queue",
+        "Voucher Viewer","Audit History","Integration Audit"
+      ]
+    },
+    "treasuryBusinessOrder": ["Overview","Setup","Cash / Bank","Settlement","Payments & Release","Cheques","Work Queues","Reports & Reconciliation"],
+    "integrationBusinessOrder": ["Overview","Providers","Sandbox Flows","Event Control","Reconciliation","Security / Control"],
+    "generalAdministrationPolicy": "Organization/Identity/Setup before Transactions; Governance/Security/Controls after Transactions; Reports last",
+    "masterDataOrder": ["Master Records","Governance"],
+    "auditHistoryPlacement": "LAST_WITHIN_SUBMENU",
+    "screenBaseline": 196,
+    "allScreensReachableExactlyOnceViaAuthoritativeDomainMenu": true,
+    "aliasTargetsOrphaned": 0,
+    "executiveHomeDefault": true,
+    "neutralGreySidebar": "PRESERVED",
+    "routes": "PRESERVED",
+    "roleDataScope": "PRESERVED",
+    "clx034SmartApproval": "PRESERVED",
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "sod": "PRESERVED",
+    "audit": "PRESERVED",
+    "apiContracts": "UNCHANGED",
+    "dataModel": "UNCHANGED",
+    "databaseMigration": false
+  },
+  "evidence": {
+    "pullRequest": 22,
+    "mergeCommit": "842a84471f3d7b289f6302de8c48c353e42020e0",
+    "preMergeClx041RunId": "36240759325",
+    "preMergeClx041": "PASS",
+    "preMergeClx040RunId": "36240759291",
+    "preMergeClx040": "PASS",
+    "preMergeClx038RunId": "36240759342",
+    "preMergeClx038": "PASS",
+    "preMergeClx035RunId": "36240759380",
+    "preMergeClx035": "PASS",
+    "preMergeClx029RunId": "36240759446",
+    "preMergeClx029": "PASS",
+    "postMergeVerificationPullRequest": 23,
+    "postMergeVerificationPullRequestMerged": false,
+    "postMergeClx041RunId": "36240821953",
+    "postMergeClx041": "PASS"
+  },
+  "controls": {
+    "liveProviders": false,
+    "realMoney": false,
+    "productionRuntimePromoted": false
+  },
+  "freeze": true
+}
