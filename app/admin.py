@@ -30,6 +30,23 @@ def permission(c,uid,module,action,office_code=None):
             return True
     return False
 
+def permission_code(c,uid,permission_code,office_code=None):
+    ts=now()
+    direct=c.execute('''SELECT 1 FROM iam_temporary_access WHERE user_id=? AND permission_code=? AND status='ACTIVE'
+      AND valid_from<=? AND valid_to>=? LIMIT 1''',(uid,permission_code,ts,ts)).fetchone()
+    if direct:return True
+    for r in roles_for(c,uid):
+        q=c.execute('''SELECT 1 FROM iam_role_permissions rp JOIN iam_permissions p ON p.id=rp.permission_id
+          WHERE rp.role_id=(SELECT id FROM iam_roles WHERE role_code=?) AND p.permission_code=? AND rp.effect='ALLOW' ''',
+          (r['role_code'],permission_code)).fetchone()
+        if q:
+            if r['role_code']=='SUPER_ADMIN': return True
+            if office_code and r['office_id']:
+                o=c.execute('SELECT office_code FROM iam_offices WHERE id=?',(r['office_id'],)).fetchone()
+                if not o or o['office_code']!=office_code: continue
+            return True
+    return False
+
 class Login(BaseModel): username:str; password:str; mfa_code:Optional[str]=None
 class Assign(BaseModel): username:str; role_code:str; office_code:Optional[str]=None; valid_to:Optional[str]=None
 class UserStatus(BaseModel): status:str=Field(pattern='^(ACTIVE|SUSPENDED|INACTIVE)$')
