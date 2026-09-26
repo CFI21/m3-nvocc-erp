@@ -233,7 +233,19 @@ def build_catalog() -> dict[str, Any]:
     for item in AGENT_SETUP_ALIASES + HO_TRANSACTION_ALIASES + HO_UTILITY_ALIASES:
         if item['target'] not in screen_ids:
             raise RuntimeError(f"M3_HO_ALIAS_TARGET_MISSING:{item['label']}->{item['target']}")
+    # CLX-040 top-level business navigation order:
+    # Agent activity first, then HO, followed by finance/integration/admin/master data.
+    agent_screens=[s for s in screens if s['domain']=='Agent Tasks']
     menu=[{
+        'domain':'Agent Tasks',
+        'submenus':[
+            {'name':'Setup','screens':[],'items':AGENT_SETUP_ALIASES},
+            {'name':'Transaction','screens':[s['screen_id'] for s in agent_screens]},
+        ],
+        'screen_count':len(agent_screens),
+        'navigation_alias_count':len(AGENT_SETUP_ALIASES),
+        'navigation_only':False,
+    },{
         'domain':'HO Tasks',
         'submenus':[
             {'name':'Transaction','screens':[],'items':HO_TRANSACTION_ALIASES},
@@ -243,18 +255,6 @@ def build_catalog() -> dict[str, Any]:
         'navigation_alias_count':len(HO_TRANSACTION_ALIASES)+len(HO_UTILITY_ALIASES),
         'navigation_only':True,
     }]
-    # Agent Tasks: Setup first, all operational screens remain under Transaction.
-    agent_screens=[s for s in screens if s['domain']=='Agent Tasks']
-    menu.append({
-        'domain':'Agent Tasks',
-        'submenus':[
-            {'name':'Setup','screens':[],'items':AGENT_SETUP_ALIASES},
-            {'name':'Transaction','screens':[s['screen_id'] for s in agent_screens]},
-        ],
-        'screen_count':len(agent_screens),
-        'navigation_alias_count':len(AGENT_SETUP_ALIASES),
-        'navigation_only':False,
-    })
 
     domain_order=['Treasury / AR-AP','Integration & Security','General / Administration','Master Data']
     for domain in domain_order:

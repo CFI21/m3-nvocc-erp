@@ -1,0 +1,35 @@
+name: M3 CLX040 Top-Level Menu Order UAT
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/screen_catalog.py"
+      - "tests/test_clx040_top_level_menu_order.py"
+      - ".github/workflows/clx040-top-level-menu-order-uat.yml"
+  workflow_dispatch:
+jobs:
+  clx040-menu-order:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Compile
+        run: python -m py_compile app/*.py
+      - name: CLX-040 menu hierarchy
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx040_top_level_menu_order.py
+      - name: Preserve CLX-039 + CLX-038 + governance
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx039_executive_home.py
+          tests/test_clx038_agent_tasks_menu.py
+          tests/test_clx037_ui_polish.py
+          tests/test_clx035_ho_completion.py
+          tests/test_clx034_smart_approval_fast_track.py
+          tests/test_clx033_finance_transaction_governance.py
