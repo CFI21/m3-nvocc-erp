@@ -36,6 +36,7 @@ from .clx036_ho_business_day import router as clx036_ho_business_day_router
 from .clx042_agent_workspace import router as clx042_agent_workspace_router
 from .clx044_gl_exact_flow import router as clx044_gl_exact_flow_router
 from .clx045_gl_reporting import router as clx045_gl_reporting_router
+from .clx046_treasury_hardening import router as clx046_treasury_hardening_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -60,6 +61,7 @@ app.include_router(clx036_ho_business_day_router)
 app.include_router(clx042_agent_workspace_router)
 app.include_router(clx044_gl_exact_flow_router)
 app.include_router(clx045_gl_reporting_router)
+app.include_router(clx046_treasury_hardening_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
