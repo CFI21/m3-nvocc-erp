@@ -113,7 +113,7 @@ def verify():
         labels=[x['label'] for x in routes]
         catalog=build_catalog()
         status='PASS' if (
-          catalog['screen_count']==193 and labels==HO_REQUIRED_LABELS
+          catalog['screen_count']==196 and labels==HO_REQUIRED_LABELS
           and all(x['resolved'] for x in routes) and all(x['pass'] for x in jobs)
         ) else 'FAIL'
         return {

@@ -12,7 +12,7 @@ def h(x): return hashlib.sha256(x.encode()).hexdigest()
 
 DOMAIN_SPECS={
  'customer':'Customers','agent':'Agents','carrier':'Carriers','port':'Ports','location':'Locations','vessel':'Vessels','voyage':'Voyages',
- 'equipment-type':'Equipment Types','container-type':'Container Types','commodity':'Commodities','package':'Packages','charge-code':'Charge Codes',
+ 'equipment-type':'Equipment Types','container-type':'Container Types','commodity':'Commodities','package':'Packages','common-party':'Common Parties','unit':'Units','sales-person':'Sales Persons','charge-code':'Charge Codes',
  'tax-code':'Tax Codes','currency':'Currencies','exchange-rate-type':'Exchange Rate Types','payment-term':'Payment Terms','bank':'Banks',
  'bank-account':'Bank Accounts','gl-account':'GL Accounts','cost-center':'Cost Centers','profit-center':'Profit Centers','trade-lane':'Trade Lanes',
  'service':'Services','route':'Routes','incoterm':'Incoterms','document-type':'Document Types','release-type':'Release Types',

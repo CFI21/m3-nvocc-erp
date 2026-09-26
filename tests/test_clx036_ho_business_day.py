@@ -22,7 +22,7 @@ def test_complete_ho_business_day_trace_passes_for_50001_50005(isolated_db):
     out=verify()
     assert out['status']=='PASS'
     assert out['canonical_jobs']==['50001','50002','50003','50004','50005']
-    assert out['screen_count']==193
+    assert out['screen_count']==196
     assert out['ho_transaction_aliases']==18
     assert [x['label'] for x in out['ho_routes']]==HO_REQUIRED_LABELS
     assert all(x['resolved'] for x in out['ho_routes'])
@@ -71,7 +71,7 @@ def test_clx034_exception_based_governance_remains_active(isolated_db):
 
 def test_no_screen_growth_or_business_model_change(isolated_db):
     c=build_catalog()
-    assert c['screen_count']==193
+    assert c['screen_count']==196
     out=verify()
     assert out['data_model_changed'] is False
     assert out['api_contracts']=='PRESERVED_WITH_ADDITIVE_CLX036_ENDPOINTS'

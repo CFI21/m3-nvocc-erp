@@ -87,7 +87,7 @@ def verification():
     util=[x for x in rows if x['submenu']=='Utilities']
     return {
         'phase':'CLX-035',
-        'status':'PASS' if c['screen_count']==193 and len(tx)==18 and len(util)==15 and not missing else 'FAIL',
+        'status':'PASS' if c['screen_count']==196 and len(tx)==18 and len(util)==15 and not missing else 'FAIL',
         'screen_count':c['screen_count'],
         'transaction_aliases':len(tx),
         'utility_aliases':len(util),
