@@ -19,7 +19,7 @@ def _f(v):
     except Exception:return 0.0
 
 def _match_filters(v,payload,company,period,date_from,date_to,currency,status,cost_center):
-    if status and str(v.get('status') or '').upper()!=status.upper():return False
+    if status and status.upper()!='ALL' and str(v.get('status') or '').upper()!=status.upper():return False
     if currency and str(v.get('currency') or '').upper()!=currency.upper():return False
     d=str(v.get('voucher_date') or '')
     if period and not d.startswith(period):return False
@@ -187,7 +187,7 @@ def _auth(role,session):
     return actor(role,'view',session)
 
 def _filters(company,period,date_from,date_to,account,cost_center,currency,status):
-    return dict(company=company,period=period,date_from=date_from,date_to=date_to,account=account,cost_center=cost_center,currency=currency,status=status or 'Posted')
+    return dict(company=company,period=period,date_from=date_from,date_to=date_to,account=account,cost_center=cost_center,currency=currency,status='Posted' if status is None else status)
 
 @router.get('/reports/{key}')
 def report(key:str,company:Optional[str]=None,period:Optional[str]=None,date_from:Optional[str]=None,date_to:Optional[str]=None,account:Optional[str]=None,cost_center:Optional[str]=None,currency:Optional[str]=None,status:Optional[str]=None,x_role:str=Header('AUDITOR'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
