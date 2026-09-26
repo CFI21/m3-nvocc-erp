@@ -140,6 +140,6 @@ def test_web_shell_interaction_contract():
     for marker in (
         "function calcRows", "openDrawer(", "loadRelated(", "loadAudit(",
         "renderQuickActions(", "showClx049Workspace(", "openClx49Link(",
-        "pageSize", "sortKey", "state.search"
+        "pageSize", "sortKey", "gridSearch"
     ):
         assert marker in html, marker
