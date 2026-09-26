@@ -12,8 +12,8 @@ EXPECTED_TX=[
 
 def test_ho_tasks_restored_without_screen_duplication():
     c=build_catalog()
-    assert c["screen_count"]==193
-    assert len(c["screens"])==193
+    assert c["screen_count"]==196
+    assert len(c["screens"])==196
     assert [x["label"] for x in HO_TRANSACTION_ALIASES]==EXPECTED_TX
     assert len(HO_UTILITY_ALIASES)>=10
     ho=c["menu"][0]
