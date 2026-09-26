@@ -83,11 +83,10 @@ def _delegated(c,user_id,perm_code,tx_type,office_code,country_code):
         return True
     return False
 
-def _has_entitlement(c,s,perm_code,tx_type,office_code,country_code):
+def _has_entitlement(c,s,perm_code,tx_type,office_code,country_code,enforce_home_office=True):
     if _is_super_admin(c,s['user_id']):return True
-    return permission_code(c,s['user_id'],perm_code,office_code) or _delegated(
-        c,s['user_id'],perm_code,tx_type,office_code,country_code
-    )
+    direct=permission_code(c,s['user_id'],perm_code,office_code if enforce_home_office else None)
+    return direct or _delegated(c,s['user_id'],perm_code,tx_type,office_code,country_code)
 
 def _limit_resolution(c,s,tx_type,action,amount,currency,office_code,country_code):
     if _is_super_admin(c,s['user_id']):
@@ -165,9 +164,6 @@ def _build_context(c,s,resource_type,module,rid,action,version,amount,currency,t
     maker_conflict=(tx_type=='JOURNAL' and action=='APPROVE') or (tx_type=='TREASURY' and action in {'RELEASE','PAY'})
     if maker_ref and maker_ref in {s['user_ref'],s['username']} and maker_conflict:
         raise HTTPException(409,{'code':'MAKER_SELF_ACTION_BLOCKED','maker':maker_ref,'actor':s['user_ref']})
-    conflicts=sod_violations(c,s['user_id'])
-    if conflicts:
-        raise HTTPException(409,{'code':'SOD_CONFLICT','conflicts':[x['conflict_code'] for x in conflicts]})
     lim=_limit_resolution(c,s,tx_type,action,float(amount or 0),currency,office_code,country_code)
     if lim['decision']=='ESCALATE':
         raise HTTPException(409,{'code':'APPROVAL_LIMIT_EXCEEDED','reason':lim['reason'],'amount':amount,'currency':currency})
@@ -284,7 +280,7 @@ def decide(review_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
         if scope.get('maker_ref') in {s['user_ref'],s['username']} or scope.get('requester_user_ref')==s['user_ref']:
             raise HTTPException(409,{'code':'FOUR_EYES_REQUIRED'})
         perm=scope.get('approver_permission')
-        if not _has_entitlement(c,s,perm,scope['transaction_type'],scope.get('office_code'),scope.get('country_code')):
+        if not _has_entitlement(c,s,perm,scope['transaction_type'],scope.get('office_code'),scope.get('country_code'),False):
             raise HTTPException(403,{'code':'APPROVER_ENTITLEMENT_REQUIRED','permission':perm})
         conflicts=sod_violations(c,s['user_id'])
         if conflicts:raise HTTPException(409,{'code':'SOD_CONFLICT','conflicts':[x['conflict_code'] for x in conflicts]})
