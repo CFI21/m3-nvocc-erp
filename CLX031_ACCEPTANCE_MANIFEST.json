@@ -1,0 +1,60 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX031-HO-TASKS-NAVIGATION-INTEGRATION-ACCEPTED-20260926",
+  "phase": "CLX-031",
+  "title": "HO Tasks Transaction + Utilities Restore / Integration Gap Fix",
+  "status": "ACCEPTED",
+  "parent": "M3-CLX030-FINANCE-ENTITLEMENT-MANAGEMENT-ACCEPTED-20260926",
+  "scope": {
+    "navigation": "Restored HO Tasks parent with Transaction and Utilities in legacy order as navigation aliases only.",
+    "transactionAliasCount": 18,
+    "utilityAliasCount": 15,
+    "totalNavigationAliases": 33,
+    "screenBaseline": 193,
+    "duplicateScreens": 0,
+    "newBusinessLogic": 0,
+    "existingRoutes": "REUSED",
+    "screenData": "VERIFIED_LIVE",
+    "quickActions": "VERIFIED_LIVE",
+    "relatedRecords": "VERIFIED_LIVE",
+    "roleVisibility": "VERIFIED",
+    "postgresAdapterGap": "fetchmany compatibility added to existing PostgresCursorCompat"
+  },
+  "evidence": {
+    "dedicatedRegressionRunId": "36232117957",
+    "dedicatedTests": "3/3 PASS",
+    "frozenRegression": "34/34 PASS",
+    "catalogRoleUatRunId": "36232076161",
+    "catalogRoleUat": "PASS",
+    "apiBuildRunId": "36232308351",
+    "apiBuild": "PASS",
+    "runtimeUatRunId": "36232206481",
+    "runtimeUatJobId": "108377836265",
+    "runtimeUat": "PASS",
+    "runtimeAliasesVerified": 33,
+    "apiDeploy": "dep-darorjojo6nc738rh8mg",
+    "apiImage": "sha256:ce213cd6d44129d8d4e0fd58a6bdc84e17ff1ad08ea0f15e753679cc31b1fb40",
+    "webDeploy": "dep-daroppjncjis73egpb3g",
+    "webImage": "sha256:14ae70ecdf7cca5067ff1c30933073730dcb34e722db8240a54d744eaf9e8fc5",
+    "postDeployRuntimeErrors": 0
+  },
+  "preservedCounts": {
+    "jobs": 5,
+    "transaction_records": 95,
+    "gl_records": 280,
+    "treasury_records": 185,
+    "integration_records": 100
+  },
+  "controls": {
+    "roleDataScope": "PRESERVED",
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "audit": "PRESERVED",
+    "productionTraffic": "ON",
+    "liveProviders": "OFF",
+    "realMoney": "OFF",
+    "anclineTouched": false,
+    "clx024": "DEFERRED_NOT_ACCEPTED"
+  },
+  "freeze": true
+}
