@@ -1,0 +1,48 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-026",
+  "status": "ACCEPTED",
+  "baseline": "M3-CLX026-EXCEPTION-WORKFLOW-ACCEPTED-20260926-028",
+  "parent": "M3-CLX025-OPERATIONS-WORKBENCH-ACCEPTED-20260925-027",
+  "features": [
+    "OPEN→ACKNOWLEDGED→IN_PROGRESS→RESOLVED→CLOSED",
+    "owner/team queues",
+    "SLA due date",
+    "escalation state",
+    "resolution code",
+    "comment/history",
+    "auto create/refresh",
+    "auto close on verified source clear",
+    "My Work",
+    "Team Work",
+    "Overdue",
+    "Critical"
+  ],
+  "uat": {
+    "run": 36225534454,
+    "result": "PASS",
+    "derived_items": 9,
+    "lifecycle": "PASS",
+    "auto_reopen": "PASS"
+  },
+  "fixes": [
+    "Supabase transaction-pooler prepared statement collision fixed with prepare_threshold=None"
+  ],
+  "preserved": {
+    "screens": 193,
+    "jobs": 5,
+    "transactions": 95,
+    "gl": 280,
+    "treasury": 185,
+    "integrations": 100,
+    "role_scope": true,
+    "maker_checker": true,
+    "four_eyes": true,
+    "audit": true
+  },
+  "safety": {
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "ancline_touched": false
+  }
+}
