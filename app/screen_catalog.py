@@ -49,21 +49,21 @@ HO_TRANSACTION_ALIASES = [
 ]
 
 HO_UTILITY_ALIASES = [
+    {'label':'Template / Document Setup','target':'master-data::document-types'},
+    {'label':'Configuration','target':'master-data::configurations'},
     {'label':'User Management','target':'administration::users','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
     {'label':'Security Policy','target':'integration-security::security-policies','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
     {'label':'Password Policy','target':'administration::password-policy','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
     {'label':'MFA Policy','target':'administration::mfa-policy','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
     {'label':'Data Scope / Policy','target':'administration::data-scope-rules','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
+    {'label':'Fiscal Year','target':'gl-accounts::fiscal-year'},
     {'label':'Detention Collection','target':'agent-tasks::detention-collection'},
     {'label':'Storage Cost','target':'agent-tasks::storage-cost'},
-    {'label':'Template / Document Setup','target':'master-data::document-types'},
-    {'label':'Configuration','target':'master-data::configurations'},
-    {'label':'Audit History','target':'administration::audit','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
-    {'label':'Integration Audit','target':'integration-security::request-response-audit','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
     {'label':'Approval Limits','target':'administration::approval-limits','roles':['ADMIN','FINANCE','GL_MANAGER','AUDITOR']},
     {'label':'Approval Queue','target':'master-data::approval-queue','roles':['ADMIN','MASTER_DATA_MANAGER','AUDITOR']},
-    {'label':'Fiscal Year','target':'gl-accounts::fiscal-year'},
     {'label':'Voucher Viewer','target':'gl-accounts::voucher-history'},
+    {'label':'Audit History','target':'administration::audit','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
+    {'label':'Integration Audit','target':'integration-security::request-response-audit','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
 ]
 
 
@@ -117,6 +117,47 @@ def _group_name(group: str) -> str:
     }
     return names.get(g, _humanize(group) if group else 'General')
 
+
+DOMAIN_SUBMENU_ORDER = {
+    'Treasury / AR-AP': {
+        'Overview': 0, 'Setup': 10, 'Cash / Bank': 20, 'Settlement': 30,
+        'Payments & Release': 40, 'Cheques': 50, 'Work Queues': 70,
+        'Reports & Reconciliation': 90,
+    },
+    'Integration & Security': {
+        'Overview': 0, 'Providers': 10, 'Sandbox Flows': 20,
+        'Event Control': 40, 'Reconciliation': 50, 'Security / Control': 60,
+    },
+    'General / Administration': {
+        'Overview': 0, 'Organization': 10, 'Identity': 20,
+        'Finance & Accounting Setup · Setup': 30,
+        'Finance & Accounting Setup · Transactions': 40,
+        'Governance': 50, 'Security': 60,
+        'Finance & Accounting Setup · Controls & Month End': 70,
+        'Finance & Accounting Setup · Reports & Reconciliation': 90,
+    },
+    'Master Data': {'Master Records': 10, 'Governance': 20},
+}
+
+def _submenu_priority(domain: str, submenu: str) -> int:
+    explicit=DOMAIN_SUBMENU_ORDER.get(domain,{})
+    if submenu in explicit:return explicit[submenu]
+    low=submenu.lower()
+    if 'overview' in low or 'dashboard' in low:return 0
+    if 'setup' in low or 'master' in low or 'organization' in low or 'identity' in low:return 15
+    if 'transaction' in low or 'settlement' in low or 'payment' in low or 'cash' in low:return 35
+    if 'control' in low or 'queue' in low or 'governance' in low or 'security' in low or 'reconciliation' in low:return 65
+    if 'report' in low or 'audit' in low:return 90
+    return 55
+
+def _menu_screen_ids(domain_screens: list[dict[str, Any]], submenu: str) -> list[str]:
+    xs=[s for s in domain_screens if s['submenu']==submenu]
+    # Keep accepted business order, but audit/history viewers always finish the submenu.
+    xs=sorted(enumerate(xs), key=lambda p: (
+        1 if ('audit' in p[1]['name'].lower() or 'audit' in p[1]['key'].lower()) else 0,
+        p[0]
+    ))
+    return [s['screen_id'] for _,s in xs]
 
 def build_catalog() -> dict[str, Any]:
     screens: list[dict[str, Any]] = []
@@ -264,8 +305,9 @@ def build_catalog() -> dict[str, Any]:
         for s in domain_screens:
             if s['submenu'] not in seen_sub:
                 seen_sub.append(s['submenu'])
+        seen_sub=sorted(seen_sub,key=lambda sub:(_submenu_priority(domain,sub),seen_sub.index(sub)))
         for sub in seen_sub:
-            ids=[s['screen_id'] for s in domain_screens if s['submenu']==sub]
+            ids=_menu_screen_ids(domain_screens,sub)
             submenus.append({'name':sub,'screens':ids})
         menu.append({'domain':domain,'submenus':submenus,'screen_count':len(domain_screens)})
 
