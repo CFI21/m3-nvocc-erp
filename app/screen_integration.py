@@ -239,8 +239,14 @@ def action_route(screen_id:str=Query(...),action:str=Query(...),record_id:Option
     if domain=='Agent Tasks' and record_id:
         if a in {'approve','release','hold','cancel','amend','reissue','reverse','advance'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/{key}/{record_id}/actions/{a}','requires':['version']}
         if a=='edit':return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/{key}/{record_id}','requires':['version','fields']}
-    if screen_id.startswith('gl-accounts::'):\n        if a=='create': return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/gl/{key}','requires':['fields']}\n        if record_id and a=='edit': return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/gl/{key}/{record_id}','requires':['version','fields']}\n        if record_id and a in {'approve','reverse'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/gl/{key}/{record_id}/actions/{a}','requires':['version']}
-    if domain=='Treasury / AR-AP':\n        if a=='create': return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/treasury/{key}','requires':['fields']}\n        if record_id and a=='edit': return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/treasury/{key}/{record_id}','requires':['version','fields']}\n        if record_id and a in {'approve','release','reverse'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/treasury/{key}/{record_id}/actions/{a}','requires':['version']}
+    if screen_id.startswith('gl-accounts::'):
+        if a=='create': return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/gl/{key}','requires':['fields']}
+        if record_id and a=='edit': return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/gl/{key}/{record_id}','requires':['version','fields']}
+        if record_id and a in {'approve','reverse'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/gl/{key}/{record_id}/actions/{a}','requires':['version']}
+    if domain=='Treasury / AR-AP':
+        if a=='create': return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/treasury/{key}','requires':['fields']}
+        if record_id and a=='edit': return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/treasury/{key}/{record_id}','requires':['version','fields']}
+        if record_id and a in {'approve','release','reverse'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/treasury/{key}/{record_id}/actions/{a}','requires':['version']}
     if domain=='Master Data' and a in {'change-request','approve','reject','activate','deactivate','version-history'}:return {'mode':'EXISTING_GOVERNANCE','note':'Use /api/masterdata/changes and independent checker decision endpoints.'}
     return {'mode':'EXISTING_SCREEN_WORKFLOW','note':'Open the current screen/right-side panel; no new business mutation is introduced by CLX-011.'}
 
