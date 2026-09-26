@@ -81,6 +81,16 @@ def session(c,token):
     if not s or s['status']!='ACTIVE' or s['revoked_at'] or s['expires_at']<now():raise HTTPException(401,{'code':'SESSION_INVALID'})
     c.execute('UPDATE iam_sessions SET last_seen_at=? WHERE id=?',(now(),s['id'])); return s
 
+@router.post('/auth/logout')
+def logout(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    s=session(c,x_m3_session)
+    ts=now()
+    c.execute("UPDATE iam_sessions SET status='REVOKED',revoked_at=?,last_seen_at=? WHERE id=?",(ts,ts,s['id']))
+    audit(c,s['user_ref'],'LOGOUT','SESSION',str(s['id']),before={'status':'ACTIVE'},after={'status':'REVOKED'})
+    c.close()
+    return {'status':'LOGGED_OUT'}
+
 @router.get('/users')
 def users():
     c=connect(); x=[dict(r) for r in c.execute('''SELECT u.id,u.user_ref,u.username,u.display_name,u.email,u.status,o.office_code,u.mfa_required,u.last_login_at,u.version FROM iam_users u JOIN iam_offices o ON o.id=u.home_office_id ORDER BY u.id''')]; c.close(); return x
