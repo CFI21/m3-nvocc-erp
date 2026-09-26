@@ -33,6 +33,7 @@ jobs:
           PYTHONPATH: .
         run: >
           pytest -q
+          tests/test_clx031_ho_tasks_navigation.py
           tests/test_clx030_finance_entitlements.py
           tests/test_clx029_accounting_navigation_access.py
           tests/test_clx019_catalog_roles.py
