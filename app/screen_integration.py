@@ -107,15 +107,25 @@ def health():
 @router.get('/menu')
 def menu(q:Optional[str]=None):
     if not q: return {'screen_count':len(SCREENS),'menu':CATALOG['menu']}
-    q=q.lower().strip();screen_ids={s['screen_id'] for s in CATALOG['screens'] if q in s['name'].lower() or q in s['domain'].lower() or q in s['submenu'].lower()}
+    q=q.lower().strip()
+    screen_ids={s['screen_id'] for s in CATALOG['screens'] if q in s['name'].lower() or q in s['domain'].lower() or q in s['submenu'].lower()}
     out=[]
+    alias_hits=0
     for d in CATALOG['menu']:
         subs=[]
         for sub in d['submenus']:
-            ids=[x for x in sub['screens'] if x in screen_ids]
-            if ids:subs.append({'name':sub['name'],'screens':ids})
-        if subs:out.append({'domain':d['domain'],'submenus':subs,'screen_count':sum(len(x['screens']) for x in subs)})
-    return {'screen_count':len(screen_ids),'menu':out}
+            ids=[x for x in sub.get('screens',[]) if x in screen_ids]
+            items=[x for x in sub.get('items',[]) if q in x['label'].lower() or q in d['domain'].lower() or q in sub['name'].lower()]
+            if ids or items:
+                entry={'name':sub['name'],'screens':ids}
+                if items:
+                    entry['items']=items
+                    alias_hits+=len(items)
+                subs.append(entry)
+        if subs:
+            out.append({'domain':d['domain'],'submenus':subs,'screen_count':sum(len(x.get('screens',[])) for x in subs),
+                        'navigation_alias_count':sum(len(x.get('items',[])) for x in subs)})
+    return {'screen_count':len(screen_ids),'navigation_alias_count':alias_hits,'menu':out}
 
 @router.get('/screens')
 def screens(domain:Optional[str]=None,submenu:Optional[str]=None):
