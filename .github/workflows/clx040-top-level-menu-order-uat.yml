@@ -33,3 +33,5 @@ jobs:
           tests/test_clx035_ho_completion.py
           tests/test_clx034_smart_approval_fast_track.py
           tests/test_clx033_finance_transaction_governance.py
+
+# CLX-040 post-merge verification trigger
