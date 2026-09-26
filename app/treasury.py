@@ -5,7 +5,7 @@ from pathlib import Path
 import json,datetime,hashlib,uuid
 from .db import connect,tx,backend_name
 from .json_recovery import load_json_or_recover_arrays
-from .gl import assert_period_postable,next_voucher
+from .gl import assert_period_postable,next_voucher,fx_rate
 from .admin import session as iam_session
 from .clx034_smart_approval_fast_track import enforce_treasury_action
 
@@ -16,6 +16,8 @@ _TREASURY_META, META_RECOVERED = load_json_or_recover_arrays(
 )
 META=_TREASURY_META['modules']
 MODULES={x['key']:x for x in META}
+READ_ONLY_GROUPS={'overview','work-queues','reports'}
+READ_ONLY_MODULES={x['key'] for x in META if x.get('group') in READ_ONLY_GROUPS}
 router=APIRouter(prefix='/api/v1/treasury',tags=['Treasury / AR-AP Settlement'])
 ROLE_PERMS={
  'ADMIN':set('view create edit approve release reverse reconcile write_off'.split()),
@@ -42,6 +44,9 @@ class ActionBody(BaseModel):
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def require(m):
     if m not in MODULES:raise HTTPException(404,'Unknown treasury module')
+def require_mutable(m):
+    require(m)
+    if m in READ_ONLY_MODULES:raise HTTPException(405,{'code':'TREASURY_READ_ONLY_SCREEN','module':m})
 def actor(r,a='view'):
     r=r.upper()
     if r not in ROLE_PERMS or a not in ROLE_PERMS[r]:raise HTTPException(403,f'Role cannot {a} treasury')
@@ -129,10 +134,14 @@ def gl_post(c,r,module,actor_id,reversal=False):
       'bank-transfer':('1100','1000','JV'),'inter-bank-transfer':('1100','1000','JV'),'payment-batches':('2000','1100','PV')
     }
     dr,cr,vtype=mapping.get(module,('1100','1200','JV'))
+    configured=c.execute("SELECT debit_account_code,credit_account_code FROM gl_account_mappings WHERE source_module=? AND event_type='POST' AND active=1 ORDER BY id DESC LIMIT 1",(module,)).fetchone()
+    if configured:dr,cr=configured['debit_account_code'],configured['credit_account_code']
     if reversal:dr,cr=cr,dr
     vt='RV' if reversal else vtype
     vno=next_voucher(c,vt);amt=round(amount,2)
-    cur=c.execute('INSERT INTO gl_vouchers(gl_record_id,voucher_no,voucher_type,voucher_date,currency,status,source_type,source_ref,job_id,total_debit,total_credit,version,posted_at,created_at,maker_role,exchange_rate,base_currency,base_total_debit,base_total_credit) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(None,vno,vt,date,r['currency'],'Posted','TREASURY',r['external_ref'],r['job_id'],amt,amt,1,now(),now(),actor_id,1.0,'USD',amt,amt))
+    rate=fx_rate(c,r['currency'],date)
+    base_amt=round(amt*rate,2)
+    cur=c.execute('INSERT INTO gl_vouchers(gl_record_id,voucher_no,voucher_type,voucher_date,currency,status,source_type,source_ref,job_id,total_debit,total_credit,version,posted_at,created_at,maker_role,exchange_rate,base_currency,base_total_debit,base_total_credit) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',(None,vno,vt,date,r['currency'],'Posted','TREASURY',r['external_ref'],r['job_id'],amt,amt,1,now(),now(),actor_id,rate,'USD',base_amt,base_amt))
     vid=cur.lastrowid
     c.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(vid,1,dr,amt,0,('Reversal ' if reversal else '')+r['external_ref'],r['job_id']))
     c.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(vid,2,cr,0,amt,('Reversal ' if reversal else '')+r['external_ref'],r['job_id']))
@@ -169,7 +178,7 @@ def one(module:str,rid:int,x_role:str=Header('VIEWER')):
     require(module);actor(x_role);c=connect();r=getrec(c,module,rid);d=ser(r);c.close();return d
 @router.post('/{module}',status_code=201)
 def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_role:str=Header('VIEWER'),x_actor_id:str=Header('maker-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require(module);role=actor(x_role,'create')
+    require_mutable(module);role=actor(x_role,'create')
     if x_m3_session:
         c0=connect();s0=iam_session(c0,x_m3_session);x_actor_id=s0['user_ref'];c0.close()
     errs=validate(module,b.fields)
@@ -181,7 +190,12 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
             if old:c.execute('ROLLBACK');return json.loads(old['response_json'])
         j=jid(c,b.job_ref);ext=b.external_ref or b.fields.get(MODULES[module]['fields'][0]) or f'M3-{module[:8].upper()}-{uuid.uuid4().hex[:8].upper()}'
         amt=amount_from(b.fields);curr=b.fields.get('Currency') or b.fields.get('Settlement Currency') or 'USD';stat=b.fields.get('Status') or 'Draft'
-        cur=c.execute('INSERT INTO treasury_records(module,external_ref,job_id,party_type,party_name,currency,amount,status,version,maker_id,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?)',(module,ext,j,None,b.fields.get('Party') or b.fields.get('Customer') or b.fields.get('Supplier / Carrier'),curr,amt,stat,x_actor_id,json.dumps(b.fields),now(),now()))
+        sensitive={'supplier-carrier-payment-allocation','payment-batches','advance-payments','customer-refunds','bank-transfer','inter-bank-transfer'}
+        source_ref=b.fields.get('Payment Ref') or b.fields.get('Bill Ref') or b.fields.get('Batch / Payment Ref') or b.fields.get('Reference') or b.source_ref
+        if module in sensitive and source_ref:
+            duplicate=c.execute("SELECT id,external_ref FROM treasury_records WHERE module=? AND source_ref=? AND ABS(amount-?)<0.005 AND currency=? AND status NOT IN ('Reversed','Cancelled') ORDER BY id LIMIT 1",(module,source_ref,amt,curr)).fetchone()
+            if duplicate:raise HTTPException(409,{'code':'DUPLICATE_TREASURY_SOURCE','existing_ref':duplicate['external_ref']})
+        cur=c.execute('INSERT INTO treasury_records(module,external_ref,job_id,party_type,party_name,currency,amount,status,version,maker_id,source_type,source_ref,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)',(module,ext,j,None,b.fields.get('Party') or b.fields.get('Customer') or b.fields.get('Supplier / Carrier'),curr,amt,stat,x_actor_id,b.source_type,source_ref,json.dumps(b.fields),now(),now()))
         r=getrec(c,module,cur.lastrowid);out=ser(r);audit(c,role,x_actor_id,'CREATE',module,r['id'],j,None,out)
         if idempotency_key:c.execute('INSERT INTO idempotency_keys(actor_role,idem_key,request_hash,response_json,status_code,created_at) VALUES(?,?,?,?,201,?)',(role,idempotency_key,hashlib.sha256(json.dumps(b.model_dump(),sort_keys=True).encode()).hexdigest(),json.dumps(out),now()))
         c.execute('COMMIT');return out
@@ -190,7 +204,7 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
     finally:c.close()
 @router.put('/{module}/{rid}')
 def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_id:str=Header('maker-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require(module);role=actor(x_role,'edit')
+    require_mutable(module);role=actor(x_role,'edit')
     if x_m3_session:
         c0=connect();s0=iam_session(c0,x_m3_session);x_actor_id=s0['user_ref'];c0.close()
     errs=validate(module,b.fields)
@@ -207,7 +221,7 @@ def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_i
     finally:c.close()
 @router.post('/{module}/{rid}/actions/{action}')
 def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'),x_actor_id:str=Header('actor-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require(module);action=action.lower().replace('-','_');role=actor(x_role,action if action in {'approve','release','reverse','reconcile','write_off'} else 'edit')
+    require_mutable(module);action=action.lower().replace('-','_');role=actor(x_role,action if action in {'approve','release','reverse','reconcile','write_off'} else 'edit')
     if action in {'approve','release','reverse','write_off'}: enforce_treasury_action(module,rid,action,x_m3_session,b.version)
     if x_m3_session:
         c0=connect();s0=iam_session(c0,x_m3_session);x_actor_id=s0['user_ref'];c0.close()
@@ -235,7 +249,10 @@ def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'
         elif action=='write_off':
             if not ('customer' in module or 'supplier' in module or 'carrier' in module):raise HTTPException(422,{'code':'WRITE_OFF_ONLY_AR_AP'})
             new='Written Off'
-        elif action=='reconcile':new='Reconciled'
+        elif action=='reconcile':
+            if module=='cash-denomination' and abs(number(p,'Difference') or 0)>.01:raise HTTPException(422,{'code':'CASH_DIFFERENCE_MUST_BE_ZERO'})
+            if module=='bank-reconciliation-exception-queue':raise HTTPException(422,{'code':'EXCEPTION_MUST_BE_RESOLVED_VIA_APPROVED_MATCH_WORKFLOW'})
+            new='Reconciled'
         else:raise HTTPException(422,{'code':'UNSUPPORTED_ACTION'})
         p['Status']=new;cur=c.execute('UPDATE treasury_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?',(new,json.dumps(p),now(),rid,b.version))
         if cur.rowcount!=1:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
