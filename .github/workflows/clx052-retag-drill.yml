@@ -17,7 +17,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/setup-buildx-action@v3
-      - name: Retag frozen CLX-050 rollback images to latest
+      - name: Restore frozen CLX-051/CLX-052 runtime images to latest
         run: |
-          docker buildx imagetools create --tag ghcr.io/cfi21/m3-nvocc-web:latest ghcr.io/cfi21/m3-nvocc-web@sha256:081bbee4a60f9b1e39b23153f0e517793ce0203dd4edb96a982d668231c2c4ee
-          docker buildx imagetools create --tag ghcr.io/cfi21/m3-nvocc-api:latest ghcr.io/cfi21/m3-nvocc-api@sha256:fe00e3155ce75a44acc1a3cec879ac143cc158699b843123fb6c0a24aff77381
+          docker buildx imagetools create --tag ghcr.io/cfi21/m3-nvocc-web:latest ghcr.io/cfi21/m3-nvocc-web@sha256:069beaca63368729f10a5ab5be57824963b40ff25331a8a4f8574cf9a59aa00b
+          docker buildx imagetools create --tag ghcr.io/cfi21/m3-nvocc-api:latest ghcr.io/cfi21/m3-nvocc-api@sha256:bbc746f1317f5eec88addfb040acb94f2d7e33760c57dcd965cd3b013d050c31
