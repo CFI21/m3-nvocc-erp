@@ -7,7 +7,13 @@ from .operations_workbench import _derive, _role
 from .control_tower import _job_rows, _summarize, _team_workload, _risk_jobs, _counter
 
 router=APIRouter(prefix="/api/v1/management-kpi",tags=["CLX-028 KPI Trends + Alerts"])
+MANAGEMENT_ROLES={"ADMIN","OPS","FINANCE","AUDITOR"}
 WRITE_ROLES={"ADMIN","OPS","FINANCE"}
+
+def _management_role(value:str)->str:
+    role=_role(value)
+    if role not in MANAGEMENT_ROLES: raise HTTPException(403,{"code":"MANAGEMENT_KPI_ROLE_DENIED"})
+    return role
 
 DEFAULT_RULES=[
  ("CRITICAL_WORK","critical","GTE",1,"CRITICAL","Any critical operational work item is active."),
@@ -69,7 +75,7 @@ def _evaluate_alerts(c,snapshot_date,summary):
 
 @router.post("/snapshot")
 def create_snapshot(x_role:str=Header("VIEWER"),x_actor_id:str=Header("management-system",alias="X-Actor-Id")):
-    role=_role(x_role)
+    role=_management_role(x_role)
     if role not in WRITE_ROLES: raise HTTPException(403,{"code":"SNAPSHOT_WRITE_DENIED"})
     c=connect(); tx(c)
     try:
@@ -89,7 +95,7 @@ def create_snapshot(x_role:str=Header("VIEWER"),x_actor_id:str=Header("managemen
 
 @router.get("/snapshot/latest")
 def latest_snapshot(x_role:str=Header("VIEWER")):
-    _role(x_role); c=connect()
+    _management_role(x_role); c=connect()
     try:
         r=c.execute("SELECT * FROM management_daily_snapshots ORDER BY snapshot_date DESC LIMIT 1").fetchone()
         return {"phase":"CLX-028","snapshot":_row_to_snapshot(r) if r else None}
@@ -124,7 +130,7 @@ def alerts(status:Optional[str]="OPEN",x_role:str=Header("VIEWER")):
 
 @router.post("/alerts/{alert_key}/acknowledge")
 def acknowledge(alert_key:str,x_role:str=Header("VIEWER"),x_actor_id:str=Header("actor-user",alias="X-Actor-Id")):
-    role=_role(x_role)
+    role=_management_role(x_role)
     if role not in WRITE_ROLES: raise HTTPException(403,{"code":"ALERT_ACK_DENIED"})
     c=connect();tx(c)
     try:
@@ -137,7 +143,7 @@ def acknowledge(alert_key:str,x_role:str=Header("VIEWER"),x_actor_id:str=Header(
 
 @router.get("/control-status")
 def control_status(x_role:str=Header("AUDITOR")):
-    _role(x_role)
+    _management_role(x_role)
     return {"phase":"CLX-028","daily_snapshot_immutable":True,"trends_read_only":True,"alerts_in_app_only":True,
       "external_notifications":False,"underlying_business_mutation":False,"screen_catalog_preserved":193,
       "role_scope_preserved":True,"maker_checker_preserved":True,"four_eyes_preserved":True,
