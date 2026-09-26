@@ -6,10 +6,10 @@ from app.screen_integration import quick_actions
 from app.main import scope_clause
 
 
-def test_complete_193_screen_catalog_and_domain_counts():
+def test_complete_196_screen_catalog_and_domain_counts():
     catalog=build_catalog()
     screens=catalog['screens']
-    assert len(screens)==193
+    assert len(screens)==196
     counts={}
     for s in screens:
         counts[s['domain']]=counts.get(s['domain'],0)+1
@@ -27,14 +27,14 @@ def test_screen_ids_routes_and_menu_are_complete_and_unique():
     screens=catalog['screens']
     ids=[s['screen_id'] for s in screens]
     routes=[s['route'] for s in screens]
-    assert len(ids)==len(set(ids))==193
-    assert len(routes)==len(set(routes))==193
+    assert len(ids)==len(set(ids))==196
+    assert len(routes)==len(set(routes))==196
 
     menu_ids=[]
     for domain in catalog['menu']:
         for submenu in domain['submenus']:
             menu_ids.extend(submenu['screens'])
-    assert len(menu_ids)==193
+    assert len(menu_ids)==196
     assert set(menu_ids)==set(ids)
     assert len(menu_ids)==len(set(menu_ids))
 
