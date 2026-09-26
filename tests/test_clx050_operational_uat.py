@@ -94,7 +94,11 @@ def test_role_boundaries_and_daily_mutation_surfaces(isolated):
     assert {"create","edit"} <= mutations_for("AGENT","Agent Tasks")
     assert mutations_for("FINANCE","Treasury / AR-AP")
     assert mutations_for("TREASURY","Treasury / AR-AP")
-    assert mutations_for("GL_ACCOUNTANT","Finance & Accounting Setup")
+    accounting_mutations=set()
+    for s in catalog["screens"]:
+        if s["screen_id"].startswith("gl-accounts::"):
+            accounting_mutations.update(set(quick_actions(s["screen_id"],"GL_ACCOUNTANT")["visible_actions"]) & MUTATIONS)
+    assert accounting_mutations
     for role in ("AUDITOR","VIEWER"):
         for domain in by_domain:
             assert not mutations_for(role,domain)
