@@ -1,0 +1,69 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX038-AGENT-TASKS-MENU-REORDER-ACCEPTED-20260926",
+  "phase": "CLX-038",
+  "title": "Agent Tasks Menu Reorder + Setup Masters",
+  "status": "ACCEPTED",
+  "accepted_commit": "3fa0cb9f65720b07f0da7f5ffd1bf582d591d15d",
+  "parentBaseline": "M3-CLX037-UI-POLISH-NAVIGATION-CONSISTENCY-ACCEPTED-20260926",
+  "accepted_at": "2026-09-26T11:16:00Z",
+  "scope": {
+    "agentTasksSubmenuOrder": ["Setup","Transaction"],
+    "setupItems": [
+      "Agent",
+      "Common Parties",
+      "Vessel",
+      "Voyage Registration",
+      "Commodity",
+      "Units",
+      "Sales Person"
+    ],
+    "transactionScreensPreserved": 19,
+    "existingAuthoritativeMastersReused": [
+      "Agent",
+      "Vessel",
+      "Voyage Registration",
+      "Commodity"
+    ],
+    "newGovernedMasterDomains": [
+      "Common Parties",
+      "Units",
+      "Sales Person"
+    ],
+    "screenBaselinePrevious": 193,
+    "screenBaselineNew": 196,
+    "screenIncrease": 3,
+    "databaseSchemaMigration": false,
+    "existingBusinessLogic": "PRESERVED",
+    "existingApiContracts": "PRESERVED",
+    "clx037NeutralGreySidebar": "PRESERVED",
+    "clx034SmartApproval": "PRESERVED",
+    "roleDataScope": "PRESERVED",
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "sod": "PRESERVED",
+    "audit": "PRESERVED"
+  },
+  "evidence": {
+    "pullRequest": 16,
+    "mergeCommit": "3fa0cb9f65720b07f0da7f5ffd1bf582d591d15d",
+    "preMergeClx038RunId": "36238181819",
+    "preMergeClx038": "PASS",
+    "preMergeClx035RunId": "36238181808",
+    "preMergeClx035": "PASS",
+    "preMergeClx036RunId": "36238181810",
+    "preMergeClx036": "PASS",
+    "preMergeClx029RunId": "36238181803",
+    "preMergeClx029": "PASS",
+    "postMergeVerificationPullRequest": 17,
+    "postMergeVerificationPullRequestMerged": false,
+    "postMergeClx038RunId": "36238231751",
+    "postMergeClx038": "PASS"
+  },
+  "controls": {
+    "liveProviders": false,
+    "realMoney": false,
+    "productionRuntimePromoted": false
+  },
+  "freeze": true
+}
