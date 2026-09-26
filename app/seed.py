@@ -66,6 +66,28 @@ def _load_seed():
                     row.setdefault('Child B/L 1',f'CLXHBL{jr}-A')
                     row.setdefault('Child B/L 2',f'CLXHBL{jr}-B')
                     row.setdefault('Container',jobs[jr]['container'])
+                if key=='special-rates-request':
+                    row.setdefault('Booking Ref',jobs[jr]['booking'])
+                if key=='booking':
+                    row.setdefault('Booking No.',jobs[jr]['booking'])
+                    row.setdefault('POL',jobs[jr]['pol']);row.setdefault('POD',jobs[jr]['pod'])
+                if key=='bl':
+                    row.setdefault('B/L No.',jobs[jr]['bl'])
+                    row.setdefault('HBL',jobs[jr]['bl'])
+                if key=='delivery-order':
+                    row.setdefault('HBL',jobs[jr]['bl'])
+                    row.setdefault('Job Ref',jr)
+                if key=='switch-bl':
+                    row.setdefault('Original B/L',jobs[jr]['bl'])
+                    row.setdefault('Switch B/L',f'CLXSWBL{jr}')
+                    row.setdefault('Original Shipper',f'Original Shipper {jr}')
+                    row.setdefault('Original Consignee',jobs[jr]['customer'])
+                    row.setdefault('New Shipper',f'Switch Shipper {jr}')
+                    row.setdefault('New Consignee',f'Switch Consignee {jr}')
+                    row.setdefault('Reason','Synthetic switch B/L UAT')
+                    row.setdefault('Confidentiality','Yes')
+                    row.setdefault('Original B/L Preserved','Yes')
+                    row.setdefault('Approval','Pending')
                 recovered.append(row)
             data[key]=recovered
         return {'modules':modules,'jobs':jobs,'data':data}
