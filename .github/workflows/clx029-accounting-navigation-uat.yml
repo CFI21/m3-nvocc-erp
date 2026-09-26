@@ -1,0 +1,37 @@
+name: M3 CLX029 Accounting Navigation UAT
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/screen_catalog.py"
+      - "app/screen_integration.py"
+      - "app/gl.py"
+      - "app/admin_seed.py"
+      - "web/index.html"
+      - "tests/test_clx019_catalog_roles.py"
+      - "tests/test_clx029_accounting_navigation_access.py"
+      - ".github/workflows/clx029-accounting-navigation-uat.yml"
+  workflow_dispatch:
+
+jobs:
+  accounting-navigation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt pytest
+      - name: Accounting navigation + access UAT
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx029_accounting_navigation_access.py
+          tests/test_clx019_catalog_roles.py
+          tests/test_clx025_operations_workbench.py
+          tests/test_clx026_exception_workflow.py
+          tests/test_clx027_control_tower.py
+          tests/test_clx028_management_kpi.py
+          tests/test_live_provider_runtime.py

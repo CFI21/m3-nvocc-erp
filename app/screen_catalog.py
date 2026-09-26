@@ -98,10 +98,12 @@ def build_catalog() -> dict[str, Any]:
     seen={m['key'] for _,m in gl_modules}
     gl_modules += [(g,m) for g,m in gl_extra if m['key'] not in seen]
     for group,m in gl_modules:
-        screens.append(_base_screen(
-            'gl-accounts','GL / Accounts',gl_groups[group],m['key'],m['name'],m['route'],
+        s=_base_screen(
+            'gl-accounts','General / Administration','Finance & Accounting Setup · '+gl_groups[group],m['key'],m['name'],m['route'],
             COMMON_MUTATE + COMMON_READ + ['approve','release','reverse']
-        ))
+        )
+        s['roles']=['ADMIN','GL_MANAGER','GL_ACCOUNTANT','AUDITOR']
+        screens.append(s)
 
     # Treasury: recover complete definitions and restore the one accepted persisted
     # module whose object was cut by the 1,000-line source truncation.
@@ -139,7 +141,7 @@ def build_catalog() -> dict[str, Any]:
             elif key in {'data-scope-rules','customer-agent-access','approval-limits','maker-checker','approval-delegations','temporary-access','access-reviews'}: group='governance'
             else: group='security'
         screens.append(_base_screen(
-            'administration','Administration',_group_name(group),key,
+            'administration','General / Administration',_group_name(group),key,
             m.get('name',_humanize(key)),m.get('route',f'/admin/{group}/{key}'),
             COMMON_READ + ['activate','deactivate','change-request','approve','reject','version-history']
         ))
@@ -175,7 +177,7 @@ def build_catalog() -> dict[str, Any]:
 
     # Stable menu derived from the rebuilt catalog.
     menu=[]
-    domain_order=['Agent Tasks','GL / Accounts','Treasury / AR-AP','Integration & Security','Administration','Master Data']
+    domain_order=['Agent Tasks','Treasury / AR-AP','Integration & Security','General / Administration','Master Data']
     for domain in domain_order:
         domain_screens=[s for s in screens if s['domain']==domain]
         submenus=[]

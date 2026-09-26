@@ -15,8 +15,8 @@ PARENT=CATALOG['parent']
 router=APIRouter(prefix='/api/clx011',tags=['CLX-011 Screen Integration / Menu / Quick Actions'])
 
 DOMAIN_SLUG={
-    'Agent Tasks':'agent','GL / Accounts':'gl','Treasury / AR-AP':'treasury',
-    'Integration & Security':'integration','Administration':'admin','Master Data':'master'
+    'Agent Tasks':'agent','Treasury / AR-AP':'treasury',
+    'Integration & Security':'integration','General / Administration':'admin','Master Data':'master'
 }
 
 # Domain-level capabilities only filter the UX surface. Existing server-side APIs remain authoritative.
@@ -27,7 +27,7 @@ ROLE_ACTIONS={
  'DOCS': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy','approve','hold','amend','reissue','version-history'},
  'FINANCE': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy','approve','reverse','change-request','version-history'},
  'GL_MANAGER': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy','approve','release','reverse'},
- 'GL_ACCOUNTANT': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy','approve'},
+ 'GL_ACCOUNTANT': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy'},
  'TREASURY_MANAGER': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy','approve','release','reverse'},
  'SECURITY_ADMIN': {'quick-view','related-records','print','export','email','audit-history','retry','activate','deactivate'},
  'MASTER_DATA_MANAGER': {'quick-view','related-records','print','export','email','audit-history','change-request','approve','reject','activate','deactivate','version-history'},
@@ -74,6 +74,12 @@ def require_screen(screen_id):
     s=SCREENS.get(screen_id)
     if not s: raise HTTPException(404,'Unknown CLX-011 screen')
     return s
+
+def screen_role_allowed(s,role):
+    r=role.upper()
+    if r=='SUPER_ADMIN': r='ADMIN'
+    allowed={str(x).upper() for x in s.get('roles',[])}
+    return not allowed or r in allowed
 
 def safe_rows(c,sql,args=(),limit=100):
     return [dict(r) for r in c.execute(sql,args).fetchmany(limit)]
@@ -124,14 +130,16 @@ def screen(screen_id:str=Query(...)):
 
 @router.get('/screen-data')
 def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=Header('VIEWER')):
-    s=require_screen(screen_id);role=x_role.upper();c=connect();rows=[]
+    s=require_screen(screen_id);role=x_role.upper()
+    if not screen_role_allowed(s,role): raise HTTPException(403,'Role cannot access this screen')
+    c=connect();rows=[]
     try:
         if s['domain']=='Agent Tasks':
             sql='''SELECT t.id,t.external_ref,j.job_ref,c.name customer,a.code agent,t.status,t.version,t.payload_json
                    FROM transaction_records t JOIN jobs j ON j.id=t.job_id JOIN customers c ON c.id=t.customer_id JOIN agents a ON a.id=t.agent_id WHERE t.module=?''';args=[s['key']]
             if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
             rows=safe_rows(c,sql,args)
-        elif s['domain']=='GL / Accounts':
+        elif s['screen_id'].startswith('gl-accounts::'):
             sql='''SELECT g.id,g.external_ref,j.job_ref,g.source_type,g.source_ref,g.status,g.version,g.payload_json
                    FROM gl_records g LEFT JOIN jobs j ON j.id=g.job_id WHERE g.module=?''';args=[s['key']]
             if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
@@ -146,7 +154,7 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
                    FROM integration_records i LEFT JOIN jobs j ON j.id=i.job_id WHERE i.module=?''';args=[s['key']]
             if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
             rows=safe_rows(c,sql,args)
-        elif s['domain']=='Administration':
+        elif s['screen_id'].startswith('administration::'):
             if s['key']=='identity-dashboard':
                 rows=[{'Metric':'Users','Value':c.execute('SELECT COUNT(*) n FROM iam_users').fetchone()['n']},{'Metric':'Roles','Value':c.execute('SELECT COUNT(*) n FROM iam_roles').fetchone()['n']},{'Metric':'Open Access Reviews','Value':c.execute("SELECT COUNT(*) n FROM iam_access_reviews WHERE status!='COMPLETED'").fetchone()['n']}]
             else:
@@ -178,7 +186,9 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
 
 @router.get('/quick-actions')
 def quick_actions(screen_id:str=Query(...),role:str=Query('VIEWER'),status:Optional[str]=None):
-    s=require_screen(screen_id);r=role.upper();caps=ROLE_ACTIONS.get(r,ROLE_ACTIONS['VIEWER']);configured=s['quick_actions']
+    s=require_screen(screen_id);r=role.upper()
+    if not screen_role_allowed(s,r): raise HTTPException(403,'Role cannot access this screen')
+    caps=ROLE_ACTIONS.get(r,ROLE_ACTIONS['VIEWER']);configured=s['quick_actions']
     visible=[a for a in configured if a in caps]
     # Status-sensitive pruning to reduce invalid choices in the UI. Server APIs remain authoritative.
     st=(status or '').lower()
@@ -197,7 +207,7 @@ def action_route(screen_id:str=Query(...),action:str=Query(...),record_id:Option
     if domain=='Agent Tasks' and record_id:
         if a in {'approve','release','hold','cancel','amend','reissue','reverse','advance'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/v1/{key}/{record_id}/actions/{a}','requires':['version']}
         if a=='edit':return {'mode':'EXISTING_API','method':'PUT','path':f'/api/v1/{key}/{record_id}','requires':['version','fields']}
-    if domain=='GL / Accounts' and record_id and a in {'approve','release','reverse'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/gl/{key}/{record_id}/actions/{a}','requires':['version']}
+    if screen_id.startswith('gl-accounts::') and record_id and a in {'approve','release','reverse'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/gl/{key}/{record_id}/actions/{a}','requires':['version']}
     if domain=='Treasury / AR-AP' and record_id and a in {'approve','release','reverse'}:return {'mode':'EXISTING_API','method':'POST','path':f'/api/treasury/{key}/{record_id}/actions/{a}','requires':['version']}
     if domain=='Master Data' and a in {'change-request','approve','reject','activate','deactivate','version-history'}:return {'mode':'EXISTING_GOVERNANCE','note':'Use /api/masterdata/changes and independent checker decision endpoints.'}
     return {'mode':'EXISTING_SCREEN_WORKFLOW','note':'Open the current screen/right-side panel; no new business mutation is introduced by CLX-011.'}
@@ -239,7 +249,7 @@ def workflow(job_ref:str):
 
 @router.get('/search')
 def search(q:str=Query(...,min_length=2,max_length=80),role:str=Query('VIEWER')):
-    needle=q.lower();screen_hits=[{'type':'screen','screen_id':s['screen_id'],'name':s['name'],'domain':s['domain'],'submenu':s['submenu']} for s in CATALOG['screens'] if needle in json.dumps(s).lower()][:50]
+    needle=q.lower();r=role.upper();screen_hits=[{'type':'screen','screen_id':s['screen_id'],'name':s['name'],'domain':s['domain'],'submenu':s['submenu']} for s in CATALOG['screens'] if screen_role_allowed(s,r) and needle in json.dumps(s).lower()][:50]
     c=connect();record_hits=[];like='%'+needle+'%'
     try:
         for table,typ in [('transaction_records','agent'),('gl_records','gl'),('treasury_records','treasury'),('integration_records','integration')]:
