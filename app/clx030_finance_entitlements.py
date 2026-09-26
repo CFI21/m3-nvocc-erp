@@ -115,7 +115,7 @@ def matrix(q:Optional[str]=Query(None),target_type:Optional[str]=Query(None),sta
     direct=[dict(r) for r in c.execute('''SELECT t.temp_ref,u.username,p.permission_code,p.sensitive,t.valid_from,t.valid_to,t.status,t.reason,t.approved_by
       FROM iam_temporary_access t JOIN iam_users u ON u.id=t.user_id JOIN iam_permissions p ON p.permission_code=t.permission_code
       WHERE t.permission_code IN (%s) ORDER BY t.id DESC'''%(','.join('?'*len(FINANCE_CODES))),tuple(sorted(FINANCE_CODES)))]
-    assignments=[dict(r) for r in c.execute('''SELECT u.username,r.role_code,o.office_code,co.country_code,ur.valid_from,ur.valid_to,ur.status,ur.assigned_by
+    assignments=[dict(r) for r in c.execute('''SELECT ur.id assignment_id,u.username,r.role_code,o.office_code,co.country_code,ur.valid_from,ur.valid_to,ur.status,ur.assigned_by
       FROM iam_user_roles ur JOIN iam_users u ON u.id=ur.user_id JOIN iam_roles r ON r.id=ur.role_id
       LEFT JOIN iam_offices o ON o.id=ur.office_id LEFT JOIN iam_countries co ON co.id=ur.country_id
       ORDER BY u.username,r.role_code''')]
