@@ -24,6 +24,7 @@ ROLE_PERMS={
  'FINANCE':set('view create edit approve release reverse reconcile write_off'.split()),
  'GL_MANAGER':set('view create edit approve release reverse reconcile'.split()),
  'TREASURY_MANAGER':set('view create edit approve release reverse reconcile'.split()),
+ 'TREASURY':set('view create edit approve release reverse reconcile'.split()),
  'AR_ACCOUNTANT':set('view create edit approve write_off'.split()),
  'AP_ACCOUNTANT':set('view create edit approve write_off'.split()),
  'GL_ACCOUNTANT':set('view create edit'.split()),
