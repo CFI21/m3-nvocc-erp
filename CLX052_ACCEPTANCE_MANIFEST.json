@@ -1,0 +1,167 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX052-GO-LIVE-CONTROL-ACCEPTED-20260926",
+  "phase": "CLX-052",
+  "title": "Final Go-Live Control + Production Cutover Rehearsal",
+  "status": "ACCEPTED",
+  "go_live_ready": true,
+  "production_ready": true,
+  "accepted_code_commit": "30269fc8ff75d53a8313bc79d8b41613ceb3420e",
+  "parentBaseline": "M3-CLX051-PRODUCTION-READINESS-ACCEPTED-20260926",
+  "scope": {
+    "screenBaseline": 196,
+    "screenCountChange": 0,
+    "menuOrder": "PRESERVED",
+    "businessLogic": "PRESERVED",
+    "dataModelBusinessChange": false,
+    "apiContractBreak": false,
+    "roleDataScope": "PRESERVED",
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "sod": "PRESERVED",
+    "audit": "PRESERVED",
+    "newBusinessModules": false,
+    "runtimeCodeChanged": false
+  },
+  "governedRuntime": {
+    "webServiceId": "srv-darbgkvlk1mc738rohng",
+    "apiServiceId": "srv-dar9fh17lnhs73ahlh60",
+    "webUrl": "https://m3-nvocc-web-latest.onrender.com",
+    "apiUrl": "https://m3-nvocc-api-latest-1.onrender.com",
+    "webDigest": "sha256:069beaca63368729f10a5ab5be57824963b40ff25331a8a4f8574cf9a59aa00b",
+    "apiDigest": "sha256:bbc746f1317f5eec88addfb040acb94f2d7e33760c57dcd965cd3b013d050c31",
+    "runtimeDigestInheritedFromClx051": true,
+    "legacyNamedProdServicesCutoverTargets": false
+  },
+  "cutoverControl": {
+    "runbook": "CLX052_CUTOVER_RUNBOOK.md",
+    "sequenceDefined": true,
+    "ownersDefined": true,
+    "evidenceDefined": true,
+    "separateExplicitLiveActivationRequired": true,
+    "watchWindowMinutes": 60,
+    "watchChecksMinutes": [
+      0,
+      5,
+      15,
+      30,
+      60
+    ],
+    "rollbackTriggersDefined": true
+  },
+  "providerReadiness": {
+    "providers": [
+      "truelayer-bank",
+      "openexchangerates-fx",
+      "truelayer-payments",
+      "avalara-avatax"
+    ],
+    "enabledProviders": 0,
+    "enabledRealMoneyProviders": 0,
+    "credentialVariablesIdentified": true,
+    "callbackWebhookControlsIdentified": true,
+    "retryTimeoutCircuitControlsPresent": true,
+    "liveActivationPerformed": false
+  },
+  "database": {
+    "provider": "Supabase",
+    "project": "M3-NVOCC-PROD",
+    "projectRef": "ozupgknqaqgvprliewxe",
+    "jobs50001to50005": [
+      "50001",
+      "50002",
+      "50003",
+      "50004",
+      "50005"
+    ],
+    "orphanCounts": {
+      "transactions": 0,
+      "gl": 0,
+      "treasury": 0,
+      "integration": 0
+    },
+    "duplicateCounts": {
+      "transactions": 0,
+      "gl": 0,
+      "treasury": 0,
+      "integration": 0
+    },
+    "financeControl": {
+      "debitVC": "152030.00",
+      "creditVC": "152030.00",
+      "debitLC": "28530.00",
+      "creditLC": "28530.00",
+      "balancedVC": true,
+      "balancedLC": true
+    }
+  },
+  "security": {
+    "denyByDefaultRls": true,
+    "supabaseSecurityAdvisor": "INFO_ONLY_RLS_ENABLED_NO_POLICY_INTENTIONAL",
+    "loginLogoutMfaSessionControls": "PASS",
+    "roleDataScope": "PASS",
+    "makerCheckerFourEyesSod": "PASS",
+    "auditImmutability": "PASS",
+    "cspHstsHttps": "PASS",
+    "requestCorrelationIds": "PASS"
+  },
+  "observability": {
+    "webHealth": "PASS",
+    "apiHealth": "HTTP_200_REPEATED",
+    "databaseHealth": "PASS",
+    "operationsWorkbench": "AVAILABLE",
+    "managementControlTower": "AVAILABLE",
+    "managementAlerts": "AVAILABLE",
+    "activeSodRules": 3
+  },
+  "regression": {
+    "clx052GoLiveControl": "PASS",
+    "clx051ProductionReadiness": "PASS",
+    "clx050OperationalUat": "PASS",
+    "buildFirst": "PASS",
+    "clx043": "PASS",
+    "clx044": "PASS",
+    "clx045": "PASS",
+    "clx046": "PASS",
+    "clx047": "PASS",
+    "clx048": "PASS",
+    "clx049": "PASS"
+  },
+  "evidence": {
+    "pullRequest": 36,
+    "prHead": "f9723a259d4b0bb2da823e4019688bc490ec1302",
+    "mergeCommit": "30269fc8ff75d53a8313bc79d8b41613ceb3420e",
+    "clx052RunId": "36274588134",
+    "mainPredeployRunId": "36274852959",
+    "rollbackRetagRunId": "36274890321",
+    "rollbackTarget": {
+      "baseline": "CLX-050",
+      "webDigest": "sha256:081bbee4a60f9b1e39b23153f0e517793ce0203dd4edb96a982d668231c2c4ee",
+      "apiDigest": "sha256:fe00e3155ce75a44acc1a3cec879ac143cc158699b843123fb6c0a24aff77381",
+      "webDeployId": "dep-das41krbc2fs73986bd0",
+      "apiDeployId": "dep-das41mnavr4c738u11og",
+      "webStatus": "LIVE",
+      "apiStatus": "LIVE",
+      "status": "PASS"
+    },
+    "restoreRetagRunId": "36274978087",
+    "restoredCandidate": {
+      "webDeployId": "dep-das42aojo6nc73a4fbg0",
+      "apiDeployId": "dep-das42bh7lnhs73fhf2c0",
+      "webDigest": "sha256:069beaca63368729f10a5ab5be57824963b40ff25331a8a4f8574cf9a59aa00b",
+      "apiDigest": "sha256:bbc746f1317f5eec88addfb040acb94f2d7e33760c57dcd965cd3b013d050c31",
+      "webStatus": "LIVE",
+      "apiStatus": "LIVE",
+      "apiHealth": "HTTP_200_REPEATED",
+      "status": "PASS"
+    },
+    "controlledRollbackRestoreDrill": "PASS"
+  },
+  "controls": {
+    "productionTraffic": false,
+    "liveProviders": false,
+    "realMoney": false
+  },
+  "finalActivationGate": "SEPARATE_EXPLICIT_USER_COMMAND_REQUIRED",
+  "freeze": true
+}
