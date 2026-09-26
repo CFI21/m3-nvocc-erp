@@ -36,7 +36,7 @@ def test_frozen_196_top_level_and_all_admin_master_screens_load(isolated):
         d=screen_data(s['screen_id'],x_role='ADMIN')
         assert 'rows' in d
         a=set(quick_actions(s['screen_id'],'ADMIN')['visible_actions'])
-        if s['domain']=='General / Administration':
+        if s['screen_id'].startswith('administration::'):
             assert not ({'create','edit','release','reverse'} & a)
 
 def test_admin_role_assignment_validates_active_status_effective_dates_and_self_sensitive(isolated):
