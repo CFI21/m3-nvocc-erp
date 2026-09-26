@@ -1,0 +1,40 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX029-ACCOUNTING-NAVIGATION-ACCEPTED-20260926",
+  "phase": "CLX-029",
+  "title": "Accounting Navigation + Explicit GL User/Role Entitlements",
+  "status": "ACCEPTED",
+  "accepted_commit": "b16718b416dccdb5536a2d85d49686004a310384",
+  "parent": "M3-CLX028-FINAL-ACCEPTED",
+  "accepted_at": "2026-09-26T07:59:00Z",
+  "scope": {
+    "navigation": "GL / Chart of Accounts / general-ledger configuration moved under General / Administration → Finance & Accounting Setup",
+    "agentTasks": "Operational agent transactions only; no GL configuration",
+    "access": "Explicit GL_ACCOUNTANT / GL_MANAGER and granular GL entitlement catalog; FINANCE, OPS, AGENT and VIEWER receive no implicit GL setup access",
+    "audit": "Existing immutable audit preserves actor, timestamp, before and after values",
+    "dataModel": "UNCHANGED",
+    "apiContracts": "PRESERVED"
+  },
+  "evidence": {
+    "pullRequestUatRunId": "36228292363",
+    "pullRequestUat": "PASS",
+    "predeployRunId": "36228347243",
+    "predeploy": "PASS",
+    "catalogRoleUatRunId": "36228347246",
+    "catalogRoleUat": "PASS",
+    "apiImageBuildRunId": "36228347242",
+    "apiImageBuild": "PASS",
+    "webImageBuildRunId": "36228347257",
+    "webImageBuild": "PASS"
+  },
+  "controls": {
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "roleDataScope": "PRESERVED",
+    "liveProviders": false,
+    "realMoney": false,
+    "productionRuntimePromoted": false,
+    "renderProductionAutoDeploy": false
+  },
+  "freeze": true
+}
