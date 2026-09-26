@@ -30,6 +30,7 @@ ROLE_ACTIONS={
  'GL_MANAGER': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy','approve','release','reverse'},
  'GL_ACCOUNTANT': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy'},
  'TREASURY_MANAGER': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy','approve','release','reverse'},
+ 'TREASURY': {'quick-view','related-records','print','export','email','audit-history','create','edit','copy','approve','release','reverse'},
  'SECURITY_ADMIN': {'quick-view','related-records','print','export','email','audit-history','retry','activate','deactivate'},
  'MASTER_DATA_MANAGER': {'quick-view','related-records','print','export','email','audit-history','change-request','approve','reject','activate','deactivate','version-history'},
  'MASTER_DATA': {'quick-view','related-records','print','export','email','audit-history','change-request','version-history'},
