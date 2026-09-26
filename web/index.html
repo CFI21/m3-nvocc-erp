@@ -161,9 +161,12 @@ async function openFinanceForm(mode){
     const fields=(meta.fields||Object.keys(base)).filter(x=>!['id','version','job_ref','external_ref','status','module'].includes(String(x).toLowerCase()));
     $('drawerTitle').textContent=(mode==='create'?'Create ':'Edit ')+state.current.name;
     let html='<div class="formGrid"><div class="formNote">Uses the existing '+(kind==='gl'?'GL':'Treasury')+' API. Validation, audit, optimistic locking and approval controls remain server-authoritative.</div>';
+    if(kind==='gl'&&meta.tabs?.length)html+='<div class="formField full"><div class="toolbar">'+meta.tabs.map((t,i)=>'<button type="button" class="btn '+(i===0?'primary':'')+'">'+esc(t)+'</button>').join('')+'</div></div>';
     html+='<div class="formField"><label>Job Ref</label><input id="clx43Job" maxlength="5" value="'+esc(selectedJob()||'')+'" '+(mode==='edit'?'disabled':'')+'></div>';
     html+='<div class="formField"><label>External Ref</label><input id="clx43External" value="'+esc(state.selected?.external_ref||'')+'" '+(mode==='edit'?'disabled':'')+'></div>';
-    for(const name of fields){const full=/remarks|notes|narration|description|instruction/i.test(name);html+='<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+(full?'<textarea data-clx43-field="'+esc(name)+'">'+esc(base[name]??'')+'</textarea>':'<input data-clx43-field="'+esc(name)+'" value="'+esc(base[name]??'')+'">')+'</div>'}
+    for(const name of fields){if(name==='Account Lines'||name==='Budget Lines'||name==='Reconciliation Lines'||name==='Cheque Stock')continue;const full=/remarks|notes|narration|description|instruction|company assignment/i.test(name);const val=base[name]??'';const type=/date/i.test(name)?'date':(/amount|balance|rate|debit|credit|wht|total|difference/i.test(name)?'number':'text');html+='<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+(full?'<textarea data-clx43-field="'+esc(name)+'">'+esc(val)+'</textarea>':'<input type="'+type+'" data-clx43-field="'+esc(name)+'" value="'+esc(val)+'">')+'</div>'}
+    if(kind==='gl'&&meta.line_columns?.length){let existing=Array.isArray(base['Account Lines'])?base['Account Lines']:[{}];html+='<div class="formField full"><label>Account Detail</label><div style="overflow:auto"><table><thead><tr>'+meta.line_columns.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+existing.map((row,ri)=>'<tr>'+meta.line_columns.map(col=>'<td><input data-clx44-line-row="'+ri+'" data-clx44-line-col="'+esc(col)+'" value="'+esc(row[col]??'')+'" style="min-width:110px"></td>').join('')+'</tr>').join('')+'</tbody></table></div></div>'}
+    if(kind==='gl'&&meta.reference_actions?.length)html+='<div class="formField full"><div class="muted">Reference actions: '+meta.reference_actions.map(esc).join(' · ')+'</div></div>';
     html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button><button class="btn primary" onclick="saveFinanceForm(\''+mode+'\')">Save</button></div></div>';
     $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open');
   }catch(e){alert(e.message)}
@@ -172,6 +175,7 @@ async function saveFinanceForm(mode){
   const kind=financeDomain();if(!kind)return;
   try{
     const fields={};document.querySelectorAll('[data-clx43-field]').forEach(el=>fields[el.dataset.clx43Field]=el.value);
+    const lineEls=[...document.querySelectorAll('[data-clx44-line-row]')];if(lineEls.length){const lines=[];for(const el of lineEls){const i=Number(el.dataset.clx44LineRow);lines[i]=lines[i]||{};lines[i][el.dataset.clx44LineCol]=el.value}fields['Account Lines']=lines.filter(x=>Object.values(x).some(v=>String(v).trim()!==''));}
     const headers={'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'};
     let path='/api/v1/'+kind+'/'+state.current.key,method='POST',body;
     if(mode==='create'){
