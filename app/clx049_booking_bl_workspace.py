@@ -125,8 +125,8 @@ def trace(job_ref:str,x_role:str=Header('AUDITOR'),x_agent_scope:str|None=Header
       'bl_job_link':bool(w['bl'] and w['bl']['job_ref']==job_ref),
       'delivery_order_same_job':bool(w['delivery_order'] and w['delivery_order']['job_ref']==job_ref),
       'lock_same_job':bool(w['lock_info']['vessel_lock'] and w['lock_info']['vessel_lock']['job_ref']==job_ref),
-      'switch_original_bl_link':not w['switch_bl'] or switch_fields.get('Original B/L') in {w['context']['hbl_no'],bl_fields.get('B/L No.'),bl_fields.get('HBL')},
-      'delivery_order_bl_link':not w['delivery_order'] or do_fields.get('HBL') in {None,'',w['context']['hbl_no'],bl_fields.get('B/L No.'),bl_fields.get('HBL')},
+      'switch_original_bl_link':bool(w['switch_bl'] and switch_fields.get('Original B/L') and switch_fields.get('Original B/L') in {w['context']['hbl_no'],bl_fields.get('B/L No.'),bl_fields.get('HBL')}),
+      'delivery_order_bl_link':bool(w['delivery_order'] and do_fields.get('HBL') and do_fields.get('HBL') in {w['context']['hbl_no'],bl_fields.get('B/L No.'),bl_fields.get('HBL')}),
       'same_authoritative_context':all(x is None or x.get('job_ref')==job_ref for x in [w['special_rate_request'],w['booking'],w['bl'],w['delivery_order'],w['lock_info']['vessel_lock'],w['switch_bl']])
     }
     return {'phase':'CLX-049','job_ref':job_ref,'refs':refs,'checks':checks,'pass':all(checks.values()),'screen_count_change':0,'parallel_records_created':False}
