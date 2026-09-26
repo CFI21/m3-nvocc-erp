@@ -106,6 +106,26 @@ def provider(c,key):
     if not r: raise HTTPException(404,'Unknown sandbox provider')
     return r
 
+def require_mock_provider(p):
+    if str(p['endpoint_mode']).upper()!='MOCK' or not str(p['credential_ref']).startswith('secret://sandbox/'):
+        raise HTTPException(403,{'code':'LIVE_PROVIDER_DISABLED'})
+    if str(p['status']).upper()!='ENABLED':
+        raise HTTPException(422,{'code':'PROVIDER_NOT_ENABLED'})
+
+def authoritative_source_exists(c,source_ref):
+    if not source_ref:return False
+    checks=[
+      ('treasury_records','external_ref'),('treasury_records','source_ref'),
+      ('gl_records','external_ref'),('gl_records','source_ref'),
+      ('gl_vouchers','voucher_no'),('gl_vouchers','source_ref'),
+      ('treasury_bank_feed_items','statement_ref'),('treasury_bank_feed_items','matched_source_ref')
+    ]
+    for table,col in checks:
+        if c.execute(f'SELECT 1 FROM {table} WHERE {col}=? LIMIT 1',(source_ref,)).fetchone():return True
+    # Existing accepted Treasury references can live inside governed payload JSON.
+    if c.execute("SELECT 1 FROM treasury_records WHERE payload_json LIKE ? LIMIT 1",(f'%{source_ref}%',)).fetchone():return True
+    return False
+
 def payment_row(c,pid):
     r=c.execute('''SELECT p.*,j.job_ref,pb.batch_no,pb.status batch_status,v.voucher_no
       FROM sandbox_payment_requests p JOIN jobs j ON j.id=p.job_id JOIN treasury_payment_batches pb ON pb.id=p.batch_id
@@ -160,7 +180,7 @@ def list_records(module:str,x_role:str=Header('AUDITOR'),x_office_scope:Optional
 
 @router.post('/providers/{provider_key}/simulate')
 async def simulate_provider(provider_key:str,body:ProviderSimulation,request:Request,x_role:str=Header('VIEWER'),x_actor_id:str=Header('unknown'),x_csrf_token:Optional[str]=Header(None),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key')):
-    role=require_role(x_role,'simulate'); check_csrf(request,x_csrf_token); c=connect(); rate_limit(c,'simulate:'+x_actor_id,20); p=provider(c,provider_key)
+    role=require_role(x_role,'simulate'); check_csrf(request,x_csrf_token); c=connect(); rate_limit(c,'simulate:'+x_actor_id,20); p=provider(c,provider_key); require_mock_provider(p)
     if p['circuit_state']=='OPEN': security_audit(c,x_actor_id,role,'PROVIDER_CALL_BLOCKED',provider_key,'DENY',{'reason':'CIRCUIT_OPEN'}); c.close(); raise HTTPException(503,{'code':'CIRCUIT_OPEN'})
     raw=await request.body(); req_hash=sha_bytes(raw); idem=idempotency_key or str(uuid.uuid4())
     old=c.execute('SELECT * FROM integration_events WHERE provider_id=? AND idempotency_key=?',(p['id'],idem)).fetchone()
@@ -185,7 +205,14 @@ async def simulate_provider(provider_key:str,body:ProviderSimulation,request:Req
 def retry_event(event_id:int,body:RetryBody,request:Request,x_role:str=Header('VIEWER'),x_actor_id:str=Header('unknown'),x_csrf_token:Optional[str]=Header(None)):
     role=require_role(x_role,'retry'); check_csrf(request,x_csrf_token); c=connect(); rate_limit(c,'retry:'+x_actor_id,30); r=c.execute('SELECT e.*,p.provider_key,p.circuit_state FROM integration_events e JOIN finance_providers p ON p.id=e.provider_id WHERE e.id=?',(event_id,)).fetchone()
     if not r: c.close(); raise HTTPException(404,'Integration event not found')
+    p=provider(c,r['provider_key']); require_mock_provider(p)
     if r['status']=='DELIVERED': c.close(); return {'ok':True,'status':'DELIVERED','already_delivered':True}
+    if r['circuit_state']=='OPEN':
+        security_audit(c,x_actor_id,role,'EVENT_RETRY_BLOCKED',r['event_ref'],'DENY',{'reason':'CIRCUIT_OPEN'},r['correlation_id']); c.close()
+        raise HTTPException(503,{'code':'CIRCUIT_OPEN'})
+    if r['status']=='DEAD_LETTER' or r['attempt_count']>=r['max_attempts']:
+        security_audit(c,x_actor_id,role,'EVENT_RETRY_BLOCKED',r['event_ref'],'DENY',{'reason':'RETRY_LIMIT_EXCEEDED'},r['correlation_id']); c.close()
+        raise HTTPException(422,{'code':'RETRY_LIMIT_EXCEEDED','attempt_count':r['attempt_count'],'max_attempts':r['max_attempts']})
     n=r['attempt_count']+1; success=body.force_success
     if success:
         status='DELIVERED'; result='SUCCESS'; next_retry=None
@@ -196,7 +223,7 @@ def retry_event(event_id:int,body:RetryBody,request:Request,x_role:str=Header('V
         status='RETRY'; result='FAILURE'; next_retry=now()
     c.execute('UPDATE integration_events SET status=?,attempt_count=?,next_retry_at=?,updated_at=? WHERE id=?',(status,n,next_retry,now(),event_id))
     c.execute('INSERT INTO integration_attempts(event_id,attempt_no,result,latency_ms,detail_redacted,ts) VALUES(?,?,?,?,?,?)',(event_id,n,result,120,json.dumps({'detail':'sandbox retry'}),now()))
-    security_audit(c,x_actor_id,role,'EVENT_RETRY',r['event_ref'],status,{'force_success':success}); out=dict(c.execute('SELECT * FROM integration_events WHERE id=?',(event_id,)).fetchone()); c.close(); return out
+    security_audit(c,x_actor_id,role,'EVENT_RETRY',r['event_ref'],status,{'force_success':success},r['correlation_id']); out=dict(c.execute('SELECT * FROM integration_events WHERE id=?',(event_id,)).fetchone()); c.close(); return out
 
 @router.get('/queues/retry')
 def retry_queue(x_role:str=Header('AUDITOR')):
@@ -207,10 +234,14 @@ def dead_queue(x_role:str=Header('AUDITOR')):
 
 @router.post('/webhooks/{provider_key}')
 async def webhook(provider_key:str,request:Request,x_webhook_signature:Optional[str]=Header(None),x_event_id:Optional[str]=Header(None)):
-    raw=await request.body(); c=connect(); rate_limit(c,'webhook:'+provider_key,25); p=provider(c,provider_key); external=x_event_id or sha_bytes(raw)[:16]; expected=hmac.new(MOCK_WEBHOOK_SECRET,raw,hashlib.sha256).hexdigest(); valid=bool(x_webhook_signature and hmac.compare_digest(expected,x_webhook_signature))
+    raw=await request.body(); c=connect(); rate_limit(c,'webhook:'+provider_key,25); p=provider(c,provider_key); require_mock_provider(p); external=x_event_id or sha_bytes(raw)[:16]; expected=hmac.new(MOCK_WEBHOOK_SECRET,raw,hashlib.sha256).hexdigest(); valid=bool(x_webhook_signature and hmac.compare_digest(expected,x_webhook_signature))
     prior=c.execute('SELECT * FROM webhook_receipts WHERE provider_id=? AND external_event_id=?',(p['id'],external)).fetchone()
     if prior:
-        security_audit(c,'webhook', 'SYSTEM','WEBHOOK_DUPLICATE',provider_key,'IGNORED',{'external_event_id':external}); c.close(); return {'duplicate':True,'status':prior['status']}
+        incoming_hash=sha_bytes(raw)
+        if prior['payload_hash']!=incoming_hash:
+            security_audit(c,'webhook','SYSTEM','WEBHOOK_DUPLICATE_CONFLICT',provider_key,'DENY',{'external_event_id':external}); c.close()
+            raise HTTPException(409,{'code':'WEBHOOK_EVENT_ID_PAYLOAD_MISMATCH'})
+        security_audit(c,'webhook','SYSTEM','WEBHOOK_DUPLICATE',provider_key,'IGNORED',{'external_event_id':external}); c.close(); return {'duplicate':True,'status':prior['status']}
     status='ACCEPTED' if valid else 'REJECTED'
     c.execute('INSERT INTO webhook_receipts(provider_id,external_event_id,payload_hash,signature_valid,status,received_at) VALUES(?,?,?,?,?,?)',(p['id'],external,sha_bytes(raw),1 if valid else 0,status,now()))
     security_audit(c,'webhook','SYSTEM','WEBHOOK_SIGNATURE',provider_key,'PASS' if valid else 'DENY',{'external_event_id':external})
@@ -245,6 +276,8 @@ def manual_match(line_id:int,body:ManualMatchBody,request:Request,x_role:str=Hea
     role=require_role(x_role,'reconcile'); check_csrf(request,x_csrf_token); c=connect(); r=c.execute('SELECT * FROM bank_import_lines WHERE id=?',(line_id,)).fetchone()
     if not r: c.close(); raise HTTPException(404,'Bank import line not found')
     if r['status']=='FAILED': c.close(); raise HTTPException(422,{'code':'FAILED_LINE_CANNOT_MATCH'})
+    if r['status']=='MATCHED': c.close(); raise HTTPException(409,{'code':'BANK_LINE_ALREADY_MATCHED','source_ref':r['matched_source_ref']})
+    if not authoritative_source_exists(c,body.source_ref): c.close(); raise HTTPException(422,{'code':'UNKNOWN_RECONCILIATION_SOURCE'})
     c.execute("UPDATE bank_import_lines SET status='MATCHED',matched_source_ref=?,failure_reason=NULL WHERE id=?",(body.source_ref,line_id))
     b=c.execute('SELECT batch_id FROM bank_import_lines WHERE id=?',(line_id,)).fetchone()['batch_id']; counts=c.execute("SELECT SUM(status='MATCHED') m,SUM(status='UNMATCHED') u,SUM(status='FAILED') f FROM bank_import_lines WHERE batch_id=?",(b,)).fetchone(); c.execute('UPDATE bank_import_batches SET matched_count=?,unmatched_count=?,failed_count=?,status=? WHERE id=?',(counts['m'],counts['u'],counts['f'],'COMPLETE' if counts['u']==0 and counts['f']==0 else 'PARTIAL',b)); security_audit(c,x_actor_id,role,'BANK_MANUAL_MATCH',str(line_id),'PASS',{'source_ref':body.source_ref}); c.close(); return {'ok':True,'line_id':line_id,'source_ref':body.source_ref}
 
