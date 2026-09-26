@@ -56,8 +56,9 @@ def _priority(category:str,blocking:bool=False)->str:
     if category in {"CUTOFF_RISK","DOCUMENT_GAP","MILESTONE_DELAY"}: return "MEDIUM"
     return "LOW"
 
-def _item(c,key,category,title,detail,job,priority=None,module=None,transaction_id=None,target=None,age_hours=None,sla_hours=24):
-    st=_state(c,key)
+def _item(c,key,category,title,detail,job,priority=None,module=None,transaction_id=None,target=None,age_hours=None,sla_hours=24,state_map=None):
+    st=(state_map or {}).get(key) if state_map is not None else _state(c,key)
+    st=st or {}
     p=st.get("priority_override") or priority or _priority(category)
     age=float(age_hours or 0)
     return {
@@ -98,6 +99,7 @@ def _audit(c,role,actor,action,metadata):
 
 def _derive(c,role,agent_scope,customer_scope):
     clause,args=_scope(role,agent_scope,customer_scope)
+    state_map={r["exception_key"]:dict(r) for r in c.execute("SELECT * FROM operations_work_items").fetchall()}
     jobs=c.execute("""SELECT j.id,j.job_ref,j.operational_status,c.code customer_code,a.code agent_code,
       w.documentation_status,w.vgm_status,w.customs_status,w.transshipment_status,w.release_status,w.closed,
       f.payment_status,f.outstanding,f.credit_hold
@@ -111,14 +113,14 @@ def _derive(c,role,agent_scope,customer_scope):
         if j["closed"]: continue
         if j["documentation_status"] not in ("COMPLETE","APPROVED"):
             items.append(_item(c,f"JOB:{j['id']}:DOC", "DOCUMENT_GAP","Documentation gap",j["documentation_status"],j,
-                               target=f"/api/v1/booking?job_ref={j['job_ref']}"))
+                               target=f"/api/v1/booking?job_ref={j['job_ref']}",state_map=state_map))
         if j["vgm_status"] in ("MISSING","PENDING"):
             items.append(_item(c,f"JOB:{j['id']}:VGM","DOCUMENT_GAP","VGM action required",j["vgm_status"],j,
-                               target=f"/api/v1/container-activity?job_ref={j['job_ref']}"))
+                               target=f"/api/v1/container-activity?job_ref={j['job_ref']}",state_map=state_map))
         if j["customs_status"] not in ("CLEARED","N/A"):
-            items.append(_item(c,f"JOB:{j['id']}:CUSTOMS","MILESTONE_DELAY","Customs milestone pending",j["customs_status"],j))
+            items.append(_item(c,f"JOB:{j['id']}:CUSTOMS","MILESTONE_DELAY","Customs milestone pending",j["customs_status"],j,state_map=state_map))
         if j["transshipment_status"]=="PENDING":
-            items.append(_item(c,f"JOB:{j['id']}:TS","MILESTONE_DELAY","Transshipment confirmation pending","PENDING",j))
+            items.append(_item(c,f"JOB:{j['id']}:TS","MILESTONE_DELAY","Transshipment confirmation pending","PENDING",j,state_map=state_map))
         if j["release_status"]=="BLOCKED" or j["payment_status"]!="CLEARED" or int(j["credit_hold"] or 0)==1 or float(j["outstanding"] or 0)>0:
             reasons=[]
             if j["release_status"]=="BLOCKED": reasons.append("release blocked")
@@ -126,7 +128,7 @@ def _derive(c,role,agent_scope,customer_scope):
             if int(j["credit_hold"] or 0)==1: reasons.append("credit hold")
             if float(j["outstanding"] or 0)>0: reasons.append("outstanding balance")
             items.append(_item(c,f"JOB:{j['id']}:PAYREL","PAYMENT_RELEASE_BLOCK","Payment / release block",", ".join(reasons),j,
-                               priority="HIGH",target=f"/api/v1/delivery-order?job_ref={j['job_ref']}"))
+                               priority="HIGH",target=f"/api/v1/delivery-order?job_ref={j['job_ref']}",state_map=state_map))
 
     if visible_ids:
         marks=",".join("?" for _ in visible_ids)
@@ -136,13 +138,13 @@ def _derive(c,role,agent_scope,customer_scope):
             d=dict(r); j={"id":d["job_id"],"job_ref":d["job_ref"]}
             items.append(_item(c,f"INT:{d['id']}","FAILED_INTEGRATION","Integration action required",
                                f"{d['module']} / {d['status']}",j,priority="HIGH",module=d["module"],transaction_id=d["id"],
-                               target=f"/api/v1/integrations/{d['module']}/{d['id']}",age_hours=_age(d.get("updated_at")),sla_hours=4))
+                               target=f"/api/v1/integrations/{d['module']}/{d['id']}",age_hours=_age(d.get("updated_at")),sla_hours=4,state_map=state_map))
         for r in c.execute(f"""SELECT e.*,j.job_ref FROM exception_events e LEFT JOIN jobs j ON j.id=e.job_id
                               WHERE e.resolved=0 AND e.job_id IN ({marks})""",vals):
             d=dict(r);j={"id":d["job_id"],"job_ref":d["job_ref"]}
             items.append(_item(c,f"EX:{d['id']}","RECONCILIATION_EXCEPTION",d["code"],d["detail"],j,
                                priority="CRITICAL" if d["severity"]=="BLOCKING" else "HIGH",module=d["module"],
-                               transaction_id=d["transaction_id"],age_hours=_age(d["ts"]),sla_hours=8))
+                               transaction_id=d["transaction_id"],age_hours=_age(d["ts"]),sla_hours=8,state_map=state_map))
         for r in c.execute(f"""SELECT t.*,j.job_ref FROM transaction_records t JOIN jobs j ON j.id=t.job_id
                               WHERE t.job_id IN ({marks}) AND UPPER(t.status) NOT IN ('RELEASED','CLOSED','CANCELLED')""",vals):
             d=dict(r)
@@ -157,7 +159,7 @@ def _derive(c,role,agent_scope,customer_scope):
                     j={"id":d["job_id"],"job_ref":d["job_ref"]}
                     items.append(_item(c,f"CUT:{d['id']}:{k}","CUTOFF_RISK","Cut-off risk",
                                        f"{k}: {v}",j,priority="CRITICAL" if hrs<=4 else "HIGH",module=d["module"],
-                                       transaction_id=d["id"],target=f"/api/v1/{d['module']}/{d['id']}",age_hours=max(0,-hrs),sla_hours=4))
+                                       transaction_id=d["id"],target=f"/api/v1/{d['module']}/{d['id']}",age_hours=max(0,-hrs),sla_hours=4,state_map=state_map))
     dedup={x["exception_key"]:x for x in items}
     return list(dedup.values())
 
