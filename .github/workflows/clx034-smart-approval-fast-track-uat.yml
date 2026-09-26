@@ -43,3 +43,5 @@ jobs:
           tests/test_clx027_control_tower.py
           tests/test_clx028_management_kpi.py
           tests/test_live_provider_runtime.py
+
+# CLX-034 post-merge verification trigger
