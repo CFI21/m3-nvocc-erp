@@ -289,21 +289,22 @@ def decide(review_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
         level=int(scope.get('level',1))
         if not _is_super_admin(c,s['user_id']) and (lim['decision']!='WITHIN_LIMIT' or int(lim['required_level'])<level):
             raise HTTPException(409,{'code':'APPROVER_LEVEL_INSUFFICIENT','required_level':level})
-        result=b.decision
+        decision=b.decision
+        stored={'APPROVE':'APPROVED','REJECT':'REJECTED','RETURN_FOR_CORRECTION':'RETURN_FOR_CORRECTION'}[decision]
         c.execute("UPDATE iam_access_reviews SET status='COMPLETED',completed_at=?,result=? WHERE id=?",
-                  (now(),result+((':'+b.reason_code) if b.reason_code else ''),r['id']))
-        scope['approved_by']=s['user_ref'] if result=='APPROVE' else None
+                  (now(),stored+((':'+b.reason_code) if b.reason_code else ''),r['id']))
+        scope['approved_by']=s['user_ref'] if decision=='APPROVE' else None
         c.execute('UPDATE iam_access_reviews SET scope=? WHERE id=?',(json.dumps(scope,sort_keys=True),r['id']))
-        audit(c,s['user_ref'],'FINANCE_TRANSACTION_'+result,'FINANCE_APPROVAL',scope['chain_id'],
-              {'status':'PENDING','level':level},{'status':result,'level':level,'comment':b.comment,'reason_code':b.reason_code},
+        audit(c,s['user_ref'],'FINANCE_TRANSACTION_'+stored,'FINANCE_APPROVAL',scope['chain_id'],
+              {'status':'PENDING','level':level},{'status':stored,'level':level,'comment':b.comment,'reason_code':b.reason_code},
               {'target_url':scope.get('target_url')})
-        if result=='APPROVE' and level<int(scope['required_levels']):
+        if decision=='APPROVE' and level<int(scope['required_levels']):
             next_level=level+1
             existing=_reviews_for_chain(c,scope['chain_id'])
             if not any(int(x['scope_payload'].get('level',0))==next_level for x in existing):
                 _create_level(c,scope,next_level)
             return {'status':'NEXT_LEVEL_REQUIRED','chain_id':scope['chain_id'],'next_level':next_level}
-        return {'status':result,'chain_id':scope['chain_id'],'level':level}
+        return {'status':decision,'chain_id':scope['chain_id'],'level':level}
     finally:c.close()
 
 @router.post('/chains/{chain_id}/reopen')
