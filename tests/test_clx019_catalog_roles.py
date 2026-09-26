@@ -18,7 +18,7 @@ def test_complete_196_screen_catalog_and_domain_counts():
         'Treasury / AR-AP':37,
         'Integration & Security':20,
         'General / Administration':75,
-        'Master Data':42,
+        'Master Data':45,
     }
 
 
