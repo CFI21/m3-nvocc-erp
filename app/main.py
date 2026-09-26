@@ -28,6 +28,7 @@ from .operations_workbench import router as operations_workbench_router
 from .control_tower import router as control_tower_router
 from .management_kpi import router as management_kpi_router
 from .clx030_finance_entitlements import router as clx030_finance_entitlements_router
+from .clx031_finance_controls import router as clx031_finance_controls_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -44,6 +45,7 @@ app.add_middleware(
 )
 app.mount('/static',StaticFiles(directory=HERE/'static'),name='static')
 app.include_router(clx030_finance_entitlements_router)
+app.include_router(clx031_finance_controls_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
