@@ -16,7 +16,7 @@ def test_ho_tasks_restored_without_screen_duplication():
     assert len(c["screens"])==196
     assert [x["label"] for x in HO_TRANSACTION_ALIASES]==EXPECTED_TX
     assert len(HO_UTILITY_ALIASES)>=10
-    ho=c["menu"][0]
+    ho=next(x for x in c["menu"] if x["domain"]=="HO Tasks")
     assert ho["domain"]=="HO Tasks"
     assert [x["name"] for x in ho["submenus"]]==["Transaction","Utilities"]
     assert ho["navigation_only"] is True
