@@ -7,7 +7,7 @@ import json,hashlib,uuid,datetime,sqlite3
 from .db import connect,tx,IntegrityError,backend_name
 from .json_recovery import load_json_or_recover_arrays
 from .admin import session as iam_session, permission_code as iam_permission_code
-from .clx033_finance_transaction_governance import enforce_gl_action
+from .clx034_smart_approval_fast_track import enforce_gl_action
 
 HERE=Path(__file__).resolve().parent
 META, META_RECOVERED = load_json_or_recover_arrays(
