@@ -1,0 +1,76 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-027",
+  "status": "ACCEPTED",
+  "baseline": "M3-CLX027-MANAGEMENT-CONTROL-TOWER-ACCEPTED-20260926-029",
+  "parent_baseline": "M3-CLX026-EXCEPTION-WORKFLOW-ACCEPTED-20260926-028",
+  "clx024_status": "DEFERRED_NOT_ACCEPTED",
+  "scope": [
+    "read-only operational dashboard",
+    "management control tower",
+    "executive operational KPIs",
+    "job open/closed/release/document/payment exposure",
+    "active/critical/high/overdue/unassigned work-item KPIs",
+    "team workload by lifecycle and severity",
+    "exception category and priority distribution",
+    "top risk jobs with deterministic risk scoring",
+    "drill-down links to CLX-026 workbench"
+  ],
+  "controls": {
+    "read_only": true,
+    "source_data_only": true,
+    "no_second_operations_engine": true,
+    "underlying_business_mutation": false,
+    "role_scope_enforced": true,
+    "maker_checker_preserved": true,
+    "four_eyes_preserved": true,
+    "audit_preserved": true,
+    "screen_catalog_preserved": 193,
+    "production_traffic": "ON",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "ancline_touched": false
+  },
+  "runtime": {
+    "api_deploy": "dep-darncjvavr4c73fd9rk0",
+    "api_image": "sha256:6c8181a7c33ed077aee7c3346f6cb13bfc350cf856f8022961c66a7483d5a87c",
+    "api_commit": "2a31a9eb66e35193dbd54db7a1aa394d445fd623",
+    "web_deploy": "dep-darncv7avr4c73fdb470",
+    "web_image": "sha256:d8e393bfe8c9095a2e8a265120f8a6f34f229b4cb197137d541c50fa63b0bd09",
+    "web_commit": "19e20bcce32451b9ca51bed3ae8fcc5929dfaa46",
+    "recent_runtime_error_like_logs": 0
+  },
+  "uat": {
+    "workflow_run": 36227392077,
+    "result": "PASS",
+    "jobs_total": 5,
+    "active_work_items": 9,
+    "agent_without_scope": "DENIED",
+    "risk_jobs": "PASS",
+    "team_workload": "PASS",
+    "drilldown_contract": "PASS",
+    "read_only_controls": "PASS"
+  },
+  "regression": {
+    "workflow_run": 36227415187,
+    "result": "PASS",
+    "tests_passed": 21,
+    "suites": [
+      "CLX-019 193-screen catalog/roles",
+      "CLX-025 operations workbench",
+      "CLX-026 exception workflow",
+      "CLX-027 control tower",
+      "live-provider safety controls"
+    ]
+  },
+  "preserved_counts": {
+    "jobs": 5,
+    "transaction_records": 95,
+    "gl_records": 280,
+    "treasury_records": 185,
+    "integration_records": 100,
+    "active_work_items": 9
+  },
+  "residual_uat_state": 0,
+  "residual_uat_history": 0
+}
