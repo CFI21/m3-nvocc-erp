@@ -1,0 +1,41 @@
+name: M3 CLX039 Executive Home UAT
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/index.html"
+      - "tests/test_clx039_executive_home.py"
+      - ".github/workflows/clx039-executive-home-uat.yml"
+  workflow_dispatch:
+
+jobs:
+  clx039-executive-home:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt pytest
+      - name: Compile
+        run: python -m py_compile app/*.py
+      - name: CLX-039 header + executive home
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx039_executive_home.py
+      - name: Preserve current approved navigation + governance + business-day baseline
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx038_agent_tasks_menu.py
+          tests/test_clx037_ui_polish.py
+          tests/test_clx036_ho_business_day.py
+          tests/test_clx035_ho_completion.py
+          tests/test_clx034_smart_approval_fast_track.py
+          tests/test_clx033_finance_transaction_governance.py
+          tests/test_clx032_finance_controls.py
+          tests/test_clx030_finance_entitlements.py
+          tests/test_clx029_accounting_navigation_access.py
+          tests/test_live_provider_runtime.py
