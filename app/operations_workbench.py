@@ -182,8 +182,9 @@ def _history(c,key,role,actor,action,from_status=None,to_status=None,owner=None,
 
 def _sync_items(c,items:list[dict],role:str,actor:str):
     stamp=now(); active={x["exception_key"] for x in items}
+    existing={r["exception_key"]:dict(r) for r in c.execute("SELECT * FROM operations_work_items").fetchall()}
     for item in items:
-        old=_state(c,item["exception_key"])
+        old=existing.get(item["exception_key"],{})
         team=old.get("team") or _default_team(item["category"])
         due=old.get("sla_due_at") or _due_from_item(item)
         escalation="NONE"
