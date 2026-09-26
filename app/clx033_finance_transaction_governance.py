@@ -67,12 +67,12 @@ def _country_for_office(c,office_code):
 def _is_super_admin(c,user_id):
     return any(r['role_code']=='SUPER_ADMIN' for r in roles_for(c,user_id))
 
-def _delegated(c,user_id,permission_code,tx_type,office_code,country_code):
+def _delegated(c,user_id,perm_code,tx_type,office_code,country_code):
     ts=now()
     for r in c.execute('''SELECT permission_code FROM iam_delegations
       WHERE to_user_id=? AND status='ACTIVE' AND valid_from<=? AND valid_to>=?''',(user_id,ts,ts)):
         raw=r['permission_code']; parts=raw.split(';'); base=parts[0]
-        if base!=permission_code: continue
+        if base!=perm_code: continue
         dims={}
         for item in parts[1:]:
             if '=' in item:
@@ -83,10 +83,10 @@ def _delegated(c,user_id,permission_code,tx_type,office_code,country_code):
         return True
     return False
 
-def _has_entitlement(c,s,permission_code,tx_type,office_code,country_code):
+def _has_entitlement(c,s,perm_code,tx_type,office_code,country_code):
     if _is_super_admin(c,s['user_id']):return True
-    return permission_code(c,s['user_id'],permission_code,office_code) or _delegated(
-        c,s['user_id'],permission_code,tx_type,office_code,country_code
+    return permission_code(c,s['user_id'],perm_code,office_code) or _delegated(
+        c,s['user_id'],perm_code,tx_type,office_code,country_code
     )
 
 def _limit_resolution(c,s,tx_type,action,amount,currency,office_code,country_code):
