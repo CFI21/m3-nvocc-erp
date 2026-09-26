@@ -104,13 +104,13 @@ def test_gl_role_assignment_is_scoped_four_eyes_and_revocable(isolated_db):
     assert a['office_code']=='DXB'
     assert a['status']=='ACTIVE'
 
-    view=matrix(q='finance.dxb')
+    view=matrix(q='finance.dxb',x_m3_session=checker)
     row=next(x for x in view['assignments'] if x['assignment_id']==a['assignment_id'])
     assert row['status']=='ACTIVE'
 
     out=revoke_role_assignment(a['assignment_id'],checker)
     assert out['status']=='REVOKED'
-    view=matrix(q='finance.dxb')
+    view=matrix(q='finance.dxb',x_m3_session=checker)
     row=next(x for x in view['assignments'] if x['assignment_id']==a['assignment_id'])
     assert row['status']=='INACTIVE'
 
