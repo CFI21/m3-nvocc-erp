@@ -1,0 +1,80 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-028",
+  "status": "ACCEPTED",
+  "baseline": "M3-CLX028-KPI-TRENDS-SNAPSHOT-ALERTS-ACCEPTED-20260926-030",
+  "parent_baseline": "M3-CLX027-MANAGEMENT-CONTROL-TOWER-ACCEPTED-20260926-029",
+  "clx024_status": "DEFERRED_NOT_ACCEPTED",
+  "scope": [
+    "daily immutable management snapshots",
+    "KPI trend history and day-over-day deltas",
+    "management alert rules and in-app alert events",
+    "management-role-only access to global KPI history",
+    "KPI Trends UI",
+    "no external notifications",
+    "no underlying business mutation"
+  ],
+  "controls": {
+    "snapshot_db_immutable": true,
+    "snapshot_update_delete_triggers": 2,
+    "management_role_boundary": true,
+    "alerts_in_app_only": true,
+    "external_notifications": false,
+    "underlying_business_mutation": false,
+    "screen_catalog_preserved": 193,
+    "maker_checker_preserved": true,
+    "four_eyes_preserved": true,
+    "production_traffic": "ON",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "ancline_touched": false
+  },
+  "runtime": {
+    "api_deploy": "dep-darnht8jo6nc738moi30",
+    "api_image": "sha256:ec92b0fce9e40b72676a099daea123569bf14e8ddb976627c235ad62b8611b16",
+    "api_commit": "16c3064b9dfb61e1cafb78e2837069e1aec81eda",
+    "web_deploy": "dep-darnhu59fdbs73aaugg0",
+    "web_image": "sha256:b91be6f9811fcc2994d084e24eecf04e4898d7d34eda2ec31097194f3eb6293c",
+    "web_commit": "9421419eefb481ccc6a3459d94bc89f7dbed1023",
+    "recent_runtime_error_like_logs": 0
+  },
+  "uat": {
+    "workflow_run": 36227997818,
+    "result": "PASS",
+    "snapshot_idempotency": "PASS",
+    "management_role_boundary": "PASS",
+    "latest_snapshot": "PASS",
+    "trends": "PASS",
+    "alerts": "PASS",
+    "controls": "PASS"
+  },
+  "regression": {
+    "workflow_run": 36228021726,
+    "result": "PASS",
+    "tests_passed": 23
+  },
+  "daily_snapshot": {
+    "snapshot_date": "2026-09-26",
+    "jobs_total": 5,
+    "jobs_open": 4,
+    "jobs_closed": 1,
+    "release_blocked": 3,
+    "document_gaps": 2,
+    "payment_blocks": 0,
+    "active_work_items": 9,
+    "critical": 0,
+    "high": 3,
+    "overdue": 0,
+    "unassigned": 9,
+    "open_management_alerts": 2,
+    "source_hash": "b1c8378ae0b521bf7d13ed3c289226df3f35ed4d14d0804c4c2c8eeb2e596083"
+  },
+  "preserved_counts": {
+    "jobs": 5,
+    "transaction_records": 95,
+    "gl_records": 280,
+    "treasury_records": 185,
+    "integration_records": 100,
+    "active_work_items": 9
+  }
+}
