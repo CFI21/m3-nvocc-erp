@@ -1,0 +1,22 @@
+name: M3 CLX037 UI Polish UAT
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "web/index.html"
+      - "tests/test_clx037_ui_polish.py"
+      - ".github/workflows/clx037-ui-polish-uat.yml"
+  workflow_dispatch:
+
+jobs:
+  clx037-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install pytest
+      - name: Grey sidebar verification
+        run: pytest -q tests/test_clx037_ui_polish.py
