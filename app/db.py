@@ -230,6 +230,9 @@ class PostgresCursorCompat:
     def fetchall(self):
         return self._cursor.fetchall()
 
+    def fetchmany(self, size=None):
+        return self._cursor.fetchmany(size) if size is not None else self._cursor.fetchmany()
+
     def __iter__(self):
         return iter(self._cursor)
 
