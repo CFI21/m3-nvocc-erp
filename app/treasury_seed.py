@@ -1,11 +1,15 @@
 from pathlib import Path
 import json
+from .json_recovery import load_json_or_recover_arrays
 
 HERE=Path(__file__).resolve().parent
 
 def run(conn):
     now='2026-09-23T23:30:00Z'
-    meta=json.loads((HERE/'treasury_meta.json').read_text())['modules']
+    treasury,_=load_json_or_recover_arrays(HERE/'treasury_meta.json',['modules'])
+    meta=list(treasury.get('modules',[]))
+    if 'bank-reconciliation-exception-queue' not in {m['key'] for m in meta}:
+        meta.append({'key':'bank-reconciliation-exception-queue','name':'Bank Reconciliation Exception Queue','group':'work-queues','route':'/treasury/work-queues/bank-reconciliation-exception-queue'})
     accounts=[
         ('BANK-USD-01','BANK','Operating USD','Synthetic Bank A','USD',225000,225000,25000),
         ('BANK-EUR-01','BANK','Operating EUR','Synthetic Bank B','EUR',95000,95000,10000),
