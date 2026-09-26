@@ -182,18 +182,19 @@ def enforce_execution(resource_type,module,rid,action,session_token,version,amou
     c=connect()
     try:
         s=session(c,session_token)
+        chain_id=_chain_key(resource_type,module,rid,action,version)
+        existing=_reviews_for_chain(c,chain_id)
+        existing_state=_state(existing) if existing else {'status':'NONE'}
+        if existing_state['status']=='APPROVED' and action.upper() in {'POST','RELEASE','PAY','REVERSE','CLOSE'}:
+            last=[x for x in existing if str(x.get('result') or '').startswith('APPROVED')]
+            if last:
+                decider=last[-1]['scope_payload'].get('approved_by')
+                if decider in {s['user_ref'],s['username']}:
+                    raise HTTPException(409,{'code':'EXECUTOR_CANNOT_BE_FINAL_APPROVER','chain_id':chain_id})
         base=_build_context(c,s,resource_type,module,rid,action,version,amount,currency,tx_type,office_code,country_code,maker_ref,target_url)
         _,reviews=_ensure_request(c,base)
         state=_state(reviews)
         if state['status']=='APPROVED':
-            approved_by=[_json(x.get('after_json')).get('actor') for x in []]
-            if action.upper() in {'POST','RELEASE','PAY','REVERSE','CLOSE'}:
-                last=[x for x in reviews if str(x.get('result') or '').startswith('APPROVED')]
-                if last:
-                    scope=last[-1]['scope_payload']
-                    decider=scope.get('approved_by')
-                    if decider in {s['user_ref'],s['username']}:
-                        raise HTTPException(409,{'code':'EXECUTOR_CANNOT_BE_FINAL_APPROVER','chain_id':base['chain_id']})
             return {'approved':True,'chain_id':base['chain_id'],'required_levels':state['required_levels']}
         code={'PENDING':'FINANCE_APPROVAL_PENDING','REJECTED':'FINANCE_APPROVAL_REJECTED',
               'RETURN_FOR_CORRECTION':'FINANCE_RETURNED_FOR_CORRECTION'}.get(state['status'],'FINANCE_APPROVAL_REQUIRED')
