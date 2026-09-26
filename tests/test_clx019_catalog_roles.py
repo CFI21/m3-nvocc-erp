@@ -15,10 +15,9 @@ def test_complete_193_screen_catalog_and_domain_counts():
         counts[s['domain']]=counts.get(s['domain'],0)+1
     assert counts=={
         'Agent Tasks':19,
-        'GL / Accounts':47,
         'Treasury / AR-AP':37,
         'Integration & Security':20,
-        'Administration':28,
+        'General / Administration':75,
         'Master Data':42,
     }
 
