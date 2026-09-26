@@ -15,6 +15,16 @@ body{font:13px Arial;margin:0;background:#f4f6f8;color:#1d2939}.top{padding:14px
 <input id="reason" value="Approved business finance access" placeholder="Reason">
 <button class="primary" onclick="requestGrant()">Submit grant / approval request</button>
 </div><div class="muted" style="margin-top:7px">Sensitive rights always go to an independent checker; the maker cannot approve their own request.</div></div>
+<div class="card"><b>User → GL role assignment</b><div class="grid" style="margin-top:8px">
+<input id="roleUser" placeholder="Username">
+<select id="roleCode"><option>GL_ACCOUNTANT</option><option>GL_MANAGER</option></select>
+<input id="roleOffice" placeholder="Office scope (optional)">
+<input id="roleCountry" placeholder="Country scope (optional)">
+<input id="roleFrom" placeholder="Effective from ISO (optional)">
+<input id="roleTo" placeholder="Effective to ISO (optional)">
+<input id="roleReason" value="Approved accounting responsibility" placeholder="Reason">
+<button class="primary" onclick="requestRole()">Submit role assignment</button>
+</div><div class="muted" style="margin-top:7px">Sensitive GL roles require independent maker/checker approval before activation.</div></div>
 <div class="card"><b>Search / filter</b><div class="grid" style="margin-top:8px"><input id="q" placeholder="User, role, permission..." oninput="load()"><select id="status" onchange="load()"><option value="">All statuses</option><option>PENDING</option><option>ACTIVE</option><option>COMPLETED</option><option>REVOKED</option></select><button onclick="load()">Refresh</button><button onclick="loadAudit()">Audit history</button></div></div>
 <div id="summary"></div><div id="views"></div>
 </div>
@@ -24,11 +34,13 @@ async function api(url,opt={}){opt.headers={...(opt.headers||{}),'Content-Type':
 async function login(){try{let d=await api('/api/admin/auth/login',{method:'POST',body:JSON.stringify({username:$('username').value,password:$('password').value,mfa_code:$('mfa').value})});token=d.session_token;localStorage.setItem('m3-clx030-session',token);$('sessionState').textContent='Signed in as '+d.username+' · '+d.roles.join(', ');await load()}catch(e){$('sessionState').innerHTML='<span class=bad>'+esc(e.message)+'</span>'}}
 function toggleTarget(){$('target').placeholder=$('targetType').value==='USER'?'Username':'Role code'}
 async function requestGrant(){try{let b={target_type:$('targetType').value,permission_code:$('permission').value,reason:$('reason').value,office_code:$('office').value||null,country_code:$('country').value||null,valid_from:$('validFrom').value||null,valid_to:$('validTo').value||null};if(b.target_type==='USER')b.username=$('target').value;else b.role_code=$('target').value;let d=await api('/api/clx030/grants',{method:'POST',body:JSON.stringify(b)});alert(d.status+(d.review_ref?' · '+d.review_ref:''));await load()}catch(e){alert(e.message)}}
+async function requestRole(){try{let b={username:$('roleUser').value,role_code:$('roleCode').value,office_code:$('roleOffice').value||null,country_code:$('roleCountry').value||null,valid_from:$('roleFrom').value||null,valid_to:$('roleTo').value||null,reason:$('roleReason').value};let d=await api('/api/clx030/role-assignments',{method:'POST',body:JSON.stringify(b)});alert(d.status+(d.review_ref?' · '+d.review_ref:''));await load()}catch(e){alert(e.message)}}
+async function revokeAssignment(id){if(!confirm('Revoke GL role assignment '+id+'?'))return;try{await api('/api/clx030/role-assignments/'+id+'/revoke',{method:'POST'});await load()}catch(e){alert(e.message)}}
 async function decide(ref,decision){try{let d=await api('/api/clx030/reviews/'+encodeURIComponent(ref)+'/decision',{method:'POST',body:JSON.stringify({decision,comment:'CLX-030 UI decision'})});alert(d.status);await load()}catch(e){alert(e.message)}}
 async function revokeDirect(ref){if(!confirm('Revoke '+ref+'?'))return;try{await api('/api/clx030/direct/'+encodeURIComponent(ref)+'/revoke',{method:'POST'});await load()}catch(e){alert(e.message)}}
 function table(title,rows,cols,actions){return '<div class=card><b>'+esc(title)+'</b><div class=table><table><thead><tr>'+cols.map(c=>'<th>'+esc(c)+'</th>').join('')+(actions?'<th>Actions</th>':'')+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+cols.map(c=>'<td>'+esc(r[c])+'</td>').join('')+(actions?'<td>'+actions(r)+'</td>':'')+'</tr>').join('')+'</tbody></table></div></div>'}
 async function load(){try{let d=await api('/api/clx030/matrix?q='+encodeURIComponent($('q').value)+'&status='+encodeURIComponent($('status').value));$('permission').innerHTML=d.finance_permissions.map(x=>'<option>'+esc(x)+'</option>').join('');$('summary').innerHTML='<div class=card><b>CLX-030 Access Control</b><p>'+d.users.length+' users · '+d.roles.length+' finance-relevant roles · '+d.role_permissions.length+' role rights · '+d.direct_permissions.length+' direct rights · '+d.access_reviews.length+' entitlement reviews</p></div>';
-let h='';h+=table('User → Role → Scope',d.assignments,['username','role_code','office_code','country_code','valid_from','valid_to','status','assigned_by']);
+let h='';h+=table('User → Role → Scope',d.assignments,['assignment_id','username','role_code','office_code','country_code','valid_from','valid_to','status','assigned_by'],r=>(r.status==='ACTIVE'&&['GL_ACCOUNTANT','GL_MANAGER'].includes(r.role_code))?'<button onclick="revokeAssignment('+r.assignment_id+')">Revoke</button>':'');
 h+=table('Role → Permission Matrix',d.role_permissions,['role_code','permission_code','sensitive','effect']);
 h+=table('Direct User Finance Permissions',d.direct_permissions,['temp_ref','username','permission_code','sensitive','valid_from','valid_to','status','approved_by'],r=>r.status==='ACTIVE'?'<button onclick="revokeDirect(\''+esc(r.temp_ref)+'\')">Revoke</button>':'');
 h+=table('Maker / Checker Queue',d.access_reviews,['review_ref','status','reviewer','due_date','result'],r=>r.status==='PENDING'?'<button onclick="decide(\''+esc(r.review_ref)+'\',\'APPROVE\')">Approve</button> <button onclick="decide(\''+esc(r.review_ref)+'\',\'REJECT\')">Reject</button>':'');$('views').innerHTML=h}catch(e){$('views').innerHTML='<div class="card bad">'+esc(e.message)+'</div>'}}
