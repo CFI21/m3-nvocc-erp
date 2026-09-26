@@ -1,6 +1,10 @@
 name: M3 CLX026 Exception Workflow UAT
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx026-exception-workflow-uat.yml"
 jobs:
   uat:
     runs-on: ubuntu-latest
