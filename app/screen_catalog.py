@@ -14,6 +14,47 @@ COMMON_READ = ['quick-view','related-records','print','export','email','audit-hi
 COMMON_MUTATE = ['create','edit','copy']
 COMMON_APPROVAL = ['approve','hold','cancel','amend','reissue','release','reverse']
 
+# CLX-031: legacy HO Tasks navigation aliases only.
+# These entries reference existing accepted screens; they do not increase the 193-screen catalog.
+HO_TRANSACTION_ALIASES = [
+    {'label':'Agent Opening','target':'master-data::agents'},
+    {'label':'Vendor Opening','target':'master-data::carriers'},
+    {'label':'Customer Opening','target':'master-data::customers'},
+    {'label':'Container Purchase','target':'gl-accounts::bills'},
+    {'label':'Container Sale','target':'gl-accounts::invoice'},
+    {'label':'Purchase Invoice','target':'gl-accounts::bills'},
+    {'label':'Purchase Invoice Slot','target':'gl-accounts::bills'},
+    {'label':'Sale Invoice','target':'gl-accounts::invoice'},
+    {'label':'Payment','target':'gl-accounts::payment'},
+    {'label':'Receipt','target':'gl-accounts::receipt'},
+    {'label':'Purchase Invoice Storage','target':'agent-tasks::storage-cost'},
+    {'label':'Sale Invoice Detention','target':'agent-tasks::detention-collection'},
+    {'label':'Sale Invoice Import','target':'gl-accounts::invoice'},
+    {'label':'Lease Rental Transaction','target':'gl-accounts::prepayments'},
+    {'label':'Container Exchange','target':'agent-tasks::container-activity'},
+    {'label':'Exchange Rate Update','target':'integration-security::fx-rate-feed'},
+    {'label':'Third Party Deal Info','target':'integration-security::provider-adapters'},
+    {'label':'Third Party Tracking Info','target':'integration-security::request-response-audit'},
+]
+
+HO_UTILITY_ALIASES = [
+    {'label':'User Management','target':'administration::users'},
+    {'label':'Security Policy','target':'integration-security::security-policies'},
+    {'label':'Password Policy','target':'administration::password-policy'},
+    {'label':'MFA Policy','target':'administration::mfa-policy'},
+    {'label':'Data Scope / Policy','target':'administration::data-scope-rules'},
+    {'label':'Detention Collection','target':'agent-tasks::detention-collection'},
+    {'label':'Storage Cost','target':'agent-tasks::storage-cost'},
+    {'label':'Template / Document Setup','target':'master-data::document-types'},
+    {'label':'Configuration','target':'master-data::configuration'},
+    {'label':'Audit History','target':'administration::identity-audit'},
+    {'label':'Integration Audit','target':'integration-security::request-response-audit'},
+    {'label':'Approval Limits','target':'administration::approval-limits'},
+    {'label':'Approval Queue','target':'master-data::approval-queue'},
+    {'label':'Fiscal Year','target':'gl-accounts::fiscal-year'},
+    {'label':'Voucher Viewer','target':'gl-accounts::voucher-history'},
+]
+
 
 def _humanize(key: str) -> str:
     return key.replace('-', ' ').title()
@@ -176,7 +217,21 @@ def build_catalog() -> dict[str, Any]:
         ))
 
     # Stable menu derived from the rebuilt catalog.
-    menu=[]
+    # CLX-031 adds HO Tasks as navigation aliases only. Alias targets must already exist.
+    screen_ids={s['screen_id'] for s in screens}
+    for item in HO_TRANSACTION_ALIASES + HO_UTILITY_ALIASES:
+        if item['target'] not in screen_ids:
+            raise RuntimeError(f"M3_HO_ALIAS_TARGET_MISSING:{item['label']}->{item['target']}")
+    menu=[{
+        'domain':'HO Tasks',
+        'submenus':[
+            {'name':'Transaction','screens':[],'items':HO_TRANSACTION_ALIASES},
+            {'name':'Utilities','screens':[],'items':HO_UTILITY_ALIASES},
+        ],
+        'screen_count':0,
+        'navigation_alias_count':len(HO_TRANSACTION_ALIASES)+len(HO_UTILITY_ALIASES),
+        'navigation_only':True,
+    }]
     domain_order=['Agent Tasks','Treasury / AR-AP','Integration & Security','General / Administration','Master Data']
     for domain in domain_order:
         domain_screens=[s for s in screens if s['domain']==domain]
@@ -198,6 +253,12 @@ def build_catalog() -> dict[str, Any]:
         'screens':screens,
         'menu':menu,
         'catalog_recovery':'REBUILT_FROM_AUTHORITATIVE_SOURCE_METADATA_AND_ACCEPTED_PERSISTED_MODULES',
+        'clx031_ho_tasks':{
+            'navigation_only':True,
+            'transaction_alias_count':len(HO_TRANSACTION_ALIASES),
+            'utility_alias_count':len(HO_UTILITY_ALIASES),
+            'screen_count_unchanged':True,
+        },
     }
     if len(screens) != 193:
         raise RuntimeError(f'M3_SCREEN_CATALOG_COUNT_MISMATCH:{len(screens)}!=193')
