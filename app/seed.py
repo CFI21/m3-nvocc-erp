@@ -4,6 +4,7 @@ from .db import connect,DB_PATH
 from .gl_seed import run as gl_seed_run
 from .treasury_seed import run as treasury_seed_run
 from .integration_seed import run as integration_seed_run
+from .json_recovery import extract_array_objects
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text()); PRIMARY=META['primary_keys']
 def extref(module,row,i,job):
@@ -24,8 +25,49 @@ def seed_support(conn,module,tid,row,jr,jid,container_id,now):
     elif module=='switch-bl' and row.get('Approval')=='Approved':
         raw=f"{tid}|{row.get('Original B/L')}|{row.get('Switch B/L')}|{jr}|seed"; h=hashlib.sha256(raw.encode()).hexdigest()
         conn.execute('INSERT INTO switch_bl_history(transaction_id,job_id,ts,original_bill_no,switch_bill_no,original_parties_json,new_parties_json,approved_by,confidentiality,immutable_hash) VALUES(?,?,?,?,?,?,?,?,1,?)',(tid,jid,now,row.get('Original B/L'),row.get('Switch B/L'),json.dumps({'shipper':row.get('Original Shipper'),'consignee':row.get('Original Consignee')}),json.dumps({'shipper':row.get('New Shipper'),'consignee':row.get('New Consignee'),'notify':row.get('New Notify')}),row.get('Approved By') or 'CLX Supervisor',h))
+def _load_seed():
+    path=HERE/'seed.json'; text=path.read_text()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        modules=META['modules']
+        data={}
+        crt=extract_array_objects(text,'crt')
+        if len(crt)<5:
+            raise RuntimeError('M3_SEED_RECOVERY_REQUIRES_FIVE_COMPLETE_CRT_ROWS')
+        jobs={}
+        for i,row in enumerate(crt[:5],1):
+            jr=str(row.get('Job Ref') or f'5000{i}')
+            jobs[jr]={
+              'customer':row.get('Customer') or f'Synthetic Customer {jr}',
+              'agent':row.get('Agent') or f'CLX-AGT-{jr}',
+              'booking':row.get('Booking Ref') or f'CLX-BKG-{jr}',
+              'vessel':row.get('Vessel') or f'Synthetic Vessel {jr}',
+              'voyage':row.get('Voyage') or f'VOY-{jr}',
+              'pol':row.get('POL') or 'NLRTM',
+              'pod':row.get('POD') or 'NLRTM',
+              'container':row.get('Container No.') or f'CLXU{jr}000',
+              'bl':row.get('BL Ref') or f'CLXHBL{jr}',
+              'status':row.get('Status') or 'Open',
+            }
+        for m in modules:
+            key=m['key']; rows=extract_array_objects(text,key)
+            by_job={}
+            for row in rows:
+                raw=json.dumps(row,sort_keys=True)
+                hit=re.search(r'5000[1-5]',raw)
+                if hit: by_job[hit.group(0)]=row
+            recovered=[]
+            for jr in jobs:
+                row=dict(by_job.get(jr) or {})
+                row.setdefault('Job Ref',jr)
+                row.setdefault('Status','Open')
+                recovered.append(row)
+            data[key]=recovered
+        return {'modules':modules,'jobs':jobs,'data':data}
+
 def run(reset=True):
-    SEED=json.loads((HERE/'seed.json').read_text())
+    SEED=_load_seed()
     if reset and DB_PATH.exists(): DB_PATH.unlink()
     conn=connect(); conn.executescript((HERE/'schema.sql').read_text()); now='2026-09-23T20:00:00Z'; jobs=SEED['jobs']
     for jr,j in jobs.items():
