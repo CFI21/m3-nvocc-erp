@@ -146,34 +146,34 @@ def gl_detail_rows(**flt):
 def subledger_reconciliation_rows(company=None,period=None,date_from=None,date_to=None,currency=None,status=None,cost_center=None,**_):
     c=connect()
     try:
-        links=[dict(r) for r in c.execute('''SELECT l.gl_record_id,l.voucher_id,l.source_type,l.source_ref,l.job_id,
-          g.module,g.external_ref,g.status,g.payload_json,v.voucher_no,v.status voucher_status,v.total_debit,v.total_credit,
-          v.currency,v.voucher_date FROM gl_source_links l
-          LEFT JOIN gl_records g ON g.id=l.gl_record_id
-          LEFT JOIN gl_vouchers v ON v.id=l.voucher_id
-          WHERE g.module IN ('invoice','bills','receipt','payment','wht-deposits','bank-reconciliation')
-          ORDER BY g.module,g.id''')]
+        records=[dict(r) for r in c.execute("SELECT id,module,external_ref,job_id,status,payload_json FROM gl_records WHERE module IN ('invoice','bills','receipt','payment','wht-deposits','bank-reconciliation') ORDER BY module,id")]
+        out=[]
+        for r in records:
+            p=_payload(r.get('payload_json'));module=r['module']
+            if company and str(p.get('Company') or '').lower()!=company.lower():continue
+            if cost_center and str(p.get('Cost Center') or p.get('Cost Centre') or '').lower()!=cost_center.lower():continue
+            curr=str(p.get('Currency') or '')
+            if currency and curr.upper()!=currency.upper():continue
+            d=str(p.get('Date') or p.get('Voucher / Inv Date') or p.get('Voucher / Bill Date') or p.get('Deposit Date') or p.get('Reconciled Date') or '')
+            if period and d and not d.startswith(period):continue
+            if date_from and d and d<date_from:continue
+            if date_to and d and d>date_to:continue
+            amount=0.0
+            for k in ('Invoice Amount','Payment Amount','Receipt Amount','Amount','Net Amount'):
+                if p.get(k) not in (None,''):amount=_f(p.get(k));break
+            v=c.execute("SELECT * FROM gl_vouchers WHERE source_ref=? AND status='Posted' ORDER BY id LIMIT 1",(r['external_ref'],)).fetchone()
+            if not v:
+                # Accepted synthetic/legacy source references may be stored in the record source_ref instead of external_ref.
+                sr=c.execute('SELECT source_ref FROM gl_records WHERE id=?',(r['id'],)).fetchone()
+                if sr and sr['source_ref']:v=c.execute("SELECT * FROM gl_vouchers WHERE source_ref=? AND status='Posted' ORDER BY id LIMIT 1",(sr['source_ref'],)).fetchone()
+            voucher_amount=max(_f(v['total_debit']),_f(v['total_credit'])) if v else 0.0
+            linked=bool(v)
+            diff=round(amount-voucher_amount,2) if linked and amount else (0.0 if linked else amount)
+            recon='MATCHED' if linked and abs(diff)<0.01 else ('UNLINKED' if not linked else 'DIFFERENCE')
+            if status and status.upper() not in {'POSTED','ALL'} and recon!=status.upper():continue
+            out.append({'Module':module,'Source Ref':r['external_ref'],'Voucher No':v['voucher_no'] if v else None,'Currency':(v['currency'] if v else curr),'Subledger Amount':round(amount,2),'GL Amount':round(voucher_amount,2),'Difference':diff,'Reconciliation Status':recon,'Job ID':r['job_id']})
+        return out
     finally:c.close()
-    out=[]
-    for r in links:
-        p=_payload(r.pop('payload_json',None));module=r.get('module')
-        if company and str(p.get('Company') or '').lower()!=company.lower():continue
-        if cost_center and str(p.get('Cost Center') or p.get('Cost Centre') or '').lower()!=cost_center.lower():continue
-        if currency and str(r.get('currency') or p.get('Currency') or '').upper()!=currency.upper():continue
-        d=str(r.get('voucher_date') or p.get('Date') or p.get('Voucher / Inv Date') or '')
-        if period and d and not d.startswith(period):continue
-        if date_from and d and d<date_from:continue
-        if date_to and d and d>date_to:continue
-        amount=0.0
-        for k in ('Invoice Amount','Payment Amount','Receipt Amount','Amount','Net Amount'):
-            if p.get(k) not in (None,''):amount=_f(p.get(k));break
-        voucher_amount=max(_f(r.get('total_debit')),_f(r.get('total_credit')))
-        linked=bool(r.get('voucher_id'))
-        diff=round(amount-voucher_amount,2) if linked and amount else (0.0 if linked else amount)
-        recon='MATCHED' if linked and abs(diff)<0.01 else ('UNLINKED' if not linked else 'DIFFERENCE')
-        if status and recon!=status.upper():continue
-        out.append({'Module':module,'Source Ref':r.get('external_ref') or r.get('source_ref'),'Voucher No':r.get('voucher_no'),'Currency':r.get('currency') or p.get('Currency'),'Subledger Amount':round(amount,2),'GL Amount':round(voucher_amount,2),'Difference':diff,'Reconciliation Status':recon,'Job ID':r.get('job_id')})
-    return out
 
 def report_rows(key,**flt):
     if key=='trial-balance-report':return trial_balance_rows(**flt)
