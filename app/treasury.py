@@ -191,7 +191,7 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
         j=jid(c,b.job_ref);ext=b.external_ref or b.fields.get(MODULES[module]['fields'][0]) or f'M3-{module[:8].upper()}-{uuid.uuid4().hex[:8].upper()}'
         amt=amount_from(b.fields);curr=b.fields.get('Currency') or b.fields.get('Settlement Currency') or 'USD';stat=b.fields.get('Status') or 'Draft'
         sensitive={'supplier-carrier-payment-allocation','payment-batches','advance-payments','customer-refunds','bank-transfer','inter-bank-transfer'}
-        source_ref=b.fields.get('Payment Ref') or b.fields.get('Bill Ref') or b.fields.get('Batch / Payment Ref') or b.fields.get('Reference')
+        source_ref=b.fields.get('Payment Ref') or b.fields.get('Bill Ref') or b.fields.get('Batch / Payment Ref') or b.fields.get('Payments') or b.fields.get('Reference')
         if module in sensitive and source_ref:
             duplicate=c.execute("SELECT id,external_ref FROM treasury_records WHERE module=? AND source_ref=? AND ABS(amount-?)<0.005 AND currency=? AND status NOT IN ('Reversed','Cancelled') ORDER BY id LIMIT 1",(module,source_ref,amt,curr)).fetchone()
             if duplicate:raise HTTPException(409,{'code':'DUPLICATE_TREASURY_SOURCE','existing_ref':duplicate['external_ref']})
