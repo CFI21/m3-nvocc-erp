@@ -102,13 +102,134 @@ async function openScreen(id,navContext=null){let s=state.byId[id];if(!s)return;
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
 async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();openDrawer('details')}
+async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}openDrawer('details')}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
 async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
 async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
 async function loadAudit(){let jr=selectedJob();try{let x=await api('/api/clx011/events?limit=40');let html=`<div class=card><b>CLX-011 screen/action audit</b></div><pre class=pre>${esc(JSON.stringify(x.slice(0,20),null,2))}</pre>`;if(jr){let y=await api('/api/v1/system/events/audit?job_ref='+jr+'&limit=30');html+=`<div class=card><b>Job ${jr} domain audit</b></div><pre class=pre>${esc(JSON.stringify(y,null,2))}</pre>`}$('tab-audit').innerHTML=html}catch(e){$('tab-audit').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
 function showJson(title,obj){$('drawerTitle').textContent=title;$('tab-details').innerHTML='<pre class=pre>'+esc(JSON.stringify(JSON.parse(obj),null,2))+'</pre>';drawerTabs('details')}
 
+
+const CLX49_KEYS=new Set(['special-rates-request','booking','bl','switch-bl']);
+const CLX49_BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization'];
+const CLX49_BOOKING_TABS=['Booking Info','Other Info'];
+let clx49Workspace=null,clx49ActiveTab='';
+
+function clx49Headers(w){
+  const h={'X-Role':state.role};
+  if(state.role==='AGENT'&&w?.context?.agent_code)h['X-Agent-Scope']=w.context.agent_code;
+  return h;
+}
+async function openClx49Link(screenId,jr){
+  await openScreen(screenId);
+  const i=state.rows.findIndex(r=>String(r.job_ref??r['Job Ref']??'')===String(jr));
+  if(i>=0)await selectRow(i);
+}
+function clx49FieldEditor(record,fields){
+  if(!record)return '<div class="card empty">No existing authoritative record for this job.</div>';
+  const p=record.fields||{};
+  const names=(fields&&fields.length?fields:Object.keys(p)).filter(x=>x!=='Job Ref');
+  return '<div class="formGrid">'+names.map(name=>{
+    const full=/instruction|remarks|description|reason|authorization|notify/i.test(name);
+    const val=p[name]??'';
+    return '<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+
+      (full?'<textarea data-clx49-field="'+esc(name)+'">'+esc(val)+'</textarea>':'<input data-clx49-field="'+esc(name)+'" value="'+esc(val)+'">')+'</div>';
+  }).join('')+'</div>';
+}
+function clx49ContextHeader(w){
+  const x=w.context;
+  return '<div class="card"><div class="toolbar"><b>Job '+esc(x.job_ref)+'</b><span class="muted">Booking '+esc(x.booking_ref||'—')+' · B/L '+esc(x.hbl_no||'—')+' · '+esc(x.customer_name)+' · '+esc(x.agent_code)+' · '+esc(x.pol)+' → '+esc(x.pod)+' · '+esc(x.vessel_name)+' / '+esc(x.voyage_no)+'</span></div></div>';
+}
+function clx49Nav(w){
+  const j=w.context.job_ref,d=w.deep_links;
+  return '<div class="toolbar">'+
+    '<button class="btn" onclick="openClx49Link(\''+d.special_rate_request+'\',\''+j+'\')">Special Rate Request</button>'+
+    '<button class="btn" onclick="openClx49Link(\''+d.booking+'\',\''+j+'\')">Booking</button>'+
+    '<button class="btn" onclick="openClx49Link(\''+d.bl+'\',\''+j+'\')">B/L</button>'+
+    '<button class="btn" onclick="openClx49Link(\''+d.switch_bl+'\',\''+j+'\')">Switch B/L</button>'+
+    '</div>';
+}
+function clx49RecordForTab(w,tab){
+  if(tab==='Booking Info')return {module:'booking',record:w.booking};
+  if(tab==='Release Instruction')return {module:'delivery-order',record:w.delivery_order,fields:['Release Instruction','Freight Status','Customs Status','Original BL Status','Telex Release','Payment Block','Valid Until','Release Status','Status']};
+  if(tab==='Delivery Order')return {module:'delivery-order',record:w.delivery_order};
+  if(tab==='Lock Info')return {module:'vessel-lock',record:w.lock_info?.vessel_lock};
+  if(tab==='Authorization')return {module:'bl',record:w.bl,fields:['Draft Approval','Original / Express','Issue Date','Status']};
+  return {module:null,record:null};
+}
+function clx49RenderBlTab(tab){
+  const w=clx49Workspace;clx49ActiveTab=tab;
+  const x=clx49RecordForTab(w,tab),r=x.record;
+  let html=clx49ContextHeader(w)+clx49Nav(w);
+  html+='<div class="card"><div class="toolbar">'+CLX49_BL_TABS.map(t=>'<button class="btn '+(t===tab?'primary':'')+'" onclick="clx49RenderBlTab(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div></div>';
+  if(tab==='Lock Info'){
+    html+='<div class="card"><b>Workflow Holds / Release</b><pre class="pre">'+esc(JSON.stringify({workflow:w.lock_info.workflow,holds:w.lock_info.holds},null,2))+'</pre></div>';
+  }
+  if(tab==='Authorization'){
+    html+='<div class="card"><b>Authorization / Approval Audit</b><div class="muted">Uses the existing B/L transaction and existing audit/governance path.</div><pre class="pre">'+esc(JSON.stringify(w.authorization.audit.slice(0,10),null,2))+'</pre></div>';
+  }
+  html+='<div class="card"><b>'+esc(tab)+'</b>'+clx49FieldEditor(r,x.fields);
+  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\''+x.module+'\','+r.id+','+r.version+')">Save '+esc(tab)+'</button>'+
+    (tab==='Authorization'?'<button class="btn" onclick="approveClx049Bl('+r.id+','+r.version+')">Approve via Existing B/L Governance</button>':'')+'</div>';
+  html+='</div>';
+  $('gridArea').innerHTML=renderGrid()+html;
+}
+function clx49RenderBooking(tab){
+  const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
+  const core=['Booking No.','Job Ref','Customer','Agent','Carrier','Carrier Booking Ref','POL','POD','Vessel','Voyage','Equipment','Quantity','Booking Date','Status'];
+  const other=Object.keys(r?.fields||{}).filter(k=>!core.includes(k));
+  let html=clx49ContextHeader(w)+clx49Nav(w);
+  html+='<div class="card"><div class="toolbar">'+CLX49_BOOKING_TABS.map(t=>'<button class="btn '+(t===tab?'primary':'')+'" onclick="clx49RenderBooking(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div></div>';
+  html+='<div class="card"><b>'+esc(tab)+'</b>'+clx49FieldEditor(r,tab==='Booking Info'?core:other);
+  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(tab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div>';
+  html+='</div>';
+  $('gridArea').innerHTML=renderGrid()+html;
+}
+function clx49RenderSpecialRate(){
+  const w=clx49Workspace,r=w.special_rate_request;
+  let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="card"><b>Special Rate Request</b>'+clx49FieldEditor(r);
+  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'special-rates-request\','+r.id+','+r.version+')">Save Special Rate Request</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Open Related Booking</button></div>';
+  html+='</div>';$('gridArea').innerHTML=renderGrid()+html;
+}
+function clx49RenderSwitchBl(){
+  const w=clx49Workspace,r=w.switch_bl;
+  let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="card"><b>Switch B/L</b><div class="muted">Original B/L → Switch B/L relationship, party changes, reason, confidentiality, approval and immutable history remain on the existing governed Switch B/L record.</div>'+clx49FieldEditor(r);
+  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'switch-bl\','+r.id+','+r.version+')">Save Switch B/L</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Back to Source B/L</button></div>';
+  html+='<pre class="pre">'+esc(JSON.stringify(w.switch_bl_history,null,2))+'</pre></div>';$('gridArea').innerHTML=renderGrid()+html;
+}
+async function showClx049Workspace(){
+  const jr=selectedJob();if(!jr)return openDrawer('details');
+  try{
+    clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers({context:{agent_code:state.selected?.agent_code}})});
+    if(state.current.key==='bl')clx49RenderBlTab(CLX49_BL_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
+    else if(state.current.key==='booking')clx49RenderBooking(CLX49_BOOKING_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
+    else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
+    else if(state.current.key==='switch-bl')clx49RenderSwitchBl();
+  }catch(e){alert(e.message)}
+}
+async function saveClx049Tab(module,id,version){
+  try{
+    const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.value);
+    const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
+    await api('/api/v1/'+module+'/'+id,{method:'PUT',headers,body:JSON.stringify({version,fields})});
+    const jr=clx49Workspace.context.job_ref;
+    clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers(clx49Workspace)});
+    if(state.current.key==='bl')clx49RenderBlTab(clx49ActiveTab||'Booking Info');
+    else if(state.current.key==='booking')clx49RenderBooking(clx49ActiveTab||'Booking Info');
+    else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
+    else clx49RenderSwitchBl();
+  }catch(e){alert(e.message)}
+}
+async function approveClx049Bl(id,version){
+  try{
+    if(!confirm('Approve this B/L through the existing governed B/L action?'))return;
+    const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
+    await api('/api/v1/bl/'+id+'/actions/approve',{method:'POST',headers,body:JSON.stringify({version,reason:'CLX-049 B/L authorization'})});
+    const jr=clx49Workspace.context.job_ref;
+    clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers(clx49Workspace)});
+    clx49RenderBlTab('Authorization');
+  }catch(e){alert(e.message)}
+}
 function rowPayload(row){
   if(!row)return {};
   if(row.fields&&typeof row.fields==='object')return {...row.fields};
