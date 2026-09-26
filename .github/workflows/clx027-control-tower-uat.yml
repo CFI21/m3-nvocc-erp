@@ -1,0 +1,53 @@
+name: M3 CLX027 Control Tower UAT
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx027-control-tower-uat.yml"
+  workflow_dispatch:
+
+jobs:
+  uat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runtime management control tower UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          curl --fail --silent "$API/api/v1/control-tower" -H "X-Role: AUDITOR" -o /tmp/tower.json
+          curl --fail --silent "$API/api/v1/control-tower/risk-jobs" -H "X-Role: AUDITOR" -o /tmp/risks.json
+          curl --fail --silent "$API/api/v1/control-tower/teams" -H "X-Role: AUDITOR" -o /tmp/teams.json
+          curl --fail --silent "$API/api/v1/control-tower/control-status" -H "X-Role: AUDITOR" -o /tmp/control.json
+
+          code=$(curl -s -o /tmp/agent.json -w "%{http_code}" "$API/api/v1/control-tower" -H "X-Role: AGENT")
+          test "$code" = "403"
+
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/tower.json'))
+          assert d['phase']=='CLX-027'
+          assert d['mode']=='READ_ONLY_MANAGEMENT_CONTROL_TOWER'
+          s=d['summary']
+          assert s['jobs_total']==5
+          assert s['active_work_items']>=1
+          assert len(d['risk_jobs'])>=1
+          assert all('workbench_url' in x for x in d['risk_jobs'])
+          assert isinstance(d['team_workload'],list)
+          c=d['controls']
+          assert c['source_data_only'] is True
+          assert c['underlying_business_mutation'] is False
+          assert c['screen_catalog_preserved']==193
+          assert c['role_scope_enforced'] is True
+          assert c['live_providers']=='OFF'
+          assert c['real_money']=='OFF'
+
+          ctl=json.load(open('/tmp/control.json'))
+          assert ctl['read_only'] is True
+          assert ctl['maker_checker_preserved'] is True
+          assert ctl['four_eyes_preserved'] is True
+          assert ctl['live_provider_activation'] is False
+          assert ctl['real_money'] is False
+          print('CLX027_CONTROL_TOWER_RUNTIME_PASS')
+          PY
