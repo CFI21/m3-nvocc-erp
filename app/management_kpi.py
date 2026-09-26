@@ -103,7 +103,7 @@ def latest_snapshot(x_role:str=Header("VIEWER")):
 
 @router.get("/trends")
 def trends(days:int=30,x_role:str=Header("VIEWER")):
-    _role(x_role); days=max(1,min(days,365)); c=connect()
+    _management_role(x_role); days=max(1,min(days,365)); c=connect()
     try:
         rows=c.execute("SELECT * FROM management_daily_snapshots ORDER BY snapshot_date DESC LIMIT ?",(days,)).fetchall()
         data=[_row_to_snapshot(r) for r in reversed(rows)]
@@ -116,7 +116,7 @@ def trends(days:int=30,x_role:str=Header("VIEWER")):
 
 @router.get("/alerts")
 def alerts(status:Optional[str]="OPEN",x_role:str=Header("VIEWER")):
-    _role(x_role); c=connect()
+    _management_role(x_role); c=connect()
     try:
         _ensure_rules(c)
         if status:
