@@ -19,6 +19,7 @@ def _alias_rows():
     for submenu,items in [('Transaction',HO_TRANSACTION_ALIASES),('Utilities',HO_UTILITY_ALIASES)]:
         for item in items:
             s=by_id[item['target']]
+            alias_roles=item.get('roles') or s.get('roles',[])
             out.append({
                 'domain':'HO Tasks',
                 'submenu':submenu,
@@ -27,7 +28,7 @@ def _alias_rows():
                 'target_domain':s['domain'],
                 'target_submenu':s['submenu'],
                 'target_route':s['route'],
-                'roles':s.get('roles',[]),
+                'roles':alias_roles,
                 'actions':s.get('actions',[]),
                 'quick_actions':s.get('quick_actions',[]),
                 'authorization':'TARGET_SCREEN_SERVER_AUTHORITY',
@@ -41,7 +42,8 @@ def aliases(role:Optional[str]=None,submenu:Optional[str]=None,q:Optional[str]=N
     c,rows=_alias_rows()
     if role:
         _,by_id=_by_id()
-        rows=[x for x in rows if screen_role_allowed(by_id[x['target']],role)]
+        rr=role.upper(); rr='ADMIN' if rr=='SUPER_ADMIN' else rr
+        rows=[x for x in rows if (not x.get('roles') or rr in {str(v).upper() for v in x['roles']}) and screen_role_allowed(by_id[x['target']],role)]
     if submenu:
         rows=[x for x in rows if x['submenu'].lower()==submenu.lower()]
     if q:
@@ -62,7 +64,9 @@ def resolve(label:str=Query(...,min_length=2),role:str=Query('VIEWER')):
         raise HTTPException(404,{'code':'HO_ALIAS_NOT_FOUND','label':label})
     by_id={s['screen_id']:s for s in c['screens']}
     target=by_id[match['target']]
-    if not screen_role_allowed(target,role):
+    rr=role.upper(); rr='ADMIN' if rr=='SUPER_ADMIN' else rr
+    alias_roles={str(v).upper() for v in match.get('roles',[])}
+    if (alias_roles and rr not in alias_roles) or not screen_role_allowed(target,role):
         raise HTTPException(403,{'code':'HO_TARGET_ROLE_DENIED','label':label,'target':match['target'],'role':role.upper()})
     caps=ROLE_ACTIONS.get(role.upper(),ROLE_ACTIONS['VIEWER'])
     visible=[a for a in target.get('quick_actions',[]) if a in caps]
