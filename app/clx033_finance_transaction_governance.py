@@ -162,7 +162,8 @@ def _build_context(c,s,resource_type,module,rid,action,version,amount,currency,t
     if not exec_perm:raise HTTPException(422,{'code':'NO_EXECUTION_ENTITLEMENT_MAPPING','transaction_type':tx_type,'action':action})
     if not _has_entitlement(c,s,exec_perm,tx_type,office_code,country_code):
         raise HTTPException(403,{'code':'FINANCE_ENTITLEMENT_REQUIRED','permission':exec_perm})
-    if maker_ref and maker_ref in {s['user_ref'],s['username']} and action in {'APPROVE','POST','RELEASE','PAY','WRITE_OFF','REVERSE','CLOSE'}:
+    maker_conflict=(tx_type=='JOURNAL' and action=='APPROVE') or (tx_type=='TREASURY' and action in {'RELEASE','PAY'})
+    if maker_ref and maker_ref in {s['user_ref'],s['username']} and maker_conflict:
         raise HTTPException(409,{'code':'MAKER_SELF_ACTION_BLOCKED','maker':maker_ref,'actor':s['user_ref']})
     conflicts=sod_violations(c,s['user_id'])
     if conflicts:
