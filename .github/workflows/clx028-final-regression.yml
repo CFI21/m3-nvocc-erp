@@ -1,0 +1,29 @@
+name: M3 CLX028 Final Regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx028-final-regression.yml"
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements.txt pytest
+      - name: Full governed regression
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx019_catalog_roles.py
+          tests/test_clx025_operations_workbench.py
+          tests/test_clx026_exception_workflow.py
+          tests/test_clx027_control_tower.py
+          tests/test_clx028_management_kpi.py
+          tests/test_live_provider_runtime.py
