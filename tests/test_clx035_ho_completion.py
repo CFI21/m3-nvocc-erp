@@ -6,10 +6,10 @@ from app.screen_catalog import build_catalog, HO_TRANSACTION_ALIASES, HO_UTILITY
 from app.screen_integration import ADMIN_TABLE, MD_DOMAIN_MAP
 
 
-def test_clx035_preserves_193_and_all_33_ho_aliases():
+def test_clx035_preserves_196_and_all_33_ho_aliases():
     v=verification()
     assert v['status']=='PASS'
-    assert v['screen_count']==193
+    assert v['screen_count']==196
     assert v['transaction_aliases']==18
     assert v['utility_aliases']==15
     assert v['total_aliases']==33
@@ -49,14 +49,14 @@ def test_admin_can_resolve_user_management_with_existing_target():
     r=resolve('User Management','ADMIN')
     assert r['target']=='administration::users'
     assert r['target_route']
-    assert r['screen_count']==193
+    assert r['screen_count']==196
 
 
 def test_alias_listing_applies_role_filter_without_changing_catalog():
     viewer=aliases(role='VIEWER')
     admin=aliases(role='ADMIN')
-    assert viewer['screen_count']==193
-    assert admin['screen_count']==193
+    assert viewer['screen_count']==196
+    assert admin['screen_count']==196
     assert admin['navigation_alias_count']>=viewer['navigation_alias_count']
     assert not any(x['label']=='User Management' for x in viewer['items'])
     assert any(x['label']=='User Management' for x in admin['items'])
