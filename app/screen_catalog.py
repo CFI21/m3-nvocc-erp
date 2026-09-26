@@ -26,7 +26,7 @@ AGENT_SETUP_ALIASES = [
 ]
 
 # CLX-031: legacy HO Tasks navigation aliases only.
-# These entries reference existing accepted screens; they do not increase the 193-screen catalog.
+# These entries reference existing accepted screens; they do not increase the 196-screen catalog.
 HO_TRANSACTION_ALIASES = [
     {'label':'Agent Opening','target':'master-data::agents'},
     {'label':'Vendor Opening','target':'master-data::carriers'},
@@ -284,6 +284,6 @@ def build_catalog() -> dict[str, Any]:
             'screen_count_unchanged':True,
         },
     }
-    if len(screens) != 193:
-        raise RuntimeError(f'M3_SCREEN_CATALOG_COUNT_MISMATCH:{len(screens)}!=193')
+    if len(screens) != 196:
+        raise RuntimeError(f'M3_SCREEN_CATALOG_COUNT_MISMATCH:{len(screens)}!=196')
     return catalog
