@@ -31,6 +31,7 @@ from .clx030_finance_entitlements import router as clx030_finance_entitlements_r
 from .clx032_finance_controls import router as clx032_finance_controls_router
 from .clx033_finance_transaction_governance import router as clx033_finance_transaction_governance_router
 from .clx034_smart_approval_fast_track import router as clx034_smart_approval_fast_track_router
+from .clx035_ho_completion import router as clx035_ho_completion_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -50,6 +51,7 @@ app.include_router(clx030_finance_entitlements_router)
 app.include_router(clx032_finance_controls_router)
 app.include_router(clx033_finance_transaction_governance_router)
 app.include_router(clx034_smart_approval_fast_track_router)
+app.include_router(clx035_ho_completion_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
