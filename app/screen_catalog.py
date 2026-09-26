@@ -46,7 +46,7 @@ HO_UTILITY_ALIASES = [
     {'label':'Detention Collection','target':'agent-tasks::detention-collection'},
     {'label':'Storage Cost','target':'agent-tasks::storage-cost'},
     {'label':'Template / Document Setup','target':'master-data::document-types'},
-    {'label':'Configuration','target':'master-data::configuration'},
+    {'label':'Configuration','target':'master-data::configurations'},
     {'label':'Audit History','target':'administration::identity-audit'},
     {'label':'Integration Audit','target':'integration-security::request-response-audit'},
     {'label':'Approval Limits','target':'administration::approval-limits'},
