@@ -39,7 +39,7 @@ def test_verified_dashboards_and_master_audit_are_bound(isolated):
 def test_gl_treasury_mutations_route_to_real_v1_apis():
     assert action_route('gl-accounts::voucher','approve',1,1)['path'].startswith('/api/v1/gl/')
     assert action_route('gl-accounts::voucher','edit',1,1)['path'].startswith('/api/v1/gl/')
-    assert action_route('treasury::payment-batch','approve',1,1)['path'].startswith('/api/v1/treasury/')
+    assert action_route('treasury::cashbook','approve',1,1)['path'].startswith('/api/v1/treasury/')
     assert action_route('treasury::payment-batch','edit',1,1)['path'].startswith('/api/v1/treasury/')
 
 def test_no_visible_action_falls_back_to_dead_placeholder():
