@@ -245,7 +245,7 @@ class PostgresConnectionCompat:
         if psycopg is None:
             raise RuntimeError('DATABASE_URL is set but psycopg is unavailable')
         # autocommit matches the historical sqlite isolation_level=None behavior.
-        self._conn = psycopg.connect(url, autocommit=True, row_factory=dict_row, connect_timeout=15)
+        self._conn = psycopg.connect(url, autocommit=True, row_factory=dict_row, connect_timeout=15, prepare_threshold=None)
 
     def execute(self, sql: str, params: Iterable[Any] | None = None):
         translated, wants_lastrowid = _translate_sql(sql)
