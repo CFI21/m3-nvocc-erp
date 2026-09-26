@@ -66,6 +66,40 @@ def duplicate_name(c,domain,name,exclude_key=None):
     if exclude_key:q+=' AND record_key<>?';args.append(exclude_key)
     return c.execute(q,args).fetchone()
 
+def pending_duplicate_name(c,domain,name,exclude_key=None):
+    if not name:return None
+    for r in c.execute("SELECT record_key,payload_json FROM md_change_requests WHERE domain=? AND status='PENDING' AND operation IN ('CREATE','UPDATE')",(domain,)):
+        if exclude_key and r['record_key']==exclude_key: continue
+        p=json.loads(r['payload_json'] or '{}')
+        n=p.get('name') or p.get('display_name')
+        if n and str(n).strip().lower()==str(name).strip().lower(): return r
+    return None
+
+def active_master(c,domain,key):
+    if not key:return False
+    return bool(c.execute("SELECT 1 FROM md_records WHERE domain=? AND record_key=? AND status='ACTIVE'",(domain,key)).fetchone())
+
+def reference_errors(c,domain,payload):
+    errs=[]
+    if domain=='bank-account':
+        if payload.get('bank') and not active_master(c,'bank',payload.get('bank')): errs.append('BANK_REFERENCE_NOT_ACTIVE')
+        if payload.get('currency') and not active_master(c,'currency',payload.get('currency')): errs.append('CURRENCY_REFERENCE_NOT_ACTIVE')
+    if domain=='route':
+        if payload.get('pol') and not active_master(c,'port',payload.get('pol')): errs.append('POL_REFERENCE_NOT_ACTIVE')
+        if payload.get('pod') and not active_master(c,'port',payload.get('pod')): errs.append('POD_REFERENCE_NOT_ACTIVE')
+    if domain=='tax-code' and payload.get('country'):
+        if not c.execute("SELECT 1 FROM iam_countries WHERE country_code=? AND status='ACTIVE'",(payload.get('country'),)).fetchone(): errs.append('COUNTRY_REFERENCE_NOT_ACTIVE')
+    return errs
+
+def usage_count(c,domain,key):
+    n=c.execute('SELECT COUNT(*) n FROM md_usage WHERE domain=? AND record_key=?',(domain,key)).fetchone()['n']
+    if domain=='customer': n+=c.execute('SELECT COUNT(*) n FROM jobs j JOIN customers x ON x.id=j.customer_id WHERE x.code=?',(key,)).fetchone()['n']
+    elif domain=='agent': n+=c.execute('SELECT COUNT(*) n FROM jobs j JOIN agents x ON x.id=j.agent_id WHERE x.code=?',(key,)).fetchone()['n']
+    elif domain=='port': n+=c.execute('SELECT COUNT(*) n FROM jobs WHERE pol=? OR pod=?',(key,key)).fetchone()['n']
+    elif domain=='vessel': n+=c.execute('SELECT COUNT(*) n FROM jobs j JOIN voyages v ON v.id=j.voyage_id JOIN vessels x ON x.id=v.vessel_id WHERE x.name=(SELECT display_name FROM md_records WHERE domain=? AND record_key=?)',(domain,key)).fetchone()['n']
+    elif domain=='voyage': n+=c.execute('SELECT COUNT(*) n FROM jobs j JOIN voyages v ON v.id=j.voyage_id WHERE v.voyage_no=?',(key,)).fetchone()['n']
+    return n
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','domains':DOMAINS,'domain_count':len(DOMAINS),'screens':SCREENS,'screen_count':len(SCREENS),'governance':'MAKER_CHECKER_VERSIONED','delete_mode':'PROTECTED_NO_HARD_DELETE'}
 @router.get('/overview')
@@ -89,10 +123,15 @@ def create_change(b:Change,x_role:Optional[str]=Header(None,alias='X-Role'),x_us
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
     errs=validate_payload(b.domain,b.payload,existing_payload) if b.operation in ('CREATE','UPDATE') else []
-    if errs:c.close();raise HTTPException(422,{'codes':errs})
+    if b.operation in ('CREATE','UPDATE'): errs+=reference_errors(c,b.domain,{**existing_payload,**b.payload})
+    if b.operation=='DEACTIVATE' and usage_count(c,b.domain,b.record_key)>0:
+        c.close();raise HTTPException(409,{'code':'MASTER_IN_USE','record_key':b.record_key})
+    if errs:c.close();raise HTTPException(422,{'codes':sorted(set(errs))})
     name=b.payload.get('name') or b.payload.get('display_name') or existing_payload.get('name') or (existing['display_name'] if existing else None)
     dup=duplicate_name(c,b.domain,name,b.record_key)
     if dup:c.close();raise HTTPException(409,{'code':'DUPLICATE_DISPLAY_NAME','record_key':dup['record_key']})
+    pdup=pending_duplicate_name(c,b.domain,name,b.record_key)
+    if pdup:c.close();raise HTTPException(409,{'code':'PENDING_DUPLICATE_DISPLAY_NAME','record_key':pdup['record_key']})
     ref='MDC-'+uuid.uuid4().hex[:10].upper();base=existing['version'] if existing else 0
     c.execute('INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) VALUES(?,?,?,?,?,?,?,?,?)',(ref,b.domain,b.record_key,b.operation,j(b.payload),b.reason,user,now(),base));audit(c,user,'CHANGE_REQUEST_CREATE',b.domain,b.record_key,ref,None,b.payload);c.close();return {'change_ref':ref,'status':'PENDING','base_version':base}
 @router.get('/changes')
@@ -115,14 +154,20 @@ def decide(change_ref:str,b:Decision,x_role:Optional[str]=Header(None,alias='X-R
     if current and current['version']!=ch['base_version']:c.close();raise HTTPException(409,{'code':'MASTER_VERSION_CONFLICT','current_version':current['version'],'base_version':ch['base_version']})
     payload=json.loads(ch['payload_json']);ts=now();before=dict(current) if current else None
     if ch['operation']=='CREATE':
+        errs=validate_payload(ch['domain'],payload,{})+reference_errors(c,ch['domain'],payload)
+        dup=duplicate_name(c,ch['domain'],payload.get('name') or payload.get('display_name'),ch['record_key'])
+        if errs:c.close();raise HTTPException(422,{'codes':sorted(set(errs))})
+        if dup:c.close();raise HTTPException(409,{'code':'DUPLICATE_DISPLAY_NAME','record_key':dup['record_key']})
         c.execute('INSERT INTO md_records(domain,record_key,display_name,payload_json,status,version,effective_from,effective_to,approved_by,approved_at,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)',(ch['domain'],ch['record_key'],payload.get('name') or payload.get('display_name') or ch['record_key'],j(payload),'ACTIVE',1,payload.get('effective_from'),payload.get('effective_to'),user,ts,ts,ts));ver=1
     elif ch['operation']=='UPDATE':
-        old=json.loads(current['payload_json']);merged={**old,**payload};errs=validate_payload(ch['domain'],{},merged)
-        if errs:c.close();raise HTTPException(422,{'codes':errs})
+        old=json.loads(current['payload_json']);merged={**old,**payload};errs=validate_payload(ch['domain'],{},merged)+reference_errors(c,ch['domain'],merged)
+        if errs:c.close();raise HTTPException(422,{'codes':sorted(set(errs))})
         dup=duplicate_name(c,ch['domain'],merged.get('name') or merged.get('display_name') or current['display_name'],ch['record_key'])
         if dup:c.close();raise HTTPException(409,{'code':'DUPLICATE_DISPLAY_NAME','record_key':dup['record_key']})
         ver=current['version']+1;c.execute('UPDATE md_records SET display_name=?,payload_json=?,version=?,effective_from=COALESCE(?,effective_from),effective_to=COALESCE(?,effective_to),approved_by=?,approved_at=?,updated_at=? WHERE id=?',(merged.get('name') or merged.get('display_name') or current['display_name'],j(merged),ver,payload.get('effective_from'),payload.get('effective_to'),user,ts,ts,current['id']));payload=merged
     elif ch['operation']=='DEACTIVATE':
+        refs=usage_count(c,ch['domain'],ch['record_key'])
+        if refs>0:c.close();raise HTTPException(409,{'code':'MASTER_IN_USE','record_key':ch['record_key'],'used_references':refs})
         ver=current['version']+1;c.execute("UPDATE md_records SET status='INACTIVE',version=?,effective_to=COALESCE(?,?),approved_by=?,approved_at=?,updated_at=? WHERE id=?",(ver,payload.get('effective_to'),ts[:10],user,ts,ts,current['id']));payload=json.loads(current['payload_json'])
     else:
         ver=current['version']+1;c.execute("UPDATE md_records SET status='ACTIVE',version=?,effective_to=NULL,approved_by=?,approved_at=?,updated_at=? WHERE id=?",(ver,user,ts,ts,current['id']));payload=json.loads(current['payload_json'])
