@@ -86,34 +86,74 @@ def job_id(conn,jr):
     r=conn.execute('SELECT id FROM jobs WHERE job_ref=?',(jr,)).fetchone()
     if not r:raise HTTPException(422,{'code':'UNKNOWN_JOB'})
     return r['id']
+def _num(v):
+    if v in (None,''): return 0.0
+    return float(v)
+
+def _line_amount(line,*keys):
+    for k in keys:
+        if k in line and line[k] not in (None,''): return _num(line[k])
+    return 0.0
+
 def validate(module,fields):
     errs=[]
     if module=='opening-balance':
         try:
-            if float(fields.get('Debit') or 0)>0 and float(fields.get('Credit') or 0)>0: errs.append('OPENING_BALANCE_SIDE_CONFLICT')
+            if _num(fields.get('Debit'))>0 and _num(fields.get('Credit'))>0: errs.append('OPENING_BALANCE_SIDE_CONFLICT')
         except: errs.append('INVALID_AMOUNT')
     if module=='bank-reconciliation':
         try:
-            diff=float(fields.get('Book Balance') or 0)-float(fields.get('Bank Balance') or 0)
-            if fields.get('Difference') not in (None,'') and abs(float(fields.get('Difference'))-diff)>0.01:errs.append('RECONCILIATION_DIFFERENCE_MISMATCH')
-            if fields.get('Status')=='Reconciled' and abs(diff)>0.01:errs.append('RECONCILIATION_NOT_BALANCED')
+            book=_num(fields.get('Book Balance')); bank=_num(fields.get('Statement Balance') if fields.get('Statement Balance') not in (None,'') else fields.get('Bank Balance'))
+            diff=book-bank
+            supplied=fields.get('Difference')
+            if supplied not in (None,'') and abs(_num(supplied)-diff)>0.01:errs.append('RECONCILIATION_DIFFERENCE_MISMATCH')
+            if str(fields.get('Status') or '').lower()=='reconciled' and abs(diff)>0.01:errs.append('RECONCILIATION_NOT_BALANCED')
         except: errs.append('INVALID_RECONCILIATION_AMOUNT')
     if module=='tax-tool':
         try:
-            calc=float(fields.get('Base Amount') or 0)*float(fields.get('Rate') or 0)/100
-            if fields.get('Tax Amount') not in (None,'') and abs(float(fields.get('Tax Amount'))-calc)>0.01:errs.append('TAX_AMOUNT_MISMATCH')
+            calc=_num(fields.get('Base Amount'))*_num(fields.get('Rate'))/100
+            if fields.get('Tax Amount') not in (None,'') and abs(_num(fields.get('Tax Amount'))-calc)>0.01:errs.append('TAX_AMOUNT_MISMATCH')
         except:errs.append('INVALID_TAX_AMOUNT')
     if module in {'invoice','bills','receipt','payment','payment-requisition','credit-note','debit-note','accruals','prepayments','month-end-journals'}:
         try:
-            if float(fields.get('Amount') or 0)<=0:errs.append('AMOUNT_MUST_BE_POSITIVE')
+            amount=fields.get('Amount')
+            if module in {'invoice','bills'}: amount=fields.get('Invoice Amount',amount)
+            elif module=='receipt': amount=fields.get('Receipt Amount',amount)
+            elif module=='payment': amount=fields.get('Payment Amount',amount)
+            if amount not in (None,'') and _num(amount)<=0:errs.append('AMOUNT_MUST_BE_POSITIVE')
         except:errs.append('INVALID_AMOUNT')
     if module=='voucher':
         try:
-            amt=float(fields.get('Amount') or 0)
-            if amt<=0:errs.append('VOUCHER_AMOUNT_MUST_BE_POSITIVE')
-            if not fields.get('Debit Account') or not fields.get('Credit Account'):errs.append('VOUCHER_ACCOUNTS_REQUIRED')
-            if fields.get('Debit Account')==fields.get('Credit Account'):errs.append('VOUCHER_ACCOUNTS_MUST_DIFFER')
+            lines=fields.get('Account Lines') or []
+            if lines:
+                debit=sum(_line_amount(x,'Debit (VC)','Debit','Debit(VC)') for x in lines)
+                credit=sum(_line_amount(x,'Credit (VC)','Credit','Credit(VC)') for x in lines)
+                if debit<=0 or credit<=0: errs.append('VOUCHER_DEBIT_CREDIT_REQUIRED')
+                if abs(debit-credit)>0.01: errs.append('UNBALANCED_VOUCHER')
+                for x in lines:
+                    if not x.get('Account Code'): errs.append('VOUCHER_LINE_ACCOUNT_REQUIRED'); break
+            else:
+                amt=_num(fields.get('Amount'))
+                if amt<=0:errs.append('VOUCHER_AMOUNT_MUST_BE_POSITIVE')
+                if not fields.get('Debit Account') or not fields.get('Credit Account'):errs.append('VOUCHER_ACCOUNTS_REQUIRED')
+                if fields.get('Debit Account')==fields.get('Credit Account'):errs.append('VOUCHER_ACCOUNTS_MUST_DIFFER')
         except:errs.append('INVALID_VOUCHER_AMOUNT')
+    if module in {'invoice','bills'}:
+        try:
+            inv=_num(fields.get('Invoice Amount')); tax=_num(fields.get('Tax Amount')); net=_num(fields.get('Net Amount'))
+            if fields.get('Net Amount') not in (None,'') and abs((inv+tax)-net)>0.01: errs.append('INVOICE_NET_AMOUNT_MISMATCH')
+        except: errs.append('INVALID_INVOICE_TOTAL')
+    if module in {'receipt','payment'}:
+        try:
+            gross=_num(fields.get('Receipt Amount') if module=='receipt' else fields.get('Payment Amount'))
+            inv_adj=_num(fields.get('Inv Adj Amount')); set_adj=_num(fields.get('Set Adj Amount')); net=_num(fields.get('Net Amount'))
+            if fields.get('Net Amount') not in (None,'') and abs((gross+inv_adj+set_adj)-net)>0.01: errs.append('NET_AMOUNT_MISMATCH')
+        except: errs.append('INVALID_NET_AMOUNT')
+    if module=='cash-denomination-record':
+        try:
+            total=_num(fields.get('Total')); balance=_num(fields.get('Balance'))
+            if fields.get('Difference') not in (None,'') and abs(_num(fields.get('Difference'))-(total-balance))>0.01: errs.append('CASH_DENOMINATION_DIFFERENCE_MISMATCH')
+        except: errs.append('INVALID_CASH_DENOMINATION')
     return errs
 
 def fiscal_period(conn,date_text):
@@ -150,13 +190,28 @@ def next_voucher(conn,vtype):
 
 def build_voucher(conn,record_id,fields,jid,source_type,source_ref,status='Draft',maker_role='GL_ACCOUNTANT'):
     vtype=str(fields.get('Voucher Type') or 'JV').upper(); vno=fields.get('Voucher No.') or next_voucher(conn,vtype)
-    amount=float(fields.get('Amount') or 0); debit=fields.get('Debit Account'); credit=fields.get('Credit Account'); curr=fields.get('Currency') or 'USD'; vdate=fields.get('Date') or '2026-09-23'
-    rate=float(fields.get('Exchange Rate') or fx_rate(conn,curr,vdate)); base=round(amount*rate,2)
+    lines=fields.get('Account Lines') or []
+    curr=fields.get('Currency') or 'USD'; vdate=fields.get('Date') or '2026-09-23'
+    rate=_num(fields.get('Exchange Rate')) or fx_rate(conn,curr,vdate)
+    if lines:
+        debit_total=sum(_line_amount(x,'Debit (VC)','Debit','Debit(VC)') for x in lines)
+        credit_total=sum(_line_amount(x,'Credit (VC)','Credit','Credit(VC)') for x in lines)
+        amount=max(debit_total,credit_total)
+    else:
+        amount=_num(fields.get('Amount')); debit_total=credit_total=amount
+    base_debit=round(debit_total*rate,2); base_credit=round(credit_total*rate,2)
     cur=conn.execute('''INSERT INTO gl_vouchers(gl_record_id,voucher_no,voucher_type,voucher_date,currency,status,source_type,source_ref,job_id,total_debit,total_credit,version,created_at,maker_role,exchange_rate,base_currency,base_total_debit,base_total_credit)
-    VALUES(?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)''',(record_id,vno,vtype,vdate,curr,status,source_type,source_ref,jid,amount,amount,now(),maker_role,rate,'USD',base,base))
+    VALUES(?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)''',(record_id,vno,vtype,vdate,curr,status,source_type,source_ref,jid,debit_total,credit_total,now(),maker_role,rate,'USD',base_debit,base_credit))
     vid=cur.lastrowid
-    conn.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(vid,1,debit,amount,0,fields.get('Narration') or source_ref,jid))
-    conn.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(vid,2,credit,0,amount,fields.get('Narration') or source_ref,jid))
+    if lines:
+        for i,line in enumerate(lines,1):
+            account=line.get('Account Code'); debit=_line_amount(line,'Debit (VC)','Debit','Debit(VC)'); credit=_line_amount(line,'Credit (VC)','Credit','Credit(VC)')
+            desc=line.get('Narration') or line.get('Particular') or fields.get('Narration') or source_ref
+            conn.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(vid,i,account,debit,credit,desc,jid))
+    else:
+        debit=fields.get('Debit Account'); credit=fields.get('Credit Account')
+        conn.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(vid,1,debit,amount,0,fields.get('Narration') or source_ref,jid))
+        conn.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(vid,2,credit,0,amount,fields.get('Narration') or source_ref,jid))
     conn.execute('UPDATE gl_records SET external_ref=?,payload_json=json_set(payload_json,\'$."Voucher No."\',?) WHERE id=?',(vno,vno,record_id))
     conn.execute('INSERT INTO gl_source_links(gl_record_id,voucher_id,source_type,source_ref,job_id) VALUES(?,?,?,?,?)',(record_id,vid,source_type or 'MANUAL',source_ref or vno,jid))
     return vid,vno
