@@ -74,12 +74,14 @@ function glReportQuery(){
 async function reloadGlReport(){
   if(!isGlReport())return;
   try{
-    $('gridArea').innerHTML=glReportFilterBar()+'<div class="card">Loading live report…</div>';
     const q=glReportQuery();const d=await api('/api/clx045/reports/'+encodeURIComponent(state.current.key)+(q?'?'+q:''),{headers:{'X-Role':state.role}});
     state.rows=normalizeRows(d.rows);state.page=1;state.sortKey='';state.status='';state.savedView='';
     $('screenMeta').innerHTML='<div class="card"><b>'+esc(state.current.name)+'</b><span class="muted"> · CLX-045 live read-only report · '+d.count+' rows</span></div>'+
       (d.totals?'<div class="card"><b>Control totals</b><span class="muted"> · Debit VC '+esc(d.totals.debit_vc)+' / Credit VC '+esc(d.totals.credit_vc)+' · Debit LC '+esc(d.totals.debit_lc)+' / Credit LC '+esc(d.totals.credit_lc)+' · Balanced VC '+esc(d.balanced_vc)+' · Balanced LC '+esc(d.balanced_lc)+'</span></div>':'');
-    $('gridArea').innerHTML=glReportFilterBar()+renderGrid();await renderQuickActions();
+    const keep={};for(const id of ['glCompany','glPeriod','glDateFrom','glDateTo','glAccount','glCostCenter','glCurrency','glReportStatus']){const el=$(id);if(el)keep[id]=el.value}
+    $('gridArea').innerHTML=glReportFilterBar()+renderGrid();
+    for(const [id,v] of Object.entries(keep)){const el=$(id);if(el)el.value=v}
+    await renderQuickActions();
   }catch(e){$('gridArea').innerHTML=glReportFilterBar()+'<div class=card><b class=badtext>Error loading GL report</b><pre class=pre>'+esc(e.message)+'</pre></div>'}
 }
 function clearGlReportFilters(){for(const id of ['glCompany','glPeriod','glDateFrom','glDateTo','glAccount','glCostCenter','glCurrency']){const el=$(id);if(el)el.value=''}const st=$('glReportStatus');if(st)st.value='Posted';reloadGlReport()}
