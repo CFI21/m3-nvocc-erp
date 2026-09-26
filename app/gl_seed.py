@@ -7,7 +7,7 @@ def run(conn):
     accounts=[
       ('1000','Cash','ASSET',None,'USD'),('1100','Bank - Operating','ASSET',None,'USD'),('1200','Accounts Receivable','ASSET',None,'USD'),
       ('1300','Tax Receivable','ASSET',None,'USD'),('2000','Accounts Payable','LIABILITY',None,'USD'),('2100','WHT Payable','LIABILITY',None,'USD'),
-      ('2200','Tax Payable','LIABILITY',None,'USD'),('4000','Freight Revenue','REVENUE',None,'USD'),('4010','Detention / Storage Revenue','REVENUE',None,'USD'),
+      ('2200','Tax Payable','LIABILITY',None,'USD'),('3000','Opening Equity','CAPITAL',None,'USD'),('4000','Freight Revenue','REVENUE',None,'USD'),('4010','Detention / Storage Revenue','REVENUE',None,'USD'),
       ('5000','Carrier Freight Expense','EXPENSE',None,'USD'),('5010','Storage / Detention Expense','EXPENSE',None,'USD'),('6000','Bank Charges','EXPENSE',None,'USD')]
     for a in accounts:conn.execute('INSERT INTO gl_accounts(account_code,account_name,account_type,parent_code,currency) VALUES(?,?,?,?,?)',a)
     for c in [('USD','US Dollar',2,'SPOT'),('EUR','Euro',2,'SPOT'),('GBP','Pound Sterling',2,'SPOT'),('AED','UAE Dirham',2,'FIXED'),('PKR','Pakistan Rupee',2,'SPOT')]:conn.execute('INSERT INTO gl_currencies(code,name,decimals,rate_type) VALUES(?,?,?,?)',c)
@@ -21,8 +21,9 @@ def run(conn):
         rec('chart-of-accounts','COA-'+a[0],None,{'Account Code':a[0],'Account Name':a[1],'Type':a[2],'Parent':a[3] or '—','Currency':a[4],'Active':'Yes'})
     for c in [('USD','US Dollar',2,'SPOT'),('EUR','Euro',2,'SPOT'),('GBP','Pound Sterling',2,'SPOT'),('AED','UAE Dirham',2,'FIXED'),('PKR','Pakistan Rupee',2,'SPOT')]:rec('currency','CUR-'+c[0],None,{'Currency':c[0],'Name':c[1],'Decimals':str(c[2]),'Rate Type':c[3],'Active':'Yes'})
     for typ,pfx in [('JV','JV'),('SI','SI'),('PI','PI'),('RC','RC'),('PV','PV')]:rec('voucher-properties','VP-'+typ,None,{'Voucher Type':typ,'Prefix':pfx,'Next Number':'1','Approval Required':'Yes','Active':'Yes'})
-    for i,code in enumerate(['1000','1100','1200','2000','4000'],1):
-        name=next(a[1] for a in accounts if a[0]==code); debit=10000*i if code in ('1000','1100','1200') else 0; credit=5000*i if code in ('2000','4000') else 0
+    openings=[('1000',10000,0),('1100',20000,0),('1200',30000,0),('2000',0,20000),('3000',0,40000)]
+    for i,(code,debit,credit) in enumerate(openings,1):
+        name=next(a[1] for a in accounts if a[0]==code)
         rec('opening-balance',f'OB-2026-{i:03d}',None,{'Period':'2026-01','Account Code':code,'Account Name':name,'Debit':str(debit),'Credit':str(credit),'Currency':'USD','Status':'Approved'},'Approved')
     for i,m in enumerate(maps[:5],1):rec('account-integration',f'AI-{i:03d}',None,{'Source Module':m[0],'Event':m[1],'Debit Account':m[2],'Credit Account':m[3],'Tax Account':m[4] or '—','Active':'Yes'})
     for i in range(1,6):rec('reconciliation-date-setup',f'RDS-{i:03d}',None,{'Bank Account':'1100','Cut-off Date':f'2026-0{i}-30','Last Reconciled':f'2026-0{i}-29','Status':'Active'})
