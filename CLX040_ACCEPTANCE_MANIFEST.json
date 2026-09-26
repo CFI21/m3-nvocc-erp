@@ -1,0 +1,53 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX040-TOP-LEVEL-MENU-ORDER-ACCEPTED-20260926",
+  "phase": "CLX-040",
+  "title": "Top-Level Menu Order Correction",
+  "status": "ACCEPTED",
+  "accepted_commit": "5bcd6f7dfb71433a3483af9357e7cf1d2b8c017c",
+  "parentBaseline": "M3-CLX039-DASHBOARD-TOPBAR-EXECUTIVE-HOME-ACCEPTED-20260926",
+  "accepted_at": "2026-09-26T12:00:00Z",
+  "scope": {
+    "topLevelMenuOrder": [
+      "Agent Tasks",
+      "HO Tasks",
+      "Treasury / AR-AP",
+      "Integration & Security",
+      "General / Administration",
+      "Master Data"
+    ],
+    "agentTasksSubmenus": ["Setup","Transaction"],
+    "hoTasksSubmenus": ["Transaction","Utilities"],
+    "screenBaseline": 196,
+    "executiveHome": "PRESERVED",
+    "neutralGreySidebar": "PRESERVED",
+    "routes": "PRESERVED",
+    "roleDataScope": "PRESERVED",
+    "financeGovernance": "PRESERVED",
+    "businessLogic": "UNCHANGED",
+    "dataModel": "UNCHANGED",
+    "databaseMigration": false
+  },
+  "evidence": {
+    "pullRequest": 20,
+    "mergeCommit": "5bcd6f7dfb71433a3483af9357e7cf1d2b8c017c",
+    "preMergeClx040RunId": "36240471970",
+    "preMergeClx040": "PASS",
+    "preMergeClx038RunId": "36240471936",
+    "preMergeClx038": "PASS",
+    "preMergeClx035RunId": "36240471964",
+    "preMergeClx035": "PASS",
+    "preMergeClx029RunId": "36240471952",
+    "preMergeClx029": "PASS",
+    "postMergeVerificationPullRequest": 21,
+    "postMergeVerificationPullRequestMerged": false,
+    "postMergeClx040RunId": "36240526347",
+    "postMergeClx040": "PASS"
+  },
+  "controls": {
+    "liveProviders": false,
+    "realMoney": false,
+    "productionRuntimePromoted": false
+  },
+  "freeze": true
+}
