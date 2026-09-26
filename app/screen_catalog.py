@@ -211,10 +211,14 @@ def build_catalog() -> dict[str, Any]:
             'route':'/treasury/work-queues/bank-reconciliation-exception-queue',
         })
     for m in treasury_modules:
-        screens.append(_base_screen(
+        s=_base_screen(
             'treasury','Treasury / AR-AP',_group_name(m.get('group','')),m['key'],m['name'],m['route'],
             COMMON_MUTATE + COMMON_READ + ['approve','release','reverse']
-        ))
+        )
+        # CLX-050: keep screen visibility aligned with the already-authoritative
+        # Treasury API role matrix; do not grant any capability the API does not own.
+        s['roles']=['ADMIN','FINANCE','GL_MANAGER','TREASURY_MANAGER','TREASURY','AR_ACCOUNTANT','AP_ACCOUNTANT','GL_ACCOUNTANT','AUDITOR','VIEWER','OPS']
+        screens.append(s)
 
     # Integration & Security: complete accepted metadata.
     integration=_load_json('integration_meta.json')['modules']

@@ -88,9 +88,14 @@ app.include_router(gl_router)
 
 ROLE_PERMS={
  'ADMIN':set('create edit approve release hold cancel amend reissue reverse advance view'.split()),
+ 'SUPER_ADMIN':set('create edit approve release hold cancel amend reissue reverse advance view'.split()),
  'OPS':set('create edit approve release hold amend reissue advance view'.split()),
  'DOCS':set('create edit approve hold amend reissue view'.split()),
  'FINANCE':set('create edit approve hold reverse view'.split()),
+ 'GL_ACCOUNTANT':set('view'.split()),
+ 'GL_MANAGER':set('view'.split()),
+ 'TREASURY':set('view'.split()),
+ 'AUDITOR':set('view'.split()),
  'AGENT':set('create edit amend view'.split()),
  'VIEWER':set('view'.split())
 }
@@ -389,7 +394,7 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
 @app.delete('/api/v1/{module}/{tid}')
 def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
     require_module(module); role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
-    if role!='ADMIN': raise HTTPException(403,'ADMIN only delete')
+    if role not in {'ADMIN','SUPER_ADMIN'}: raise HTTPException(403,'ADMIN only delete')
     conn=connect(); tx(conn)
     try:
         r=get_tx(conn,module,tid,role,ascope,cscope)
