@@ -5,6 +5,7 @@ from typing import Optional, Any
 import json, datetime, uuid
 from .db import connect
 from .screen_catalog import build_catalog
+from .clx045_gl_reporting import REPORT_KEYS, report_rows
 
 HERE=Path(__file__).resolve().parent
 CATALOG=build_catalog()
@@ -150,10 +151,13 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
             if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
             rows=safe_rows(c,sql,args)
         elif s['screen_id'].startswith('gl-accounts::'):
-            sql='''SELECT g.id,g.external_ref,j.job_ref,g.source_type,g.source_ref,g.status,g.version,g.payload_json
-                   FROM gl_records g LEFT JOIN jobs j ON j.id=g.job_id WHERE g.module=?''';args=[s['key']]
-            if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
-            rows=safe_rows(c,sql,args)
+            if s['key'] in REPORT_KEYS:
+                rows=report_rows(s['key'],status='Posted')
+            else:
+                sql='''SELECT g.id,g.external_ref,j.job_ref,g.source_type,g.source_ref,g.status,g.version,g.payload_json
+                       FROM gl_records g LEFT JOIN jobs j ON j.id=g.job_id WHERE g.module=?''';args=[s['key']]
+                if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
+                rows=safe_rows(c,sql,args)
         elif s['domain']=='Treasury / AR-AP':
             sql='''SELECT t.id,t.external_ref,j.job_ref,t.party_type,t.party_name,t.currency,t.amount,t.status,t.version,t.source_type,t.source_ref,t.payload_json
                    FROM treasury_records t LEFT JOIN jobs j ON j.id=t.job_id WHERE t.module=?''';args=[s['key']]
@@ -199,7 +203,7 @@ def functional_actions(s):
     sid=s['screen_id']; domain=s['domain']; key=s['key']; submenu=s.get('submenu','')
     if domain=='Agent Tasks': return common|{'create','edit','approve','release','hold','cancel','amend','reissue','reverse','advance'}
     if sid.startswith('gl-accounts::'):
-        if 'Reports & Reconciliation' in submenu: return common
+        if key in REPORT_KEYS or 'Reports' in submenu: return {'quick-view','related-records','print','export','audit-history'}
         return common|{'create','edit','approve','reverse'}
     if domain=='Treasury / AR-AP':
         if submenu in {'Overview','Reports & Reconciliation','Work Queues'}: return common
