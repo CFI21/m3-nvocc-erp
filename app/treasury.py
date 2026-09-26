@@ -7,7 +7,7 @@ from .db import connect,tx,backend_name
 from .json_recovery import load_json_or_recover_arrays
 from .gl import assert_period_postable,next_voucher
 from .admin import session as iam_session
-from .clx033_finance_transaction_governance import enforce_treasury_action
+from .clx034_smart_approval_fast_track import enforce_treasury_action
 
 HERE=Path(__file__).resolve().parent
 _TREASURY_META, META_RECOVERED = load_json_or_recover_arrays(
