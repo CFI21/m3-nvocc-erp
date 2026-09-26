@@ -1,0 +1,62 @@
+name: M3 CLX028 KPI Snapshot Alerts UAT
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx028-kpi-alerts-uat.yml"
+  workflow_dispatch:
+
+jobs:
+  uat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runtime KPI snapshot and alert UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          curl --fail --silent -X POST "$API/api/v1/management-kpi/snapshot"             -H "X-Role: OPS" -H "X-Actor-Id: clx028-uat-system" -o /tmp/s1.json
+          curl --fail --silent -X POST "$API/api/v1/management-kpi/snapshot"             -H "X-Role: OPS" -H "X-Actor-Id: clx028-uat-system" -o /tmp/s2.json
+          curl --fail --silent "$API/api/v1/management-kpi/snapshot/latest" -H "X-Role: AUDITOR" -o /tmp/latest.json
+          curl --fail --silent "$API/api/v1/management-kpi/trends?days=30" -H "X-Role: AUDITOR" -o /tmp/trends.json
+          curl --fail --silent "$API/api/v1/management-kpi/alerts?status=OPEN" -H "X-Role: AUDITOR" -o /tmp/alerts.json
+          curl --fail --silent "$API/api/v1/management-kpi/control-status" -H "X-Role: AUDITOR" -o /tmp/control.json
+
+          code=$(curl -s -o /tmp/viewer.json -w "%{http_code}" "$API/api/v1/management-kpi/trends?days=30" -H "X-Role: VIEWER")
+          test "$code" = "403"
+          code=$(curl -s -o /tmp/agent.json -w "%{http_code}" "$API/api/v1/management-kpi/alerts" -H "X-Role: AGENT")
+          test "$code" = "403"
+
+          python - <<'PY'
+          import json
+          s1=json.load(open('/tmp/s1.json'))
+          s2=json.load(open('/tmp/s2.json'))
+          latest=json.load(open('/tmp/latest.json'))
+          trends=json.load(open('/tmp/trends.json'))
+          alerts=json.load(open('/tmp/alerts.json'))
+          ctl=json.load(open('/tmp/control.json'))
+
+          assert s1['ok'] is True and s2['ok'] is True
+          assert s2['created'] is False
+          snap=latest['snapshot']
+          assert snap is not None
+          assert snap['jobs_total']==5
+          assert snap['active_work_items']>=1
+          assert snap['immutable']==1
+          assert len(snap['source_hash'])==64
+          assert trends['phase']=='CLX-028'
+          assert len(trends['snapshots'])>=1
+          assert alerts['phase']=='CLX-028'
+          assert alerts['external_notifications'] is False
+          assert len(alerts['alerts'])>=1
+          assert ctl['daily_snapshot_immutable'] is True
+          assert ctl['trends_read_only'] is True
+          assert ctl['alerts_in_app_only'] is True
+          assert ctl['external_notifications'] is False
+          assert ctl['underlying_business_mutation'] is False
+          assert ctl['screen_catalog_preserved']==193
+          assert ctl['live_provider_activation'] is False
+          assert ctl['real_money'] is False
+          print('CLX028_KPI_SNAPSHOT_ALERTS_PASS')
+          PY
