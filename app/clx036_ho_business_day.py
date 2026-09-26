@@ -58,7 +58,7 @@ def _job_trace(c,jr):
         GROUP BY module,external_ref HAVING COUNT(*)>1) x''',(jid,)),
     }
     orphan_sources=_count(c,'''SELECT COUNT(*) n FROM gl_records g
-      WHERE g.job_id=? AND g.source_ref IS NOT NULL AND trim(g.source_ref)='' ''',(jid,))
+      WHERE g.job_id=? AND g.source_ref IS NOT NULL AND trim(g.source_ref)=''',(jid,))
     master_refs={
       'customer':bool(c.execute("SELECT 1 FROM md_records WHERE domain='customer' AND record_key=? AND status='ACTIVE'",(j['customer_code'],)).fetchone()),
       'agent':bool(c.execute("SELECT 1 FROM md_records WHERE domain='agent' AND record_key=? AND status='ACTIVE'",(j['agent_code'],)).fetchone()),
