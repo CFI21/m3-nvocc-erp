@@ -37,3 +37,5 @@ jobs:
           tests/test_clx032_finance_controls.py
           tests/test_clx030_finance_entitlements.py
           tests/test_clx029_accounting_navigation_access.py
+
+# CLX-041 post-merge verification trigger
