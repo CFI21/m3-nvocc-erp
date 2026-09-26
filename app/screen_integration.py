@@ -196,11 +196,13 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
 
 def functional_actions(s):
     common={'quick-view','related-records','print','export','email','audit-history'}
-    sid=s['screen_id']; domain=s['domain']; key=s['key']
+    sid=s['screen_id']; domain=s['domain']; key=s['key']; submenu=s.get('submenu','')
     if domain=='Agent Tasks': return set(s['quick_actions'])
     if sid.startswith('gl-accounts::'):
+        if 'Reports & Reconciliation' in submenu: return common
         return common|{'create','edit','approve','reverse'}
     if domain=='Treasury / AR-AP':
+        if submenu in {'Overview','Reports & Reconciliation','Work Queues'}: return common
         return common|{'create','edit','approve','release','reverse'}
     if domain=='Integration & Security':
         return common
