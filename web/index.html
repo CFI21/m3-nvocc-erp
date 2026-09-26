@@ -147,7 +147,98 @@ async function executeAgentAction(a){
     await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
 }
-async function runAction(a){$('fabWrap').classList.remove('open');if(a==='create'){await openAgentForm('create');return}if(a==='edit'){if(!state.selected)return alert('Select a record to edit');await openAgentForm('edit');return}if(a==='activate'||a==='deactivate'){await changeAgentSetupStatus(a);return}if(a==='quick-view'){openDrawer('details');return}if(a==='related-records'){openDrawer('related');return}if(a==='audit-history'){openDrawer('audit');return}if(a==='print'){window.print();return}if(a==='export'){exportCsv();return}let jr=selectedJob(),ref=state.selected?.external_ref??state.selected?.record_key??state.selected?.user_ref??null;if(a==='email'){try{let r=await api('/api/clx011/simulate-email',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'},body:JSON.stringify({screen_id:state.current.screen_id,record_ref:ref,job_ref:jr,subject:`${state.current.name} update`})});alert('Email action recorded as '+r.delivery+' — no external delivery.');loadAudit()}catch(e){alert(e.message)}return}if(state.current?.domain==='Agent Tasks'&&['approve','release','hold','cancel','amend','reissue','reverse','advance'].includes(a)){await executeAgentAction(a);return}let rid=state.selected?.id,version=state.selected?.version;let route=await api('/api/clx011/action-route?screen_id='+encodeURIComponent(state.current.screen_id)+'&action='+encodeURIComponent(a)+(rid?'&record_id='+rid:'')+(version?'&version='+version:''));$('drawerTitle').textContent='Quick Action · '+a;$('tab-details').innerHTML=`<div class=card><b>${esc(a.replaceAll('-',' '))}</b><p>This Quick Action routes to the existing accepted workflow. CLX-042 does not duplicate business logic.</p></div><pre class=pre>${esc(JSON.stringify(route,null,2))}</pre>`;drawerTabs('details');$('drawer').classList.add('open')}
+function financeDomain(){if(state.current?.screen_id?.startsWith('gl-accounts::'))return 'gl';if(state.current?.domain==='Treasury / AR-AP')return 'treasury';return null}
+async function financeModuleMeta(kind){
+  const raw=await api(kind==='gl'?'/api/v1/gl/modules':'/api/v1/treasury/modules',{headers:{'X-Role':state.role}});
+  const xs=Array.isArray(raw)?raw:(raw.modules||[]);
+  return xs.find(x=>x.key===state.current.key)||{};
+}
+async function openFinanceForm(mode){
+  const kind=financeDomain();if(!kind)return;
+  if(mode==='edit'&&!state.selected)return alert('Select a record to edit');
+  try{
+    const meta=await financeModuleMeta(kind),base=state.selected?rowPayload(state.selected):{};
+    const fields=(meta.fields||Object.keys(base)).filter(x=>!['id','version','job_ref','external_ref','status','module'].includes(String(x).toLowerCase()));
+    $('drawerTitle').textContent=(mode==='create'?'Create ':'Edit ')+state.current.name;
+    let html='<div class="formGrid"><div class="formNote">Uses the existing '+(kind==='gl'?'GL':'Treasury')+' API. Validation, audit, optimistic locking and approval controls remain server-authoritative.</div>';
+    html+='<div class="formField"><label>Job Ref</label><input id="clx43Job" maxlength="5" value="'+esc(selectedJob()||'')+'" '+(mode==='edit'?'disabled':'')+'></div>';
+    html+='<div class="formField"><label>External Ref</label><input id="clx43External" value="'+esc(state.selected?.external_ref||'')+'" '+(mode==='edit'?'disabled':'')+'></div>';
+    for(const name of fields){const full=/remarks|notes|narration|description|instruction/i.test(name);html+='<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+(full?'<textarea data-clx43-field="'+esc(name)+'">'+esc(base[name]??'')+'</textarea>':'<input data-clx43-field="'+esc(name)+'" value="'+esc(base[name]??'')+'">')+'</div>'}
+    html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button><button class="btn primary" onclick="saveFinanceForm(\''+mode+'\')">Save</button></div></div>';
+    $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open');
+  }catch(e){alert(e.message)}
+}
+async function saveFinanceForm(mode){
+  const kind=financeDomain();if(!kind)return;
+  try{
+    const fields={};document.querySelectorAll('[data-clx43-field]').forEach(el=>fields[el.dataset.clx43Field]=el.value);
+    const headers={'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'};
+    let path='/api/v1/'+kind+'/'+state.current.key,method='POST',body;
+    if(mode==='create'){
+      const jr=$('clx43Job').value.trim();if(jr&&!/^\d{5}$/.test(jr))throw new Error('Job Ref must be exactly 5 digits');
+      body={job_ref:jr||null,external_ref:$('clx43External').value.trim()||null,fields};
+      headers['Idempotency-Key']='CLX043-'+kind+'-'+state.current.key+'-'+Date.now();
+    }else{
+      path+='/'+state.selected.id;method='PUT';body={version:state.selected.version,fields};
+    }
+    await api(path,{method,headers,body:JSON.stringify(body)});
+    $('drawer').classList.remove('open');await openScreen(state.current.screen_id,state.navContext);
+  }catch(e){alert(e.message)}
+}
+async function executeFinanceAction(a){
+  const kind=financeDomain();if(!kind||!state.selected?.id)return alert('Select a record first');
+  try{
+    const route=await api('/api/clx011/action-route?screen_id='+encodeURIComponent(state.current.screen_id)+'&action='+encodeURIComponent(a)+'&record_id='+state.selected.id+'&version='+state.selected.version);
+    if(route.mode!=='EXISTING_API')throw new Error('No authoritative action route is available');
+    if(!confirm('Execute '+a.toUpperCase()+' on '+(state.selected.external_ref||state.current.name)+'?'))return;
+    await api(route.path,{method:route.method,headers:{'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'},body:JSON.stringify({version:state.selected.version,reason:'CLX-043 governed UI action'})});
+    await openScreen(state.current.screen_id,state.navContext);
+  }catch(e){alert(e.message)}
+}
+const MASTER_DOMAIN_MAP={'customers':'customer','agents':'agent','carriers':'carrier','ports':'port','locations':'location','vessels':'vessel','voyages':'voyage','equipment-types':'equipment-type','container-types':'container-type','commodities':'commodity','commoditys':'commodity','packages':'package','common-partys':'common-party','units':'unit','sales-persons':'sales-person','charge-codes':'charge-code','tax-codes':'tax-code','currencies':'currency','exchange-rate-types':'exchange-rate-type','payment-terms':'payment-term','banks':'bank','bank-accounts':'bank-account','gl-accounts':'gl-account','cost-centers':'cost-center','profit-centers':'profit-center','trade-lanes':'trade-lane','services':'service','routes':'route','incoterms':'incoterm','document-types':'document-type','release-types':'release-type','reference-sequences':'reference-sequence','configuration':'configuration','configurations':'configuration'};
+function currentMasterDomain(){return state.current?.domain==='Master Data'?MASTER_DOMAIN_MAP[state.current.key]||null:null}
+async function openMasterChange(){
+  const domain=currentMasterDomain();if(!domain)return;
+  const selected=state.selected||{},base=rowPayload(selected),isUpdate=!!selected.record_key;
+  $('drawerTitle').textContent=(isUpdate?'Update ':'Create ')+state.current.name;
+  let html='<div class="formGrid"><div class="formNote">Uses the existing governed Master Data change-request workflow. Independent approval, duplicate prevention, versioning and audit remain server-authoritative.</div>';
+  html+='<div class="formField"><label>Record Key *</label><input id="clx43MasterKey" value="'+esc(selected.record_key||'')+'" '+(isUpdate?'disabled':'')+'></div>';
+  html+='<div class="formField"><label>Name *</label><input id="clx43MasterName" value="'+esc(selected.display_name||base.name||'')+'"></div>';
+  html+='<div class="formField"><label>Effective From</label><input id="clx43MasterFrom" value="'+esc(selected.effective_from||base.effective_from||'')+'"></div>';
+  html+='<div class="formField"><label>Effective To</label><input id="clx43MasterTo" value="'+esc(selected.effective_to||base.effective_to||'')+'"></div>';
+  html+='<div class="formField full"><label>Reason *</label><textarea id="clx43MasterReason">CLX-043 governed master change</textarea></div>';
+  html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button><button class="btn primary" onclick="saveMasterChange('+(isUpdate?'true':'false')+')">Submit Change Request</button></div></div>';
+  $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open');
+}
+async function saveMasterChange(isUpdate){
+  const domain=currentMasterDomain();if(!domain)return;
+  try{
+    const key=$('clx43MasterKey').value.trim(),name=$('clx43MasterName').value.trim(),reason=$('clx43MasterReason').value.trim();
+    if(!key||!name||!reason)throw new Error('Record Key, Name and Reason are required');
+    const payload={name};if($('clx43MasterFrom').value.trim())payload.effective_from=$('clx43MasterFrom').value.trim();if($('clx43MasterTo').value.trim())payload.effective_to=$('clx43MasterTo').value.trim();
+    await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-User':'ui-user'},body:JSON.stringify({domain,record_key:key,operation:isUpdate?'UPDATE':'CREATE',payload,reason})});
+    $('drawer').classList.remove('open');await openScreen(state.current.screen_id,state.navContext);
+  }catch(e){alert(e.message)}
+}
+async function masterStatusChange(operation){
+  const domain=currentMasterDomain();if(!domain||!state.selected?.record_key)return alert('Select a master record first');
+  try{
+    await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-User':'ui-user'},body:JSON.stringify({domain,record_key:state.selected.record_key,operation:operation.toUpperCase(),payload:{},reason:'CLX-043 governed status change'})});
+    alert(operation.toUpperCase()+' change request created for independent approval.');
+  }catch(e){alert(e.message)}
+}
+async function showMasterVersions(){
+  const domain=currentMasterDomain();if(!domain||!state.selected?.record_key)return alert('Select a master record first');
+  try{const d=await api('/api/masterdata/versions/'+encodeURIComponent(domain)+'/'+encodeURIComponent(state.selected.record_key));$('drawerTitle').textContent='Version History · '+state.selected.record_key;$('tab-details').innerHTML='<pre class=pre>'+esc(JSON.stringify(d,null,2))+'</pre>';drawerTabs('details');$('drawer').classList.add('open')}catch(e){alert(e.message)}
+}
+async function decideMasterChange(decision){
+  const ref=state.selected?.change_ref;if(!ref)return alert('Select a pending change first');
+  try{
+    await api('/api/masterdata/changes/'+encodeURIComponent(ref)+'/decision',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-User':'ui-checker'},body:JSON.stringify({decision:decision.toUpperCase(),comment:'CLX-043 governed approval decision'})});
+    await openScreen(state.current.screen_id,state.navContext);
+  }catch(e){alert(e.message)}
+}
+async function runAction(a){$('fabWrap').classList.remove('open');const isAgent=state.current?.domain==='Agent Tasks',fin=financeDomain(),md=currentMasterDomain();if(a==='create'){if(isAgent)await openAgentForm('create');else if(fin)await openFinanceForm('create');return}if(a==='edit'){if(!state.selected)return alert('Select a record to edit');if(isAgent)await openAgentForm('edit');else if(fin)await openFinanceForm('edit');return}if(a==='activate'||a==='deactivate'){if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup')await changeAgentSetupStatus(a);else if(md)await masterStatusChange(a);return}if(a==='change-request'&&md){await openMasterChange();return}if(a==='version-history'&&md){await showMasterVersions();return}if((a==='approve'||a==='reject')&&state.current?.screen_id==='master-data::approval-queue'){await decideMasterChange(a);return}if(a==='quick-view'){openDrawer('details');return}if(a==='related-records'){openDrawer('related');return}if(a==='audit-history'){openDrawer('audit');return}if(a==='print'){window.print();return}if(a==='export'){exportCsv();return}let jr=selectedJob(),ref=state.selected?.external_ref??state.selected?.record_key??state.selected?.user_ref??null;if(a==='email'){try{let r=await api('/api/clx011/simulate-email',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'},body:JSON.stringify({screen_id:state.current.screen_id,record_ref:ref,job_ref:jr,subject:`${state.current.name} update`})});alert('Email action recorded as '+r.delivery+' — no external delivery.');loadAudit()}catch(e){alert(e.message)}return}if(isAgent&&['approve','release','hold','cancel','amend','reissue','reverse','advance'].includes(a)){await executeAgentAction(a);return}if(fin&&['approve','release','reverse'].includes(a)){await executeFinanceAction(a);return}let rid=state.selected?.id,version=state.selected?.version;let route=await api('/api/clx011/action-route?screen_id='+encodeURIComponent(state.current.screen_id)+'&action='+encodeURIComponent(a)+(rid?'&record_id='+rid:'')+(version?'&version='+version:''));$('drawerTitle').textContent='Quick Action · '+a;$('tab-details').innerHTML=`<div class=card><b>${esc(a.replaceAll('-',' '))}</b><p>This screen uses its existing approved workflow. No new business mutation is introduced by CLX-043.</p></div><pre class=pre>${esc(JSON.stringify(route,null,2))}</pre>`;drawerTabs('details');$('drawer').classList.add('open')}
 async function doGlobalSearch(){let q=$('globalSearch').value.trim();if(q.length<2){$('searchPanel').classList.remove('open');return}let d=await api('/api/clx011/search?q='+encodeURIComponent(q)+'&role='+encodeURIComponent(state.role));let html=d.screen_hits.map(x=>`<div class=searchItem onclick="openScreen('${x.screen_id.replaceAll("'","\\'")}');$('searchPanel').classList.remove('open')"><b>${esc(x.name)}</b><div class=muted>${esc(x.domain)} · ${esc(x.submenu)}</div></div>`).join('');html+=d.record_hits.map(x=>`<div class=searchItem><b>${esc(x.external_ref??x.record_key??'Record')}</b><div class=muted>${esc(x.type)} · Job ${esc(x.job_ref??'—')} · ${esc(x.status??'')}</div></div>`).join('');$('searchPanel').innerHTML=html||'<div class="searchItem muted">No matches</div>';$('searchPanel').classList.add('open')}
 function showShortlist(ids,title){let xs=ids.map(id=>state.byId[id]).filter(Boolean);$('searchPanel').innerHTML=`<div class=searchItem><b>${esc(title)}</b></div>`+xs.map(s=>`<div class=searchItem onclick="openScreen('${s.screen_id.replaceAll("'","\\'")}');$('searchPanel').classList.remove('open')"><b>${esc(s.name)}</b><div class=muted>${esc(s.domain)} · ${esc(s.submenu)}</div></div>`).join('');$('searchPanel').classList.add('open')}
 
