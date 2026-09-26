@@ -26,6 +26,7 @@ from .live_provider_runtime import router as live_provider_router
 from .provider_onboarding import router as provider_onboarding_router
 from .operations_workbench import router as operations_workbench_router
 from .control_tower import router as control_tower_router
+from .management_kpi import router as management_kpi_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -41,6 +42,7 @@ app.add_middleware(
     expose_headers=['X-Request-Id','X-Correlation-Id'],
 )
 app.mount('/static',StaticFiles(directory=HERE/'static'),name='static')
+app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
 app.include_router(provider_onboarding_router)
