@@ -3,46 +3,84 @@
   "phase": "CLX-026",
   "status": "ACCEPTED",
   "baseline": "M3-CLX026-EXCEPTION-WORKFLOW-ACCEPTED-20260926-028",
-  "parent": "M3-CLX025-OPERATIONS-WORKBENCH-ACCEPTED-20260925-027",
-  "features": [
-    "OPEN→ACKNOWLEDGED→IN_PROGRESS→RESOLVED→CLOSED",
-    "owner/team queues",
-    "SLA due date",
-    "escalation state",
+  "parent_baseline": "M3-CLX025-OPERATIONS-WORKBENCH-ACCEPTED-20260925-027",
+  "clx024_status": "DEFERRED_NOT_ACCEPTED",
+  "scope": [
+    "governed exception lifecycle OPEN→ACKNOWLEDGED→IN_PROGRESS→RESOLVED→CLOSED",
+    "owner and team queues",
+    "SLA due date and escalation state",
     "resolution code",
-    "comment/history",
-    "auto create/refresh",
-    "auto close on verified source clear",
-    "My Work",
-    "Team Work",
-    "Overdue",
-    "Critical"
+    "comments and work-item history",
+    "auto-create/refresh from approved derived source conditions",
+    "auto-close when underlying source condition is cleared",
+    "auto-reopen when a cleared condition becomes active again",
+    "My Work / Team Work / Overdue / Critical views",
+    "safe assignment and acknowledgement",
+    "direct related job/transaction/action links"
   ],
-  "uat": {
-    "run": 36225534454,
-    "result": "PASS",
-    "derived_items": 9,
-    "lifecycle": "PASS",
-    "auto_reopen": "PASS"
-  },
-  "fixes": [
-    "Supabase transaction-pooler prepared statement collision fixed with prepare_threshold=None"
-  ],
-  "preserved": {
-    "screens": 193,
-    "jobs": 5,
-    "transactions": 95,
-    "gl": 280,
-    "treasury": 185,
-    "integrations": 100,
-    "role_scope": true,
-    "maker_checker": true,
-    "four_eyes": true,
-    "audit": true
-  },
-  "safety": {
+  "controls": {
+    "source_business_tables_unchanged": true,
+    "work_item_state_extension_only": true,
+    "arbitrary_bulk_work_item_creation_blocked": true,
+    "role_scope_enforced": true,
+    "maker_checker_preserved": true,
+    "four_eyes_preserved": true,
+    "audit_preserved": true,
+    "screen_catalog_preserved": 193,
+    "production_traffic": "ON",
     "live_providers": "OFF",
     "real_money": "OFF",
     "ancline_touched": false
+  },
+  "database": {
+    "migration": "CLX026_001_exception_workflow.sql",
+    "active_work_items": 9,
+    "residual_uat_state": 0,
+    "residual_uat_history": 0,
+    "preserved_counts": {
+      "jobs": 5,
+      "transaction_records": 95,
+      "gl_records": 280,
+      "treasury_records": 185,
+      "integration_records": 100
+    }
+  },
+  "runtime": {
+    "api_deploy": "dep-darmsdnavr4c73fbcb60",
+    "api_image": "sha256:98e62734c5eced33f11a6a90937c30a082d8dc1fea8925ebbde65697ae99e572",
+    "api_code_commit": "f8275dcc85503f871ae68ba8a2f838ab81c01989",
+    "web_deploy": "dep-darmpsgjo6nc738k3f0g",
+    "web_image": "sha256:0bc112537595b26e6814a669e04d278a4b0fa2e56e97c7585065c78b066c56c1",
+    "web_ui_commit": "506d9661f89d25da52809a6b3e7b60d5756074c7",
+    "recent_runtime_error_like_logs": 0
+  },
+  "uat": {
+    "workflow_run": 36225534454,
+    "final_job": 108359008699,
+    "result": "PASS",
+    "derived_items": 9,
+    "lifecycle_transition_chain": "PASS",
+    "ownership_assignment": "PASS",
+    "history": "PASS",
+    "my_team_overdue_critical_views": "PASS",
+    "auto_close": "PASS",
+    "auto_reopen": "PASS",
+    "safety_controls": "PASS"
+  },
+  "regression": {
+    "workflow_run": 36225743592,
+    "result": "PASS",
+    "tests_passed": 18,
+    "suites": [
+      "CLX-019 193-screen catalog/roles",
+      "CLX-025 operations workbench",
+      "CLX-026 exception workflow",
+      "live-provider safety controls"
+    ]
+  },
+  "defect_resolution": {
+    "detected": "Supabase transaction-pooler DuplicatePreparedStatement during repeated N+1 work-item state reads",
+    "fix": "batched state reads for workbench derivation and refresh paths",
+    "verified_after_fix": true
   }
 }
