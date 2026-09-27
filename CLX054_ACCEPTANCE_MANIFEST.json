@@ -36,10 +36,16 @@
     "project": "M3-NVOCC-PROD",
     "projectRef": "ozupgknqaqgvprliewxe",
     "status": "ACTIVE_HEALTHY",
-    "jobs50001to50005": ["50001","50002","50003","50004","50005"],
+    "jobs50001to50005": [
+      "50001",
+      "50002",
+      "50003",
+      "50004",
+      "50005"
+    ],
     "finance": {
-      "totalDebit": 152030.00,
-      "totalCredit": 152030.00,
+      "totalDebit": 152030,
+      "totalCredit": 152030,
       "balanced": true
     },
     "activeSodRules": 3
@@ -67,5 +73,35 @@
     "mergeFreezeBeforePlus60": false
   },
   "noAnclineAncChanges": true,
-  "freeze": false
+  "freeze": false,
+  "regression": {
+    "clx054FastFinishRunId": "36311316309",
+    "clx054FastFinish": "PASS",
+    "clx053ProductionActivationReadinessRunId": "36311316253",
+    "clx053ProductionActivationReadiness": "PASS",
+    "clx053FinalAcceptanceFreezeRunId": "36311316213",
+    "clx053FinalAcceptanceFreeze": "PASS",
+    "clx052RunId": "36311316125",
+    "clx052": "PASS",
+    "clx051RunId": "36311316242",
+    "clx051": "PASS",
+    "clx050RunId": "36311316261",
+    "clx050": "PASS",
+    "clx049RunId": "36311316224",
+    "clx049": "PASS",
+    "clx048RunId": "36311316185",
+    "clx048": "PASS",
+    "clx047RunId": "36311316195",
+    "clx047": "PASS",
+    "clx046RunId": "36311316117",
+    "clx046": "PASS",
+    "clx045RunId": "36311316240",
+    "clx045": "PASS",
+    "clx044RunId": "36311316157",
+    "clx044": "PASS",
+    "clx043RunId": "36311316186",
+    "clx043": "PASS",
+    "buildFirstRunId": "36311316249",
+    "buildFirst": "PASS"
+  }
 }
