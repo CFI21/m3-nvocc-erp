@@ -1,0 +1,36 @@
+name: M3 CLX054 Fast Finish Draft Gate
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  clx054-fast-finish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Compile
+        run: python -m py_compile app/*.py
+      - name: CLX-054 draft acceptance guard
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx054_fast_finish.py
+      - name: Targeted non-destructive regression
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx053_acceptance_manifest.py
+          tests/test_clx053_production_activation_readiness.py
+          tests/test_clx052_go_live_control.py
+          tests/test_clx051_production_readiness.py
+          tests/test_clx050_operational_uat.py
+          tests/test_clx049_booking_bl_workspace.py
+          tests/test_clx048_admin_masterdata.py
+          tests/test_clx047_integration_security.py
+          tests/test_clx046_treasury_hardening.py
+          tests/test_clx045_gl_reporting.py
