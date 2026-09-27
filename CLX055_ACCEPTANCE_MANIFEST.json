@@ -1,26 +1,26 @@
 {
-  "schema":"M3_CLX_ACCEPTANCE_MANIFEST_V1",
-  "id":"M3-CLX055-PRODUCTION-OPERATIONS-WORKSPACE-DRAFT-20260927",
-  "phase":"CLX-055",
-  "title":"Production Operations Workspace + Daily User Control",
-  "status":"DRAFT",
-  "parentBaseline":"M3-CLX054-CONTROLLED-PRODUCTION-CUTOVER-ACCEPTED-20260927",
-  "baselineCommit":"1d4d5a5e4f9cf189ba3fd6f3fe5fc787e9005934",
-  "scope":{
-    "screenBaseline":196,
-    "screenCountChange":0,
-    "businessLogic":"PRESERVED_EXCEPT_APPROVED_CLX055_UI_WORKBENCH_ENHANCEMENT",
-    "dataModelBusinessChange":false,
-    "apiContractBreak":false,
-    "apiAdditiveOnly":true,
-    "menuOrder":"PRESERVED",
-    "roleDataScope":"PRESERVED",
-    "makerChecker":"PRESERVED",
-    "fourEyes":"PRESERVED",
-    "sod":"PRESERVED",
-    "audit":"PRESERVED",
-    "newBusinessModules":false,
-    "approvedBusinessScope":[
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX055-PRODUCTION-OPERATIONS-WORKSPACE-ACCEPTED-20260927",
+  "phase": "CLX-055",
+  "title": "Production Operations Workspace + Daily User Control",
+  "status": "ACCEPTED",
+  "parentBaseline": "M3-CLX054-CONTROLLED-PRODUCTION-CUTOVER-ACCEPTED-20260927",
+  "baselineCommit": "1d4d5a5e4f9cf189ba3fd6f3fe5fc787e9005934",
+  "scope": {
+    "screenBaseline": 196,
+    "screenCountChange": 0,
+    "businessLogic": "PRESERVED_EXCEPT_APPROVED_CLX055_UI_WORKBENCH_ENHANCEMENT",
+    "dataModelBusinessChange": false,
+    "apiContractBreak": false,
+    "apiAdditiveOnly": true,
+    "menuOrder": "PRESERVED",
+    "roleDataScope": "PRESERVED",
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "sod": "PRESERVED",
+    "audit": "PRESERVED",
+    "newBusinessModules": false,
+    "approvedBusinessScope": [
       "strengthen Operations Control / Exception Dashboard",
       "add Today / My Work / Team Work / Overdue / Critical views",
       "improve related links to existing M3 screens",
@@ -29,12 +29,31 @@
       "verify no broken/dead/duplicate/placeholder operational actions"
     ]
   },
-  "runtimeSafety":{
-    "productionTraffic":"ON",
-    "liveProviders":"OFF",
-    "realMoney":"OFF",
-    "repeat60MinuteCutoverWatchRequired":false
+  "runtimeSafety": {
+    "productionTraffic": "ON",
+    "liveProviders": "OFF",
+    "realMoney": "OFF",
+    "repeat60MinuteCutoverWatchRequired": false
   },
-  "noAnclineAncChanges":true,
-  "freeze":false
+  "noAnclineAncChanges": true,
+  "freeze": true,
+  "acceptance": {
+    "result": "PASS",
+    "clx055RunId": "36325905223",
+    "clx055Gate": "PASS",
+    "buildFirstRunId": "36325905132",
+    "buildFirst": "PASS",
+    "clx050RunId": "36325905159",
+    "clx050": "PASS",
+    "clx051RunId": "36325905150",
+    "clx051": "PASS",
+    "clx052RunId": "36325905139",
+    "clx052": "PASS",
+    "clx053ActivationReadinessRunId": "36325905088",
+    "clx053ActivationReadiness": "PASS",
+    "clx053FreezeRunId": "36325905164",
+    "clx053Freeze": "PASS",
+    "clx054GateRunId": "36325905090",
+    "clx054Gate": "PASS"
+  }
 }
