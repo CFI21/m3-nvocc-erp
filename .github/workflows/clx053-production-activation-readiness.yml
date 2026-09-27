@@ -1,0 +1,30 @@
+name: M3 CLX053 Production Activation Readiness
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  clx053-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Lightweight compile
+        run: python -m py_compile app/*.py
+      - name: CLX-053 production activation readiness gate
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_clx053_production_activation_readiness.py
+      - name: Inherited CLX-052/051/050 gates
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx052_go_live_control.py
+          tests/test_clx051_production_readiness.py
+          tests/test_clx050_operational_uat.py
+          tests/test_build_first_fast_track.py

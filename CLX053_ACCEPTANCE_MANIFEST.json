@@ -1,0 +1,80 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX053-PRODUCTION-ACTIVATION-READINESS-ACCEPTED-20260927",
+  "phase": "CLX-053",
+  "title": "Final Production Activation Readiness + Controlled Go-Live Gate",
+  "status": "ACCEPTED",
+  "acceptedFrom": "PR-37",
+  "parentBaseline": "M3-CLX052-GO-LIVE-CONTROL-ACCEPTED-20260926",
+  "scope": {
+    "screenBaseline": 196,
+    "screenCountChange": 0,
+    "menuOrder": "PRESERVED",
+    "executiveHome": "PRESERVED",
+    "neutralGreySidebar": "PRESERVED",
+    "businessLogic": "PRESERVED",
+    "dataModelBusinessChange": false,
+    "apiContractBreak": false,
+    "roleDataScope": "PRESERVED",
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "sod": "PRESERVED",
+    "audit": "PRESERVED",
+    "newBusinessModules": false
+  },
+  "runtime": {
+    "webServiceId": "srv-darbgkvlk1mc738rohng",
+    "apiServiceId": "srv-dar9fh17lnhs73ahlh60",
+    "webDigest": "sha256:069beaca63368729f10a5ab5be57824963b40ff25331a8a4f8574cf9a59aa00b",
+    "apiDigest": "sha256:bbc746f1317f5eec88addfb040acb94f2d7e33760c57dcd965cd3b013d050c31",
+    "webStatus": "LIVE",
+    "apiStatus": "LIVE"
+  },
+  "database": {
+    "provider": "Supabase",
+    "project": "M3-NVOCC-PROD",
+    "projectRef": "ozupgknqaqgvprliewxe",
+    "status": "ACTIVE_HEALTHY",
+    "jobs50001to50005": ["50001", "50002", "50003", "50004", "50005"]
+  },
+  "regression": {
+    "clx053RunId": "36308382512",
+    "clx053": "PASS",
+    "clx052RunId": "36308382352",
+    "clx052": "PASS",
+    "clx051RunId": "36308382383",
+    "clx051": "PASS",
+    "clx050RunId": "36308382408",
+    "clx050": "PASS",
+    "clx049RunId": "36308382447",
+    "clx049": "PASS",
+    "clx048RunId": "36308382394",
+    "clx048": "PASS",
+    "clx047RunId": "36308382489",
+    "clx047": "PASS",
+    "clx046RunId": "36308382389",
+    "clx046": "PASS",
+    "clx045RunId": "36308382392",
+    "clx045": "PASS",
+    "clx044RunId": "36308382337",
+    "clx044": "PASS",
+    "clx043RunId": "36308382336",
+    "clx043": "PASS",
+    "buildFirstRunId": "36308382419",
+    "buildFirst": "PASS"
+  },
+  "rollback": {
+    "baseline": "CLX-050",
+    "webDigest": "sha256:081bbee4a60f9b1e39b23153f0e517793ce0203dd4edb96a982d668231c2c4ee",
+    "apiDigest": "sha256:fe00e3155ce75a44acc1a3cec879ac143cc158699b843123fb6c0a24aff77381",
+    "controlledRollbackRestoreDrill": "PASS"
+  },
+  "controls": {
+    "productionTraffic": false,
+    "liveProviders": false,
+    "realMoney": false,
+    "separateExplicitActivationRequired": true
+  },
+  "noAnclineAncChanges": true,
+  "freeze": true
+}
