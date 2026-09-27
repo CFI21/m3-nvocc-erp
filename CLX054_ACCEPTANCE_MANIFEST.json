@@ -1,0 +1,71 @@
+{
+  "schema": "M3_CLX_ACCEPTANCE_MANIFEST_V1",
+  "id": "M3-CLX054-CONTROLLED-PRODUCTION-CUTOVER-DRAFT-20260927",
+  "phase": "CLX-054",
+  "title": "Controlled Production Activation + Cutover",
+  "status": "DRAFT_PENDING_PLUS_60_WATCH",
+  "parentBaseline": "M3-CLX053-PRODUCTION-ACTIVATION-READINESS-ACCEPTED-20260927",
+  "baselineCommit": "07d60f6ac8b39f7089a47f3ea16b9976232a3d80",
+  "scope": {
+    "screenBaseline": 196,
+    "screenCountChange": 0,
+    "menuOrder": "PRESERVED",
+    "executiveHome": "PRESERVED",
+    "neutralGreySidebar": "PRESERVED",
+    "businessLogic": "PRESERVED",
+    "dataModelBusinessChange": false,
+    "apiContractBreak": false,
+    "roleDataScope": "PRESERVED",
+    "makerChecker": "PRESERVED",
+    "fourEyes": "PRESERVED",
+    "sod": "PRESERVED",
+    "audit": "PRESERVED",
+    "newBusinessModules": false
+  },
+  "runtime": {
+    "webServiceId": "srv-darbgkvlk1mc738rohng",
+    "apiServiceId": "srv-dar9fh17lnhs73ahlh60",
+    "webDigest": "sha256:069beaca63368729f10a5ab5be57824963b40ff25331a8a4f8574cf9a59aa00b",
+    "apiDigest": "sha256:bbc746f1317f5eec88addfb040acb94f2d7e33760c57dcd965cd3b013d050c31",
+    "productionTraffic": "ON",
+    "liveProviders": "OFF",
+    "realMoney": "OFF"
+  },
+  "database": {
+    "provider": "Supabase",
+    "project": "M3-NVOCC-PROD",
+    "projectRef": "ozupgknqaqgvprliewxe",
+    "status": "ACTIVE_HEALTHY",
+    "jobs50001to50005": ["50001","50002","50003","50004","50005"],
+    "finance": {
+      "totalDebit": 152030.00,
+      "totalCredit": 152030.00,
+      "balanced": true
+    },
+    "activeSodRules": 3
+  },
+  "watchWindow": {
+    "activation": "PASS",
+    "plus5": "PASS",
+    "plus15": "PASS",
+    "plus30": "PASS",
+    "plus60": "PENDING"
+  },
+  "controls": {
+    "enabledLiveProviderCount": 0,
+    "criticalRollbackTriggerDetected": false,
+    "finalAcceptanceAllowedBeforePlus60": false
+  },
+  "rollback": {
+    "baseline": "CLX-050",
+    "webDigest": "sha256:081bbee4a60f9b1e39b23153f0e517793ce0203dd4edb96a982d668231c2c4ee",
+    "apiDigest": "sha256:fe00e3155ce75a44acc1a3cec879ac143cc158699b843123fb6c0a24aff77381",
+    "controlledRollbackRestoreDrill": "PASS"
+  },
+  "finalization": {
+    "acceptanceManifestMayBecomeAcceptedOnlyAfterPlus60Pass": true,
+    "mergeFreezeBeforePlus60": false
+  },
+  "noAnclineAncChanges": true,
+  "freeze": false
+}
