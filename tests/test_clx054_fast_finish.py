@@ -7,13 +7,13 @@ ROOT = Path(__file__).resolve().parents[1]
 def load_manifest():
     return json.loads((ROOT / "CLX054_ACCEPTANCE_MANIFEST.json").read_text())
 
-def test_clx054_fast_finish_draft_is_not_prematurely_accepted():
+def test_clx054_final_acceptance_after_plus60():
     m=load_manifest()
     assert m["phase"]=="CLX-054"
-    assert m["status"]=="DRAFT_PENDING_PLUS_60_WATCH"
-    assert m["freeze"] is False
-    assert m["watchWindow"]["plus60"]=="PENDING"
-    assert m["finalization"]["mergeFreezeBeforePlus60"] is False
+    assert m["status"]=="ACCEPTED"
+    assert m["freeze"] is True
+    assert m["watchWindow"]["plus60"]=="PASS"
+    assert m["finalization"]["finalPlus60Verification"]=="PASS"
 
 def test_clx054_preserves_frozen_scope():
     m=load_manifest()
