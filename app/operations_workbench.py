@@ -56,6 +56,22 @@ def _priority(category:str,blocking:bool=False)->str:
     if category in {"CUTOFF_RISK","DOCUMENT_GAP","MILESTONE_DELAY"}: return "MEDIUM"
     return "LOW"
 
+def _target_screen(category:str,module:Optional[str]=None)->str:
+    m=(module or "").lower()
+    if category=="DOCUMENT_GAP":
+        return "agent-tasks::bl" if "bl" in m else "agent-tasks::booking"
+    if category=="CUTOFF_RISK":
+        return "agent-tasks::booking"
+    if category=="MILESTONE_DELAY":
+        return "agent-tasks::planning"
+    if category=="PAYMENT_RELEASE_BLOCK":
+        return "agent-tasks::delivery-order"
+    if category=="FAILED_INTEGRATION":
+        return "integration-security::request-response-audit"
+    if category=="RECONCILIATION_EXCEPTION":
+        return "treasury::bank-reconciliation-exception-queue"
+    return "agent-tasks::booking"
+
 def _item(c,key,category,title,detail,job,priority=None,module=None,transaction_id=None,target=None,age_hours=None,sla_hours=24,state_map=None):
     st=(state_map or {}).get(key) if state_map is not None else _state(c,key)
     st=st or {}
@@ -70,6 +86,7 @@ def _item(c,key,category,title,detail,job,priority=None,module=None,transaction_
       "escalation_state":st.get("escalation_state","NONE"),"sla_due_at":st.get("sla_due_at"),
       "age_hours":round(age,1),"sla_hours":sla_hours,"sla_breached":age>sla_hours,
       "target_url":target or (f"/api/v1/jobs/{job.get('job_ref')}" if job.get("job_ref") else None),
+      "target_screen_id":_target_screen(category,module),"target_label":"Open related M3 screen",
       "source":"DERIVED_EXISTING_APPROVED_DATA"
     }
 
@@ -220,6 +237,14 @@ def _sync_items(c,items:list[dict],role:str,actor:str):
 
 def _view_filter(items:list[dict],view:Optional[str],actor_id:Optional[str],team:Optional[str]):
     v=(view or "").lower()
+    if v=="today":
+        today=datetime.datetime.now(datetime.timezone.utc).date()
+        out=[]
+        for x in items:
+            due=_parse_dt(x.get("sla_due_at"))
+            if x.get("status") in ("RESOLVED","CLOSED"): continue
+            if due and due.date()<=today: out.append(x)
+        return out
     if v=="my":
         return [x for x in items if actor_id and x.get("owner")==actor_id]
     if v=="team":
@@ -258,10 +283,11 @@ def list_workbench(
       "critical":sum(x["priority"]=="CRITICAL" for x in items),
       "high":sum(x["priority"]=="HIGH" for x in items),
       "sla_breached":sum(x["sla_breached"] for x in items),
-      "unassigned":sum(not x["owner"] for x in items)
+      "unassigned":sum(not x["owner"] for x in items),
+      "due_today":sum((_parse_dt(x.get("sla_due_at")) is not None and _parse_dt(x.get("sla_due_at")).date()<=datetime.datetime.now(datetime.timezone.utc).date() and x.get("status") not in ("RESOLVED","CLOSED")) for x in items)
     }
-    return {"phase":"CLX-026","summary":summary,"items":items,"source_data_only":True,
-            "views":["my","team","overdue","critical"],"lifecycle":["OPEN","ACKNOWLEDGED","IN_PROGRESS","RESOLVED","CLOSED"],
+    return {"phase":"CLX-055","summary":summary,"items":items,"source_data_only":True,
+            "views":["today","my","team","overdue","critical"],"lifecycle":["OPEN","ACKNOWLEDGED","IN_PROGRESS","RESOLVED","CLOSED"],
             "maker_checker_preserved":True,"live_providers":"OFF","real_money":"OFF"}
 
 def _bulk(body:BulkAction,action:str,role:str,actor_id:str):
@@ -380,9 +406,9 @@ def refresh_workbench(x_role:str=Header("VIEWER"),x_actor_id:str=Header("SYSTEM"
 @router.get("/control-status")
 def control_status(x_role:str=Header("AUDITOR")):
     _role(x_role)
-    return {"phase":"CLX-026","role_scope_enforced":True,"safe_bulk_actions":["ASSIGN","ACKNOWLEDGE"],
+    return {"phase":"CLX-055","role_scope_enforced":True,"safe_bulk_actions":["ASSIGN","ACKNOWLEDGE"],
             "lifecycle":["OPEN","ACKNOWLEDGED","IN_PROGRESS","RESOLVED","CLOSED"],
             "auto_refresh":True,"auto_close_when_source_cleared":True,
-            "views":["MY_WORK","TEAM_WORK","OVERDUE","CRITICAL"],
+            "views":["TODAY","MY_WORK","TEAM_WORK","OVERDUE","CRITICAL"],
             "underlying_financial_or_operational_mutation":False,"maker_checker_preserved":True,
             "four_eyes_preserved":True,"audit_enabled":True,"live_provider_activation":False,"real_money":False}

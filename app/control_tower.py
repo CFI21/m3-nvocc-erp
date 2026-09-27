@@ -110,7 +110,7 @@ def control_tower(
     finally:c.close()
     active=[x for x in items if x.get("status") not in ("RESOLVED","CLOSED")]
     return {
-      "phase":"CLX-027",
+      "phase":"CLX-055",
       "mode":"READ_ONLY_MANAGEMENT_CONTROL_TOWER",
       "summary":_summarize(jobs,items),
       "job_statuses":_counter([x.get("operational_status") or "UNKNOWN" for x in jobs]),
@@ -121,7 +121,7 @@ def control_tower(
       "team_workload":_team_workload(items),
       "risk_jobs":_risk_jobs(jobs,items)[:10],
       "controls":{
-        "source_data_only":True,"underlying_business_mutation":False,"screen_catalog_preserved":193,
+        "source_data_only":True,"underlying_business_mutation":False,"screen_catalog_preserved":196,
         "role_scope_enforced":True,"maker_checker_preserved":True,"four_eyes_preserved":True,"audit_preserved":True,
         "live_providers":"OFF","real_money":"OFF"
       }
@@ -138,7 +138,7 @@ def risk_jobs(
         jobs=_job_rows(c,role,x_agent_scope,x_customer_scope)
         items=_derive(c,role,x_agent_scope,x_customer_scope)
     finally:c.close()
-    return {"phase":"CLX-027","items":_risk_jobs(jobs,items)}
+    return {"phase":"CLX-055","items":_risk_jobs(jobs,items)}
 
 @router.get("/teams")
 def teams(
@@ -149,13 +149,13 @@ def teams(
     role=_role(x_role);c=connect()
     try:items=_derive(c,role,x_agent_scope,x_customer_scope)
     finally:c.close()
-    return {"phase":"CLX-027","teams":_team_workload(items)}
+    return {"phase":"CLX-055","teams":_team_workload(items)}
 
 @router.get("/control-status")
 def control_status(x_role:str=Header("AUDITOR")):
     _role(x_role)
     return {
-      "phase":"CLX-027","read_only":True,"source_data_only":True,"screen_catalog_preserved":193,
+      "phase":"CLX-055","read_only":True,"source_data_only":True,"screen_catalog_preserved":196,
       "role_scope_enforced":True,"maker_checker_preserved":True,"four_eyes_preserved":True,"audit_preserved":True,
       "live_provider_activation":False,"real_money":False
     }

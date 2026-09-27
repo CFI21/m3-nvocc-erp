@@ -452,21 +452,63 @@ async function showControlTower(){try{
   <div class=card style="margin-top:8px"><b>Top Risk Jobs</b>${d.risk_jobs.map(x=>`<p><b>Job ${esc(x.job_ref)}</b> · Risk ${x.risk_score} · ${x.active_exceptions} exception(s) · ${esc(x.categories.join(', '))}<br><button class=btn onclick="showOpsWorkbenchForJob('${esc(x.job_ref)}')">Open workbench</button></p>`).join('')||'<p class=muted>No active risk jobs</p>'}</div>`;
   $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open')
 }catch(e){alert(e.message)}}
+function opsHeaders(){
+  return {'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user','X-Team':['OPS','DOCS','FINANCE'].includes(state.role)?state.role:'OPS'};
+}
+async function openOpsRelated(screenId,jobRef){
+  if(!screenId||!state.byId[screenId])return alert('Related M3 screen is not available in the frozen catalog.');
+  $('drawer').classList.remove('open');
+  await openScreen(screenId);
+  $('statusPill').textContent=jobRef?'Job '+jobRef:'Related';
+}
+async function opsAssignSelf(key,view=''){
+  try{
+    const team=['OPS','DOCS','FINANCE'].includes(state.role)?state.role:'OPS';
+    await api('/api/v1/operations-workbench/'+encodeURIComponent(key)+'/assign',{method:'POST',headers:opsHeaders(),body:JSON.stringify({owner:'ui-user',team,comment:'CLX-055 same-page ownership'})});
+    await showOpsWorkbench(view);
+  }catch(e){alert(e.message)}
+}
+async function opsLifecycle(key,action,view=''){
+  try{
+    const body={action,comment:'CLX-055 same-page lifecycle action'};
+    if(action==='RESOLVE'){
+      const code=prompt('Resolution code','RESOLVED_OPERATIONALLY');
+      if(!code)return;
+      body.resolution_code=code;
+    }
+    await api('/api/v1/operations-workbench/'+encodeURIComponent(key)+'/lifecycle',{method:'POST',headers:opsHeaders(),body:JSON.stringify(body)});
+    await showOpsWorkbench(view);
+  }catch(e){alert(e.message)}
+}
+function opsActionButtons(x,view=''){
+  const buttons=[];
+  if(!x.owner)buttons.push(`<button class=btn onclick="opsAssignSelf('${esc(x.exception_key)}','${esc(view)}')">Assign to me</button>`);
+  if(x.status==='OPEN')buttons.push(`<button class=btn onclick="opsLifecycle('${esc(x.exception_key)}','ACKNOWLEDGE','${esc(view)}')">Acknowledge</button>`);
+  if(x.status==='ACKNOWLEDGED')buttons.push(`<button class=btn onclick="opsLifecycle('${esc(x.exception_key)}','START','${esc(view)}')">Start</button>`);
+  if(x.status==='IN_PROGRESS')buttons.push(`<button class=btn onclick="opsLifecycle('${esc(x.exception_key)}','RESOLVE','${esc(view)}')">Resolve</button>`);
+  if(x.status==='RESOLVED')buttons.push(`<button class=btn onclick="opsLifecycle('${esc(x.exception_key)}','CLOSE','${esc(view)}')">Close</button>`);
+  if(x.target_screen_id)buttons.push(`<button class="btn primary" onclick="openOpsRelated('${esc(x.target_screen_id)}','${esc(x.job_ref||'')}')">${esc(x.target_label||'Open related M3 screen')}</button>`);
+  return `<div class=toolbar>${buttons.join('')}</div>`;
+}
+function opsCard(x,view=''){
+  const due=x.sla_due_at?esc(x.sla_due_at):'—';
+  const resolution=x.resolution_code?` · Resolution ${esc(x.resolution_code)}`:'';
+  return `<div class=card style="margin-bottom:7px"><b>${esc(x.priority)} · Job ${esc(x.job_ref||'—')} · ${esc(x.category)}</b><div class=muted>${esc(x.status)} · Team ${esc(x.team||'—')} · Owner ${esc(x.owner||'Unassigned')} · ${esc(x.escalation_state||'NONE')} · Due ${due} · SLA ${x.sla_breached?'BREACHED':'OK'}${resolution}</div><p>${esc(x.title)} — ${esc(x.detail)}</p>${opsActionButtons(x,view)}</div>`;
+}
 async function showOpsWorkbenchForJob(jobRef){try{
-  let d=await api('/api/v1/operations-workbench?job_ref='+encodeURIComponent(jobRef),{headers:{'X-Role':state.role,'X-Actor-Id':'ui-user','X-Team':['OPS','DOCS','FINANCE'].includes(state.role)?state.role:'OPS'}});
-  $('drawerTitle').textContent='Job '+jobRef+' · Exception Workbench';
-  $('tab-details').innerHTML=d.items.map(x=>`<div class=card style="margin-bottom:7px"><b>${esc(x.priority)} · ${esc(x.category)}</b><div class=muted>${esc(x.status)} · ${esc(x.team||'—')} · ${esc(x.owner||'Unassigned')}</div><p>${esc(x.title)} — ${esc(x.detail)}</p></div>`).join('')||'<div class=empty>No active exceptions</div>';
+  let d=await api('/api/v1/operations-workbench?job_ref='+encodeURIComponent(jobRef),{headers:opsHeaders()});
+  $('drawerTitle').textContent='Job '+jobRef+' · Production Operations Workspace';
+  $('tab-details').innerHTML=d.items.map(x=>opsCard(x,'')).join('')||'<div class=empty>No active exceptions</div>';
   drawerTabs('details');$('drawer').classList.add('open')
 }catch(e){alert(e.message)}}
 async function showOpsWorkbench(view=''){try{
-  const actor='ui-user',team=['OPS','DOCS','FINANCE'].includes(state.role)?state.role:'OPS';
   let url='/api/v1/operations-workbench'+(view?'?view='+encodeURIComponent(view):'');
-  let d=await api(url,{headers:{'X-Role':state.role,'X-Actor-Id':actor,'X-Team':team}});
-  $('drawerTitle').textContent='CLX-026 Exception Workflow';
+  let d=await api(url,{headers:opsHeaders()});
+  $('drawerTitle').textContent='CLX-055 Production Operations Workspace';
   let s=d.summary;
-  let controls=`<div class=toolbar><button class=btn onclick="showOpsWorkbench('')">All</button><button class=btn onclick="showOpsWorkbench('my')">My Work</button><button class=btn onclick="showOpsWorkbench('team')">Team Work</button><button class=btn onclick="showOpsWorkbench('overdue')">Overdue</button><button class=btn onclick="showOpsWorkbench('critical')">Critical</button></div>`;
-  $('tab-details').innerHTML=controls+`<div class=card><b>Governed Exception Workflow</b><p>${s.total} active · ${s.critical} critical · ${s.high} high · ${s.sla_breached} SLA breached · ${s.unassigned} unassigned</p><div class=muted>Lifecycle: OPEN → ACKNOWLEDGED → IN_PROGRESS → RESOLVED → CLOSED · auto-refresh/auto-close from approved M3 source conditions only.</div></div>`+
-  d.items.map(x=>`<div class=card style="margin-bottom:7px"><b>${esc(x.priority)} · Job ${esc(x.job_ref||'—')} · ${esc(x.category)}</b><div class=muted>${esc(x.status)} · Team ${esc(x.team||'—')} · Owner ${esc(x.owner||'Unassigned')} · ${esc(x.escalation_state||'NONE')} · SLA ${x.sla_breached?'BREACHED':'OK'}</div><p>${esc(x.title)} — ${esc(x.detail)}</p><button class=btn onclick="window.open(M3_API_BASE+'${x.target_url}','_blank')">Open related action</button></div>`).join('')||'<div class=empty>No work items in this view</div>';
+  let controls=`<div class=toolbar><button class=btn onclick="showOpsWorkbench('')">All</button><button class=btn onclick="showOpsWorkbench('today')">Today</button><button class=btn onclick="showOpsWorkbench('my')">My Work</button><button class=btn onclick="showOpsWorkbench('team')">Team Work</button><button class=btn onclick="showOpsWorkbench('overdue')">Overdue</button><button class=btn onclick="showOpsWorkbench('critical')">Critical</button></div>`;
+  $('tab-details').innerHTML=controls+`<div class=card><b>Production Operations Control</b><p>${s.total} active · ${s.due_today||0} due today · ${s.critical} critical · ${s.high} high · ${s.sla_breached} SLA breached · ${s.unassigned} unassigned</p><div class=muted>Lifecycle: OPEN → ACKNOWLEDGED → IN_PROGRESS → RESOLVED → CLOSED · ownership, due date, escalation and resolution remain governed and auditable.</div></div>`+
+  d.items.map(x=>opsCard(x,view)).join('')||'<div class=empty>No work items in this view</div>';
   drawerTabs('details');$('drawer').classList.add('open')
 }catch(e){alert(e.message)}}
 async function showBusinessDay(){try{let d=await api('/api/clx012/runs/latest');$('drawerTitle').textContent='CLX-012 Business Day';$('tab-details').innerHTML=`<div class=card><b>${esc(d.run_ref)}</b><p>Status: ${esc(d.status)}</p><div class=muted>${esc(d.business_date)} · ${d.stage_events} stage events · ${d.exception_scenarios} exception scenarios · ${d.open_actions} active queue items</div></div><pre class=pre>${esc(JSON.stringify(d.summary,null,2))}</pre>`;drawerTabs('details');$('drawer').classList.add('open')}catch(e){alert(e.message)}}
@@ -508,6 +550,7 @@ async function showExecutiveHome(){
   const favorites=homeScreenLinks([...state.favorites],'No favorite screens yet.');
   $('gridArea').innerHTML=`
     <div class="homeGrid">
+      <div class="homeCard" onclick="showOpsWorkbench('today')"><span>Today</span><b>${esc(s.overdue??0)}</b><span class="muted">Due today / overdue attention</span></div>
       <div class="homeCard" onclick="showOpsWorkbench('my')"><span>My Work</span><b>${esc(myCount)}</b><span class="muted">Assigned work items</span></div>
       <div class="homeCard" onclick="showOpsWorkbench('critical')"><span>Critical Exceptions</span><b>${esc(criticalCount)}</b><span class="muted">Requires attention</span></div>
       <div class="homeCard" onclick="showOpsWorkbench('overdue')"><span>Overdue</span><b>${esc(s.overdue??0)}</b><span class="muted">SLA / due-date exposure</span></div>

@@ -1,0 +1,28 @@
+name: M3 CLX055 Production Operations Workspace
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  clx055:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Compile
+        run: python -m py_compile app/*.py
+      - name: CLX-055 targeted tests
+        env:
+          PYTHONPATH: .
+        run: >
+          pytest -q
+          tests/test_clx055_production_operations_workspace.py
+          tests/test_clx026_exception_workflow.py
+          tests/test_clx027_control_tower.py
+          tests/test_clx043_full_functional.py
+          tests/test_clx050_operational_uat.py
+          tests/test_clx054_fast_finish.py
