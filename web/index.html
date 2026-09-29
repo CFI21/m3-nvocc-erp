@@ -24,6 +24,39 @@
 .bookingTotals{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:7px 9px;background:#fafbfc;border-top:1px solid var(--line);font-size:11px}
 .bookingTotals b{font-size:12px}
 .bookingStickyActions{position:sticky;bottom:0;z-index:3;background:#fff;border-top:1px solid var(--line);padding:8px;display:flex;justify-content:flex-end;gap:7px}
+.cwShell{background:#f5f5f5;border:1px solid #b9bec5;border-radius:2px;margin-top:6px;font:11px/1.2 Arial,Helvetica,sans-serif;color:#222}
+.cwMenuBar{height:24px;background:#f7f7f7;border-bottom:1px solid #b9bec5;display:flex;align-items:center;gap:16px;padding:0 8px;color:#222}
+.cwMenuBar span{cursor:default}
+.cwPrimaryTabs,.cwSecondaryTabs{display:flex;align-items:flex-end;background:#e6e8eb;border-bottom:1px solid #aeb4bc;white-space:nowrap;overflow:auto}
+.cwPrimaryTabs button,.cwSecondaryTabs button{border:0;border-right:1px solid #c2c7cd;background:#e6e8eb;padding:5px 9px;font-size:11px;cursor:pointer}
+.cwPrimaryTabs button.active,.cwSecondaryTabs button.active{background:#fff;border-top:2px solid #7c8794;font-weight:700}
+.cwWorkspace{background:#fff;padding:6px}
+.cwTopGrid{display:grid;grid-template-columns:39% 61%;gap:7px}
+.cwGroup{border:1px solid #b8bdc4;background:#fafafa;position:relative;padding:18px 6px 6px}
+.cwGroupTitle{position:absolute;left:8px;top:3px;font-weight:700;font-size:11px;color:#333}
+.cwFormGrid{display:grid;grid-template-columns:repeat(6,minmax(58px,1fr));gap:4px 5px;align-items:end}
+.cwField{display:flex;align-items:center;gap:4px;min-width:0}
+.cwField label{font-size:10px;white-space:nowrap;color:#333}
+.cwField input,.cwField select{height:22px;border:1px solid #aeb4bc;background:#fff;padding:2px 4px;min-width:0;width:100%;font-size:10px;border-radius:0}
+.cwField input.cwWarn{background:#fce3df}.cwField input.cwDate{background:#fde8c8}.cwField input:disabled{background:#ececec;color:#666}
+.cwSpan2{grid-column:span 2}.cwSpan3{grid-column:span 3}.cwSpan4{grid-column:span 4}.cwSpan6{grid-column:1/-1}
+.cwCheck{display:flex;align-items:center;gap:3px;font-size:10px}.cwCheck input{width:auto;height:auto}
+.cwAgentGrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.cwAgentBox{border:1px solid #b8bdc4;background:#fff}
+.cwAgentHead{font-weight:700;padding:4px 5px;border-bottom:1px solid #c6cbd1;background:#f5f5f5}
+.cwAgentBody{padding:4px}.cwAgentBody .cwField{margin-bottom:3px}
+.cwAgentEmpty{border:1px solid #d1d5db;background:#f7f7f7;padding:8px 4px;text-align:center;font-size:10px;margin-top:4px}
+.cwCarrierRow{display:grid;grid-template-columns:70px 1fr 28px 1.2fr 1fr 28px;gap:4px;align-items:center;margin-top:4px}
+.cwCarrierRow label{font-size:10px;text-align:right}.cwCarrierRow input,.cwCarrierRow select{height:22px;border:1px solid #aeb4bc;font-size:10px;padding:2px 4px}
+.cwCargoGridWrap{margin-top:6px;border:1px solid #b8bdc4;overflow:auto;background:#fff}
+.cwCargoGrid{border-collapse:collapse;width:100%;min-width:1350px;font-size:10px}
+.cwCargoGrid th,.cwCargoGrid td{border-right:1px solid #cfd4da;border-bottom:1px solid #cfd4da;height:23px;padding:2px 4px;text-align:left;white-space:nowrap}
+.cwCargoGrid th{background:#eceff2;font-weight:400}.cwCargoGrid td:first-child,.cwCargoGrid th:first-child{width:20px;text-align:center}
+.cwCargoGrid input{border:0;width:100%;height:20px;padding:1px 2px;font-size:10px;background:transparent;outline:none}
+.cwBottomBar{display:flex;align-items:center;gap:6px;padding:5px;background:#f1f3f5;border:1px solid #b8bdc4;border-top:0;font-size:10px}
+.cwMetric{display:flex;align-items:center;gap:3px}.cwMetric span{background:#fff;border:1px solid #b9bec5;padding:3px 6px;min-width:44px;text-align:right}
+.cwActions{margin-left:auto;display:flex;gap:8px;align-items:center}.cwActions button{border:0;background:transparent;font-size:10px;cursor:pointer}
+@media(max-width:1250px){.cwTopGrid{grid-template-columns:1fr}.cwFormGrid{grid-template-columns:repeat(4,minmax(70px,1fr))}}
 @media(max-width:1350px){.bookingOpsGrid{grid-template-columns:repeat(4,minmax(120px,1fr))}.bookingOpsField.span6{grid-column:1/-1}}
 @media(max-width:1100px) and (min-width:951px){.homeGrid{grid-template-columns:repeat(3,minmax(120px,1fr))}.homeSections{grid-template-columns:1fr}.app{grid-template-columns:248px 1fr}.domainBtn,.subBtn{padding-right:10px}.screenLink{padding-left:32px}.top{flex-wrap:wrap;height:auto;min-height:60px;padding-top:8px;padding-bottom:8px}.top input{min-width:180px;flex:1}.content{padding:12px}}
 @media(max-width:950px){.formGrid{grid-template-columns:1fr}.homeGrid{grid-template-columns:1fr 1fr}.homeSections{grid-template-columns:1fr}.app{grid-template-columns:1fr}.side{display:none}.kpis{grid-template-columns:1fr 1fr}.drawer{width:100%}.top{flex-wrap:wrap;height:auto;min-height:60px;padding-top:8px;padding-bottom:8px}.top input{min-width:120px;flex:1}.searchPanel{right:8px;left:8px;width:auto}.content{padding:10px}}
@@ -264,76 +297,66 @@ function clx49BookingPartyBox(record,title,fields){
 function clx49RenderBooking(tab){
   const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
   const p=r?.fields||{};
-  const known=new Set([
-    'Booking No.','Job Ref','Booking Date','Status','Transport Mode','Service Level','Shipment Type','Container Mode',
-    'Carrier Booking Ref','POL','Via Port','Transshipment Port','POD','Vessel','Voyage','ETD','ETA',
-    'Customer','Booking Party','Shipper','Consignee','Notify Party','Agent',
-    'Container Owner','SOC / COC','Equipment Provider','Carrier','Vessel / Slot Operator','POL Agent','POT Agent','POD Agent',
-    'Operations Owner','Sales Person','Commercial Owner','Bill-To / Revenue Party','Cost Party','Finance / Credit Party',
-    'Equipment','Quantity','Commodity','Packages','Package Type','Weight','Measurement','Volume','Chargeable Weight',
-    'Origin','Destination','Cargo','Freight Term','Rate / Quote Ref','SI Cut-off','VGM Cut-off','Gate-in Cut-off'
-  ]);
-  const other=Object.keys(p).filter(k=>!known.has(k));
+  const v=n=>esc(p[n]??'');
+  const inp=(n,cls='')=>'<input class="'+cls+'" data-clx49-field="'+esc(n)+'" value="'+v(n)+'">';
+  const field=(label,n,cls='',inputCls='')=>'<div class="cwField '+cls+'"><label>'+esc(label)+'</label>'+inp(n,inputCls)+'</div>';
   let html=clx49ContextHeader(w)+clx49Nav(w);
-  html+='<div class="card"><div class="toolbar">'+CLX49_BOOKING_TABS.map(t=>'<button class="btn '+(t===tab?'primary':'')+'" onclick="clx49RenderBooking(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div></div>';
-
+  html+='<div class="cwShell">';
+  html+='<div class="cwMenuBar"><span>File</span><span>Edit</span><span>View</span><span>Actions</span><span>Electronic Messaging</span><span>Documents</span><span>Job Invoicing</span><span>Help</span></div>';
+  html+='<div class="cwPrimaryTabs"><button class="active">Details</button><button>Routing</button><button>Containers</button><button>Packing</button><button>Workflow & Tracking</button><button>AWB</button><button>Electronic Messaging</button><button>AR and AP Invoices</button><button>Consol Profit/Loss</button><button>Consol Costing</button><button>Doc Data</button><button>Addresses</button><button>eDocs</button><button>Notes</button><button>Logs</button></div>';
+  html+='<div class="cwWorkspace">';
   if(tab==='Booking Info'){
-    html+='<div class="bookingOps"><div class="bookingOpsHead">Booking / Transport Details</div><div class="bookingOpsGrid">';
-    html+=clx49BookingInput(r,'Booking No.');
-    html+=clx49BookingInput(r,'Booking Date');
-    html+=clx49BookingSelect(r,'Status',['','DRAFT','PENDING','CONFIRMED','HOLD','CANCELLED']);
-    html+=clx49BookingSelect(r,'Transport Mode',['','SEA','AIR','ROAD','RAIL']);
-    html+=clx49BookingInput(r,'Service Level');
-    html+=clx49BookingInput(r,'Shipment Type');
-    html+=clx49BookingInput(r,'Carrier');
-    html+=clx49BookingInput(r,'Carrier Booking Ref');
-    html+=clx49BookingInput(r,'Vessel');
-    html+=clx49BookingInput(r,'Voyage');
-    html+=clx49BookingInput(r,'POL');
-    html+=clx49BookingInput(r,'Via Port');
-    html+=clx49BookingInput(r,'Transshipment Port');
-    html+=clx49BookingInput(r,'POD');
-    html+=clx49BookingInput(r,'ETD');
-    html+=clx49BookingInput(r,'ETA');
-    html+=clx49BookingInput(r,'SOC / COC');
-    html+=clx49BookingInput(r,'Container Owner');
-    html+=clx49BookingInput(r,'Equipment Provider');
-    html+=clx49BookingInput(r,'Vessel / Slot Operator');
+    html+='<div class="cwTopGrid">';
+
+    html+='<div class="cwGroup"><div class="cwGroupTitle">Booking Details</div><div class="cwFormGrid">';
+    html+=field('Type','Shipment Type');
+    html+=field('Agent','Agent');
+    html+=field('Transport','Transport Mode','cwSpan2');
+    html+=field('Container Mode','Container Mode');
+    html+=field('Status','Status');
+    html+='<label class="cwCheck"><input type="checkbox"> Domestic</label>';
+    html+='<label class="cwCheck"><input type="checkbox"> Is Load</label>';
+    html+=field('Last Discharge','POD','cwSpan2');
+    html+=field('Phase','Booking Date');
+    html+=field('Flight / Vessel','Vessel','cwSpan2');
+    html+=field('Aircraft / Voyage','Voyage','cwSpan2');
+    html+=field('Load Port','POL','','cwWarn');
+    html+=field('ETD','ETD','','cwDate');
+    html+=field('ATD','ATD');
+    html+=field('Discharge','Via Port','','cwWarn');
+    html+=field('ETA','ETA','','cwDate');
+    html+=field('ATA','ATA');
+    html+='<label class="cwCheck"><input type="checkbox"> Is Domestic</label><label class="cwCheck"><input type="checkbox" checked> Is Linked</label><label class="cwCheck"><input type="checkbox"> Is Charter</label><label class="cwCheck"><input type="checkbox" checked> Is Cargo Only</label>';
+    html+=field('Svc. Lvl','Service Level');
+    html+=field('MAWB / Booking','Carrier Booking Ref','cwSpan2');
+    html+=field('Payment','Freight Term');
+    html+=field('CRN / Quote','Rate / Quote Ref','cwSpan2');
     html+='</div></div>';
 
-    html+='<div class="bookingOps"><div class="bookingOpsHead">Parties / Agents</div><div class="bookingPartyGrid">';
-    html+=clx49BookingPartyBox(r,'Commercial Parties',['Customer','Booking Party','Shipper','Consignee','Notify Party']);
-    html+=clx49BookingPartyBox(r,'Operational Agents',['Agent','POL Agent','POT Agent','POD Agent','Operations Owner']);
-    html+='</div><div class="bookingOpsGrid">';
-    html+=clx49BookingInput(r,'Sales Person');
-    html+=clx49BookingInput(r,'Commercial Owner');
-    html+=clx49BookingInput(r,'Bill-To / Revenue Party');
-    html+=clx49BookingInput(r,'Cost Party');
-    html+=clx49BookingInput(r,'Finance / Credit Party');
+    html+='<div class="cwGroup"><div class="cwGroupTitle">Organizations</div>';
+    html+='<div class="cwSecondaryTabs"><button class="active">Organizations</button><button>Departure</button><button>Arrival</button><button>Docs</button><button>Pre-Allocation</button><button>Archived Quantities</button><button>Numbers</button><button>Additional Detail</button></div>';
+    html+='<div class="cwAgentGrid"><div class="cwAgentBox"><div class="cwAgentHead">Sending Agent</div><div class="cwAgentBody">'+field('Agent','POL Agent','cwSpan2')+field('Address','Shipper','cwSpan2')+'<div class="cwAgentEmpty">'+(p['POL Agent']?'Selected organization':'* NO ORGANIZATION IS SELECTED')+'</div></div></div>';
+    html+='<div class="cwAgentBox"><div class="cwAgentHead">Receiving Agent</div><div class="cwAgentBody">'+field('Agent','POD Agent','cwSpan2')+field('Address','Consignee','cwSpan2')+'<div class="cwAgentEmpty">'+(p['POD Agent']?'Selected organization':'* NO ORGANIZATION IS SELECTED')+'</div></div></div></div>';
+    html+='<div class="cwCarrierRow"><label>Carrier</label>'+inp('Carrier')+'<button>...</button><select><option>(None Selected)</option></select>'+inp('Vessel / Slot Operator')+'<button>⌄</button></div>';
+    html+='<div class="cwCarrierRow"><label>Creditor</label>'+inp('Cost Party')+'<button>...</button><select><option>(None Selected)</option></select>'+inp('Finance / Credit Party')+'<button>⌄</button></div>';
+    html+='<div class="cwCarrierRow"><label>Carrier Bkg. Ref</label>'+inp('Carrier Booking Ref')+'<span></span><label>Agents Reference</label>'+inp('Booking No.')+'<span></span></div>';
     html+='</div></div>';
 
-    html+='<div class="bookingOps"><div class="bookingOpsHead">Cargo / Equipment</div><div class="bookingCargoWrap"><table class="bookingCargo"><thead><tr>'+
-      '<th>Equipment</th><th>Qty</th><th>Commodity</th><th>Packages</th><th>Pkg Type</th><th>Weight</th><th>Volume</th><th>Chargeable</th><th>Origin</th><th>Destination</th><th>SI Cut-off</th><th>VGM Cut-off</th><th>Gate-in Cut-off</th>'+
-      '</tr></thead><tbody><tr>'+
-      ['Equipment','Quantity','Commodity','Packages','Package Type','Weight','Volume','Chargeable Weight','Origin','Destination','SI Cut-off','VGM Cut-off','Gate-in Cut-off'].map(n=>'<td><input data-clx49-field="'+esc(n)+'" value="'+esc(p[n]??'')+'"></td>').join('')+
-      '</tr></tbody></table></div>';
-    html+='<div class="bookingTotals"><span><b>Equipment:</b> '+esc(p['Equipment']||'—')+'</span><span><b>Quantity:</b> '+esc(p['Quantity']||'0')+'</span><span><b>Packages:</b> '+esc(p['Packages']||'0')+'</span><span><b>Weight:</b> '+esc(p['Weight']||'0')+'</span><span><b>Volume:</b> '+esc(p['Volume']||'0')+'</span><span class="muted">Single authoritative booking cargo record — no duplicate model created.</span></div></div>';
+    html+='<div class="cwCargoGridWrap"><table class="cwCargoGrid"><thead><tr><th></th><th>Shipment ID</th><th>Consignee</th><th>Shipper</th><th>Origin</th><th>Dest.</th><th>House Bill Number</th><th>Packs</th><th>Type</th><th>Inners</th><th>Type</th><th>Weight</th><th>U/W</th><th>Volume</th><th>U/V</th><th>Inspection</th><th>ETD</th><th>ETA</th><th>Department</th></tr></thead><tbody><tr><td>*</td>'+
+      ['Booking No.','Consignee','Shipper','Origin','Destination','BL No.','Packages','Package Type','Inners','Inner Type','Weight','Weight Unit','Volume','Volume Unit','Inspection','ETD','ETA','Department'].map(n=>'<td><input data-clx49-field="'+esc(n)+'" value="'+v(n)+'"></td>').join('')+
+      '</tr><tr><td>*</td>'+Array.from({length:18},()=>'<td></td>').join('')+'</tr></tbody></table></div>';
 
-    html+='<div class="bookingOps"><div class="bookingOpsHead">Commercial / References</div><div class="bookingOpsGrid">';
-    html+=clx49BookingInput(r,'Freight Term');
-    html+=clx49BookingInput(r,'Rate / Quote Ref');
-    html+=clx49BookingInput(r,'Cargo','span3');
-    html+='</div></div>';
+    html+='<div class="cwBottomBar"><label class="cwCheck"><input type="checkbox"> Show Sub\'s</label>';
+    html+='<div class="cwMetric">Ship. Count <span>1</span></div><div class="cwMetric">Packs <span>'+v('Packages')+'</span></div><div class="cwMetric">Weight <span>'+v('Weight')+'</span></div><div class="cwMetric">Volume <span>'+v('Volume')+'</span></div><div class="cwMetric">Chargeable <span>'+v('Chargeable Weight')+'</span></div>';
+    html+='<div class="cwMetric">Prepaid <span>'+v('Prepaid')+'</span></div><div class="cwMetric">Collect <span>'+v('Collect')+'</span></div>';
+    html+='<div class="cwActions"><button onclick="openAgentForm(\'create\')">□ New</button><button onclick="openAgentForm(\'edit\')">✎ Edit</button><button onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">● Save</button></div></div>';
   }else{
-    html+='<div class="card"><b>Other Info</b>'+clx49FieldEditor(r,other)+'</div>';
+    html+='<div class="card"><b>Other Info</b>'+clx49FieldEditor(r,Object.keys(p))+'</div>';
   }
-
-  if(r)html+='<div class="bookingStickyActions"><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save Booking</button></div>';
+  html+='</div></div>';
   $('gridArea').innerHTML=html;
-  if(tab==='Booking Info'){
-    for(const n of ['Via Port','Transshipment Port'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
-    clx49BookingTogglePot();
-  }
+  for(const n of ['Via Port','Transshipment Port'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
+  clx49BookingTogglePot();
 }
 function clx49RenderSpecialRate(){
   const w=clx49Workspace,r=w.special_rate_request;
