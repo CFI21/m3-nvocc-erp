@@ -24,39 +24,50 @@
 .bookingTotals{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:7px 9px;background:#fafbfc;border-top:1px solid var(--line);font-size:11px}
 .bookingTotals b{font-size:12px}
 .bookingStickyActions{position:sticky;bottom:0;z-index:3;background:#fff;border-top:1px solid var(--line);padding:8px;display:flex;justify-content:flex-end;gap:7px}
-.cwShell{background:#f5f5f5;border:1px solid #b9bec5;border-radius:2px;margin-top:6px;font:11px/1.2 Arial,Helvetica,sans-serif;color:#222}
-.cwMenuBar{height:24px;background:#f7f7f7;border-bottom:1px solid #b9bec5;display:flex;align-items:center;gap:16px;padding:0 8px;color:#222}
-.cwMenuBar span{cursor:default}
-.cwPrimaryTabs,.cwSecondaryTabs{display:flex;align-items:flex-end;background:#e6e8eb;border-bottom:1px solid #aeb4bc;white-space:nowrap;overflow:auto}
-.cwPrimaryTabs button,.cwSecondaryTabs button{border:0;border-right:1px solid #c2c7cd;background:#e6e8eb;padding:5px 9px;font-size:11px;cursor:pointer}
-.cwPrimaryTabs button.active,.cwSecondaryTabs button.active{background:#fff;border-top:2px solid #7c8794;font-weight:700}
-.cwWorkspace{background:#fff;padding:6px}
-.cwTopGrid{display:grid;grid-template-columns:39% 61%;gap:7px}
-.cwGroup{border:1px solid #b8bdc4;background:#fafafa;position:relative;padding:18px 6px 6px}
-.cwGroupTitle{position:absolute;left:8px;top:3px;font-weight:700;font-size:11px;color:#333}
-.cwFormGrid{display:grid;grid-template-columns:repeat(6,minmax(58px,1fr));gap:4px 5px;align-items:end}
-.cwField{display:flex;align-items:center;gap:4px;min-width:0}
-.cwField label{font-size:10px;white-space:nowrap;color:#333}
-.cwField input,.cwField select{height:22px;border:1px solid #aeb4bc;background:#fff;padding:2px 4px;min-width:0;width:100%;font-size:10px;border-radius:0}
-.cwField input.cwWarn{background:#fce3df}.cwField input.cwDate{background:#fde8c8}.cwField input:disabled{background:#ececec;color:#666}
-.cwSpan2{grid-column:span 2}.cwSpan3{grid-column:span 3}.cwSpan4{grid-column:span 4}.cwSpan6{grid-column:1/-1}
-.cwCheck{display:flex;align-items:center;gap:3px;font-size:10px}.cwCheck input{width:auto;height:auto}
+.cwShell{height:calc(100vh - 155px);min-height:560px;background:#e9eaec;border:1px solid #aeb3ba;margin-top:4px;font:11px/1.15 Tahoma,Arial,Helvetica,sans-serif;color:#202020;display:grid;grid-template-rows:24px 27px minmax(0,1fr)}
+.cwMenuBar{height:24px;background:linear-gradient(#fafafa,#e7e7e7);border-bottom:1px solid #aeb3ba;display:flex;align-items:center;padding:0 7px;gap:2px}
+.cwMenuBar button{height:22px;border:0;background:transparent;padding:1px 8px;font-size:11px;color:#111;cursor:pointer}
+.cwMenuBar button:hover{background:#dfe7f0}
+.cwPrimaryTabs,.cwSecondaryTabs{display:flex;align-items:flex-end;background:#dedfe1;border-bottom:1px solid #aab0b7;white-space:nowrap;overflow-x:auto;overflow-y:hidden}
+.cwPrimaryTabs{height:27px}
+.cwPrimaryTabs button,.cwSecondaryTabs button{height:26px;border:0;border-right:1px solid #c2c5c9;background:linear-gradient(#f4f4f4,#dedfe1);padding:3px 8px;font-size:10px;cursor:pointer;color:#222}
+.cwPrimaryTabs button.active,.cwSecondaryTabs button.active{background:#fff;border-top:1px solid #888;border-bottom:1px solid #fff;font-weight:700}
+.cwWorkspace{background:#fff;display:grid;grid-template-rows:auto minmax(180px,1fr) 31px;min-height:0;overflow:hidden;padding:5px}
+.cwTopGrid{display:grid;grid-template-columns:minmax(480px,40%) minmax(620px,60%);gap:6px;min-height:205px}
+.cwGroup{border:1px solid #aeb4bb;background:#f7f7f7;position:relative;padding:19px 6px 6px;min-width:0}
+.cwGroupTitle{position:absolute;left:7px;top:3px;font-weight:700;font-size:11px;color:#333}
+.cwFormGrid{display:grid;grid-template-columns:repeat(8,minmax(48px,1fr));gap:3px 4px;align-items:center}
+.cwField{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:4px;min-width:0}
+.cwField label{font-size:10px;white-space:nowrap;color:#333;text-align:right}
+.cwField input,.cwField select{height:21px;border:1px solid #9fa6ae;background:#fff;padding:1px 3px;min-width:0;width:100%;font-size:10px;border-radius:0}
+.cwField input.cwWarn{background:#f7d9d8}.cwField input.cwDate{background:#ffe0b5}.cwField input:disabled{background:#e8e8e8;color:#666}
+.cwSpan2{grid-column:span 2}.cwSpan3{grid-column:span 3}.cwSpan4{grid-column:span 4}.cwSpan6{grid-column:span 6}.cwSpan8{grid-column:1/-1}
+.cwCheck{display:flex;align-items:center;gap:2px;font-size:10px;white-space:nowrap}.cwCheck input{width:13px;height:13px;margin:0}
+.cwSecondaryTabs{height:24px;margin:-14px -5px 5px}
+.cwSecondaryTabs button{height:23px;padding:2px 7px}
 .cwAgentGrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
-.cwAgentBox{border:1px solid #b8bdc4;background:#fff}
-.cwAgentHead{font-weight:700;padding:4px 5px;border-bottom:1px solid #c6cbd1;background:#f5f5f5}
+.cwAgentBox{border:1px solid #aeb4bb;background:#fff;min-height:82px}
+.cwAgentHead{font-weight:700;padding:3px 5px;border-bottom:1px solid #bfc4ca;background:#f4f4f4}
 .cwAgentBody{padding:4px}.cwAgentBody .cwField{margin-bottom:3px}
-.cwAgentEmpty{border:1px solid #d1d5db;background:#f7f7f7;padding:8px 4px;text-align:center;font-size:10px;margin-top:4px}
-.cwCarrierRow{display:grid;grid-template-columns:70px 1fr 28px 1.2fr 1fr 28px;gap:4px;align-items:center;margin-top:4px}
-.cwCarrierRow label{font-size:10px;text-align:right}.cwCarrierRow input,.cwCarrierRow select{height:22px;border:1px solid #aeb4bc;font-size:10px;padding:2px 4px}
-.cwCargoGridWrap{margin-top:6px;border:1px solid #b8bdc4;overflow:auto;background:#fff}
-.cwCargoGrid{border-collapse:collapse;width:100%;min-width:1350px;font-size:10px}
-.cwCargoGrid th,.cwCargoGrid td{border-right:1px solid #cfd4da;border-bottom:1px solid #cfd4da;height:23px;padding:2px 4px;text-align:left;white-space:nowrap}
-.cwCargoGrid th{background:#eceff2;font-weight:400}.cwCargoGrid td:first-child,.cwCargoGrid th:first-child{width:20px;text-align:center}
+.cwAgentEmpty{border:1px solid #d0d4d9;background:#f3f3f3;padding:7px 4px;text-align:center;font-size:9px;margin-top:4px;height:31px}
+.cwCarrierRow{display:grid;grid-template-columns:72px minmax(90px,1fr) 24px minmax(110px,1fr) minmax(110px,1fr) 24px;gap:3px;align-items:center;margin-top:3px}
+.cwCarrierRow label{font-size:10px;text-align:right}.cwCarrierRow input,.cwCarrierRow select{height:21px;border:1px solid #9fa6ae;font-size:10px;padding:1px 3px;min-width:0}
+.cwCarrierRow button{height:21px;border:1px solid #9fa6ae;background:#e8e8e8;padding:0 4px;cursor:pointer}
+.cwCargoGridWrap{margin-top:5px;border:1px solid #aeb4bb;overflow:auto;background:#fff;min-height:0}
+.cwCargoGrid{border-collapse:collapse;width:100%;min-width:1370px;font-size:10px;table-layout:auto}
+.cwCargoGrid th,.cwCargoGrid td{border-right:1px solid #c9ced4;border-bottom:1px solid #c9ced4;height:23px;padding:1px 3px;text-align:left;white-space:nowrap}
+.cwCargoGrid th{background:linear-gradient(#f8f8f8,#e4e6e9);font-weight:400;position:sticky;top:0;z-index:1}
+.cwCargoGrid td:first-child,.cwCargoGrid th:first-child{width:22px;text-align:center}
+.cwCargoGrid tr.cwBlank td{height:240px;vertical-align:top;background:#fff}
 .cwCargoGrid input{border:0;width:100%;height:20px;padding:1px 2px;font-size:10px;background:transparent;outline:none}
-.cwBottomBar{display:flex;align-items:center;gap:6px;padding:5px;background:#f1f3f5;border:1px solid #b8bdc4;border-top:0;font-size:10px}
-.cwMetric{display:flex;align-items:center;gap:3px}.cwMetric span{background:#fff;border:1px solid #b9bec5;padding:3px 6px;min-width:44px;text-align:right}
-.cwActions{margin-left:auto;display:flex;gap:8px;align-items:center}.cwActions button{border:0;background:transparent;font-size:10px;cursor:pointer}
-@media(max-width:1250px){.cwTopGrid{grid-template-columns:1fr}.cwFormGrid{grid-template-columns:repeat(4,minmax(70px,1fr))}}
+.cwBottomBar{height:31px;display:flex;align-items:center;gap:5px;padding:3px 5px;background:linear-gradient(#f8f8f8,#e6e8ea);border:1px solid #aeb4bb;border-top:0;font-size:10px}
+.cwMetric{display:flex;align-items:center;gap:2px}.cwMetric span{background:#fff;border:1px solid #aeb4bb;padding:2px 5px;min-width:46px;height:20px;text-align:right}
+.cwActions{margin-left:auto;display:flex;gap:8px;align-items:center}.cwActions button{height:23px;border:0;background:transparent;font-size:10px;cursor:pointer;padding:0 4px}.cwActions button:hover{background:#dde4ec}
+.cwIconBtn{width:23px!important;padding:0!important;border:1px solid #9fa6ae!important;background:#ededed!important}
+.cwMiniSelect{height:21px;border:1px solid #9fa6ae;background:#fff;font-size:10px;min-width:66px}
+.cwStatusBlock{background:#f6cdcb!important;text-align:center!important;font-weight:700}
+.cwShell .muted{font-size:9px}
+@media(max-width:1350px){.cwShell{height:auto;min-height:720px}.cwTopGrid{grid-template-columns:1fr}.cwWorkspace{grid-template-rows:auto 340px 31px}.cwFormGrid{grid-template-columns:repeat(6,minmax(58px,1fr))}}.cwFormGrid{grid-template-columns:repeat(4,minmax(70px,1fr))}}
 @media(max-width:1350px){.bookingOpsGrid{grid-template-columns:repeat(4,minmax(120px,1fr))}.bookingOpsField.span6{grid-column:1/-1}}
 @media(max-width:1100px) and (min-width:951px){.homeGrid{grid-template-columns:repeat(3,minmax(120px,1fr))}.homeSections{grid-template-columns:1fr}.app{grid-template-columns:248px 1fr}.domainBtn,.subBtn{padding-right:10px}.screenLink{padding-left:32px}.top{flex-wrap:wrap;height:auto;min-height:60px;padding-top:8px;padding-bottom:8px}.top input{min-width:180px;flex:1}.content{padding:12px}}
 @media(max-width:950px){.formGrid{grid-template-columns:1fr}.homeGrid{grid-template-columns:1fr 1fr}.homeSections{grid-template-columns:1fr}.app{grid-template-columns:1fr}.side{display:none}.kpis{grid-template-columns:1fr 1fr}.drawer{width:100%}.top{flex-wrap:wrap;height:auto;min-height:60px;padding-top:8px;padding-bottom:8px}.top input{min-width:120px;flex:1}.searchPanel{right:8px;left:8px;width:auto}.content{padding:10px}}
@@ -154,6 +165,7 @@ async function drillGlReportRow(i){
 }
 async function openScreen(id,navContext=null){
   let s=state.byId[id];if(!s)return;
+  $('flow').style.display='flex';$('prevBtn').style.display='';$('nextBtn').style.display='';
   $('favorite').style.visibility='visible';state.current=s;state.navContext=navContext;state.selected=null;state.page=1;state.sortKey='';state.status='';state.savedView='';
   addRecent(id);renderNav();renderBreadcrumb();renderFlow();history.replaceState(null,'','#screen='+encodeURIComponent(id));
   if(GL_REPORT_KEYS.has(s.key)){await reloadGlReport();api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});return}
@@ -340,14 +352,19 @@ function cwCheck(record,name,label,checkedDefault=false){
   const checked=val?['YES','TRUE','1','Y'].includes(val):checkedDefault;
   return '<label class="cwCheck"><input type="checkbox" data-clx49-field="'+esc(name)+'" '+(checked?'checked':'')+'> '+esc(label)+'</label>';
 }
+function cwSelect(record,name,options,extraClass=''){
+  const cur=String(record?.fields?.[name]??'');
+  const vals=cur&&!options.includes(cur)?[cur,...options]:options;
+  return '<select class="cwMiniSelect '+extraClass+'" data-clx49-field="'+esc(name)+'">'+vals.map(x=>'<option value="'+esc(x)+'" '+(cur===x?'selected':'')+'>'+esc(x||'')+'</option>').join('')+'</select>';
+}
 function clx49RenderBooking(tab){
   const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
   const p=r?.fields||{};
   const v=n=>esc(p[n]??'');
   const inp=(n,cls='')=>'<input class="'+cls+'" data-clx49-field="'+esc(n)+'" value="'+v(n)+'">';
   const field=(label,n,cls='',inputCls='')=>'<div class="cwField '+cls+'"><label>'+esc(label)+'</label>'+inp(n,inputCls)+'</div>';
-  let html=clx49ContextHeader(w)+clx49Nav(w);
-  html+='<div class="cwShell">';
+  $('screenMeta').innerHTML='';$('flow').style.display='none';$('prevBtn').style.display='none';$('nextBtn').style.display='none';
+  let html='<div class="cwShell">';
   html+='<div class="cwMenuBar">'+
     '<button onclick="cwBookingMenu(\'new\')">File</button>'+
     '<button onclick="cwBookingMenu(\'edit\')">Edit</button>'+
@@ -364,48 +381,50 @@ function clx49RenderBooking(tab){
     '<button onclick="cwBookingMenu(\'containers\')">Containers</button>'+
     '<button onclick="cwFocus(\'.cwCargoGridWrap\')">Packing</button>'+
     '<button onclick="cwBookingMenu(\'tracking\')">Workflow & Tracking</button>'+
-    '<button onclick="cwBookingMenu(\'bl\')">AWB / B/L</button>'+
+    '<button onclick="cwBookingMenu(\'bl\')">AWB</button>'+
     '<button onclick="cwBookingMenu(\'email\')">Electronic Messaging</button>'+
-    '<button onclick="cwBookingMenu(\'invoice\')">AR Invoice</button>'+
-    '<button onclick="cwBookingMenu(\'bills\')">AP Invoice</button>'+
+    '<button onclick="cwBookingMenu(\'invoice\')">AR and AP Invoices</button>'+
     '<button onclick="cwBookingMenu(\'profit\')">Consol Profit/Loss</button>'+
     '<button onclick="cwBookingMenu(\'bills\')">Consol Costing</button>'+
     '<button onclick="cwBookingMenu(\'bl\')">Doc Data</button>'+
     '<button onclick="cwFocus(\'.cwAgentGrid\')">Addresses</button>'+
     '<button onclick="cwBookingMenu(\'bl\')">eDocs</button>'+
     '<button onclick="cwBookingMenu(\'other\')">Notes</button>'+
-    '<button onclick="cwBookingMenu(\'audit\')">Logs</button>'+
+    '<button onclick="cwBookingMenu(\'audit\')">⚡ Logs</button>'+
   '</div>';
   html+='<div class="cwWorkspace">';
   if(tab==='Booking Info'){
     html+='<div class="cwTopGrid">';
 
-    html+='<div class="cwGroup"><div class="cwGroupTitle">Booking Details</div><div class="cwFormGrid">';
-    html+=field('Type','Shipment Type');
-    html+=field('Agent','Agent');
-    html+=field('Transport','Transport Mode','cwSpan2');
-    html+=field('Container Mode','Container Mode');
-    html+=field('Status','Status');
+    html+='<div class="cwGroup"><div class="cwGroupTitle">Consol Details</div><div class="cwFormGrid">';
+    html+='<div class="cwField cwSpan2"><label>Type</label>'+cwSelect(r,'Shipment Type',['','AGT','FCL','LCL'])+'</div>';
+    html+='<div class="cwField cwSpan2"><label>Agent</label>'+cwSelect(r,'Agent',['',p['Agent']||''])+'</div>';
+    html+='<div class="cwField cwSpan2"><label>Transport</label>'+cwSelect(r,'Transport Mode',['','SEA','AIR','ROAD','RAIL'])+'</div>';
+    html+='<div class="cwField cwSpan2"><label>Container Mode</label>'+cwSelect(r,'Container Mode',['','FCL','LCL','LSE','SOC'])+'</div>';
     html+=cwCheck(r,'Domestic','Domestic');
-    html+=cwCheck(r,'Is Load','Is Load');
-    html+=field('Last Discharge','POD','cwSpan2');
-    html+=field('Phase','Booking Date');
-    html+=field('Flight / Vessel','Vessel','cwSpan2');
-    html+=field('Aircraft / Voyage','Voyage','cwSpan2');
-    html+=field('Load Port','POL','','cwWarn');
-    html+=field('ETD','ETD','','cwDate');
-    html+=field('ATD','ATD');
-    html+=field('Discharge','Via Port','','cwWarn');
-    html+=field('ETA','ETA','','cwDate');
-    html+=field('ATA','ATA');
+    html+=cwCheck(r,'Is Load','1st Load');
+    html+=field('Last Dis','POD','cwSpan2','cwWarn');
+    html+='<div class="cwField cwSpan2"><label>Phase</label>'+cwSelect(r,'Status',['','DRAFT','PENDING','CONFIRMED','HOLD','CANCELLED'])+'</div>';
+    html+=field('Flight','Flight','cwSpan2');
+    html+=field('Aircraft Type','Aircraft Type','cwSpan2');
+    html+=field('Aircraft Reg.','Aircraft Registration','cwSpan2');
+    html+=field('Load Port','POL','cwSpan2','cwWarn');
+    html+=field('ETD','ETD','cwSpan2','cwDate');
+    html+=field('ATD','ATD','cwSpan2');
+    html+=field('Discharge','Via Port','cwSpan2','cwWarn');
+    html+=field('ETA','ETA','cwSpan2','cwDate');
+    html+=field('ATA','ATA','cwSpan2');
     html+=cwCheck(r,'Is Domestic','Is Domestic');
     html+=cwCheck(r,'Is Linked','Is Linked',true);
     html+=cwCheck(r,'Is Charter','Is Charter');
     html+=cwCheck(r,'Is Cargo Only','Is Cargo Only',true);
-    html+=field('Svc. Lvl','Service Level');
-    html+=field('MAWB / Booking','Carrier Booking Ref','cwSpan2');
-    html+=field('Payment','Freight Term');
-    html+=field('CRN / Quote','Rate / Quote Ref','cwSpan2');
+    html+='<div class="cwField cwSpan2"><label></label><input class="cwStatusBlock" value="'+esc(p['Operational Status']||'Unknown')+'" data-clx49-field="Operational Status"></div>';
+    html+='<div class="cwField cwSpan2"><label>Svc. Lvl.</label>'+cwSelect(r,'Service Level',['','STD','EXP','ECO'])+'</div>';
+    html+=field('MAWB','Carrier Booking Ref','cwSpan3');
+    html+=cwCheck(r,'Neutral MAWB','Neutral MAWB');
+    html+='<div class="cwField cwSpan2"><label>Payment</label>'+cwSelect(r,'Freight Term',['','PREPAID','COLLECT'])+'</div>';
+    html+=field('CRN','Rate / Quote Ref','cwSpan3');
+    html+='<div class="cwField cwSpan2"><label>Scrn.</label>'+cwSelect(r,'Screening Status',['','NOT','YES','NO'])+'</div>';
     html+='</div></div>';
 
     html+='<div class="cwGroup"><div class="cwGroupTitle">Organizations</div>';
@@ -419,30 +438,24 @@ function clx49RenderBooking(tab){
       '<button onclick="cwFocus(\'[data-clx49-field=&quot;Booking No.&quot;]\')">Numbers</button>'+
       '<button onclick="cwBookingMenu(\'other\')">Additional Detail</button>'+
     '</div>';
-    html+='<div class="cwAgentGrid"><div class="cwAgentBox"><div class="cwAgentHead">Sending Agent</div><div class="cwAgentBody">'+field('Agent','POL Agent','cwSpan2')+field('Address','Shipper','cwSpan2')+'<div class="cwAgentEmpty">'+(p['POL Agent']?'Selected organization':'* NO ORGANIZATION IS SELECTED')+'</div></div></div>';
-    html+='<div class="cwAgentBox"><div class="cwAgentHead">Receiving Agent</div><div class="cwAgentBody">'+field('Agent','POD Agent','cwSpan2')+field('Address','Consignee','cwSpan2')+'<div class="cwAgentEmpty">'+(p['POD Agent']?'Selected organization':'* NO ORGANIZATION IS SELECTED')+'</div></div></div></div>';
-    html+='<div class="cwCarrierRow"><label>Carrier</label>'+inp('Carrier')+'<button onclick="cwFocus(\'[data-clx49-field=&quot;Carrier&quot;]\')">...</button>'+inp('Container Owner')+inp('Vessel / Slot Operator')+'<button onclick="cwBookingMenu(\'containers\')">⌄</button></div>';
-    html+='<div class="cwCarrierRow"><label>Creditor</label>'+inp('Cost Party')+'<button onclick="cwBookingMenu(\'bills\')">...</button>'+inp('Bill-To / Revenue Party')+inp('Finance / Credit Party')+'<button onclick="cwBookingMenu(\'invoice\')">⌄</button></div>';
-    html+='<div class="cwCarrierRow"><label>POL Agent</label>'+inp('POL Agent')+'<span></span><label>POT Agent</label>'+inp('POT Agent')+'<span></span></div>';
+    html+='<div class="cwAgentGrid">';
+    html+='<div class="cwAgentBox"><div class="cwAgentHead">Sending Agent</div><div class="cwAgentBody"><div class="cwCarrierRow" style="grid-template-columns:1fr 24px 72px 24px"><input data-clx49-field="POL Agent" value="'+v('POL Agent')+'"><button onclick="cwFocus(\'[data-clx49-field=&quot;POL Agent&quot;]\')">...</button>'+cwSelect(r,'POL Agent Contact',[''])+'<button onclick="cwBookingMenu(\'email\')">✉</button></div><div class="cwSecondaryTabs" style="margin:3px 0 0;height:20px"><button class="active">Address</button><button>Contact</button></div>'+inp('Shipper')+'<div class="cwAgentEmpty">'+(p['POL Agent']?'Selected organization':'* NO ORGANIZATION IS SELECTED')+'</div></div></div>';
+    html+='<div class="cwAgentBox"><div class="cwAgentHead">Receiving Agent</div><div class="cwAgentBody"><div class="cwCarrierRow" style="grid-template-columns:1fr 24px 72px 24px"><input data-clx49-field="POD Agent" value="'+v('POD Agent')+'"><button onclick="cwFocus(\'[data-clx49-field=&quot;POD Agent&quot;]\')">...</button>'+cwSelect(r,'POD Agent Contact',[''])+'<button onclick="cwBookingMenu(\'email\')">✉</button></div><div class="cwSecondaryTabs" style="margin:3px 0 0;height:20px"><button class="active">Address</button><button>Contact</button></div>'+inp('Consignee')+'<div class="cwAgentEmpty">'+(p['POD Agent']?'Selected organization':'* NO ORGANIZATION IS SELECTED')+'</div></div></div>';
+    html+='</div>';
+    html+='<div class="cwCarrierRow"><label>Carrier</label>'+inp('Carrier')+'<button onclick="cwFocus(\'[data-clx49-field=&quot;Carrier&quot;]\')">...</button>'+cwSelect(r,'Carrier Service',['','(None Selected)'])+inp('Container Owner')+'<button onclick="cwBookingMenu(\'containers\')">⌄</button></div>';
+    html+='<div class="cwCarrierRow"><label>Creditor</label>'+inp('Cost Party')+'<button onclick="cwBookingMenu(\'bills\')">...</button>'+cwSelect(r,'Creditor Type',['','(None Selected)'])+inp('Finance / Credit Party')+'<button onclick="cwBookingMenu(\'invoice\')">⌄</button></div>';
     html+='<div class="cwCarrierRow"><label>Carrier Bkg. Ref</label>'+inp('Carrier Booking Ref')+'<span></span><label>Agents Reference</label>'+inp('Booking No.')+'<span></span></div>';
     html+='</div></div>';
 
-    html+='<div class="cwCargoGridWrap"><table class="cwCargoGrid"><thead><tr><th></th><th>Shipment ID</th><th>Consignee</th><th>Shipper</th><th>Origin</th><th>Dest.</th><th>House Bill Number</th><th>Packs</th><th>Type</th><th>Inners</th><th>Type</th><th>Weight</th><th>U/W</th><th>Volume</th><th>U/V</th><th>Inspection</th><th>ETD</th><th>ETA</th><th>Department</th></tr></thead><tbody><tr><td>*</td>'+
-      ['Booking No.','Consignee','Shipper','Origin','Destination','BL No.','Packages','Package Type','Inners','Inner Type','Weight','Weight Unit','Volume','Volume Unit','Inspection','ETD','ETA','Department'].map(n=>'<td><input data-clx49-field="'+esc(n)+'" value="'+v(n)+'"></td>').join('')+
-      '</tr></tbody></table></div>';
+    html+='<div class="cwCargoGridWrap"><table class="cwCargoGrid"><thead><tr><th></th><th>Shipment ID</th><th>Consignee</th><th>Shipper</th><th>Origin</th><th>Dest.</th><th>House Bill Number</th><th>Packs</th><th>Type</th><th>Inners</th><th>Type</th><th>Weight</th><th>U/W</th><th>Volume</th><th>U/V</th><th>Inspection</th><th>ETD</th><th>ETA</th><th>Department</th></tr></thead><tbody>';
+    html+='<tr><td>*</td>'+['Booking No.','Consignee','Shipper','Origin','Destination','BL No.','Packages','Package Type','Inners','Inner Type','Weight','Weight Unit','Volume','Volume Unit','Inspection','ETD','ETA','Department'].map(n=>'<td><input data-clx49-field="'+esc(n)+'" value="'+v(n)+'"></td>').join('')+'</tr>';
+    html+='<tr class="cwBlank"><td>*</td><td colspan="18"></td></tr></tbody></table></div>';
 
     html+='<div class="cwBottomBar"><label class="cwCheck"><input type="checkbox" data-clx49-field="Show Subs" '+(String(p['Show Subs']||'').toUpperCase()==='YES'?'checked':'')+'> Show Sub\'s</label>';
-    html+='<div class="cwMetric">Ship. Count <span>1</span></div><div class="cwMetric">Packs <span>'+v('Packages')+'</span></div><div class="cwMetric">Weight <span>'+v('Weight')+'</span></div><div class="cwMetric">Volume <span>'+v('Volume')+'</span></div><div class="cwMetric">Chargeable <span>'+v('Chargeable Weight')+'</span></div>';
-    html+='<div class="cwMetric">Prepaid <span>'+v('Prepaid')+'</span></div><div class="cwMetric">Collect <span>'+v('Collect')+'</span></div>';
-    html+='<div class="cwActions">'+
-      '<button onclick="openAgentForm(\'create\')">□ New</button>'+
-      '<button onclick="openAgentForm(\'edit\')">✎ Edit</button>'+
-      '<button onclick="cwCreateLinked(\'agent-tasks::container-activity\')">＋ Add Shipment/Container</button>'+
-      '<button onclick="cwBookingMenu(\'bl\')">▣ Documents</button>'+
-      '<button onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">● Save</button>'+
-    '</div></div>';
+    html+='<div class="cwMetric">Ship. Count <span>1</span></div><div class="cwMetric">Packs <span>'+v('Packages')+'</span></div><div class="cwMetric">Weight <span>'+v('Weight')+' KG</span></div><div class="cwMetric">Volume <span>'+v('Volume')+' M3</span></div><div class="cwMetric">Chargeable <span>'+v('Chargeable Weight')+' KG</span></div><div class="cwMetric">Prepaid <span>'+v('Prepaid')+'</span></div><div class="cwMetric">Collect <span>'+v('Collect')+'</span></div>';
+    html+='<div class="cwActions"><button onclick="openAgentForm(\'create\')">□ New</button><button onclick="openAgentForm(\'edit\')">✎ Edit</button><button onclick="cwCreateLinked(\'agent-tasks::container-activity\')">✚ Attach</button><button onclick="cwBookingMenu(\'containers\')">●</button><button onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">💾 Save</button></div></div>';
   }else{
-    html+='<div class="card"><b>Other Info</b>'+clx49FieldEditor(r,Object.keys(p))+'</div>';
+    html+='<div style="padding:8px;overflow:auto">'+clx49FieldEditor(r,Object.keys(p))+'</div><div class="cwBottomBar"><div class="cwActions"><button onclick="clx49RenderBooking(\'Booking Info\')">Back</button><button onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">💾 Save</button></div></div>';
   }
   html+='</div></div>';
   $('gridArea').innerHTML=html;
