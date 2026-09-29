@@ -4,6 +4,27 @@
 <style>
 :root{--bg:#f4f6f8;--panel:#fff;--line:#d7dde5;--ink:#1d2939;--muted:#667085;--brand:#2f6b55;--brand2:#e8f3ed;--nav:#4b5563;--nav2:#5f6b78;--ok:#027a48;--warn:#b54708;--bad:#b42318;--shadow:0 12px 32px rgba(16,24,40,.12)}
 *{box-sizing:border-box}body{margin:0;font:12px/1.38 Arial,Helvetica,sans-serif;background:var(--bg);color:var(--ink)}button,input,select{font:inherit}.app{display:grid;grid-template-columns:286px 1fr;min-height:100vh}.side{background:var(--nav);color:#fff;height:100vh;position:sticky;top:0;overflow:auto}.logo{padding:16px;border-bottom:1px solid #6b7280}.logo b{font-size:18px;letter-spacing:.3px}.logo small{display:block;color:#d1d5db;margin-top:4px}.menuSearch{padding:10px}.menuSearch input{width:100%;padding:8px;border:1px solid #6b7280;border-radius:5px;background:#374151;color:#fff}.menuBlock{border-top:1px solid rgba(255,255,255,.05)}.domainBtn,.subBtn{width:100%;text-align:left;border:0;color:#f9fafb;background:transparent;padding:10px 14px;cursor:pointer;display:flex;align-items:center;gap:8px;min-height:36px}.domainBtn{font-weight:700}.domainBtn:hover,.subBtn:hover{background:var(--nav2)}.domainBtn:focus-visible,.subBtn:focus-visible,.screenLink:focus-visible{outline:2px solid #e5e7eb;outline-offset:-2px}.subBtn{padding-left:24px;color:#e5e7eb}.screenLink{display:block;padding:8px 14px 8px 38px;color:#f3f4f6;cursor:pointer;border-left:3px solid transparent;line-height:1.35}.screenLink:hover,.screenLink.active{background:var(--nav2);border-left-color:#d1d5db}.count{margin-left:auto;color:#d1d5db;font-size:10px}.collapse{display:none}.main{min-width:0}.top{height:60px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;padding:0 14px;position:sticky;top:0;z-index:15}.pill{padding:4px 8px;border-radius:12px;background:var(--brand2);color:var(--brand);font-weight:700}.top .grow{flex:1}.top input{padding:7px 9px;border:1px solid #b8c2cf;border-radius:5px;min-width:250px}.top select,.top button{padding:7px 9px;border:1px solid #b8c2cf;border-radius:5px;background:#fff}.topTitleHome{cursor:pointer;white-space:nowrap}.headerAction{white-space:nowrap;cursor:pointer}.moreWrap{position:relative}.moreMenu{position:absolute;right:0;top:38px;width:235px;background:#fff;border:1px solid var(--line);border-radius:7px;box-shadow:var(--shadow);padding:6px;display:none;z-index:60}.moreWrap.open .moreMenu{display:block}.moreMenu button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:8px 9px;cursor:pointer}.moreMenu button:hover{background:#f3f4f6}.homeGrid{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:10px;margin:10px 0}.homeCard{background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px;cursor:pointer;min-height:104px}.homeCard:hover{box-shadow:0 4px 16px rgba(16,24,40,.08)}.homeCard b{display:block;font-size:24px;margin:8px 0 3px}.homeSections{display:grid;grid-template-columns:1fr 1fr;gap:10px}.homeList{margin-top:8px}.homeLink{padding:8px 0;border-bottom:1px solid #eef1f4;cursor:pointer}.homeLink:hover{color:var(--brand)}.content{padding:14px}.crumb{color:var(--muted);font-size:11px;margin-bottom:6px}.heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.heading h1{font-size:19px;margin:0}.heading .grow{flex:1}.btn{padding:7px 9px;border:1px solid #b8c2cf;border-radius:5px;background:#fff;cursor:pointer}.btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}.btn:hover{filter:brightness(.98)}.kpis{display:grid;grid-template-columns:repeat(5,minmax(110px,1fr));gap:8px;margin:10px 0}.card{background:#fff;border:1px solid var(--line);border-radius:6px;padding:10px}.kpi b{font-size:18px;display:block;margin-top:2px}.toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:10px 0}.toolbar input,.toolbar select{padding:7px;border:1px solid #b8c2cf;border-radius:4px;background:#fff}.toolbar input{min-width:230px}.tablewrap{background:#fff;border:1px solid var(--line);overflow:auto;max-height:63vh}.tablewrap table{border-collapse:collapse;width:100%;min-width:1050px}.tablewrap th,.tablewrap td{padding:7px 8px;border-bottom:1px solid #e7ebf0;text-align:left;white-space:nowrap;max-width:300px;overflow:hidden;text-overflow:ellipsis}.tablewrap th{background:#edf2f5;position:sticky;top:0;cursor:pointer;z-index:2}.tablewrap tr{position:relative}.tablewrap tr:hover td{background:#f9fbfc}.rowAction{width:25px;height:25px;border-radius:50%;border:1px solid #b8c2cf;background:#fff;opacity:.18;cursor:pointer}.tablewrap tr:hover .rowAction{opacity:1}.status{padding:3px 7px;border-radius:10px;background:#eef2f6}.status.ok{background:#e7f6ec;color:var(--ok)}.status.warn{background:#fff4e5;color:var(--warn)}.drawer{position:fixed;right:0;top:60px;bottom:0;width:455px;background:#fff;border-left:1px solid var(--line);box-shadow:var(--shadow);transform:translateX(100%);transition:.18s;z-index:40;overflow:auto}.drawer.open{transform:none}.drawerHead{padding:12px 14px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;position:sticky;top:0;background:#fff;z-index:2}.drawerBody{padding:12px}.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px}.tab{border:0;background:#fff;padding:7px 9px;border-bottom:2px solid transparent;cursor:pointer}.tab.active{border-bottom-color:var(--brand);color:var(--brand);font-weight:700}.pre{white-space:pre-wrap;word-break:break-word;background:#f8fafb;border:1px solid #e7ebf0;padding:8px;border-radius:5px;max-height:430px;overflow:auto}.relatedGrid{display:grid;grid-template-columns:1fr 1fr;gap:7px}.relatedCard{border:1px solid var(--line);border-radius:5px;padding:8px;cursor:pointer}.relatedCard:hover{background:#f8fafb}.fabWrap{position:fixed;right:28px;bottom:28px;z-index:35}.fab{width:52px;height:52px;border-radius:50%;border:0;background:var(--brand);color:#fff;box-shadow:var(--shadow);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center}.fab:focus{outline:3px solid #a8d5bf;outline-offset:2px}.fabTip{position:absolute;right:62px;bottom:13px;background:#1f2937;color:#fff;padding:5px 8px;border-radius:4px;white-space:nowrap;opacity:0;pointer-events:none;transition:.12s}.fabWrap:hover .fabTip,.fab:focus+.fabTip{opacity:1}.fabMenu{position:absolute;right:0;bottom:62px;background:#fff;border:1px solid var(--line);border-radius:8px;box-shadow:var(--shadow);padding:7px;width:235px;display:none;max-height:420px;overflow:auto}.fabWrap:hover .fabMenu,.fabWrap.open .fabMenu{display:block}.fabMenu button{display:block;width:100%;text-align:left;border:0;background:#fff;padding:8px;border-radius:4px;cursor:pointer}.fabMenu button:hover{background:#eef5f1}.flow{display:flex;gap:5px;align-items:center;overflow:auto;padding:7px 0}.flowStep{padding:6px 8px;border:1px solid var(--line);border-radius:12px;background:#fff;white-space:nowrap;cursor:pointer}.flowStep.active{background:var(--brand2);border-color:#a8d5bf;color:var(--brand);font-weight:700}.searchPanel{position:fixed;top:58px;right:170px;width:480px;max-height:65vh;overflow:auto;background:#fff;border:1px solid var(--line);box-shadow:var(--shadow);z-index:50;display:none}.searchPanel.open{display:block}.searchItem{padding:9px;border-bottom:1px solid #eee;cursor:pointer}.searchItem:hover{background:#f8fafb}.favorite{font-size:18px;cursor:pointer;color:#9aa3af}.favorite.on{color:#b7791f}.muted{color:var(--muted)}.oktxt{color:var(--ok)}.warntext{color:var(--warn)}.badtext{color:var(--bad)}.empty{padding:24px;text-align:center;color:var(--muted)}.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}.formField{display:flex;flex-direction:column;gap:4px}.formField.full{grid-column:1/-1}.formField input,.formField select,.formField textarea{padding:8px;border:1px solid #b8c2cf;border-radius:5px;background:#fff;width:100%}.formActions{grid-column:1/-1;display:flex;gap:7px;justify-content:flex-end;margin-top:8px}.formNote{grid-column:1/-1;padding:8px;border-radius:5px;background:#f8fafb;color:var(--muted)}
+.bookingOps{background:#fff;border:1px solid var(--line);border-radius:6px;overflow:hidden;margin-top:8px}
+.bookingOpsHead{display:flex;align-items:center;gap:8px;padding:7px 9px;background:#edf2f5;border-bottom:1px solid var(--line);font-weight:700}
+.bookingOpsGrid{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));gap:7px;padding:8px}
+.bookingOpsField{display:flex;flex-direction:column;gap:3px;min-width:0}
+.bookingOpsField.span2{grid-column:span 2}.bookingOpsField.span3{grid-column:span 3}.bookingOpsField.span6{grid-column:1/-1}
+.bookingOpsField label{font-size:11px;color:#475467;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bookingOpsField input,.bookingOpsField select,.bookingOpsField textarea{height:30px;padding:5px 6px;border:1px solid #b8c2cf;border-radius:3px;background:#fff;width:100%}
+.bookingOpsField textarea{height:56px;resize:vertical}
+.bookingOpsField input:disabled,.bookingOpsField select:disabled{background:#eef1f4;color:#667085}
+.bookingPartyGrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
+.bookingPartyBox{border:1px solid var(--line);border-radius:4px;padding:7px;background:#fafbfc}
+.bookingPartyBox h4{margin:0 0 6px;font-size:12px}
+.bookingCargoWrap{overflow:auto;border-top:1px solid var(--line)}
+.bookingCargo{width:100%;border-collapse:collapse;min-width:1220px}
+.bookingCargo th,.bookingCargo td{border-right:1px solid #e4e7ec;border-bottom:1px solid #e4e7ec;padding:4px}
+.bookingCargo th{background:#f2f4f7;font-size:10px;text-align:left;white-space:nowrap}
+.bookingCargo input,.bookingCargo select{width:100%;min-width:75px;height:28px;border:1px solid #b8c2cf;border-radius:2px;padding:4px}
+.bookingTotals{display:flex;gap:14px;align-items:center;flex-wrap:wrap;padding:7px 9px;background:#fafbfc;border-top:1px solid var(--line);font-size:11px}
+.bookingTotals b{font-size:12px}
+.bookingStickyActions{position:sticky;bottom:0;z-index:3;background:#fff;border-top:1px solid var(--line);padding:8px;display:flex;justify-content:flex-end;gap:7px}
+@media(max-width:1350px){.bookingOpsGrid{grid-template-columns:repeat(4,minmax(120px,1fr))}.bookingOpsField.span6{grid-column:1/-1}}
 @media(max-width:1100px) and (min-width:951px){.homeGrid{grid-template-columns:repeat(3,minmax(120px,1fr))}.homeSections{grid-template-columns:1fr}.app{grid-template-columns:248px 1fr}.domainBtn,.subBtn{padding-right:10px}.screenLink{padding-left:32px}.top{flex-wrap:wrap;height:auto;min-height:60px;padding-top:8px;padding-bottom:8px}.top input{min-width:180px;flex:1}.content{padding:12px}}
 @media(max-width:950px){.formGrid{grid-template-columns:1fr}.homeGrid{grid-template-columns:1fr 1fr}.homeSections{grid-template-columns:1fr}.app{grid-template-columns:1fr}.side{display:none}.kpis{grid-template-columns:1fr 1fr}.drawer{width:100%}.top{flex-wrap:wrap;height:auto;min-height:60px;padding-top:8px;padding-bottom:8px}.top input{min-width:120px;flex:1}.searchPanel{right:8px;left:8px;width:auto}.content{padding:10px}}
 </style></head>
@@ -222,48 +243,93 @@ function clx49RenderBlTab(tab){
   html+='</div>';
   $('gridArea').innerHTML=renderGrid()+html;
 }
-function clx49BookingGroup(record,title,fields,opts={}){
-  if(!record)return '<div class="card empty">No existing authoritative Booking record for this job.</div>';
-  const p=record.fields||{};
-  let html='<div class="card"><b>'+esc(title)+'</b><div class="formGrid">';
-  for(const name of fields){
-    const full=/remarks|notes|instruction|description/i.test(name);
-    const val=p[name]??'';
-    const disabled=opts.disablePot&&name==='POT Agent'?' disabled':'';
-    const note=opts.disablePot&&name==='POT Agent'?' <span class="muted">(active only when Via / Transshipment Port is entered)</span>':'';
-    html+='<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+note+'</label>'+
-      (full?'<textarea data-clx49-field="'+esc(name)+'"'+disabled+'>'+esc(val)+'</textarea>':'<input data-clx49-field="'+esc(name)+'" value="'+esc(val)+'"'+disabled+'>')+'</div>';
-  }
-  return html+'</div></div>';
+function clx49BookingInput(record,name,cls=''){
+  const p=record?.fields||{},val=p[name]??'';
+  const disabled=name==='POT Agent'?' data-pot-agent="1"':'';
+  return '<div class="bookingOpsField '+cls+'"><label>'+esc(name)+'</label><input data-clx49-field="'+esc(name)+'" value="'+esc(val)+'"'+disabled+'></div>';
+}
+function clx49BookingSelect(record,name,options,cls=''){
+  const p=record?.fields||{},val=String(p[name]??'');
+  return '<div class="bookingOpsField '+cls+'"><label>'+esc(name)+'</label><select data-clx49-field="'+esc(name)+'">'+options.map(x=>'<option value="'+esc(x)+'" '+(val===x?'selected':'')+'>'+esc(x||'—')+'</option>').join('')+'</select></div>';
 }
 function clx49BookingTogglePot(){
   const via=document.querySelector('[data-clx49-field="Via Port"]')?.value.trim()||'';
   const trans=document.querySelector('[data-clx49-field="Transshipment Port"]')?.value.trim()||'';
   const pot=document.querySelector('[data-clx49-field="POT Agent"]');
-  if(pot)pot.disabled=!(via||trans);
+  if(pot){pot.disabled=!(via||trans);pot.title=pot.disabled?'Enter Via Port or Transshipment Port first':''}
+}
+function clx49BookingPartyBox(record,title,fields){
+  return '<div class="bookingPartyBox"><h4>'+esc(title)+'</h4><div class="bookingOpsGrid" style="grid-template-columns:repeat(2,minmax(120px,1fr));padding:0">'+fields.map(n=>clx49BookingInput(record,n,n==='Notify Party'?'span2':'')).join('')+'</div></div>';
 }
 function clx49RenderBooking(tab){
   const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
-  const basic=['Booking No.','Booking Date','Status','Carrier Booking Ref','POL','Via Port','Transshipment Port','POD','Vessel','Voyage'];
-  const parties=['Customer','Booking Party','Shipper','Consignee','Notify Party','Agent'];
-  const operational=['Container Owner','SOC / COC','Equipment Provider','Carrier','Vessel / Slot Operator','POL Agent','POT Agent','POD Agent','Operations Owner','Sales Person','Commercial Owner','Bill-To / Revenue Party','Cost Party','Finance / Credit Party'];
-  const cargo=['Equipment','Quantity','Commodity','Packages','Weight','Measurement','Cargo','Freight Term','Rate / Quote Ref','SI Cut-off','VGM Cut-off','Gate-in Cut-off'];
-  const grouped=new Set([...basic,...parties,...operational,...cargo,'Job Ref']);
-  const other=Object.keys(r?.fields||{}).filter(k=>!grouped.has(k));
+  const p=r?.fields||{};
+  const known=new Set([
+    'Booking No.','Job Ref','Booking Date','Status','Transport Mode','Service Level','Shipment Type','Container Mode',
+    'Carrier Booking Ref','POL','Via Port','Transshipment Port','POD','Vessel','Voyage','ETD','ETA',
+    'Customer','Booking Party','Shipper','Consignee','Notify Party','Agent',
+    'Container Owner','SOC / COC','Equipment Provider','Carrier','Vessel / Slot Operator','POL Agent','POT Agent','POD Agent',
+    'Operations Owner','Sales Person','Commercial Owner','Bill-To / Revenue Party','Cost Party','Finance / Credit Party',
+    'Equipment','Quantity','Commodity','Packages','Package Type','Weight','Measurement','Volume','Chargeable Weight',
+    'Origin','Destination','Cargo','Freight Term','Rate / Quote Ref','SI Cut-off','VGM Cut-off','Gate-in Cut-off'
+  ]);
+  const other=Object.keys(p).filter(k=>!known.has(k));
   let html=clx49ContextHeader(w)+clx49Nav(w);
   html+='<div class="card"><div class="toolbar">'+CLX49_BOOKING_TABS.map(t=>'<button class="btn '+(t===tab?'primary':'')+'" onclick="clx49RenderBooking(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div></div>';
+
   if(tab==='Booking Info'){
-    const p=r?.fields||{};
-    const hasVia=!!String(p['Via Port']||p['Transshipment Port']||'').trim();
-    html+=clx49BookingGroup(r,'Booking Basic & Routing',basic);
-    html+=clx49BookingGroup(r,'Parties',parties);
-    html+=clx49BookingGroup(r,'Operational Control',operational,{disablePot:!hasVia});
-    html+=clx49BookingGroup(r,'Cargo & Equipment',cargo);
+    html+='<div class="bookingOps"><div class="bookingOpsHead">Booking / Transport Details</div><div class="bookingOpsGrid">';
+    html+=clx49BookingInput(r,'Booking No.');
+    html+=clx49BookingInput(r,'Booking Date');
+    html+=clx49BookingSelect(r,'Status',['','DRAFT','PENDING','CONFIRMED','HOLD','CANCELLED']);
+    html+=clx49BookingSelect(r,'Transport Mode',['','SEA','AIR','ROAD','RAIL']);
+    html+=clx49BookingInput(r,'Service Level');
+    html+=clx49BookingInput(r,'Shipment Type');
+    html+=clx49BookingInput(r,'Carrier');
+    html+=clx49BookingInput(r,'Carrier Booking Ref');
+    html+=clx49BookingInput(r,'Vessel');
+    html+=clx49BookingInput(r,'Voyage');
+    html+=clx49BookingInput(r,'POL');
+    html+=clx49BookingInput(r,'Via Port');
+    html+=clx49BookingInput(r,'Transshipment Port');
+    html+=clx49BookingInput(r,'POD');
+    html+=clx49BookingInput(r,'ETD');
+    html+=clx49BookingInput(r,'ETA');
+    html+=clx49BookingInput(r,'SOC / COC');
+    html+=clx49BookingInput(r,'Container Owner');
+    html+=clx49BookingInput(r,'Equipment Provider');
+    html+=clx49BookingInput(r,'Vessel / Slot Operator');
+    html+='</div></div>';
+
+    html+='<div class="bookingOps"><div class="bookingOpsHead">Parties / Agents</div><div class="bookingPartyGrid">';
+    html+=clx49BookingPartyBox(r,'Commercial Parties',['Customer','Booking Party','Shipper','Consignee','Notify Party']);
+    html+=clx49BookingPartyBox(r,'Operational Agents',['Agent','POL Agent','POT Agent','POD Agent','Operations Owner']);
+    html+='</div><div class="bookingOpsGrid">';
+    html+=clx49BookingInput(r,'Sales Person');
+    html+=clx49BookingInput(r,'Commercial Owner');
+    html+=clx49BookingInput(r,'Bill-To / Revenue Party');
+    html+=clx49BookingInput(r,'Cost Party');
+    html+=clx49BookingInput(r,'Finance / Credit Party');
+    html+='</div></div>';
+
+    html+='<div class="bookingOps"><div class="bookingOpsHead">Cargo / Equipment</div><div class="bookingCargoWrap"><table class="bookingCargo"><thead><tr>'+
+      '<th>Equipment</th><th>Qty</th><th>Commodity</th><th>Packages</th><th>Pkg Type</th><th>Weight</th><th>Volume</th><th>Chargeable</th><th>Origin</th><th>Destination</th><th>SI Cut-off</th><th>VGM Cut-off</th><th>Gate-in Cut-off</th>'+
+      '</tr></thead><tbody><tr>'+
+      ['Equipment','Quantity','Commodity','Packages','Package Type','Weight','Volume','Chargeable Weight','Origin','Destination','SI Cut-off','VGM Cut-off','Gate-in Cut-off'].map(n=>'<td><input data-clx49-field="'+esc(n)+'" value="'+esc(p[n]??'')+'"></td>').join('')+
+      '</tr></tbody></table></div>';
+    html+='<div class="bookingTotals"><span><b>Equipment:</b> '+esc(p['Equipment']||'—')+'</span><span><b>Quantity:</b> '+esc(p['Quantity']||'0')+'</span><span><b>Packages:</b> '+esc(p['Packages']||'0')+'</span><span><b>Weight:</b> '+esc(p['Weight']||'0')+'</span><span><b>Volume:</b> '+esc(p['Volume']||'0')+'</span><span class="muted">Single authoritative booking cargo record — no duplicate model created.</span></div></div>';
+
+    html+='<div class="bookingOps"><div class="bookingOpsHead">Commercial / References</div><div class="bookingOpsGrid">';
+    html+=clx49BookingInput(r,'Freight Term');
+    html+=clx49BookingInput(r,'Rate / Quote Ref');
+    html+=clx49BookingInput(r,'Cargo','span3');
+    html+='</div></div>';
   }else{
     html+='<div class="card"><b>Other Info</b>'+clx49FieldEditor(r,other)+'</div>';
   }
-  if(r)html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(tab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
-  $('gridArea').innerHTML=renderGrid()+html;
+
+  if(r)html+='<div class="bookingStickyActions"><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save Booking</button></div>';
+  $('gridArea').innerHTML=html;
   if(tab==='Booking Info'){
     for(const n of ['Via Port','Transshipment Port'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
     clx49BookingTogglePot();
