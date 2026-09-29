@@ -294,6 +294,52 @@ function clx49BookingTogglePot(){
 function clx49BookingPartyBox(record,title,fields){
   return '<div class="bookingPartyBox"><h4>'+esc(title)+'</h4><div class="bookingOpsGrid" style="grid-template-columns:repeat(2,minmax(120px,1fr));padding:0">'+fields.map(n=>clx49BookingInput(record,n,n==='Notify Party'?'span2':'')).join('')+'</div></div>';
 }
+async function cwOpenLinked(screenId){
+  const jr=clx49Workspace?.context?.job_ref||selectedJob();
+  if(!jr)return;
+  await openScreen(screenId);
+  const i=state.rows.findIndex(r=>String(r.job_ref??r['Job Ref']??'')===String(jr));
+  if(i>=0){
+    state.selected=state.rows[i];
+    await renderQuickActions();
+    if(CLX49_KEYS.has(state.current?.key))await showClx049Workspace();
+    else if(state.current?.domain==='Agent Tasks'){
+      $('gridArea').innerHTML=renderGrid();
+      await renderInlineAgentScreen();
+    }else openDrawer('details');
+  }
+}
+async function cwCreateLinked(screenId){
+  const jr=clx49Workspace?.context?.job_ref||selectedJob();
+  await openScreen(screenId);
+  await openAgentForm('create');
+  const el=$('clx42Job');if(el&&jr)el.value=jr;
+}
+function cwFocus(sel){
+  const el=document.querySelector(sel);if(el){el.scrollIntoView({behavior:'smooth',block:'center'});el.focus?.()}
+}
+function cwBookingMenu(action){
+  if(action==='new')return openAgentForm('create');
+  if(action==='edit')return openAgentForm('edit');
+  if(action==='save'&&clx49Workspace?.booking)return saveClx049Tab('booking',clx49Workspace.booking.id,clx49Workspace.booking.version);
+  if(action==='print')return window.print();
+  if(action==='audit')return openDrawer('audit');
+  if(action==='email')return runAction('email');
+  if(action==='bl')return cwOpenLinked('agent-tasks::bl');
+  if(action==='delivery')return cwOpenLinked('agent-tasks::delivery-order');
+  if(action==='planning')return cwOpenLinked('agent-tasks::planning');
+  if(action==='containers')return cwOpenLinked('agent-tasks::container-activity');
+  if(action==='tracking')return cwOpenLinked('agent-tasks::vessel-lock');
+  if(action==='invoice')return cwOpenLinked('gl-accounts::invoice');
+  if(action==='bills')return cwOpenLinked('gl-accounts::bills');
+  if(action==='profit')return cwOpenLinked('gl-accounts::profit-loss');
+  if(action==='other')return clx49RenderBooking('Other Info');
+}
+function cwCheck(record,name,label,checkedDefault=false){
+  const val=String(record?.fields?.[name]??'').toUpperCase();
+  const checked=val?['YES','TRUE','1','Y'].includes(val):checkedDefault;
+  return '<label class="cwCheck"><input type="checkbox" data-clx49-field="'+esc(name)+'" '+(checked?'checked':'')+'> '+esc(label)+'</label>';
+}
 function clx49RenderBooking(tab){
   const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
   const p=r?.fields||{};
@@ -302,8 +348,34 @@ function clx49RenderBooking(tab){
   const field=(label,n,cls='',inputCls='')=>'<div class="cwField '+cls+'"><label>'+esc(label)+'</label>'+inp(n,inputCls)+'</div>';
   let html=clx49ContextHeader(w)+clx49Nav(w);
   html+='<div class="cwShell">';
-  html+='<div class="cwMenuBar"><span>File</span><span>Edit</span><span>View</span><span>Actions</span><span>Electronic Messaging</span><span>Documents</span><span>Job Invoicing</span><span>Help</span></div>';
-  html+='<div class="cwPrimaryTabs"><button class="active">Details</button><button>Routing</button><button>Containers</button><button>Packing</button><button>Workflow & Tracking</button><button>AWB</button><button>Electronic Messaging</button><button>AR and AP Invoices</button><button>Consol Profit/Loss</button><button>Consol Costing</button><button>Doc Data</button><button>Addresses</button><button>eDocs</button><button>Notes</button><button>Logs</button></div>';
+  html+='<div class="cwMenuBar">'+
+    '<button onclick="cwBookingMenu(\'new\')">File</button>'+
+    '<button onclick="cwBookingMenu(\'edit\')">Edit</button>'+
+    '<button onclick="cwBookingMenu(\'print\')">View</button>'+
+    '<button onclick="$(\'fabWrap\').classList.add(\'open\')">Actions</button>'+
+    '<button onclick="cwBookingMenu(\'email\')">Electronic Messaging</button>'+
+    '<button onclick="cwBookingMenu(\'bl\')">Documents</button>'+
+    '<button onclick="cwBookingMenu(\'invoice\')">Job Invoicing</button>'+
+    '<button onclick="openDrawer(\'details\')">Help</button>'+
+  '</div>';
+  html+='<div class="cwPrimaryTabs">'+
+    '<button class="active" onclick="clx49RenderBooking(\'Booking Info\')">Details</button>'+
+    '<button onclick="cwBookingMenu(\'planning\')">Routing</button>'+
+    '<button onclick="cwBookingMenu(\'containers\')">Containers</button>'+
+    '<button onclick="cwFocus(\'.cwCargoGridWrap\')">Packing</button>'+
+    '<button onclick="cwBookingMenu(\'tracking\')">Workflow & Tracking</button>'+
+    '<button onclick="cwBookingMenu(\'bl\')">AWB / B/L</button>'+
+    '<button onclick="cwBookingMenu(\'email\')">Electronic Messaging</button>'+
+    '<button onclick="cwBookingMenu(\'invoice\')">AR Invoice</button>'+
+    '<button onclick="cwBookingMenu(\'bills\')">AP Invoice</button>'+
+    '<button onclick="cwBookingMenu(\'profit\')">Consol Profit/Loss</button>'+
+    '<button onclick="cwBookingMenu(\'bills\')">Consol Costing</button>'+
+    '<button onclick="cwBookingMenu(\'bl\')">Doc Data</button>'+
+    '<button onclick="cwFocus(\'.cwAgentGrid\')">Addresses</button>'+
+    '<button onclick="cwBookingMenu(\'bl\')">eDocs</button>'+
+    '<button onclick="cwBookingMenu(\'other\')">Notes</button>'+
+    '<button onclick="cwBookingMenu(\'audit\')">Logs</button>'+
+  '</div>';
   html+='<div class="cwWorkspace">';
   if(tab==='Booking Info'){
     html+='<div class="cwTopGrid">';
@@ -314,8 +386,8 @@ function clx49RenderBooking(tab){
     html+=field('Transport','Transport Mode','cwSpan2');
     html+=field('Container Mode','Container Mode');
     html+=field('Status','Status');
-    html+='<label class="cwCheck"><input type="checkbox"> Domestic</label>';
-    html+='<label class="cwCheck"><input type="checkbox"> Is Load</label>';
+    html+=cwCheck(r,'Domestic','Domestic');
+    html+=cwCheck(r,'Is Load','Is Load');
     html+=field('Last Discharge','POD','cwSpan2');
     html+=field('Phase','Booking Date');
     html+=field('Flight / Vessel','Vessel','cwSpan2');
@@ -326,7 +398,10 @@ function clx49RenderBooking(tab){
     html+=field('Discharge','Via Port','','cwWarn');
     html+=field('ETA','ETA','','cwDate');
     html+=field('ATA','ATA');
-    html+='<label class="cwCheck"><input type="checkbox"> Is Domestic</label><label class="cwCheck"><input type="checkbox" checked> Is Linked</label><label class="cwCheck"><input type="checkbox"> Is Charter</label><label class="cwCheck"><input type="checkbox" checked> Is Cargo Only</label>';
+    html+=cwCheck(r,'Is Domestic','Is Domestic');
+    html+=cwCheck(r,'Is Linked','Is Linked',true);
+    html+=cwCheck(r,'Is Charter','Is Charter');
+    html+=cwCheck(r,'Is Cargo Only','Is Cargo Only',true);
     html+=field('Svc. Lvl','Service Level');
     html+=field('MAWB / Booking','Carrier Booking Ref','cwSpan2');
     html+=field('Payment','Freight Term');
@@ -334,22 +409,38 @@ function clx49RenderBooking(tab){
     html+='</div></div>';
 
     html+='<div class="cwGroup"><div class="cwGroupTitle">Organizations</div>';
-    html+='<div class="cwSecondaryTabs"><button class="active">Organizations</button><button>Departure</button><button>Arrival</button><button>Docs</button><button>Pre-Allocation</button><button>Archived Quantities</button><button>Numbers</button><button>Additional Detail</button></div>';
+    html+='<div class="cwSecondaryTabs">'+
+      '<button class="active" onclick="cwFocus(\'.cwAgentGrid\')">Organizations</button>'+
+      '<button onclick="cwBookingMenu(\'planning\')">Departure</button>'+
+      '<button onclick="cwBookingMenu(\'delivery\')">Arrival</button>'+
+      '<button onclick="cwBookingMenu(\'bl\')">Docs</button>'+
+      '<button onclick="cwBookingMenu(\'planning\')">Pre-Allocation</button>'+
+      '<button onclick="cwBookingMenu(\'containers\')">Archived Quantities</button>'+
+      '<button onclick="cwFocus(\'[data-clx49-field=&quot;Booking No.&quot;]\')">Numbers</button>'+
+      '<button onclick="cwBookingMenu(\'other\')">Additional Detail</button>'+
+    '</div>';
     html+='<div class="cwAgentGrid"><div class="cwAgentBox"><div class="cwAgentHead">Sending Agent</div><div class="cwAgentBody">'+field('Agent','POL Agent','cwSpan2')+field('Address','Shipper','cwSpan2')+'<div class="cwAgentEmpty">'+(p['POL Agent']?'Selected organization':'* NO ORGANIZATION IS SELECTED')+'</div></div></div>';
     html+='<div class="cwAgentBox"><div class="cwAgentHead">Receiving Agent</div><div class="cwAgentBody">'+field('Agent','POD Agent','cwSpan2')+field('Address','Consignee','cwSpan2')+'<div class="cwAgentEmpty">'+(p['POD Agent']?'Selected organization':'* NO ORGANIZATION IS SELECTED')+'</div></div></div></div>';
-    html+='<div class="cwCarrierRow"><label>Carrier</label>'+inp('Carrier')+'<button>...</button><select><option>(None Selected)</option></select>'+inp('Vessel / Slot Operator')+'<button>⌄</button></div>';
-    html+='<div class="cwCarrierRow"><label>Creditor</label>'+inp('Cost Party')+'<button>...</button><select><option>(None Selected)</option></select>'+inp('Finance / Credit Party')+'<button>⌄</button></div>';
+    html+='<div class="cwCarrierRow"><label>Carrier</label>'+inp('Carrier')+'<button onclick="cwFocus(\'[data-clx49-field=&quot;Carrier&quot;]\')">...</button>'+inp('Container Owner')+inp('Vessel / Slot Operator')+'<button onclick="cwBookingMenu(\'containers\')">⌄</button></div>';
+    html+='<div class="cwCarrierRow"><label>Creditor</label>'+inp('Cost Party')+'<button onclick="cwBookingMenu(\'bills\')">...</button>'+inp('Bill-To / Revenue Party')+inp('Finance / Credit Party')+'<button onclick="cwBookingMenu(\'invoice\')">⌄</button></div>';
+    html+='<div class="cwCarrierRow"><label>POL Agent</label>'+inp('POL Agent')+'<span></span><label>POT Agent</label>'+inp('POT Agent')+'<span></span></div>';
     html+='<div class="cwCarrierRow"><label>Carrier Bkg. Ref</label>'+inp('Carrier Booking Ref')+'<span></span><label>Agents Reference</label>'+inp('Booking No.')+'<span></span></div>';
     html+='</div></div>';
 
     html+='<div class="cwCargoGridWrap"><table class="cwCargoGrid"><thead><tr><th></th><th>Shipment ID</th><th>Consignee</th><th>Shipper</th><th>Origin</th><th>Dest.</th><th>House Bill Number</th><th>Packs</th><th>Type</th><th>Inners</th><th>Type</th><th>Weight</th><th>U/W</th><th>Volume</th><th>U/V</th><th>Inspection</th><th>ETD</th><th>ETA</th><th>Department</th></tr></thead><tbody><tr><td>*</td>'+
       ['Booking No.','Consignee','Shipper','Origin','Destination','BL No.','Packages','Package Type','Inners','Inner Type','Weight','Weight Unit','Volume','Volume Unit','Inspection','ETD','ETA','Department'].map(n=>'<td><input data-clx49-field="'+esc(n)+'" value="'+v(n)+'"></td>').join('')+
-      '</tr><tr><td>*</td>'+Array.from({length:18},()=>'<td></td>').join('')+'</tr></tbody></table></div>';
+      '</tr></tbody></table></div>';
 
-    html+='<div class="cwBottomBar"><label class="cwCheck"><input type="checkbox"> Show Sub\'s</label>';
+    html+='<div class="cwBottomBar"><label class="cwCheck"><input type="checkbox" data-clx49-field="Show Subs" '+(String(p['Show Subs']||'').toUpperCase()==='YES'?'checked':'')+'> Show Sub\'s</label>';
     html+='<div class="cwMetric">Ship. Count <span>1</span></div><div class="cwMetric">Packs <span>'+v('Packages')+'</span></div><div class="cwMetric">Weight <span>'+v('Weight')+'</span></div><div class="cwMetric">Volume <span>'+v('Volume')+'</span></div><div class="cwMetric">Chargeable <span>'+v('Chargeable Weight')+'</span></div>';
     html+='<div class="cwMetric">Prepaid <span>'+v('Prepaid')+'</span></div><div class="cwMetric">Collect <span>'+v('Collect')+'</span></div>';
-    html+='<div class="cwActions"><button onclick="openAgentForm(\'create\')">□ New</button><button onclick="openAgentForm(\'edit\')">✎ Edit</button><button onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">● Save</button></div></div>';
+    html+='<div class="cwActions">'+
+      '<button onclick="openAgentForm(\'create\')">□ New</button>'+
+      '<button onclick="openAgentForm(\'edit\')">✎ Edit</button>'+
+      '<button onclick="cwCreateLinked(\'agent-tasks::container-activity\')">＋ Add Shipment/Container</button>'+
+      '<button onclick="cwBookingMenu(\'bl\')">▣ Documents</button>'+
+      '<button onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">● Save</button>'+
+    '</div></div>';
   }else{
     html+='<div class="card"><b>Other Info</b>'+clx49FieldEditor(r,Object.keys(p))+'</div>';
   }
@@ -382,7 +473,7 @@ async function showClx049Workspace(){
 }
 async function saveClx049Tab(module,id,version){
   try{
-    const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.value);
+    const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=(el.type==='checkbox'?(el.checked?'YES':'NO'):el.value));
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
     await api('/api/v1/'+module+'/'+id,{method:'PUT',headers,body:JSON.stringify({version,fields})});
     const jr=clx49Workspace.context.job_ref;
