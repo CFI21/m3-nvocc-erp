@@ -174,16 +174,53 @@ function clx49RenderBlTab(tab){
   html+='</div>';
   $('gridArea').innerHTML=renderGrid()+html;
 }
+function clx49BookingSection(record,title,fields,opts={}){
+  if(!record)return '<div class="card empty">No existing authoritative record for this job.</div>';
+  const p=record.fields||{};
+  const via=String(p['Via Port']||p['Transshipment Port']||'').trim();
+  const body=fields.filter(name=>name!=='Job Ref').map(name=>{
+    const full=/instruction|remarks|description|reason|authorization|notify/i.test(name);
+    const val=p[name]??'';
+    const potDisabled=opts.potAware&&name==='POT Agent'&&!via;
+    const dis=potDisabled?' disabled title="Active only when Via / Transshipment Port is entered"':'';
+    return '<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+(potDisabled?' <span class="muted">(inactive)</span>':'')+'</label>'+
+      (full?'<textarea data-clx49-field="'+esc(name)+'"'+dis+'>'+esc(val)+'</textarea>':'<input data-clx49-field="'+esc(name)+'" value="'+esc(val)+'"'+dis+'>')+'</div>';
+  }).join('');
+  return '<div class="card"><div class="toolbar"><b>'+esc(title)+'</b></div><div class="formGrid">'+body+'</div></div>';
+}
 function clx49RenderBooking(tab){
   const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
-  const core=['Booking No.','Job Ref','Customer','Agent','Carrier','Carrier Booking Ref','POL','POD','Vessel','Voyage','Equipment','Quantity','Booking Date','Status'];
-  const other=Object.keys(r?.fields||{}).filter(k=>!core.includes(k));
+  const basicRouting=['Booking No.','Booking Date','Status','Carrier Booking Ref','POL','Via Port','Transshipment Port','POD','Vessel','Voyage'];
+  const parties=['Customer','Booking Party','Shipper','Consignee','Notify Party','Agent'];
+  const operationalControl=[
+    'Container Owner','SOC / COC','Equipment Provider','Carrier','Vessel / Slot Operator',
+    'POL Agent','POT Agent','POD Agent','Operations Owner','Sales Person',
+    'Commercial Owner','Bill-To / Revenue Party','Cost Party','Finance / Credit Party'
+  ];
+  const cargoEquipment=['Equipment','Quantity','Commodity','Packages','Weight','Measurement'];
+  const grouped=[...basicRouting,...parties,...operationalControl,...cargoEquipment,'Job Ref'];
+  const other=Object.keys(r?.fields||{}).filter(k=>!grouped.includes(k));
   let html=clx49ContextHeader(w)+clx49Nav(w);
   html+='<div class="card"><div class="toolbar">'+CLX49_BOOKING_TABS.map(t=>'<button class="btn '+(t===tab?'primary':'')+'" onclick="clx49RenderBooking(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div></div>';
-  html+='<div class="card"><b>'+esc(tab)+'</b>'+clx49FieldEditor(r,tab==='Booking Info'?core:other);
-  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(tab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div>';
-  html+='</div>';
+  if(tab==='Booking Info'){
+    html+=clx49BookingSection(r,'Booking Basic & Routing',basicRouting,{potAware:true});
+    html+=clx49BookingSection(r,'Parties',parties);
+    html+=clx49BookingSection(r,'Operational Control',operationalControl,{potAware:true});
+    html+=clx49BookingSection(r,'Cargo & Equipment',cargoEquipment);
+  }else{
+    html+='<div class="card"><b>'+esc(tab)+'</b>'+clx49FieldEditor(r,other)+'</div>';
+  }
+  if(r)html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(tab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
   $('gridArea').innerHTML=renderGrid()+html;
+  if(tab==='Booking Info'){
+    const refreshPot=()=>{
+      const via=[...document.querySelectorAll('[data-clx49-field="Via Port"],[data-clx49-field="Transshipment Port"]')].some(el=>String(el.value||'').trim());
+      const pot=document.querySelector('[data-clx49-field="POT Agent"]');
+      if(pot){pot.disabled=!via;pot.title=via?'':'Active only when Via / Transshipment Port is entered';}
+    };
+    document.querySelectorAll('[data-clx49-field="Via Port"],[data-clx49-field="Transshipment Port"]').forEach(el=>el.addEventListener('input',refreshPot));
+    refreshPot();
+  }
 }
 function clx49RenderSpecialRate(){
   const w=clx49Workspace,r=w.special_rate_request;
