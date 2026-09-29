@@ -98,7 +98,55 @@ async function drillGlReportRow(i){
     $('tab-details').innerHTML='<pre class=pre>'+esc(JSON.stringify(d,null,2))+'</pre>';drawerTabs('details');$('drawer').classList.add('open');
   }catch(e){alert(e.message)}
 }
-async function openScreen(id,navContext=null){let s=state.byId[id];if(!s)return;$('favorite').style.visibility='visible';state.current=s;state.navContext=navContext;state.selected=null;state.page=1;state.sortKey='';state.status='';state.savedView='';addRecent(id);renderNav();renderBreadcrumb();renderFlow();history.replaceState(null,'','#screen='+encodeURIComponent(id));if(GL_REPORT_KEYS.has(s.key)){await reloadGlReport();api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});return}$('gridArea').innerHTML='<div class=card>Loading persisted screen data…</div>';try{let d=await api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers:{'X-Role':state.role}});state.rows=normalizeRows(d.rows);$('screenMeta').innerHTML=metaCards(d);$('gridArea').innerHTML=renderGrid();await renderQuickActions();api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{})}catch(e){$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}}
+async function openScreen(id,navContext=null){
+  let s=state.byId[id];if(!s)return;
+  $('favorite').style.visibility='visible';state.current=s;state.navContext=navContext;state.selected=null;state.page=1;state.sortKey='';state.status='';state.savedView='';
+  addRecent(id);renderNav();renderBreadcrumb();renderFlow();history.replaceState(null,'','#screen='+encodeURIComponent(id));
+  if(GL_REPORT_KEYS.has(s.key)){await reloadGlReport();api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});return}
+  $('gridArea').innerHTML='<div class=card>Loading active screen…</div>';
+  try{
+    let d=await api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers:{'X-Role':state.role}});
+    state.rows=normalizeRows(d.rows);$('screenMeta').innerHTML=metaCards(d);
+    if(CLX49_KEYS.has(s.key)&&state.rows.length){
+      state.selected=state.rows[0];
+      await renderQuickActions();
+      await showClx049Workspace();
+    }else if(s.domain==='Agent Tasks'&&state.rows.length){
+      state.selected=state.rows[0];
+      await renderQuickActions();
+      $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Screen</b><span class="muted">Existing CLX-042 functional form · authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button><button class="btn" onclick="openAgentForm(\'create\')">New '+esc(s.name)+'</button></div></div>';
+      await renderInlineAgentScreen();
+    }else{
+      $('gridArea').innerHTML=renderGrid();await renderQuickActions();
+    }
+    api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});
+  }catch(e){$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
+}
+async function renderInlineAgentScreen(){
+  if(!state.current||state.current.domain!=='Agent Tasks'||!state.selected)return;
+  try{
+    const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode=edit');
+    const base={...rowPayload(state.selected)};
+    const fields=schema.fields||[];
+    let html='<div class="card"><div class="formGrid">';
+    if(schema.kind==='AGENT_TRANSACTION'){
+      html+='<div class="formField"><label>Job Ref</label><input value="'+esc(selectedJob()||base['Job Ref']||'')+'" disabled></div>';
+      html+='<div class="formField"><label>External Ref</label><input value="'+esc(state.selected.external_ref||'')+'" disabled></div>';
+      for(const name of fields){
+        if(name==='Job Ref')continue;
+        const full=/remarks|notes|instruction|description/i.test(name);
+        html+='<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+(full?'<textarea disabled>'+esc(fieldValue(name,base))+'</textarea>':'<input value="'+esc(fieldValue(name,base))+'" disabled>')+'</div>';
+      }
+    }else{
+      html+='<div class="formField"><label>Record Key</label><input value="'+esc(state.selected.record_key||'')+'" disabled></div>';
+      html+='<div class="formField"><label>Name</label><input value="'+esc(state.selected.display_name||base.name||'')+'" disabled></div>';
+    }
+    html+='</div><div class="formActions"><button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Active Screen</button><button class="btn" onclick="openAgentForm(\'create\')">Create New</button></div></div>';
+    $('gridArea').insertAdjacentHTML('beforeend',html);
+  }catch(e){
+    $('gridArea').insertAdjacentHTML('beforeend','<div class="card"><b class="badtext">Active form unavailable</b><div class="muted">'+esc(e.message)+'</div></div>');
+  }
+}
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
 async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
