@@ -40,6 +40,7 @@ from .clx046_treasury_hardening import router as clx046_treasury_hardening_route
 from .clx047_integration_hardening import router as clx047_integration_hardening_router
 from .clx048_admin_masterdata_hardening import router as clx048_admin_masterdata_hardening_router
 from .clx049_booking_bl_workspace import router as clx049_booking_bl_workspace_router
+from .clx070_equipment_runtime import router as clx070_equipment_runtime_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -68,6 +69,7 @@ app.include_router(clx046_treasury_hardening_router)
 app.include_router(clx047_integration_hardening_router)
 app.include_router(clx048_admin_masterdata_hardening_router)
 app.include_router(clx049_booking_bl_workspace_router)
+app.include_router(clx070_equipment_runtime_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
