@@ -1,0 +1,38 @@
+name: CLX-070 Staging Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "web/equipment-runtime.html"
+      - "Dockerfile.web"
+      - ".github/workflows/clx070-staging-smoke.yml"
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Render image services
+        run: sleep 35
+      - name: Verify staging endpoints and traffic lock
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          curl --fail --silent --show-error --retry 8 --retry-delay 4 --retry-all-errors "$WEB/healthz" -o /tmp/web-health.json
+          curl --fail --silent --show-error --retry 8 --retry-delay 4 --retry-all-errors "$WEB/equipment-runtime.html" -o /tmp/equipment.html
+          curl --fail --silent --show-error --retry 8 --retry-delay 4 --retry-all-errors "$API/api/v1/health" -o /tmp/api-health.json
+          code=$(curl --silent --output /tmp/locked.json --write-out "%{http_code}" "$API/api/clx070/equipment/readiness")
+          test "$code" = "503"
+          grep -q "CLX-070 Equipment Runtime" /tmp/equipment.html
+          grep -q "PRODUCTION_TRAFFIC_LOCKED" /tmp/locked.json
+          python - <<'PY'
+          import json
+          w=json.load(open('/tmp/web-health.json'))
+          a=json.load(open('/tmp/api-health.json'))
+          assert w['status']=='ok',w
+          assert a['project']=='M3 NVOCC ERP',a
+          print('CLX070_STAGING_SMOKE_PASS')
+          PY
