@@ -1,0 +1,61 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>M3 CLX-070 Equipment Runtime</title>
+<style>
+body{font:12px Arial;margin:0;background:#f4f6f8;color:#1f2937}.top{display:flex;gap:8px;align-items:center;padding:10px 14px;background:#fff;border-bottom:1px solid #d5dbe3;position:sticky;top:0}.top b{font-size:16px}.grow{flex:1}input,select,button{font:inherit;padding:7px;border:1px solid #b8c2cf;border-radius:4px;background:#fff}button{cursor:pointer}.primary{background:#2f6b55;color:#fff}.wrap{padding:12px}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px}.card{background:#fff;border:1px solid #d7dde5;border-radius:5px;padding:9px}.card b{display:block;font-size:18px;margin-top:4px}.panel{background:#fff;border:1px solid #d7dde5;margin-top:8px}.head{padding:7px 9px;background:#edf2f5;border-bottom:1px solid #d7dde5;font-weight:bold}.bar{display:flex;gap:6px;flex-wrap:wrap;align-items:end;padding:8px}.bar label{display:grid;gap:3px;font-size:10px;font-weight:bold}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:6px;border-bottom:1px solid #e7ebf0;text-align:left;white-space:nowrap}.table th{background:#f3f5f7}.msg{padding:8px}.ok{color:#027a48}.warn{color:#b54708}.bad{color:#b42318}@media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}
+</style></head><body>
+<div class="top"><b>M3 NVOCC ERP · CLX-070 Equipment Runtime</b><span class="grow"></span>
+<input id="token" type="password" placeholder="Controlled UAT token"><button onclick="saveToken()">Use Token</button>
+<button onclick="loadAll()">Refresh</button></div>
+<div class="wrap">
+<div id="ready" class="msg">Loading readiness…</div>
+<div class="grid">
+<div class="card">Total Containers<b id="kTotal">0</b></div>
+<div class="card">Available<b id="kAvailable">0</b></div>
+<div class="card">Reserved<b id="kReserved">0</b></div>
+<div class="card">In Transit<b id="kTransit">0</b></div>
+<div class="card">Repair<b id="kRepair">0</b></div>
+</div>
+<div class="panel"><div class="head">Availability / Allocation</div>
+<div class="bar">
+<label>Port<input id="port" value="Karachi"></label>
+<label>Agent<input id="agent" value="Agent A"></label>
+<label>Type<select id="type"><option>40HC</option><option>20GP</option><option>40RF</option></select></label>
+<label>Qty<input id="qty" type="number" value="2" min="1"></label>
+<label>Safety<input id="safety" type="number" value="0" min="0"></label>
+<label>Booking Ref<input id="booking" value="CLX070-UAT"></label>
+<button onclick="checkAvail()">Check Availability</button>
+<button class="primary" onclick="allocate()">Allocate</button>
+</div><div id="availMsg" class="msg"></div></div>
+<div class="panel"><div class="head">Authoritative Container Master</div>
+<table class="table"><thead><tr><th>Container</th><th>Type</th><th>Ownership</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Condition</th><th>Booking</th></tr></thead><tbody id="containers"></tbody></table></div>
+<div class="panel"><div class="head">Equipment Work Items</div>
+<table class="table"><thead><tr><th>Ref</th><th>Type</th><th>Status</th><th>Booking</th><th>Equipment</th><th>Qty</th><th>From</th><th>To</th><th>Cost</th></tr></thead><tbody id="work"></tbody></table></div>
+</div>
+<script>
+const API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
+const $=id=>document.getElementById(id);
+function saveToken(){sessionStorage.setItem('M3_UAT_TOKEN',$('token').value||'');loadAll()}
+function headers(){let h={'X-Role':'OPS'};let t=sessionStorage.getItem('M3_UAT_TOKEN')||'';if(t)h['X-M3-UAT-Token']=t;return h}
+async function api(url,opt={}){let r=await fetch(API_BASE+url,{...opt,headers:{'Content-Type':'application/json',...headers(),...(opt.headers||{})}});let x=await r.json().catch(()=>({}));if(!r.ok)throw new Error(JSON.stringify(x));return x}
+async function loadAll(){
+ try{
+  let r=await api('/api/clx070/equipment/readiness');
+  $('ready').innerHTML='<span class="'+(r.schema_ready?'ok':'bad')+'"><b>Runtime:</b> '+(r.schema_ready?'READY':'SCHEMA NOT READY')+'</span> · backend '+r.backend+' · production traffic remains OFF';
+  let c=r.counts||{};$('kTotal').textContent=c.total||0;$('kAvailable').textContent=c.available||0;$('kReserved').textContent=c.reserved||0;$('kTransit').textContent=c.in_transit||0;$('kRepair').textContent=c.repair||0;
+  let cm=await api('/api/clx070/equipment/containers?limit=500');
+  $('containers').innerHTML=(cm.records||[]).map(x=>'<tr><td><b>'+x.container_no+'</b></td><td>'+x.size_type+'</td><td>'+x.ownership+'</td><td>'+(x.current_port||'')+'</td><td>'+(x.agent_code||'')+'</td><td>'+(x.depot_code||'')+'</td><td>'+x.equipment_status+'</td><td>'+x.condition+'</td><td>'+(x.booking_ref||'')+'</td></tr>').join('');
+  let w=await api('/api/clx070/equipment/work-items?limit=100');
+  $('work').innerHTML=(w.records||[]).map(x=>'<tr><td>'+x.work_ref+'</td><td>'+x.work_type+'</td><td>'+x.status+'</td><td>'+(x.booking_ref||'')+'</td><td>'+x.size_type+'</td><td>'+x.qty+'</td><td>'+(x.source_port||'')+'</td><td>'+(x.destination_port||'')+'</td><td>'+x.currency+' '+x.estimated_cost+'</td></tr>').join('');
+ }catch(e){$('ready').innerHTML='<span class="bad">'+e.message+'</span>'}
+}
+async function checkAvail(){
+ try{let q=new URLSearchParams({port:$('port').value,size_type:$('type').value,qty:$('qty').value,safety_stock:$('safety').value,agent_code:$('agent').value});let r=await api('/api/clx070/equipment/availability?'+q);$('availMsg').innerHTML='Physical '+r.physical_available+' · usable '+r.usable_available+' · proposed '+r.proposed_count+' · <b>shortage '+r.shortage+'</b><br>'+r.proposed_containers.map(x=>x.container_no).join(', ')}
+ catch(e){$('availMsg').textContent=e.message}
+}
+async function allocate(){
+ try{let r=await api('/api/clx070/equipment/allocate',{method:'POST',body:JSON.stringify({booking_ref:$('booking').value,port:$('port').value,agent_code:$('agent').value,size_type:$('type').value,qty:Number($('qty').value),safety_stock:Number($('safety').value)})});$('availMsg').innerHTML='<span class="ok">Allocated '+r.allocated_qty+'</span> · shortage '+r.shortage+' · '+r.allocated.join(', ');loadAll()}
+ catch(e){$('availMsg').textContent=e.message}
+}
+$('token').value=sessionStorage.getItem('M3_UAT_TOKEN')||'';loadAll();
+</script></body></html>
