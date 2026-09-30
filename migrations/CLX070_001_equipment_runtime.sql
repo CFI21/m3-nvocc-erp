@@ -24,11 +24,11 @@ ALTER TABLE public.containers ADD COLUMN IF NOT EXISTS updated_at text;
 
 UPDATE public.containers c
 SET
-  current_port = COALESCE(current_port,j.pol),
-  agent_code = COALESCE(agent_code,a.code),
-  equipment_status = COALESCE(NULLIF(equipment_status,''),'RESERVED'),
-  booking_ref = COALESCE(booking_ref,b.booking_ref),
-  updated_at = COALESCE(updated_at,now()::text)
+  current_port = COALESCE(c.current_port,j.pol),
+  agent_code = COALESCE(c.agent_code,a.code),
+  equipment_status = CASE WHEN c.job_id IS NOT NULL THEN 'RESERVED' ELSE COALESCE(NULLIF(c.equipment_status,''),'AVAILABLE') END,
+  booking_ref = COALESCE(c.booking_ref,b.booking_ref),
+  updated_at = COALESCE(c.updated_at,now()::text)
 FROM public.jobs j
 JOIN public.agents a ON a.id=j.agent_id
 JOIN public.bookings b ON b.id=j.booking_id
