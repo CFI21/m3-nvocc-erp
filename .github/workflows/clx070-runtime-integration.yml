@@ -1,0 +1,41 @@
+name: CLX-070 Real Runtime Integration
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/clx070_equipment_runtime.py"
+      - "app/main.py"
+      - "app/static/M3_NVOCC_ERP_CLX-070_EQUIPMENT_RUNTIME.html"
+      - "migrations/CLX070_001_equipment_runtime.sql"
+      - "tests/test_clx070_equipment_runtime.py"
+      - "web/index.html"
+      - ".github/workflows/clx070-runtime-integration.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/clx070_equipment_runtime.py"
+      - "app/main.py"
+      - "app/static/M3_NVOCC_ERP_CLX-070_EQUIPMENT_RUNTIME.html"
+      - "migrations/CLX070_001_equipment_runtime.sql"
+      - "tests/test_clx070_equipment_runtime.py"
+      - "web/index.html"
+      - ".github/workflows/clx070-runtime-integration.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m py_compile app/*.py
+          PYTHONPATH=. python -c "import app.main; print('CLX070_IMPORT_OK')"
+          PYTHONPATH=. pytest -q tests/test_clx070_equipment_runtime.py tests/test_clx016_postgres_adapter.py
+          grep -q "M3_PRODUCTION_TRAFFIC" app/main.py
+          grep -q "PRODUCTION_TRAFFIC_LOCKED" app/main.py
+          grep -q '"production_traffic": "OFF"' CLX070_ACCEPTANCE_MANIFEST.json
