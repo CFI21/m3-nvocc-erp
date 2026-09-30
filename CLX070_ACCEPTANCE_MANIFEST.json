@@ -1,0 +1,20 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-070",
+  "title": "Real Runtime Integration + Staging Deployment",
+  "parent": "CLX-069 GO-LIVE-READY",
+  "scope": [
+    "Extend existing containers table; no parallel container inventory",
+    "Persistent availability/allocation/work-item/movement APIs",
+    "Reposition/lease/purchase/repair/agent/SOC work-item persistence",
+    "Maker/checker decision control",
+    "Controlled UAT while production traffic remains OFF"
+  ],
+  "safety": {
+    "production_traffic": "OFF",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "ancline": "UNTOUCHED",
+    "deployment_target": "STAGING/LATEST M3 SERVICES ONLY"
+  }
+}
