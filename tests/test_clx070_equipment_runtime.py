@@ -1,6 +1,6 @@
 def test_clx070_router_is_mounted():
     import app.main as main
-    paths={getattr(r,'path',None) for r in main.app.routes if getattr(r,'path',None)}
+    paths=set(main.app.openapi()['paths'])
     assert "/api/clx070/equipment/readiness" in paths
     assert "/api/clx070/equipment/availability" in paths
     assert "/api/clx070/equipment/allocate" in paths
