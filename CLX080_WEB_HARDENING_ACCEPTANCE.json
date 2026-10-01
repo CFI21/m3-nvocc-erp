@@ -1,0 +1,25 @@
+{
+  "schema": "M3_CLX080_WEB_HARDENING_ACCEPTANCE_V1",
+  "baseline": "81fb281559067247eaa169c65fc3fec8e1a0d1ee",
+  "scope": "WEB_CACHE_VERSION_NAVIGATION_ONLY",
+  "backend_model_changed": false,
+  "database_changed": false,
+  "REAL_MONEY_READY": false,
+  "REAL_PROVIDER_READY": false,
+  "checks": {
+    "visible_build_version": "PENDING",
+    "full_sha_embedded_at_build": "PENDING",
+    "no_stale_root_html": "PENDING",
+    "no_stale_index_html": "PENDING",
+    "equipment_deep_link": "PENDING",
+    "screen_deep_link": "PENDING",
+    "browser_back_forward_route": "PENDING",
+    "role_change_preserves_route": "PENDING",
+    "clx079_tower_preserved": "PENDING",
+    "old_clx078_tower_not_reintroduced": "PENDING",
+    "canonical_196_screens": "PENDING",
+    "full_erp_regression": "PENDING",
+    "live_web_smoke": "PENDING"
+  },
+  "status": "PENDING_WORKFLOW"
+}
