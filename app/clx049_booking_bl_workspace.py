@@ -5,7 +5,7 @@ from .db import connect
 router=APIRouter(prefix='/api/clx049',tags=['CLX-049 Booking BL Same Page Workspace'])
 
 BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization']
-BOOKING_TABS=['Booking Info','Other Info']
+BOOKING_TABS=['Booking Info','Equipment','Other Info']
 FLOW_KEYS={'special-rates-request','booking','bl','switch-bl','delivery-order','vessel-lock'}
 
 def _payload(r):
