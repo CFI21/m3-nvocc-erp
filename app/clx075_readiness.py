@@ -33,7 +33,7 @@ def route_coverage():
     from .main import app
     paths=set(app.openapi()["paths"])
     groups={
-      "booking_bl":{"/api/clx049/workspace/jobs/{job_ref}"},
+      "booking_bl":{"/api/clx049/workspace/{job_ref}"},
       "container_master":{"/api/clx070/container-control/containers"},
       "journey":{"/api/clx071/journey/containers/{container_no}/events"},
       "network":{"/api/clx072/network/position"},
