@@ -1,8 +1,8 @@
 {
   "phase": "CLX-077",
   "parent": "8b8da94a7d72c42dbb29f33d381f567ebe74aab1",
-  "status": "TRANSACTION_PASS_PENDING_FINAL_LIVE_UI_SMOKE",
-  "LIVE_SESSION_READY": false,
+  "status": "FINAL_LIVE_SESSION_ACCEPTED",
+  "LIVE_SESSION_READY": true,
   "DUMMY_MONEY_FLOW_READY": true,
   "REAL_MONEY_READY": false,
   "REAL_PROVIDER_READY": false,
@@ -19,5 +19,13 @@
     "real_external_providers": false,
     "dummy_provider_only": true
   },
-  "remaining_gate": "Merge/deploy CLX-077 web/API and smoke the live Dummy Bank Review page + endpoints."
+  "remaining_gate": null,
+  "live_smoke": {
+    "run_id": 36860583786,
+    "api": "PASS",
+    "web": "PASS",
+    "api_url": "https://m3-nvocc-api-latest-1.onrender.com",
+    "web_url": "https://m3-nvocc-web-latest.onrender.com"
+  },
+  "accepted_main_before_evidence_finalize": "08eb6800f3952f9d447c6cabc498528eb4b46cdd"
 }
