@@ -1,0 +1,33 @@
+{
+  "schema": "M3_CLX080_WEB_HARDENING_ACCEPTANCE_V1",
+  "baseline": "81fb281559067247eaa169c65fc3fec8e1a0d1ee",
+  "scope": "WEB_CACHE_VERSION_NAVIGATION_ONLY",
+  "backend_model_changed": false,
+  "database_changed": false,
+  "REAL_MONEY_READY": false,
+  "REAL_PROVIDER_READY": false,
+  "checks": {
+    "visible_build_version": "PASS",
+    "full_sha_embedded_at_build": "PASS",
+    "no_stale_root_html": "PASS",
+    "no_stale_index_html": "PASS",
+    "equipment_deep_link": "PASS",
+    "screen_deep_link": "PASS",
+    "browser_back_forward_route": "PASS",
+    "role_change_preserves_route": "PASS",
+    "clx079_tower_preserved": "PASS",
+    "old_clx078_tower_not_reintroduced": "PASS",
+    "canonical_196_screens": "PASS",
+    "full_erp_regression": "PASS",
+    "live_web_smoke": "PENDING_POST_MERGE"
+  },
+  "status": "ACCEPTED_FOR_SINGLE_PR",
+  "workflow_run_id": 36907703799,
+  "validation": {
+    "focused_web_hardening": "65 passed",
+    "canonical_screen_contract": "196 PASS",
+    "full_erp_regression": "281 passed",
+    "javascript_syntax": "PASS",
+    "safety": "PASS"
+  }
+}

@@ -1,0 +1,55 @@
+name: CLX-080 Live Web Hardening
+
+on:
+  push:
+    branches: [clx080-live-web-cache-routing-hardening]
+  workflow_dispatch:
+
+jobs:
+  clx080:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r requirements.txt pytest
+      - name: Python compile
+        run: python -m py_compile app/*.py
+      - name: Inline JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          h=Path('web/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?:[^>]*)>(.*?)</script>',h,re.S)
+          for i,b in enumerate(blocks):
+              Path(f'/tmp/clx080_{i}.js').write_text(b,encoding='utf-8')
+          PY
+          for f in /tmp/clx080_*.js; do node --check "$f"; done
+      - name: CLX-080 focused web hardening tests
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx080_web_cache_routing.py tests/test_clx079_equipment_tower_ui.py tests/test_clx049_booking_bl_workspace.py tests/test_clx070_final_container_master.py tests/test_clx071_container_journey.py tests/test_clx072_equipment_network.py tests/test_clx073_equipment_cost_optimization.py tests/test_clx074_depot_mr.py tests/test_clx075_final_bulk.py tests/test_clx077_live_dummy_bank.py
+      - name: Canonical 196-screen contract
+        env: {PYTHONPATH: .}
+        run: |
+          python - <<'PY'
+          from app.screen_catalog import build_catalog
+          c=build_catalog()
+          assert c['screen_count']==196
+          assert [x['domain'] for x in c['menu']]==['HO Tasks','Agent Tasks','Treasury / AR-AP','Integration & Security','General / Administration','Master Data']
+          print('CLX080_196_SCREEN_PASS')
+          PY
+      - name: Complete ERP regression
+        env: {PYTHONPATH: .}
+        run: pytest -q
+      - name: Safety assertions
+        run: |
+          grep -q '"REAL_MONEY_READY": false' CLX080_WEB_HARDENING_ACCEPTANCE.json
+          grep -q '"REAL_PROVIDER_READY": false' CLX080_WEB_HARDENING_ACCEPTANCE.json
+          grep -q '"backend_model_changed": false' CLX080_WEB_HARDENING_ACCEPTANCE.json
+          grep -q '"database_changed": false' CLX080_WEB_HARDENING_ACCEPTANCE.json
+          echo CLX080_SAFETY_PASS
