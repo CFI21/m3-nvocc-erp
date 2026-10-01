@@ -48,7 +48,7 @@ PRIMARY=META['primary_keys']
 app=FastAPI(title='M3 NVOCC ERP CLX-018 Production Web/API Integration',version='0.18.0',description='Dedicated M3 production web/API integration. Production traffic, live providers and real money remain blocked.')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://m3-nvocc-web-latest.onrender.com'],
+    allow_origins=['https://m3-booking-approved-preview.onrender.com'],
     allow_credentials=False,
     allow_methods=['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
     allow_headers=['*'],
@@ -246,11 +246,14 @@ async def security_headers(request, call_next):
     runtime_mode=get_runtime_mode_value()
     health_exempt=request.method.upper()=='OPTIONS' or request.url.path in {'/api/v1/health','/api/clx013/runtime-mode','/api/clx013/health','/api/clx013/readiness','/api/clx016/readiness'}
     production_traffic=os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()
+    booking_preview_read_only=os.getenv('M3_BOOKING_PREVIEW_READ_ONLY','OFF').upper()=='ON'
     uat_token=os.getenv('M3_UAT_TOKEN','')
     supplied_uat=request.headers.get('X-M3-UAT-Token','')
     uat_allowed=bool(uat_token and supplied_uat and hmac.compare_digest(uat_token,supplied_uat))
     try:
-        if production_traffic!='ON' and not health_exempt and not uat_allowed:
+        if booking_preview_read_only and request.method.upper() in {'POST','PUT','PATCH','DELETE'} and not health_exempt:
+            response=JSONResponse({'detail':{'code':'M3_BOOKING_PREVIEW_READ_ONLY'}},status_code=423)
+        elif production_traffic!='ON' and not health_exempt and not uat_allowed:
             response=JSONResponse({'detail':{'code':'PRODUCTION_TRAFFIC_LOCKED','uat_header':'X-M3-UAT-Token'}},status_code=503)
         elif not health_exempt and runtime_mode=='MAINTENANCE':
             response=JSONResponse({'detail':{'code':'MAINTENANCE_MODE'}},status_code=503)
@@ -271,7 +274,7 @@ async def security_headers(request, call_next):
     response.headers['X-Frame-Options']='DENY'
     response.headers['Referrer-Policy']='no-referrer'
     response.headers['Strict-Transport-Security']='max-age=31536000; includeSubDomains'
-    response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://m3-nvocc-web-latest.onrender.com https://m3-nvocc-api-latest-1.onrender.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    response.headers['Content-Security-Policy']="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://m3-booking-approved-preview.onrender.com https://m3-booking-approved-preview-api.onrender.com; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     response.headers['Permissions-Policy']='camera=(), microphone=(), geolocation=()'
     response.headers['Cache-Control']='no-store' if request.url.path.startswith('/api/') else 'no-cache'
     return response
