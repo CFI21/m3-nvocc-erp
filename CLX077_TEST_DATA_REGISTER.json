@@ -1,18 +1,35 @@
 {
   "phase": "CLX-077",
+  "status": "ACTIVE_FOR_USER_REVIEW",
   "marker": "CLX077_TEST",
   "provider": "DUMMY_BANK",
   "run_ref": "CLX077-LIVE-001",
   "dummy_accounts": [
-    "DUMMY-EUR-CLX077",
-    "DUMMY-USD-CLX077"
+    {
+      "ref": "DUMMY-EUR-CLX077",
+      "currency": "EUR",
+      "opening": 100000,
+      "current": 107390
+    },
+    {
+      "ref": "DUMMY-USD-CLX077",
+      "currency": "USD",
+      "opening": 100000,
+      "current": 104650
+    }
   ],
-  "data_rules": [
-    "all test treasury refs start CLX077_TEST",
-    "bank lines start CLX077-BANK",
-    "vouchers start CLX077-S",
-    "payment refs start CLX077-PAY",
-    "audit history never deleted"
-  ],
-  "status": "PENDING_LIVE_RUN"
+  "records": {
+    "scenarios": 15,
+    "bank_lines": 14,
+    "simulated_payments": 7,
+    "dummy_provider_events": 14,
+    "audit_events": 15
+  },
+  "rules": [
+    "no real provider calls",
+    "no real money",
+    "all scenario data marked CLX077_TEST/DUMMY_BANK",
+    "audit history retained",
+    "archive not delete"
+  ]
 }
