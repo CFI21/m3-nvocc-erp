@@ -1,0 +1,17 @@
+{
+  "phase":"CLX-075",
+  "status":"PENDING_REHEARSAL",
+  "controls":[
+    "customers/agents/master-record counts",
+    "bookings/jobs/B-L counts",
+    "open AR/AP control totals",
+    "GL opening/control totals",
+    "active container count and duplicate container number check",
+    "active lease allocation count",
+    "branch/agent/depot stock totals",
+    "orphan booking/job/container/finance checks",
+    "post-rehearsal finance and container reconciliation"
+  ],
+  "maximum_unexplained_variance":0,
+  "production_data_written":false
+}
