@@ -1,0 +1,36 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-072",
+  "title": "Global Equipment Network + Stock Balancing & Reposition Control",
+  "parent": "CLX-071 accepted baseline 7686e05ca768b073722373c90d7637e7bf2eb2ef",
+  "architecture": [
+    "ONE M3 ERP",
+    "ONE authoritative public.containers Container Master",
+    "CLX-071 container journey retained",
+    "Existing Booking/Job/B-L/Finance/IAM/Audit retained",
+    "Existing equipment_work_items is the governed action queue",
+    "No parallel inventory and no duplicate booking model"
+  ],
+  "controls": [
+    "global equipment position by port/branch/agent/depot/size-type",
+    "available/reserved/in-transit/repair-hold stock",
+    "booking demand forecast from existing booking/work-item context",
+    "approved safety stock/target/reorder planning parameters",
+    "shortage/surplus detection",
+    "reposition recommendations",
+    "lease on-hire/off-hire recommendations",
+    "recommendation conversion to existing equipment work items",
+    "empty idle and aging control",
+    "utilization and turnaround KPIs",
+    "detention exposure",
+    "owned/leased/agent/partner/SOC segmentation",
+    "operations action queue",
+    "management KPIs",
+    "role/data-scope and maker-checker enforcement"
+  ],
+  "production_traffic": "OFF",
+  "live_providers": "OFF",
+  "real_money": "OFF",
+  "duplicate_erp": false,
+  "duplicate_container_inventory": false
+}
