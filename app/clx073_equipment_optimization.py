@@ -109,11 +109,37 @@ def check_scope_option(conn,a,o,destination_port,size_type):
         if p and p not in ports:
             raise HTTPException(403,{"code":"OPTIMIZATION_OPTION_OUTSIDE_CUSTODY_SCOPE","port":p})
 
+def work_item_in_scope(a,w):
+    if a["role"] in {"SUPER_ADMIN","ADMIN","EQUIPMENT_MANAGER","MANAGEMENT","FINANCE","AUDITOR"}:
+        return True
+    if a["role"]=="AGENT":
+        return bool(a["agent"]) and (w["source_agent"]==a["agent"] or w["destination_agent"]==a["agent"])
+    if a["role"]=="DEPOT":
+        return bool(a["depot"]) and (w["source_depot"]==a["depot"] or w["destination_depot"]==a["depot"])
+    if a["role"] in {"OPS","BRANCH_OPS","EQUIPMENT_CONTROLLER"} and a["branch"]:
+        p={}
+        try:p=json.loads(w["payload_json"] or "{}")
+        except Exception:pass
+        return p.get("source_branch")==a["branch"] or p.get("destination_branch")==a["branch"]
+    return True
+
+def require_run_scope(conn,a,r):
+    if a["role"] in {"SUPER_ADMIN","ADMIN","EQUIPMENT_MANAGER","MANAGEMENT","FINANCE","AUDITOR"}:
+        return
+    opts=[dict(x) for x in conn.execute("SELECT * FROM equipment_optimization_options WHERE run_id=?",(r["id"],)).fetchall()]
+    visible=scoped_containers(conn,a)
+    ports={x.get("current_port") for x in visible}
+    if r["destination_port"] not in ports:
+        raise HTTPException(404,"Optimization run not found in actor scope")
+    for o in opts:
+        if o.get("source_port") and o["source_port"] not in ports:
+            raise HTTPException(404,"Optimization run not found in actor scope")
+
 def create_exception(conn,kind,severity,detail,work_ref=None,run_ref=None,option_ref=None,threshold=None,actual=None):
     ex="EOX-"+uuid.uuid4().hex[:12].upper()
     conn.execute("""INSERT INTO equipment_optimization_exceptions(
       exception_ref,work_ref,run_ref,option_ref,exception_type,severity,status,threshold_value,actual_value,detail,created_at
-    ) VALUES(?,?,?,?,?,?,'OPEN',?,?,?,?,?)""",
+    ) VALUES(?,?,?,?,?,?,'OPEN',?,?,?,?)""",
       (ex,work_ref,run_ref,option_ref,kind,severity,threshold,actual,detail,now()))
     return ex
 
@@ -186,6 +212,7 @@ def run_detail(run_ref:str,x_role:str=Header("VIEWER"),x_m3_session:Optional[str
         a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope)
         r=c.execute("SELECT * FROM equipment_optimization_runs WHERE run_ref=?",(run_ref,)).fetchone()
         if not r:raise HTTPException(404,"Unknown optimization run")
+        require_run_scope(c,a,r)
         opts=[dict(x) for x in c.execute("SELECT * FROM equipment_optimization_options WHERE run_id=? ORDER BY score,estimated_total_cost",(r["id"],)).fetchall()]
         return {"actor":a,"run":dict(r),"options":opts}
     finally:c.close()
@@ -200,6 +227,7 @@ def run_decision(run_ref:str,b:DecisionBody,x_role:str=Header("EQUIPMENT_MANAGER
         if a["role"] not in APPROVE_ROLES:raise HTTPException(403,{"code":"OPTIMIZATION_APPROVAL_ROLE_REQUIRED"})
         tx(c);r=c.execute("SELECT * FROM equipment_optimization_runs WHERE run_ref=?",(run_ref,)).fetchone()
         if not r:raise HTTPException(404,"Unknown optimization run")
+        require_run_scope(c,a,r)
         d=b.decision.upper()
         if d not in {"SUBMIT","APPROVE","REJECT","CANCEL"}:raise HTTPException(422,"Invalid decision")
         if d=="APPROVE" and r["maker_role"]==a["role"]:raise HTTPException(409,{"code":"MAKER_CHECKER_CONFLICT"})
@@ -235,6 +263,7 @@ def create_work_item(run_ref:str,x_role:str=Header("EQUIPMENT_MANAGER"),x_m3_ses
         a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(c)
         r=c.execute("SELECT * FROM equipment_optimization_runs WHERE run_ref=?",(run_ref,)).fetchone()
         if not r:raise HTTPException(404,"Unknown optimization run")
+        require_run_scope(c,a,r)
         if r["status"]!="APPROVED":raise HTTPException(409,{"code":"OPTIMIZATION_RUN_NOT_APPROVED"})
         if r["linked_work_ref"]:
             c.execute("COMMIT");return {"ok":True,"work_ref":r["linked_work_ref"],"existing":True}
@@ -289,7 +318,7 @@ def variance(b:VarianceBody,x_role:str=Header("OPS"),x_m3_session:Optional[str]=
     try:
         a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(c)
         w=c.execute("SELECT * FROM equipment_work_items WHERE work_ref=?",(b.work_ref,)).fetchone()
-        if not w:raise HTTPException(404,"Unknown work item")
+        if not w or not work_item_in_scope(a,w):raise HTTPException(404,"Unknown work item in actor scope")
         p=json.loads(w["payload_json"] or "{}")
         run_ref=p.get("clx073_run_ref");option_ref=p.get("clx073_option_ref")
         planned_cost=float(p.get("planned_cost") or w["estimated_cost"] or 0);planned_lead=float(p.get("planned_lead_days") or 0)
@@ -323,13 +352,25 @@ def variance(b:VarianceBody,x_role:str=Header("OPS"),x_m3_session:Optional[str]=
     finally:c.close()
 
 @router.get("/exceptions")
-def exceptions(status:Optional[str]="OPEN",limit:int=Query(300,ge=1,le=1000)):
+def exceptions(status:Optional[str]="OPEN",limit:int=Query(300,ge=1,le=1000),
+               x_role:str=Header("VIEWER"),x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+               x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),
+               x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
     c=connect()
     try:
+        a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope)
         q="SELECT * FROM equipment_optimization_exceptions WHERE 1=1";args=[]
         if status:q+=" AND status=?";args.append(status)
         q+=" ORDER BY CASE severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 ELSE 3 END,id DESC LIMIT ?";args.append(limit)
-        return {"count":0 if not args else None,"records":[dict(r) for r in c.execute(q,args).fetchall()]}
+        rows=[dict(r) for r in c.execute(q,args).fetchall()]
+        if a["role"] not in {"SUPER_ADMIN","ADMIN","EQUIPMENT_MANAGER","MANAGEMENT","FINANCE","AUDITOR"}:
+            allowed=[]
+            for e in rows:
+                if not e.get("work_ref"):continue
+                w=c.execute("SELECT * FROM equipment_work_items WHERE work_ref=?",(e["work_ref"],)).fetchone()
+                if w and work_item_in_scope(a,w):allowed.append(e)
+            rows=allowed
+        return {"actor":a,"count":len(rows),"records":rows}
     finally:c.close()
 
 @router.post("/exceptions/{exception_ref}/decision")
@@ -341,6 +382,9 @@ def exception_decision(exception_ref:str,b:ExceptionDecision,x_role:str=Header("
         a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(c)
         e=c.execute("SELECT * FROM equipment_optimization_exceptions WHERE exception_ref=?",(exception_ref,)).fetchone()
         if not e:raise HTTPException(404,"Unknown optimization exception")
+        if a["role"] not in {"SUPER_ADMIN","ADMIN","EQUIPMENT_MANAGER","MANAGEMENT","FINANCE","AUDITOR"}:
+            w=c.execute("SELECT * FROM equipment_work_items WHERE work_ref=?",(e["work_ref"],)).fetchone() if e["work_ref"] else None
+            if not w or not work_item_in_scope(a,w):raise HTTPException(404,"Optimization exception not found in actor scope")
         d=b.action.upper()
         if d=="ACKNOWLEDGE":
             c.execute("UPDATE equipment_optimization_exceptions SET status='ACKNOWLEDGED',acknowledged_at=?,owner_role=?,owner_ref=? WHERE id=?",(now(),b.owner_role or a["role"],b.owner_ref or a["user"],e["id"]))
