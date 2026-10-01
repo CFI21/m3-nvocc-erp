@@ -1,0 +1,55 @@
+name: CLX-082 Live Verification
+on:
+  push:
+    branches: [clx082-live-verification]
+    paths: [".github/workflows/clx082-live-verification.yml"]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live B/L web
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB=https://m3-nvocc-web-latest.onrender.com
+          SHA=8b047979a439cbda9686327e2ad41a329297ee7f
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 -D /tmp/h "$WEB/" -o /tmp/web.html
+          grep -q "$SHA" /tmp/web.html
+          grep -q "CLX-082 B/L Master Field Alignment" /tmp/web.html
+          grep -q "B/L Basic Info & Routing" /tmp/web.html
+          grep -q "Cargo & Equipment" /tmp/web.html
+          grep -q "Freight & Commercial Context" /tmp/web.html
+          grep -q "Release Type / Instruction" /tmp/web.html
+          grep -q "Delivery Order" /tmp/web.html
+          grep -q "Lock Info / Holds / Authorized Release" /tmp/web.html
+          grep -q "Maker / Checker / Audit" /tmp/web.html
+          grep -q "Read-only B/L Preview" /tmp/web.html
+          grep -q "agent-tasks::switch-bl" /tmp/web.html
+          grep -q "agent-tasks::split-bl" /tmp/web.html
+          grep -qi 'cache-control:.*no-store.*no-cache.*must-revalidate' /tmp/h
+          echo CLX082_LIVE_BL_WEB_PASS
+
+      - name: Verify live B/L/API continuity
+        shell: bash
+        run: |
+          set -euo pipefail
+          API=https://m3-nvocc-api-latest-1.onrender.com
+          curl --fail --silent --show-error --retry 8 --retry-delay 3 -H 'X-Role: ADMIN' "$API/api/clx049/workspace/50001" -o /tmp/w.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx049/trace/50001" -o /tmp/t.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx070/container-control/booking-context/50001" -o /tmp/e.json
+          python - <<'PY'
+          import json
+          w=json.load(open('/tmp/w.json'))
+          assert w['bl'] is not None
+          assert w['delivery_order'] is not None
+          assert w['lock_info']['vessel_lock'] is not None
+          assert w['bl_tabs']==['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization']
+          assert w['parallel_records_created'] is False
+          assert w['live_providers'] is False
+          assert w['real_money'] is False
+          t=json.load(open('/tmp/t.json'))
+          assert t['pass'] is True
+          e=json.load(open('/tmp/e.json'))
+          assert isinstance(e,dict)
+          print('CLX082_LIVE_BL_API_PASS')
+          PY
