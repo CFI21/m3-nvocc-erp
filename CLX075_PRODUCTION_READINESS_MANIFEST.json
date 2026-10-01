@@ -1,15 +1,47 @@
 {
-  "phase":"CLX-075",
-  "status":"PENDING_FINAL_REGRESSION",
-  "PRODUCTION_READY":false,
-  "required_gates":{
-    "full_regression":"PENDING",
-    "architecture_safety":"PENDING",
-    "data_integrity":"PENDING",
-    "security_readiness":"PENDING",
-    "cutover_rehearsal":"PENDING",
-    "rollback_readiness":"PENDING",
-    "zero_known_p0_p1":"PENDING"
+  "phase": "CLX-075",
+  "status": "PASS",
+  "PRODUCTION_READY": true,
+  "required_gates": {
+    "full_regression": "PASS",
+    "architecture_safety": "PASS",
+    "data_integrity": "PASS",
+    "security_readiness": "PASS",
+    "database_migrations": "PASS",
+    "backup_restore_rehearsal": "PASS",
+    "cutover_rehearsal": "PASS",
+    "deployment_path": "PASS_GHCR_FREE_TIER",
+    "rollback_readiness": "PASS",
+    "zero_known_p0_p1": "PASS"
   },
-  "hard_stops":{"production_traffic":"OFF","live_providers":"OFF","real_money":"OFF","explicit_activation_required":true}
+  "test_evidence": {
+    "targeted": 7,
+    "full_regression": 255,
+    "warnings": 1,
+    "warning_class": "non-blocking pre-existing SyntaxWarning",
+    "github_run_id": 36848876040
+  },
+  "database_evidence": {
+    "project_id": "ozupgknqaqgvprliewxe",
+    "duplicate_container_numbers": 0,
+    "orphan_jobs": 0,
+    "orphan_containers": 0,
+    "orphan_container_finance": 0,
+    "restore_controls_passed": 13,
+    "restore_controls_total": 13
+  },
+  "security_evidence": {
+    "new_control_tables_rls": true,
+    "direct_data_api_grants": 0,
+    "supabase_security_advisor_blockers": 0,
+    "advisor_info_only": "rls_enabled_no_policy; server-only tables with no anon/authenticated/public grants"
+  },
+  "hard_stops": {
+    "production_traffic": "OFF",
+    "live_providers": "OFF",
+    "real_money": "OFF",
+    "explicit_activation_required": true,
+    "activation_authorized": false
+  },
+  "post_merge_runtime_smoke_required": true
 }
