@@ -1,16 +1,23 @@
 {
   "phase": "CLX-077",
   "parent": "8b8da94a7d72c42dbb29f33d381f567ebe74aab1",
-  "status": "PENDING_LIVE_EXECUTION",
+  "status": "TRANSACTION_PASS_PENDING_FINAL_LIVE_UI_SMOKE",
   "LIVE_SESSION_READY": false,
-  "DUMMY_MONEY_FLOW_READY": false,
+  "DUMMY_MONEY_FLOW_READY": true,
   "REAL_MONEY_READY": false,
   "REAL_PROVIDER_READY": false,
-  "required": {
-    "scenarios_pass": 15,
+  "transaction_evidence": {
+    "scenario_pass": 15,
+    "scenario_fail": 0,
     "maximum_unexplained_variance": 0,
-    "p0_p1": 0,
-    "real_provider_activity": 0,
-    "real_money_activity": 0
-  }
+    "unmatched_bank_items": 0,
+    "unbalanced_vouchers": 0,
+    "duplicate_refs": 0
+  },
+  "safety": {
+    "real_money": false,
+    "real_external_providers": false,
+    "dummy_provider_only": true
+  },
+  "remaining_gate": "Merge/deploy CLX-077 web/API and smoke the live Dummy Bank Review page + endpoints."
 }
