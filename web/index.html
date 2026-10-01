@@ -862,7 +862,7 @@ function equipmentShell(view){
     <button class="${view==='journey'?'active':''}" onclick="showEquipmentWorkspace('journey')">Journey</button>
     <button class="${view==='mr'?'active':''}" onclick="showEquipmentWorkspace('mr')">Depot &amp; M&amp;R</button>
     <button title="Container P&amp;L" aria-label="Container P&L" class="${view==='finance'?'active':''}" onclick="showEquipmentWorkspace('finance')">Financials</button>
-    <button class="${view==='kpi'?'active':''}" onclick="showEquipmentWorkspace('kpi')">KPI</button>
+    <button title="Policy &amp; SOP · KPI" aria-label="Policy & SOP and KPI" class="${view==='kpi'?'active':''}" onclick="showEquipmentWorkspace('kpi')">KPI</button>
     <button class="${view==='exceptions'?'active':''}" onclick="showEquipmentWorkspace('exceptions')">Exceptions</button>
   </div>`;
   $('screenMeta').innerHTML=`<div class="equipNote"><b>LIVE M3 EQUIPMENT CONTROL — AUTHORITATIVE CONTAINER MASTER.</b> Existing CLX-070/071/072/073/074/075 APIs and role/custody scopes remain authoritative. No separate ERP model or duplicate container inventory. External providers OFF · real money OFF.</div>`;
