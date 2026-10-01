@@ -221,13 +221,14 @@ def container_detail(container_no:str,x_role:str=Header("VIEWER"),x_m3_session:O
         parties=[dict(x) for x in c.execute("SELECT * FROM container_party_links WHERE container_id=? ORDER BY id",(cid,)).fetchall()]
         docs=[dict(x) for x in c.execute("SELECT * FROM container_documents WHERE container_id=? ORDER BY id DESC",(cid,)).fetchall()]
         fin=[dict(x) for x in c.execute("SELECT * FROM container_financial_ledger WHERE container_id=? ORDER BY id DESC LIMIT 200",(cid,)).fetchall()]
+        shares=[dict(x) for x in c.execute("SELECT * FROM container_share_rules WHERE container_id=? ORDER BY id DESC",(cid,)).fetchall()]
         events=[dict(x) for x in c.execute("SELECT * FROM container_events WHERE container_id=? ORDER BY event_time DESC,id DESC LIMIT 200",(cid,)).fetchall()]
         sums={"revenue":0.0,"cost":0.0,"commission":0.0,"share":0.0}
         for x in fin:
             k=x["entry_type"].lower()
             if k in sums:sums[k]+=float(x["amount"] or 0)
         sums["margin"]=sums["revenue"]-sums["cost"]-sums["commission"]-sums["share"]
-        return {"actor":a,"container":dict(r),"party_links":parties,"documents":docs,"financial_ledger":fin,"financial_summary":sums,"movement_events":events}
+        return {"actor":a,"container":dict(r),"party_links":parties,"documents":docs,"share_rules":shares,"financial_ledger":fin,"financial_summary":sums,"movement_events":events}
     finally:c.close()
 
 @router.patch("/containers/{container_no}")
