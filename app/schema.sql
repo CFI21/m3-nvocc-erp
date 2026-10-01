@@ -5,7 +5,19 @@ CREATE TABLE IF NOT EXISTS vessels(id INTEGER PRIMARY KEY, name TEXT NOT NULL UN
 CREATE TABLE IF NOT EXISTS voyages(id INTEGER PRIMARY KEY, voyage_no TEXT NOT NULL UNIQUE, vessel_id INTEGER NOT NULL REFERENCES vessels(id));
 CREATE TABLE IF NOT EXISTS bookings(id INTEGER PRIMARY KEY, booking_ref TEXT NOT NULL UNIQUE, customer_id INTEGER NOT NULL REFERENCES customers(id), agent_id INTEGER NOT NULL REFERENCES agents(id), voyage_id INTEGER NOT NULL REFERENCES voyages(id), pol TEXT NOT NULL, pod TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY, job_ref TEXT NOT NULL UNIQUE CHECK(length(job_ref)=5), booking_id INTEGER NOT NULL UNIQUE REFERENCES bookings(id), customer_id INTEGER NOT NULL REFERENCES customers(id), agent_id INTEGER NOT NULL REFERENCES agents(id), voyage_id INTEGER NOT NULL REFERENCES voyages(id), pol TEXT NOT NULL, pod TEXT NOT NULL, operational_status TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
-CREATE TABLE IF NOT EXISTS containers(id INTEGER PRIMARY KEY, container_no TEXT NOT NULL UNIQUE, job_id INTEGER NOT NULL REFERENCES jobs(id), size_type TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS containers(
+ id INTEGER PRIMARY KEY, container_no TEXT NOT NULL UNIQUE, job_id INTEGER REFERENCES jobs(id), size_type TEXT NOT NULL,
+ ownership TEXT NOT NULL DEFAULT 'OWNED', owner_type TEXT NOT NULL DEFAULT 'PRINCIPAL', owner_party_code TEXT,
+ principal_code TEXT NOT NULL DEFAULT 'M3 NVOCC', principal_owner_code TEXT, overseas_partner_code TEXT, leasing_company_code TEXT,
+ investor_code TEXT, agent_supplier_code TEXT, region_code TEXT, branch_code TEXT, current_port TEXT, agent_code TEXT, depot_code TEXT,
+ equipment_status TEXT NOT NULL DEFAULT 'AVAILABLE', condition TEXT NOT NULL DEFAULT 'GOOD', available_from TEXT, booking_ref TEXT,
+ acquisition_type TEXT NOT NULL DEFAULT 'LEGACY', acquisition_ref TEXT, lease_contract_ref TEXT, purchase_order_ref TEXT, supplier_or_lessor TEXT,
+ manufacturer TEXT, manufacture_date TEXT, manufacture_year INTEGER, csc_validity TEXT, csc_plate_no TEXT, classification TEXT, grade_payload TEXT,
+ max_gross_weight REAL NOT NULL DEFAULT 0, tare_weight REAL NOT NULL DEFAULT 0, capacity_cbm REAL NOT NULL DEFAULT 0, iso_code TEXT, model_no TEXT,
+ machinery TEXT, inner_length REAL NOT NULL DEFAULT 0, inner_width REAL NOT NULL DEFAULT 0, inner_height REAL NOT NULL DEFAULT 0,
+ allocate_for_sale INTEGER NOT NULL DEFAULT 0, afghan_transit INTEGER NOT NULL DEFAULT 0, technical_remarks TEXT,
+ unit_cost REAL NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'USD', idle_days INTEGER NOT NULL DEFAULT 0, updated_at TEXT
+);
 CREATE TABLE IF NOT EXISTS bills(id INTEGER PRIMARY KEY, bill_no TEXT NOT NULL UNIQUE, job_id INTEGER NOT NULL REFERENCES jobs(id), kind TEXT NOT NULL CHECK(kind IN ('HBL','MBL')), status TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS finance_states(id INTEGER PRIMARY KEY, job_id INTEGER NOT NULL UNIQUE REFERENCES jobs(id), payment_status TEXT NOT NULL, currency TEXT NOT NULL, outstanding REAL NOT NULL DEFAULT 0, credit_hold INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS workflow_states(id INTEGER PRIMARY KEY, job_id INTEGER NOT NULL UNIQUE REFERENCES jobs(id), documentation_status TEXT NOT NULL, vgm_status TEXT NOT NULL, customs_status TEXT NOT NULL, transshipment_status TEXT NOT NULL, release_status TEXT NOT NULL, closed INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1);
@@ -22,6 +34,45 @@ CREATE TABLE IF NOT EXISTS switch_bl_history(id INTEGER PRIMARY KEY, transaction
 CREATE TABLE IF NOT EXISTS split_bl_allocations(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, child_bill_no TEXT NOT NULL, container_no TEXT NOT NULL, packages REAL NOT NULL, weight REAL NOT NULL, measurement REAL NOT NULL, UNIQUE(transaction_id,child_bill_no));
 CREATE TABLE IF NOT EXISTS container_events(id INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, job_id INTEGER NOT NULL REFERENCES jobs(id), container_id INTEGER NOT NULL REFERENCES containers(id), event_type TEXT NOT NULL, event_time TEXT NOT NULL, location TEXT NOT NULL, status TEXT NOT NULL, source_module TEXT NOT NULL, detail_json TEXT NOT NULL);
 CREATE INDEX IF NOT EXISTS idx_container_events_job ON container_events(job_id,event_time);
+
+-- CLX-070 native Container Master ownership / custody / finance / policy
+CREATE TABLE IF NOT EXISTS container_party_links(
+ id INTEGER PRIMARY KEY, container_id INTEGER NOT NULL REFERENCES containers(id) ON DELETE CASCADE,
+ party_role TEXT NOT NULL, party_code TEXT NOT NULL, party_name TEXT, is_owner INTEGER NOT NULL DEFAULT 0,
+ is_custodian INTEGER NOT NULL DEFAULT 0, valid_from TEXT, valid_to TEXT, terms_json TEXT NOT NULL DEFAULT '{}',
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(container_id,party_role,party_code)
+);
+CREATE INDEX IF NOT EXISTS idx_container_party_links_container ON container_party_links(container_id,party_role);
+CREATE TABLE IF NOT EXISTS container_financial_entries(
+ id INTEGER PRIMARY KEY, entry_ref TEXT NOT NULL UNIQUE, container_id INTEGER NOT NULL REFERENCES containers(id),
+ job_id INTEGER REFERENCES jobs(id), booking_ref TEXT, bl_ref TEXT, entry_category TEXT NOT NULL, charge_code TEXT NOT NULL,
+ description TEXT, amount REAL NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'USD', party_type TEXT, party_code TEXT,
+ source_type TEXT NOT NULL, source_ref TEXT, movement_event_ref TEXT, status TEXT NOT NULL DEFAULT 'DRAFT',
+ maker_role TEXT NOT NULL, checker_role TEXT, approved_at TEXT, posted_at TEXT, metadata_json TEXT NOT NULL DEFAULT '{}',
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_container_financial_container ON container_financial_entries(container_id,status,entry_category);
+CREATE TABLE IF NOT EXISTS container_share_rules(
+ id INTEGER PRIMARY KEY, rule_ref TEXT NOT NULL UNIQUE, container_id INTEGER NOT NULL REFERENCES containers(id) ON DELETE CASCADE,
+ party_type TEXT NOT NULL, party_code TEXT NOT NULL, basis TEXT NOT NULL DEFAULT 'REVENUE', rate_percent REAL NOT NULL DEFAULT 0,
+ fixed_amount REAL NOT NULL DEFAULT 0, currency TEXT NOT NULL DEFAULT 'USD', charge_code TEXT, valid_from TEXT, valid_to TEXT,
+ active INTEGER NOT NULL DEFAULT 1, maker_role TEXT NOT NULL, checker_role TEXT, status TEXT NOT NULL DEFAULT 'DRAFT',
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS equipment_work_items(
+ id INTEGER PRIMARY KEY, work_ref TEXT NOT NULL UNIQUE, work_type TEXT NOT NULL, status TEXT NOT NULL,
+ booking_ref TEXT, job_ref TEXT, size_type TEXT NOT NULL, qty INTEGER NOT NULL, source_port TEXT, destination_port TEXT,
+ source_agent TEXT, destination_agent TEXT, source_depot TEXT, destination_depot TEXT, estimated_cost REAL NOT NULL DEFAULT 0,
+ currency TEXT NOT NULL DEFAULT 'USD', required_by TEXT, payload_json TEXT NOT NULL DEFAULT '{}', maker_role TEXT NOT NULL,
+ checker_role TEXT, decision_note TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS equipment_policy_rules(
+ id INTEGER PRIMARY KEY, rule_code TEXT NOT NULL UNIQUE, action_code TEXT NOT NULL, subject_role TEXT NOT NULL,
+ scope_type TEXT NOT NULL DEFAULT 'GLOBAL', effect TEXT NOT NULL DEFAULT 'ALLOW', threshold_amount REAL, currency TEXT,
+ four_eyes INTEGER NOT NULL DEFAULT 0, config_json TEXT NOT NULL DEFAULT '{}', active INTEGER NOT NULL DEFAULT 1,
+ created_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+
 
 
 -- CLX-005 GL / ACCOUNTS FOUNDATION
