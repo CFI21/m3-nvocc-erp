@@ -1,8 +1,8 @@
 from app.screen_catalog import build_catalog
 
 EXPECTED_TOP=[
-    'Agent Tasks',
     'HO Tasks',
+    'Agent Tasks',
     'Treasury / AR-AP',
     'Integration & Security',
     'General / Administration',
@@ -15,7 +15,7 @@ def test_top_level_menu_business_order():
 
 def test_agent_setup_transaction_order_preserved():
     c=build_catalog()
-    agent=c['menu'][0]
+    agent=next(x for x in c['menu'] if x['domain']=='Agent Tasks')
     assert [x['name'] for x in agent['submenus']]==['Setup','Transaction']
     assert [x['label'] for x in agent['submenus'][0]['items']]==[
         'Agent','Common Parties','Vessel','Voyage Registration','Commodity','Units','Sales Person'
@@ -24,7 +24,7 @@ def test_agent_setup_transaction_order_preserved():
 
 def test_ho_transaction_utilities_order_preserved():
     c=build_catalog()
-    ho=c['menu'][1]
+    ho=next(x for x in c['menu'] if x['domain']=='HO Tasks')
     assert [x['name'] for x in ho['submenus']]==['Transaction','Utilities']
 
 def test_screen_baseline_unchanged():

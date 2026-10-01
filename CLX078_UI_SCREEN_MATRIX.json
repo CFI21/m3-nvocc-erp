@@ -1,0 +1,29 @@
+{
+  "schema": "M3_CLX078_UI_SCREEN_MATRIX_V1",
+  "canonical_screen_count": 196,
+  "canonical_ids_preserved": true,
+  "canonical_routes_preserved": true,
+  "top_level_order": [
+    "HO Tasks",
+    "Agent Tasks",
+    "Treasury / AR-AP",
+    "Integration & Security",
+    "General / Administration",
+    "Master Data"
+  ],
+  "presentation_standard": "CLX-056 MASTER ERP TEMPLATE PATTERN",
+  "implementation": {
+    "shell": "single current M3 web/index.html",
+    "booking": "dense master-template workspace",
+    "bl_family": "existing same-page governed workspace retained under common shell styling",
+    "equipment": "native current shell with HO Equipment Control",
+    "finance_treasury_gl": "existing canonical screens inherit common green/gray shell and table/form styles",
+    "remaining_screens": "existing canonical renderer under same shell; no second UI"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36877781892,
+  "targeted_tests": "58 passed",
+  "full_regression": "266 passed",
+  "javascript_syntax": "PASS",
+  "top_level_order_verified": true
+}

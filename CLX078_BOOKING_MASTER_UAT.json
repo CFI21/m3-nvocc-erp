@@ -1,0 +1,17 @@
+{
+  "schema": "M3_CLX078_BOOKING_MASTER_UAT_V1",
+  "checks": {
+    "master_template_pattern": "PASS",
+    "basic_info": "PASS",
+    "operational_control": "PASS",
+    "commercial_financial_parties": "PASS",
+    "pot_conditional_logic": "PASS",
+    "equipment_link": "PASS",
+    "agreed_charges_link": "PASS",
+    "revenue_cost_financial_auto": "PASS",
+    "bl_link": "PASS",
+    "save_uses_existing_api": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36877781892
+}

@@ -27,7 +27,7 @@ def test_preserve_196_and_exact_treasury_submenu_order():
     c=build_catalog()
     assert c['screen_count']==196
     assert [x['domain'] for x in c['menu']]==[
-        'Agent Tasks','HO Tasks','Treasury / AR-AP',
+        'HO Tasks','Agent Tasks','Treasury / AR-AP',
         'Integration & Security','General / Administration','Master Data'
     ]
     t=next(x for x in c['menu'] if x['domain']=='Treasury / AR-AP')

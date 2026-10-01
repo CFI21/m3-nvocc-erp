@@ -1,0 +1,177 @@
+{
+  "schema": "M3_CLX078_FIELD_MAPPING_V1",
+  "baseline": "586ed0e048f547b0c03933aaf7cebcceb38b2b71",
+  "rule": "PRESENTATION_ONLY_NO_DUPLICATE_DATA",
+  "booking": {
+    "authoritative_object": "transaction_records(module=booking).fields + jobs/bookings context",
+    "update_api": "PUT /api/v1/booking/{id}",
+    "audit": "existing transaction audit/version path",
+    "mappings": [
+      [
+        "Booking #",
+        "Booking No.",
+        "transaction_records.fields",
+        "editable",
+        "OPS/ADMIN/AGENT",
+        "existing server validation"
+      ],
+      [
+        "Booking Date",
+        "Booking Date",
+        "transaction_records.fields",
+        "editable",
+        "OPS/ADMIN/AGENT",
+        "existing server validation"
+      ],
+      [
+        "Carrier",
+        "Carrier",
+        "transaction_records.fields",
+        "editable",
+        "OPS/ADMIN/AGENT",
+        "existing server validation"
+      ],
+      [
+        "Cntnr Owner",
+        "Container Owner",
+        "transaction_records.fields",
+        "editable",
+        "OPS/ADMIN",
+        "existing booking validation"
+      ],
+      [
+        "Commodity",
+        "Commodity",
+        "transaction_records.fields",
+        "editable",
+        "OPS/ADMIN/AGENT",
+        "master-linked"
+      ],
+      [
+        "POL/POD",
+        "POL / POD",
+        "transaction_records.fields + job context",
+        "editable",
+        "OPS/ADMIN/AGENT",
+        "routing validation"
+      ],
+      [
+        "Via/Transshipment",
+        "Via Port / Transshipment Port",
+        "transaction_records.fields",
+        "editable",
+        "OPS/ADMIN/AGENT",
+        "POT conditional"
+      ],
+      [
+        "POT Agent",
+        "POT Agent",
+        "transaction_records.fields",
+        "conditional",
+        "OPS/ADMIN/AGENT",
+        "enabled only when Via/Transshipment present"
+      ],
+      [
+        "Vessel/Voyage",
+        "Vessel / Voyage",
+        "transaction_records.fields + job context",
+        "editable",
+        "OPS/ADMIN/AGENT",
+        "existing vessel/voyage validation"
+      ],
+      [
+        "Shipper/Consignee/Notify",
+        "Shipper / Consignee / Notify Party",
+        "transaction_records.fields",
+        "editable",
+        "OPS/ADMIN/AGENT",
+        "existing party validation"
+      ],
+      [
+        "Booking Party",
+        "Booking Party",
+        "transaction_records.fields",
+        "editable",
+        "COMMERCIAL/OPS/ADMIN",
+        "existing party validation"
+      ],
+      [
+        "Principal",
+        "Principal",
+        "transaction_records.fields",
+        "editable",
+        "COMMERCIAL/ADMIN",
+        "existing party validation"
+      ],
+      [
+        "Billing Party",
+        "Billing Party",
+        "transaction_records.fields",
+        "editable",
+        "COMMERCIAL/FINANCE/ADMIN",
+        "existing finance party validation"
+      ],
+      [
+        "Settlement Agent",
+        "Settlement Agent",
+        "transaction_records.fields",
+        "editable",
+        "FINANCE/ADMIN",
+        "existing party validation"
+      ],
+      [
+        "Equipment",
+        "Equipment / Quantity / Equipment Provider",
+        "transaction_records.fields + CLX070 booking-context",
+        "mixed",
+        "OPS/EQUIPMENT/ADMIN",
+        "same authoritative container model"
+      ],
+      [
+        "Agreed Charges",
+        "existing linked operational/GL sources",
+        "GET /api/gl/job/{job_ref}/links + CLX046 trace",
+        "read-only view",
+        "COMMERCIAL/FINANCE/ADMIN",
+        "no new rate master"
+      ],
+      [
+        "Revenue/Cost",
+        "existing GL sources",
+        "GET /api/clx046/job/{job_ref}/trace",
+        "read-only view",
+        "FINANCE/ADMIN",
+        "existing GL authority"
+      ],
+      [
+        "Financial Auto",
+        "Treasury + GL linked records",
+        "GET /api/clx046/job/{job_ref}/trace",
+        "read-only view",
+        "FINANCE/TREASURY/ADMIN",
+        "existing finance controls"
+      ]
+    ]
+  },
+  "equipment_tower": {
+    "authoritative_sources": [
+      "public.containers",
+      "container_events",
+      "equipment_work_items",
+      "equipment_network_targets/policy",
+      "equipment_optimization_*",
+      "container_inspection/damage/repair_*",
+      "equipment_lease_*",
+      "container_financial_ledger"
+    ],
+    "routes": [
+      "/api/clx070/container-control/*",
+      "/api/clx071/journey/*",
+      "/api/clx072/network/*",
+      "/api/clx073/optimization/*",
+      "/api/clx074/mr/*",
+      "/api/clx075/lease/*"
+    ],
+    "duplicate_models_created": false
+  }
+}
