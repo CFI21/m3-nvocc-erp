@@ -1,0 +1,23 @@
+{
+  "project":"M3 NVOCC ERP",
+  "phase":"CLX-075",
+  "title":"Final Bulk ERP Completion + Go-Live Readiness",
+  "parent_commit":"2d88ac008af60cc91d1ff0d9ad1b4a689e19b9e1",
+  "status":"PENDING_FINAL_REGRESSION",
+  "production_ready":false,
+  "architecture":{
+    "one_erp":true,
+    "authoritative_booking_job_bl":true,
+    "authoritative_container_master":true,
+    "authoritative_finance_model":true,
+    "authoritative_iam_audit":true,
+    "duplicate_models":false,
+    "new_erp_shell":false
+  },
+  "new_completion":["lease contract commercial control","on-hire/off-hire","per-diem/minimum-hire/free-days","lease accrual and settlement","lease exceptions","final readiness controller"],
+  "inherited_verified_scope":["booking/job/B-L","rates/commercial/CRT","finance/GL/treasury","master data/bulk","IAM/security/audit","workflow/exceptions","dashboards/KPI","container journey/network/optimization/M&R","preprod/cutover/rollback"],
+  "production_traffic":"OFF",
+  "live_providers":"OFF",
+  "real_money":"OFF",
+  "activation_authorized":false
+}
