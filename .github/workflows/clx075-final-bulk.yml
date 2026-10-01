@@ -27,10 +27,15 @@ jobs:
         run: pytest -q tests
       - name: Architecture and activation safety
         run: |
-          grep -q '"production_traffic":"OFF"' CLX075_FINAL_ACCEPTANCE_MANIFEST.json
-          grep -q '"live_providers":"OFF"' CLX075_FINAL_ACCEPTANCE_MANIFEST.json
-          grep -q '"real_money":"OFF"' CLX075_FINAL_ACCEPTANCE_MANIFEST.json
-          grep -q '"duplicate_models":false' CLX075_FINAL_ACCEPTANCE_MANIFEST.json
+          python - <<'PY'
+          import json
+          m=json.load(open("CLX075_FINAL_ACCEPTANCE_MANIFEST.json"))
+          assert m["production_traffic"]=="OFF"
+          assert m["live_providers"]=="OFF"
+          assert m["real_money"]=="OFF"
+          assert m["architecture"]["duplicate_models"] is False
+          assert m["architecture"]["new_erp_shell"] is False
+          PY
           ! grep -q "CREATE TABLE IF NOT EXISTS public.containers" migrations/CLX075_001_final_bulk_readiness.sql
           ! grep -q "CREATE TABLE IF NOT EXISTS public.container_financial_ledger" migrations/CLX075_001_final_bulk_readiness.sql
           ! grep -q "CREATE TABLE IF NOT EXISTS public.bookings" migrations/CLX075_001_final_bulk_readiness.sql
