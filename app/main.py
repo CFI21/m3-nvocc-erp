@@ -48,6 +48,8 @@ from .clx073_equipment_optimization import router as clx073_equipment_optimizati
 from .clx074_inspection import router as clx074_inspection_router
 from .clx074_repair import router as clx074_repair_router
 from .clx074_control import router as clx074_control_router
+from .clx075_lease import router as clx075_lease_router
+from .clx075_readiness import router as clx075_readiness_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -84,6 +86,8 @@ app.include_router(clx073_equipment_optimization_router)
 app.include_router(clx074_inspection_router)
 app.include_router(clx074_repair_router)
 app.include_router(clx074_control_router)
+app.include_router(clx075_lease_router)
+app.include_router(clx075_readiness_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
