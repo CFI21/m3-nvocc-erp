@@ -53,3 +53,8 @@ def test_manifest_keeps_production_locked():
     assert '"production_traffic": "OFF"' in m
     assert '"live_providers": "OFF"' in m
     assert '"real_money": "OFF"' in m
+
+
+def test_exception_decision_enforces_container_custody_scope():
+    src=Path("app/clx071_container_journey.py").read_text()
+    assert 'get_container(conn,e["container_no"],a)' in src
