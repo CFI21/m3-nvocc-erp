@@ -45,3 +45,11 @@ def test_native_ui_has_cost_optimization():
     assert "/api/clx073/optimization/compare" in html
     assert "Planned vs Actual" in html
     assert "No separate ERP model or duplicate container inventory" in html
+
+
+def test_exception_insert_placeholder_count_and_scope_guards():
+    src=Path("app/clx073_equipment_optimization.py").read_text()
+    assert "VALUES(?,?,?,?,?,?,'OPEN',?,?,?,?)" in src
+    assert "def work_item_in_scope" in src
+    assert "require_run_scope(c,a,r)" in src
+    assert "Optimization exception not found in actor scope" in src
