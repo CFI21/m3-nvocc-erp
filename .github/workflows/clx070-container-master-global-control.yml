@@ -36,7 +36,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           python -m py_compile app/*.py
-          PYTHONPATH=. pytest -q tests/test_clx070_container_master_global_control.py
+          PYTHONPATH=. pytest -q tests/test_clx070_container_master_global_control.py tests/test_clx070_container_finance_runtime.py
           PYTHONPATH=. pytest -q tests/test_clx049_booking_bl_workspace.py
           PYTHONPATH=. pytest -q tests/test_clx050_operational_uat.py tests/test_build_first_fast_track.py
           grep -q "One M3 ERP." web/index.html
