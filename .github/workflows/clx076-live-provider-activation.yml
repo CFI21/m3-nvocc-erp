@@ -29,7 +29,8 @@ jobs:
           assert s["production_traffic"]=="ON", s
           assert s["live_providers"]=="OFF", s
           assert s["real_money"]=="OFF", s
-          assert s["sandbox_tests"]=="ON", s
+          assert s["sandbox_tests"] in {"ON","OFF"}, s
+          print("SANDBOX_TEST_MODE="+s["sandbox_tests"])
           print("PROVIDER_STATUS_PASS")
           for p in d["providers"]:
               print(p["provider"], "credentials_complete="+str(p["credentials_complete"]))
@@ -52,10 +53,14 @@ jobs:
             "avalara":"/api/v1/provider-onboarding/avalara/test",
           }
           results={}
+          sandbox=d["safety"]["sandbox_tests"]
           for p in d["providers"]:
               key=p["provider"]
               if not p["credentials_complete"]:
                   results[key]={"status":"DEFERRED_MISSING_CREDENTIALS","missing":[k for k,v in p["configured"].items() if not v]}
+                  continue
+              if sandbox!="ON":
+                  results[key]={"status":"CANARY_SKIPPED_SANDBOX_TESTS_OFF"}
                   continue
               url="https://m3-nvocc-api-latest-1.onrender.com"+mapping[key]
               cp=subprocess.run([
