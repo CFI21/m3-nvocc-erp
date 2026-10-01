@@ -1,0 +1,95 @@
+{
+  "phase": "CLX-077",
+  "status": "PASS",
+  "run_ref": "CLX077-LIVE-001",
+  "scenario_pass": 15,
+  "scenario_fail": 0,
+  "scenarios": [
+    {
+      "no": 1,
+      "key": "EXPORT_FCL_RECEIPT",
+      "status": "PASS"
+    },
+    {
+      "no": 2,
+      "key": "IMPORT_FCL_RECEIPT",
+      "status": "PASS"
+    },
+    {
+      "no": 3,
+      "key": "AGENT_COST_PAYMENT",
+      "status": "PASS"
+    },
+    {
+      "no": 4,
+      "key": "CARRIER_COST_PAYMENT",
+      "status": "PASS"
+    },
+    {
+      "no": 5,
+      "key": "REPOSITION_COST",
+      "status": "PASS"
+    },
+    {
+      "no": 6,
+      "key": "MR_COST",
+      "status": "PASS"
+    },
+    {
+      "no": 7,
+      "key": "LEASE_SETTLEMENT",
+      "status": "PASS"
+    },
+    {
+      "no": 8,
+      "key": "DETENTION_CHARGE",
+      "status": "PASS"
+    },
+    {
+      "no": 9,
+      "key": "CREDIT_REFUND",
+      "status": "PASS"
+    },
+    {
+      "no": 10,
+      "key": "MULTI_CURRENCY",
+      "status": "PASS"
+    },
+    {
+      "no": 11,
+      "key": "UNALLOCATED_MATCH",
+      "status": "PASS"
+    },
+    {
+      "no": 12,
+      "key": "PAYMENT_REVERSAL",
+      "status": "PASS"
+    },
+    {
+      "no": 13,
+      "key": "CUSTOMER_OVERPAYMENT",
+      "status": "PASS"
+    },
+    {
+      "no": 14,
+      "key": "PARTIAL_AP_PAYMENT",
+      "status": "PASS"
+    },
+    {
+      "no": 15,
+      "key": "FINAL_JOB_RECON",
+      "status": "PASS"
+    }
+  ],
+  "VAT_test": {
+    "status": "PASS",
+    "tax_payable_movement": -100
+  },
+  "FX_test": {
+    "status": "PASS",
+    "realized_fx_difference": 50
+  },
+  "maker_checker_evidence": "dummy payment batches carry separate maker/checker/releaser identities",
+  "real_money": false,
+  "external_provider_calls": false
+}

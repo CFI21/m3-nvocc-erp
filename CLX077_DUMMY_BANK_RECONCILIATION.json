@@ -1,0 +1,54 @@
+{
+  "phase": "CLX-077",
+  "status": "PASS",
+  "run_ref": "CLX077-LIVE-001",
+  "accounts": {
+    "EUR": {
+      "ref": "DUMMY-EUR-CLX077",
+      "opening": 100000,
+      "receipts": 14850,
+      "payments": 7460,
+      "reversals": 0,
+      "expected": 107390,
+      "actual": 107390,
+      "variance": 0
+    },
+    "USD": {
+      "ref": "DUMMY-USD-CLX077",
+      "opening": 100000,
+      "receipts": 5850,
+      "payments": 7320,
+      "reversals": 6120,
+      "expected": 104650,
+      "actual": 104650,
+      "variance": 0
+    }
+  },
+  "bank_to_treasury": "PASS",
+  "treasury_to_gl": "PASS",
+  "ar_ap_clearing": "PASS",
+  "bank_import": {
+    "EUR": {
+      "net": 7390,
+      "lines": 10,
+      "matched": 10
+    },
+    "USD": {
+      "net": 4650,
+      "lines": 4,
+      "matched": 4
+    }
+  },
+  "gl_bank_1100": {
+    "EUR": 7390,
+    "USD": 4650
+  },
+  "unmatched_bank_items": 0,
+  "unbalanced_vouchers": 0,
+  "duplicate_refs": 0,
+  "maximum_unexplained_variance": 0,
+  "simulated_payments": 7,
+  "dummy_provider_events": 14,
+  "real_money": false,
+  "external_provider_calls": false
+}

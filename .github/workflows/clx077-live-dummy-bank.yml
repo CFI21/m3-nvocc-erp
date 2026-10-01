@@ -1,0 +1,43 @@
+name: CLX-077 Final Live Dummy Bank Review
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/clx077_dummy_bank.py"
+      - "app/main.py"
+      - "web/index.html"
+      - "migrations/CLX077_001_dummy_bank_live_review.sql"
+      - "CLX077_*"
+      - "tests/test_clx077_live_dummy_bank.py"
+      - ".github/workflows/clx077-live-dummy-bank.yml"
+      - ".github/workflows/clx077-live-smoke.yml"
+  push:
+    branches: [main]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile runtime
+        run: python -m py_compile app/*.py
+      - name: CLX-077 targeted acceptance
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx077_live_dummy_bank.py
+      - name: Complete ERP regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests
+      - name: Safety assertions
+        run: |
+          ! grep -q "CREATE TABLE IF NOT EXISTS public.treasury_records" migrations/CLX077_001_dummy_bank_live_review.sql
+          ! grep -q "CREATE TABLE IF NOT EXISTS public.bank_import_batches" migrations/CLX077_001_dummy_bank_live_review.sql
+          ! grep -q "CREATE TABLE IF NOT EXISTS public.gl_vouchers" migrations/CLX077_001_dummy_bank_live_review.sql
+          grep -q "TEST BANK — SIMULATION ONLY — NO REAL MONEY" web/index.html
+          grep -q "REAL_MONEY" app/clx077_dummy_bank.py

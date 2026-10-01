@@ -1,0 +1,90 @@
+name: CLX-077 Live Production Smoke
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for CLX-077 API deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          for i in $(seq 1 90); do
+            code="$(curl --silent --output /tmp/dash.json --write-out '%{http_code}' -H 'X-Role: AUDITOR' "$API/api/clx077/dummy-bank/dashboard" || true)"
+            if [ "$code" = "200" ]; then
+              echo "CLX077_API_AVAILABLE"
+              break
+            fi
+            if [ "$i" = "90" ]; then echo "CLX077_API_TIMEOUT code=$code"; exit 1; fi
+            sleep 5
+          done
+
+      - name: Verify live dummy-bank API
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx077/dummy-bank/safety" -o /tmp/safety.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx077/dummy-bank/dashboard" -o /tmp/dashboard.json
+          curl --fail --silent --show-error -X POST -H 'X-Role: TREASURY_MANAGER' "$API/api/clx077/dummy-bank/reconcile" -o /tmp/reconcile.json
+          python - <<'PY'
+          import json
+          s=json.load(open('/tmp/safety.json'))
+          d=json.load(open('/tmp/dashboard.json'))
+          r=json.load(open('/tmp/reconcile.json'))
+          assert s["state"]["production_traffic"]=="ON", s
+          assert s["state"]["live_providers"]=="OFF", s
+          assert s["state"]["real_money"]=="OFF", s
+          assert s["state"]["real_provider_rows_enabled"]==0, s
+          assert s["state"]["real_money_provider_rows_enabled"]==0, s
+          assert s["state"]["dummy_provider_enabled"] is True, s
+          assert s["real_money_movement"] is False, s
+          assert d["passed"]==15, d
+          assert d["unmatched_bank_items"]==0, d
+          assert d["unbalanced_vouchers"]==0, d
+          assert d["simulated_payments"]==7, d
+          assert d["banner"]=="TEST BANK — SIMULATION ONLY — NO REAL MONEY", d
+          assert r["status"]=="PASS", r
+          assert float(r["maximum_unexplained_variance"])==0, r
+          print("CLX077_LIVE_API_PASS")
+          PY
+
+      - name: Wait for CLX-077 web deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          for i in $(seq 1 90); do
+            body="$(curl --silent --show-error "$WEB/" || true)"
+            if echo "$body" | grep -q "Dummy Bank Review" && echo "$body" | grep -q "TEST BANK — SIMULATION ONLY — NO REAL MONEY"; then
+              printf '%s' "$body" > /tmp/index.html
+              echo "CLX077_WEB_AVAILABLE"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "CLX077_WEB_TIMEOUT"
+          exit 1
+
+      - name: Verify live web and health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error "https://m3-nvocc-web-latest.onrender.com/healthz" -o /tmp/web-health.json
+          curl --fail --silent --show-error "https://m3-nvocc-api-latest-1.onrender.com/api/v1/health" -o /tmp/api-health.json
+          python - <<'PY'
+          import json
+          wh=json.load(open('/tmp/web-health.json'))
+          ah=json.load(open('/tmp/api-health.json'))
+          assert wh["status"]=="ok", wh
+          assert ah["project"]=="M3 NVOCC ERP", ah
+          html=open('/tmp/index.html').read()
+          assert "Dummy Bank Review" in html
+          assert "TEST BANK — SIMULATION ONLY — NO REAL MONEY" in html
+          print("CLX077_LIVE_WEB_PASS")
+          PY
