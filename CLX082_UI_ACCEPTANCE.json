@@ -1,0 +1,10 @@
+{
+  "schema": "M3_CLX082_UI_ACCEPTANCE_V1",
+  "baseline": "ce8a71952bb978d98ec171b2236f1339d7dbd240",
+  "BL_MASTER_READY": false,
+  "backend_model_changed": false,
+  "database_changed": false,
+  "REAL_MONEY_READY": false,
+  "REAL_PROVIDER_READY": false,
+  "status": "PENDING_TESTS"
+}
