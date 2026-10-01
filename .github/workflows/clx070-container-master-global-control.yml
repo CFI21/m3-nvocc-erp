@@ -1,0 +1,44 @@
+name: CLX-070 Container Master Global Control
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/clx070_equipment_runtime.py"
+      - "app/clx049_booking_bl_workspace.py"
+      - "app/schema.sql"
+      - "migrations/CLX070_002_container_master_global_control.sql"
+      - "web/index.html"
+      - "tests/test_clx070_container_master_global_control.py"
+      - "tests/test_clx049_booking_bl_workspace.py"
+      - ".github/workflows/clx070-container-master-global-control.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/clx070_equipment_runtime.py"
+      - "app/clx049_booking_bl_workspace.py"
+      - "app/schema.sql"
+      - "migrations/CLX070_002_container_master_global_control.sql"
+      - "web/index.html"
+      - "tests/test_clx070_container_master_global_control.py"
+      - "tests/test_clx049_booking_bl_workspace.py"
+      - ".github/workflows/clx070-container-master-global-control.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m py_compile app/*.py
+          PYTHONPATH=. pytest -q tests/test_clx070_container_master_global_control.py tests/test_clx070_container_finance_runtime.py
+          PYTHONPATH=. pytest -q tests/test_clx049_booking_bl_workspace.py
+          PYTHONPATH=. pytest -q tests/test_clx050_operational_uat.py tests/test_build_first_fast_track.py
+          grep -q "One M3 ERP." web/index.html
+          grep -q "Container Finance" web/index.html
+          grep -q "System Policy" web/index.html
