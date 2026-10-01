@@ -672,6 +672,10 @@ async function showExecutiveHome(){
     </div>`;
 }
 
+async function openBookingEquipmentAllocation(jobRef){
+  state.equipmentJobRef=jobRef;
+  await showEquipmentWorkspace('allocation');
+}
 function equipmentShell(view){
   state.equipmentView=view;
   state.navContext=null;
@@ -741,13 +745,20 @@ async function showEquipmentWorkspace(view='overview'){
       <div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner Type</th><th>Owner Party</th><th>Principal</th><th>Branch</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Verification</th><th>Booking</th></tr></thead><tbody>
       ${(d.records||[]).map(x=>`<tr onclick="showContainerDetail('${esc(x.container_no)}')"><td><b>${esc(x.container_no)}</b></td><td>${esc(x.size_type)}</td><td>${esc(x.owner_party_type||x.ownership)}</td><td>${esc(x.owner_party_code||'')}</td><td>${esc(x.principal_code||'')}</td><td>${esc(x.branch_code||'')}</td><td>${esc(x.current_port||'')}</td><td>${esc(x.agent_code||'')}</td><td>${esc(x.depot_code||'')}</td><td>${esc(x.equipment_status)}</td><td>${esc(x.verification_status||'')}</td><td>${esc(x.booking_ref||'')}</td></tr>`).join('')}</tbody></table></div>`;
     }else if(view==='allocation'){
-      $('gridArea').innerHTML=`<div class="card"><b>Availability / Allocation</b><div class="equipFilters">
-        <label>Port<input id="eqPort" value="Karachi"></label><label>Agent<input id="eqAgent" value="Agent A"></label>
-        <label>Size/Type<select id="eqType"><option>40HC</option><option>20GP</option><option>40RF</option></select></label>
-        <label>Qty<input id="eqQty" type="number" min="1" value="2"></label><label>Safety Stock<input id="eqSafety" type="number" min="0" value="0"></label>
-        <label>Booking Ref<input id="eqBooking" placeholder="Use Booking tab for automatic context"></label>
+      let bx=null;
+      if(state.equipmentJobRef){
+        try{bx=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(state.equipmentJobRef))}catch(_){}
+      }
+      const bc=bx?.context||{},rq=bx?.requirement||{};
+      const et=String(rq.equipment||'40HC').toUpperCase().includes('20')?'20GP':(String(rq.equipment||'').toUpperCase().includes('RF')?'40RF':'40HC');
+      const bq=parseInt(rq.quantity||'2',10)||2;
+      $('gridArea').innerHTML=`<div class="card"><b>Availability / Allocation</b><div class="muted">${bx?'Inherited directly from Job '+esc(bc.job_ref)+' / Booking '+esc(bc.booking_ref):'Open from a Booking to inherit the authoritative Job/Booking context.'}</div><div class="equipFilters">
+        <label>Port<input id="eqPort" value="${esc(bc.pol||'Karachi')}" ${bx?'readonly':''}></label><label>Agent<input id="eqAgent" value="${esc(bc.agent_code||'')}" ${bx?'readonly':''}></label>
+        <label>Size/Type<select id="eqType"><option ${et==='40HC'?'selected':''}>40HC</option><option ${et==='20GP'?'selected':''}>20GP</option><option ${et==='40RF'?'selected':''}>40RF</option></select></label>
+        <label>Qty<input id="eqQty" type="number" min="1" value="${bq}"></label><label>Safety Stock<input id="eqSafety" type="number" min="0" value="0"></label>
+        <label>Booking Ref<input id="eqBooking" value="${esc(bc.booking_ref||'')}" ${bx?'readonly':''}></label>
         <button class="btn" onclick="checkEquipmentAvailability()">Check Availability</button><button class="btn primary" onclick="allocateEquipment()">Allocate</button>
-      </div><div id="eqAllocationResult" class="equipNote">Use actual Container Master stock. From Booking, the Job/Booking context is inherited automatically.</div></div>`;
+      </div><div id="eqAllocationResult" class="equipNote">Eligible stock must be AVAILABLE, verified, not allocated for sale, owner-linked and inside the permitted custody scope.</div></div>`;
     }else if(view==='work'){
       const d=await equipmentApi('/api/clx070/equipment/work-items?limit=200');
       $('gridArea').innerHTML=`<div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace('work')">Refresh</button></div><div class="tablewrap"><table><thead><tr><th>Ref</th><th>Type</th><th>Status</th><th>Booking</th><th>Equipment</th><th>Qty</th><th>From</th><th>To</th><th>Cost</th></tr></thead><tbody>${(d.records||[]).map(x=>`<tr><td>${esc(x.work_ref)}</td><td>${esc(x.work_type)}</td><td>${esc(x.status)}</td><td>${esc(x.booking_ref||'')}</td><td>${esc(x.size_type)}</td><td>${esc(x.qty)}</td><td>${esc(x.source_port||'')}</td><td>${esc(x.destination_port||'')}</td><td>${esc(x.currency)} ${esc(x.estimated_cost)}</td></tr>`).join('')}</tbody></table></div>`;
@@ -929,7 +940,7 @@ async function checkEquipmentAvailability(){
 }
 async function allocateEquipment(){
   try{
-    const r=await equipmentApi('/api/clx070/equipment/allocate',{method:'POST',body:JSON.stringify({booking_ref:$('eqBooking').value,port:$('eqPort').value,agent_code:$('eqAgent').value,size_type:$('eqType').value,qty:Number($('eqQty').value),safety_stock:Number($('eqSafety').value)})});
+    const r=await equipmentApi('/api/clx070/equipment/allocate',{method:'POST',body:JSON.stringify({booking_ref:$('eqBooking').value,job_ref:state.equipmentJobRef||null,port:$('eqPort').value,agent_code:$('eqAgent').value,size_type:$('eqType').value,qty:Number($('eqQty').value),safety_stock:Number($('eqSafety').value)})});
     $('eqAllocationResult').innerHTML=`<span class="oktxt">Allocated ${r.allocated_qty}</span> · shortage ${r.shortage} · ${(r.allocated||[]).map(esc).join(', ')}`;
   }catch(e){$('eqAllocationResult').textContent=e.message}
 }
