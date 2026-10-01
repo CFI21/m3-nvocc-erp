@@ -1,0 +1,16 @@
+{
+  "phase": "CLX-077",
+  "parent": "8b8da94a7d72c42dbb29f33d381f567ebe74aab1",
+  "status": "PENDING_LIVE_EXECUTION",
+  "LIVE_SESSION_READY": false,
+  "DUMMY_MONEY_FLOW_READY": false,
+  "REAL_MONEY_READY": false,
+  "REAL_PROVIDER_READY": false,
+  "required": {
+    "scenarios_pass": 15,
+    "maximum_unexplained_variance": 0,
+    "p0_p1": 0,
+    "real_provider_activity": 0,
+    "real_money_activity": 0
+  }
+}
