@@ -130,6 +130,15 @@ class DocumentLink(BaseModel):
     file_name:str
     storage_ref:str
 
+class ApplyShareBody(BaseModel):
+    base_amount:float
+    currency:str="USD"
+    charge_code:Optional[str]=None
+    booking_ref:Optional[str]=None
+    job_ref:Optional[str]=None
+    bl_ref:Optional[str]=None
+    source_ref:Optional[str]=None
+
 class BulkContainer(BaseModel):
     container_no:str
     size_type:str
@@ -311,9 +320,69 @@ def add_share_rule(container_no:str,b:ShareRule,x_role:str=Header("FINANCE"),x_m
         a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"finance");tx(c);r=get_container(c,container_no,a)
         ref="CSR-"+uuid.uuid4().hex[:12].upper()
         c.execute("""INSERT INTO container_share_rules(rule_ref,container_id,owner_party_type,owner_party_code,agent_code,charge_code,share_type,basis,rate_pct,fixed_amount,currency,valid_from,valid_to,status,maker,checker,created_at)
-                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'ACTIVE',?,NULL,?)""",
+                     VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'PENDING_APPROVAL',?,NULL,?)""",
           (ref,r["id"],b.owner_party_type or r["owner_party_type"],b.owner_party_code or r["owner_party_code"],b.agent_code or r["agent_code"],b.charge_code,b.share_type,b.basis,b.rate_pct,b.fixed_amount,b.currency,b.valid_from,b.valid_to,a["user"],now()))
-        c.execute("COMMIT");return {"ok":True,"rule_ref":ref,"status":"ACTIVE"}
+        audit(c,a,"CONTAINER_SHARE_RULE_CREATE",r["id"],r["job_id"],{},b.model_dump(),{"rule_ref":ref})
+        c.execute("COMMIT");return {"ok":True,"rule_ref":ref,"status":"PENDING_APPROVAL"}
+    except Exception:
+        try:c.execute("ROLLBACK")
+        except Exception:pass
+        raise
+    finally:c.close()
+
+@router.post("/share-rules/{rule_ref}/approve")
+def approve_share_rule(rule_ref:str,x_role:str=Header("FINANCE"),x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+                       x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),
+                       x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
+    c=connect()
+    try:
+        a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"approve");tx(c)
+        r=c.execute("SELECT * FROM container_share_rules WHERE rule_ref=?",(rule_ref,)).fetchone()
+        if not r:raise HTTPException(404,"Unknown share rule")
+        if r["maker"]==a["user"]:raise HTTPException(409,{"code":"MAKER_CHECKER_CONFLICT"})
+        c.execute("UPDATE container_share_rules SET status='ACTIVE',checker=? WHERE id=?",(a["user"],r["id"]))
+        audit(c,a,"CONTAINER_SHARE_RULE_APPROVE",r["container_id"],None,dict(r),{"status":"ACTIVE","checker":a["user"]},{"rule_ref":rule_ref})
+        c.execute("COMMIT");return {"ok":True,"rule_ref":rule_ref,"status":"ACTIVE"}
+    except Exception:
+        try:c.execute("ROLLBACK")
+        except Exception:pass
+        raise
+    finally:c.close()
+
+@router.post("/containers/{container_no}/apply-sharing")
+def apply_sharing(container_no:str,b:ApplyShareBody,x_role:str=Header("FINANCE"),x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+                  x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),
+                  x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
+    c=connect()
+    try:
+        a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"finance");tx(c);r=get_container(c,container_no,a)
+        job_id=r["job_id"]
+        if b.job_ref:
+            jr=c.execute("SELECT id FROM jobs WHERE job_ref=?",(b.job_ref,)).fetchone()
+            if not jr:raise HTTPException(404,"Unknown job_ref")
+            job_id=jr["id"]
+        rules=[dict(x) for x in c.execute("""SELECT * FROM container_share_rules
+                 WHERE status='ACTIVE' AND (container_id=? OR container_id IS NULL)
+                   AND (owner_party_type IS NULL OR owner_party_type=?)
+                   AND (owner_party_code IS NULL OR owner_party_code=?)
+                   AND (agent_code IS NULL OR agent_code=?)
+                   AND (charge_code IS NULL OR charge_code=?)
+                 ORDER BY id""",(r["id"],r["owner_party_type"],r["owner_party_code"],r["agent_code"],b.charge_code)).fetchall()]
+        posted=[]
+        for rule in rules:
+            amount=(float(b.base_amount)*float(rule["rate_pct"] or 0)/100.0)+float(rule["fixed_amount"] or 0)
+            if not amount:continue
+            et="COMMISSION" if "COMMISSION" in str(rule["share_type"]).upper() else "SHARE"
+            ref="CFL-"+uuid.uuid4().hex[:12].upper()
+            party_type="AGENT" if et=="COMMISSION" and rule["agent_code"] else r["owner_party_type"]
+            party_code=rule["agent_code"] if et=="COMMISSION" and rule["agent_code"] else r["owner_party_code"]
+            c.execute("""INSERT INTO container_financial_ledger(entry_ref,container_id,job_id,booking_ref,bl_ref,movement_event_id,entry_type,charge_code,party_type,party_code,amount,currency,quantity,rate,basis,source_type,source_ref,status,created_by,created_at)
+                         VALUES(?,?,?,?,?,NULL,?,?,?,?,?,?,1,?,?, 'SHARE_RULE',?,'ACCRUED',?,?)""",
+                      (ref,r["id"],job_id,b.booking_ref or r["booking_ref"],b.bl_ref,et,b.charge_code or rule["charge_code"] or "REVENUE_SHARE",
+                       party_type,party_code,amount,b.currency,float(rule["rate_pct"] or 0),rule["basis"],b.source_ref or rule["rule_ref"],a["user"],now()))
+            posted.append({"entry_ref":ref,"rule_ref":rule["rule_ref"],"entry_type":et,"amount":amount,"party_code":party_code})
+        audit(c,a,"CONTAINER_SHARING_APPLY",r["id"],job_id,{},{"base_amount":b.base_amount,"posted":posted},{})
+        c.execute("COMMIT");return {"ok":True,"posted":posted,"count":len(posted)}
     except Exception:
         try:c.execute("ROLLBACK")
         except Exception:pass
