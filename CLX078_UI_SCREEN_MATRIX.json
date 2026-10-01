@@ -20,5 +20,10 @@
     "finance_treasury_gl": "existing canonical screens inherit common green/gray shell and table/form styles",
     "remaining_screens": "existing canonical renderer under same shell; no second UI"
   },
-  "status": "PENDING_WORKFLOW"
+  "status": "PASS",
+  "workflow_run_id": 36877781892,
+  "targeted_tests": "58 passed",
+  "full_regression": "266 passed",
+  "javascript_syntax": "PASS",
+  "top_level_order_verified": true
 }
