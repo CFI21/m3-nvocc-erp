@@ -174,7 +174,7 @@ async function renderInlineAgentScreen(){
     const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode=edit');
     const base={...rowPayload(state.selected)};
     const fields=schema.fields||[];
-    let html='<div class="card"><div class="formGrid">';
+    let html='<div class="clx78Workspace"><div class="clx78Panel"><div class="clx78PanelHead">'+esc(state.current.name)+' · Active Record</div><div class="clx78PanelBody"><div class="formGrid">';
     if(schema.kind==='AGENT_TRANSACTION'){
       html+='<div class="formField"><label>Job Ref</label><input value="'+esc(selectedJob()||base['Job Ref']||'')+'" disabled></div>';
       html+='<div class="formField"><label>External Ref</label><input value="'+esc(state.selected.external_ref||'')+'" disabled></div>';
@@ -187,7 +187,7 @@ async function renderInlineAgentScreen(){
       html+='<div class="formField"><label>Record Key</label><input value="'+esc(state.selected.record_key||'')+'" disabled></div>';
       html+='<div class="formField"><label>Name</label><input value="'+esc(state.selected.display_name||base.name||'')+'" disabled></div>';
     }
-    html+='</div><div class="formActions"><button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Active Screen</button><button class="btn" onclick="openAgentForm(\'create\')">Create New</button></div></div>';
+    html+='</div><div class="formActions"><button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Active Screen</button><button class="btn" onclick="openAgentForm(\'create\')">Create New</button></div></div></div></div>';
     $('gridArea').insertAdjacentHTML('beforeend',html);
   }catch(e){
     $('gridArea').insertAdjacentHTML('beforeend','<div class="card"><b class="badtext">Active form unavailable</b><div class="muted">'+esc(e.message)+'</div></div>');
@@ -255,25 +255,26 @@ async function clx49RenderBlTab(tab){
   const w=clx49Workspace;clx49ActiveTab=tab;
   const x=clx49RecordForTab(w,tab),r=x.record;
   let html=clx49ContextHeader(w)+clx49Nav(w);
-  html+='<div class="card"><div class="toolbar">'+CLX49_BL_TABS.map(t=>'<button class="btn '+(t===tab?'primary':'')+'" onclick="clx49RenderBlTab(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div></div>';
+  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>B/L WORKSPACE</b><span class="muted">Job '+esc(w.context.job_ref)+' · Booking '+esc(w.context.booking_ref||'—')+' · B/L '+esc(w.context.hbl_no||'—')+'</span><span class="grow"></span><button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Booking</button></div>'+
+    '<div class="clx78Tabs">'+CLX49_BL_TABS.map(t=>'<button class="'+(t===tab?'active':'')+'" onclick="clx49RenderBlTab(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div>';
   if(tab==='Lock Info'){
-    html+='<div class="card"><b>Workflow Holds / Release</b><pre class="pre">'+esc(JSON.stringify({workflow:w.lock_info.workflow,holds:w.lock_info.holds},null,2))+'</pre></div>';
+    html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Workflow Holds / Release</div><div class="clx78PanelBody"><pre class="pre">'+esc(JSON.stringify({workflow:w.lock_info.workflow,holds:w.lock_info.holds},null,2))+'</pre></div></div>';
   }
   if(tab==='Authorization'){
-    html+='<div class="card"><b>Authorization / Approval Audit</b><div class="muted">Uses the existing B/L transaction and existing audit/governance path.</div><pre class="pre">'+esc(JSON.stringify(w.authorization.audit.slice(0,10),null,2))+'</pre></div>';
+    html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Authorization / Approval Audit</div><div class="clx78PanelBody"><div class="muted">Existing B/L governance, maker-checker and audit remain authoritative.</div><pre class="pre">'+esc(JSON.stringify(w.authorization.audit.slice(0,10),null,2))+'</pre></div></div>';
   }
   if(tab==='Booking Info'){
     try{
       const e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(w.context.job_ref));
-      html+='<div class="card"><b>Allocated Equipment — Same Booking / Same B/L Context</b><div class="muted">These are the authoritative Container Master records allocated to this Booking/Job; B/L does not create a second container list.</div><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner</th><th>Principal</th><th>Agent</th><th>Depot</th><th>Status</th></tr></thead><tbody>'+
+      html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Allocated Equipment — Same Booking / Same B/L Context</div><div class="clx78PanelBody"><div class="muted">One authoritative container list follows Booking → B/L → release → journey → depot → finance.</div><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner</th><th>Principal</th><th>Agent</th><th>Depot</th><th>Status</th></tr></thead><tbody>'+
         (e.allocated_containers||[]).map(z=>'<tr onclick="showContainerDetail(\''+esc(z.container_no)+'\')"><td><b>'+esc(z.container_no)+'</b></td><td>'+esc(z.size_type)+'</td><td>'+esc(z.owner_party_type||z.ownership)+'</td><td>'+esc(z.principal_code||'')+'</td><td>'+esc(z.agent_code||'')+'</td><td>'+esc(z.depot_code||'')+'</td><td>'+esc(z.equipment_status)+'</td></tr>').join('')+
-        '</tbody></table></div></div>';
-    }catch(e){html+='<div class="card"><b class="badtext">Allocated Equipment unavailable</b><div class="muted">'+esc(e.message)+'</div></div>'}
+        '</tbody></table></div></div></div>';
+    }catch(e){html+='<div class="equipNote badtext">'+esc(e.message)+'</div>'}
   }
-  html+='<div class="card"><b>'+esc(tab)+'</b>'+clx49FieldEditor(r,x.fields);
+  html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">'+esc(tab)+'</div><div class="clx78PanelBody">'+clx49FieldEditor(r,x.fields);
   if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\''+x.module+'\','+r.id+','+r.version+')">Save '+esc(tab)+'</button>'+
     (tab==='Authorization'?'<button class="btn" onclick="approveClx049Bl('+r.id+','+r.version+')">Approve via Existing B/L Governance</button>':'')+'</div>';
-  html+='</div>';
+  html+='</div></div></div>';
   $('gridArea').innerHTML=renderGrid()+html;
 }
 function clx49BookingGroup(record,title,fields,opts={}){
@@ -408,15 +409,15 @@ async function clx49RenderBooking(tab){
 }
 function clx49RenderSpecialRate(){
   const w=clx49Workspace,r=w.special_rate_request;
-  let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="card"><b>Special Rate Request</b>'+clx49FieldEditor(r);
-  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'special-rates-request\','+r.id+','+r.version+')">Save Special Rate Request</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Open Related Booking</button></div>';
-  html+='</div>';$('gridArea').innerHTML=renderGrid()+html;
+  let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="clx78Workspace"><div class="clx78TopBar"><b>SPECIAL RATE REQUEST</b><span class="muted">Same governed Job/Booking context</span><span class="grow"></span><button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Open Booking</button></div><div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Rate Request</div><div class="clx78PanelBody">'+clx49FieldEditor(r);
+  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'special-rates-request\','+r.id+','+r.version+')">Save Special Rate Request</button></div>';
+  html+='</div></div></div>';$('gridArea').innerHTML=renderGrid()+html;
 }
 function clx49RenderSwitchBl(){
   const w=clx49Workspace,r=w.switch_bl;
-  let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="card"><b>Switch B/L</b><div class="muted">Original B/L → Switch B/L relationship, party changes, reason, confidentiality, approval and immutable history remain on the existing governed Switch B/L record.</div>'+clx49FieldEditor(r);
-  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'switch-bl\','+r.id+','+r.version+')">Save Switch B/L</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Back to Source B/L</button></div>';
-  html+='<pre class="pre">'+esc(JSON.stringify(w.switch_bl_history,null,2))+'</pre></div>';$('gridArea').innerHTML=renderGrid()+html;
+  let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="clx78Workspace"><div class="clx78TopBar"><b>SWITCH B/L</b><span class="muted">Original B/L → Switch B/L · governed confidentiality / approval / history</span><span class="grow"></span><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Back to Source B/L</button></div><div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Switch B/L Detail</div><div class="clx78PanelBody">'+clx49FieldEditor(r);
+  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'switch-bl\','+r.id+','+r.version+')">Save Switch B/L</button></div>';
+  html+='<div class="clx78Panel" style="margin-top:6px"><div class="clx78PanelHead">Immutable History</div><div class="clx78PanelBody"><pre class="pre">'+esc(JSON.stringify(w.switch_bl_history,null,2))+'</pre></div></div></div></div></div>';$('gridArea').innerHTML=renderGrid()+html;
 }
 async function showClx049Workspace(){
   const jr=selectedJob();if(!jr)return openDrawer('details');
