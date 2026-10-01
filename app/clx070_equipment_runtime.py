@@ -343,6 +343,12 @@ def create_work_item(body: WorkItemBody, x_role: str=Header("OPS"), x_agent_scop
     wt=body.work_type.upper()
     if wt not in {"REPOSITION","LEASE","PURCHASE","REPAIR","AGENT_SUPPLY","SOC","SHORTAGE"}:
         raise HTTPException(422,"Invalid work_type")
+    if role=="AGENT":
+        if not scope: raise HTTPException(403,"AGENT requires X-Agent-Scope")
+        if body.source_agent not in {None,scope} and body.destination_agent not in {None,scope}:
+            raise HTTPException(403,{"code":"WORK_ITEM_OUTSIDE_AGENT_SCOPE"})
+        if wt in {"PURCHASE","LEASE"}:
+            raise HTTPException(403,{"code":"AGENT_CANNOT_CREATE_STRATEGIC_PROCUREMENT"})
     conn=connect()
     try:
         require_schema(conn);tx(conn)
@@ -366,14 +372,18 @@ def create_work_item(body: WorkItemBody, x_role: str=Header("OPS"), x_agent_scop
         conn.close()
 
 @router.get("/work-items")
-def work_items(status: Optional[str]=None, work_type: Optional[str]=None, limit: int=Query(200,ge=1,le=1000), x_role: str=Header("VIEWER")):
-    actor(x_role,None)
+def work_items(status: Optional[str]=None, work_type: Optional[str]=None, limit: int=Query(200,ge=1,le=1000),
+               x_role: str=Header("VIEWER"), x_agent_scope: Optional[str]=Header(None)):
+    role,scope=actor(x_role,x_agent_scope)
     conn=connect()
     try:
         require_schema(conn)
         q="SELECT * FROM equipment_work_items WHERE 1=1";args=[]
         if status:q+=" AND status=?";args.append(status)
         if work_type:q+=" AND work_type=?";args.append(work_type.upper())
+        if role=="AGENT":
+            if not scope: raise HTTPException(403,"AGENT requires X-Agent-Scope")
+            q+=" AND (source_agent=? OR destination_agent=?)";args.extend([scope,scope])
         q+=" ORDER BY id DESC LIMIT ?";args.append(limit)
         rows=[dict(x) for x in conn.execute(q,args).fetchall()]
         for r in rows:
