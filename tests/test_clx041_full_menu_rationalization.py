@@ -1,7 +1,7 @@
 from app.screen_catalog import build_catalog, HO_UTILITY_ALIASES, DOMAIN_SUBMENU_ORDER
 
 EXPECTED_TOP=[
-    'Agent Tasks','HO Tasks','Treasury / AR-AP',
+    'HO Tasks','Agent Tasks','Treasury / AR-AP',
     'Integration & Security','General / Administration','Master Data'
 ]
 
