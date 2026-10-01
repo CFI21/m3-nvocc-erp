@@ -179,6 +179,9 @@ def availability(
                AND condition IN ('GOOD','VERIFIED')
                AND COALESCE(verification_status,'VERIFIED')='VERIFIED'
                AND COALESCE(allocate_for_sale,0)=0
+               AND COALESCE(owner_party_code,principal_code) IS NOT NULL
+               AND COALESCE(verification_status,'VERIFIED')='VERIFIED'
+               AND COALESCE(allocate_for_sale,0)=0
                AND COALESCE(owner_party_code,principal_code) IS NOT NULL"""
         args=[port,size_type]
         if agent_code: q+=" AND agent_code=?"; args.append(agent_code)
