@@ -1,0 +1,112 @@
+name: CLX-054 Historical Preview Comparison
+
+on:
+  push:
+    branches: [preview-clx054-frozen]
+    paths:
+      - ".github/workflows/clx054-preview-compare.yml"
+  workflow_dispatch:
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify preview and live web
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --retry 6 --retry-delay 3 https://m3-clx054-preview.onrender.com/ -o /tmp/old.html
+          curl --fail --silent --show-error --retry 6 --retry-delay 3 https://m3-nvocc-web-latest.onrender.com/ -o /tmp/new.html
+          grep -q "CLX-054 HISTORICAL PREVIEW" /tmp/old.html
+          grep -q "07d60f6ac8b39f7089a47f3ea16b9976232a3d80" /tmp/old.html
+          grep -q "M3 NVOCC ERP" /tmp/new.html
+          echo "WEB_BOTH_AVAILABLE=PASS"
+
+      - name: Compare 196-screen catalogs
+        shell: bash
+        run: |
+          set -euo pipefail
+          OLD=https://m3-clx054-preview-api.onrender.com
+          NEW=https://m3-nvocc-api-latest-1.onrender.com
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$OLD/api/clx011/screens" -o /tmp/old-screens.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$NEW/api/clx011/screens" -o /tmp/new-screens.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$OLD/api/clx011/menu" -o /tmp/old-menu.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$NEW/api/clx011/menu" -o /tmp/new-menu.json
+          python - <<'PY'
+          import json
+          o=json.load(open('/tmp/old-screens.json')); n=json.load(open('/tmp/new-screens.json'))
+          os=o.get('screens',o if isinstance(o,list) else [])
+          ns=n.get('screens',n if isinstance(n,list) else [])
+          om={x['screen_id']:x for x in os}; nm={x['screen_id']:x for x in ns}
+          removed=sorted(set(om)-set(nm)); added=sorted(set(nm)-set(om))
+          route_changed=sorted(k for k in set(om)&set(nm) if om[k].get('route')!=nm[k].get('route'))
+          name_changed=sorted(k for k in set(om)&set(nm) if om[k].get('name')!=nm[k].get('name'))
+          print(f"OLD_SCREEN_COUNT={len(os)}")
+          print(f"NEW_SCREEN_COUNT={len(ns)}")
+          print("REMOVED="+json.dumps(removed))
+          print("ADDED="+json.dumps(added))
+          print("ROUTE_CHANGED="+json.dumps(route_changed))
+          print("NAME_CHANGED="+json.dumps(name_changed))
+          assert len(os)==196, len(os)
+          assert len(ns)>=196, len(ns)
+          assert not removed, removed
+          open('/tmp/catalog-comparison.json','w').write(json.dumps({
+            'old_count':len(os),'new_count':len(ns),'removed':removed,'added':added,
+            'route_changed':route_changed,'name_changed':name_changed
+          },indent=2))
+          oldmenu=json.load(open('/tmp/old-menu.json')); newmenu=json.load(open('/tmp/new-menu.json'))
+          olddomains=[x['domain'] for x in oldmenu['menu']]
+          newdomains=[x['domain'] for x in newmenu['menu']]
+          print("OLD_MENU="+json.dumps(olddomains))
+          print("NEW_MENU="+json.dumps(newdomains))
+          print("MENU_ORDER_PRESERVED="+str(olddomains==newdomains))
+          PY
+
+      - name: Verify key screens open in both versions
+        shell: bash
+        run: |
+          set -euo pipefail
+          OLD=https://m3-clx054-preview-api.onrender.com
+          NEW=https://m3-nvocc-api-latest-1.onrender.com
+          screens=(
+            'agent-tasks::booking'
+            'agent-tasks::bl'
+            'agent-tasks::delivery-order'
+            'agent-tasks::switch-bl'
+            'gl-accounts::invoice'
+            'gl-accounts::payment'
+            'gl-accounts::receipt'
+            'treasury::bank-reconciliation-exception-queue'
+            'administration::users'
+            'master-data::agents'
+          )
+          : > /tmp/key-screen-results.txt
+          for sid in "${screens[@]}"; do
+            oc=$(curl --silent --output /tmp/o.json --write-out '%{http_code}' -G -H 'X-Role: ADMIN' --data-urlencode "screen_id=$sid" "$OLD/api/clx011/screen-data")
+            nc=$(curl --silent --output /tmp/n.json --write-out '%{http_code}' -G -H 'X-Role: ADMIN' --data-urlencode "screen_id=$sid" "$NEW/api/clx011/screen-data")
+            echo "$sid OLD=$oc NEW=$nc" | tee -a /tmp/key-screen-results.txt
+            test "$oc" = "200"
+            test "$nc" = "200"
+          done
+          echo "KEY_SCREEN_OPEN_CHECK=PASS"
+
+      - name: Verify CLX-054 preview is hard read-only
+        shell: bash
+        run: |
+          set -euo pipefail
+          code=$(curl --silent --output /tmp/write.json --write-out '%{http_code}' -X POST             -H 'Content-Type: application/json' -H 'X-Role: ADMIN'             -d '{"screen_id":"agent-tasks::booking"}'             https://m3-clx054-preview-api.onrender.com/api/clx011/navigation-event)
+          echo "PREVIEW_WRITE_HTTP=$code"
+          cat /tmp/write.json
+          test "$code" = "423"
+          grep -q "CLX054_HISTORICAL_PREVIEW_READ_ONLY" /tmp/write.json
+          echo "READ_ONLY_GUARD=PASS"
+
+      - name: Save comparison artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: clx054-vs-clx077-comparison
+          path: |
+            /tmp/catalog-comparison.json
+            /tmp/key-screen-results.txt
