@@ -1,0 +1,14 @@
+{
+  "phase": "CLX-077",
+  "status": "PENDING",
+  "run_ref": "CLX077-LIVE-001",
+  "accounts": [
+    "DUMMY-EUR-CLX077",
+    "DUMMY-USD-CLX077"
+  ],
+  "formula": "opening + receipts - payments + reversals = closing",
+  "required_variance": 0,
+  "bank_to_treasury": "PENDING",
+  "treasury_to_gl": "PENDING",
+  "ar_ap_clearing": "PENDING"
+}
