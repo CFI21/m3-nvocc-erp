@@ -30,7 +30,7 @@ def test_frozen_196_and_menu_order_preserved(isolated):
         assert s['domain']=='Agent Tasks'
 
 def test_exact_booking_and_bl_same_page_tab_order(isolated):
-    assert BOOKING_TABS==['Booking Info','Other Info']
+    assert BOOKING_TABS==['Booking Info','Equipment','Other Info']
     assert BL_TABS==['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization']
     w=workspace('50001','AUDITOR',None)
     assert w['booking_tabs']==BOOKING_TABS
@@ -101,6 +101,7 @@ def test_deep_links_are_exact_existing_screens(isolated):
     assert w['deep_links']=={
       'special_rate_request':'agent-tasks::special-rates-request',
       'booking':'agent-tasks::booking',
+      'equipment':'equipment-control::container-master',
       'bl':'agent-tasks::bl',
       'delivery_order':'agent-tasks::delivery-order',
       'lock_info':'agent-tasks::vessel-lock',
@@ -135,7 +136,7 @@ def test_switch_bl_preserves_source_relationship_and_history(isolated):
 def test_web_contains_exact_same_page_workspace_contract():
     html=open('web/index.html',encoding='utf-8').read()
     assert "const CLX49_BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization']" in html
-    assert "const CLX49_BOOKING_TABS=['Booking Info','Other Info']" in html
+    assert "const CLX49_BOOKING_TABS=['Booking Info','Equipment','Other Info']" in html
     assert "showClx049Workspace" in html
     assert "saveClx049Tab" in html
     assert "openClx49Link" in html
@@ -143,3 +144,20 @@ def test_web_contains_exact_same_page_workspace_contract():
     assert "/api/v1/'+module+'/'+id" in html
     assert "Approve via Existing B/L Governance" in html
     assert "--nav:#4b5563" in html
+
+
+def test_booking_workspace_contains_same_container_master_equipment_context(isolated):
+    w=workspace('50001','AUDITOR',None)
+    assert 'equipment' in w
+    assert w['equipment']['authoritative_source']=='containers + container_financial_entries'
+    assert w['equipment']['same_booking_job_context'] is True
+    assert all(x['job_id']==w['context']['id'] or x['booking_ref']==w['context']['booking_ref'] for x in w['equipment']['containers'])
+
+def test_web_embeds_equipment_inside_same_m3_shell():
+    html=open('web/index.html',encoding='utf-8').read()
+    assert 'One M3 ERP.' in html
+    assert 'Container Finance' in html
+    assert 'System Policy' in html
+    assert 'openBookingEquipmentControl' in html
+    assert 'openEquipmentContainer' in html
+    assert '/api/clx070/equipment/containers/' in html
