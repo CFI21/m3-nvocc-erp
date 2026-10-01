@@ -1,0 +1,23 @@
+{
+  "project":"M3 NVOCC ERP",
+  "phase":"CLX-076",
+  "title":"Live Provider Onboarding + External Integration Activation",
+  "parent_baseline":"176cb3311923c4343dcbf2f21de0eb0fe8e74d8b",
+  "production_core":"ACTIVE",
+  "provider_activation_policy":{
+    "non_money_providers":"activate only after credential-complete authenticated canary PASS",
+    "payment_provider":"auth/signing canary only; real money remains OFF",
+    "auto_rollback":"disable any provider that fails canary",
+    "secret_storage":"secure runtime environment only",
+    "secret_values_exposed":false
+  },
+  "target_providers":[
+    "TrueLayer Data API",
+    "Open Exchange Rates",
+    "Avalara AvaTax",
+    "TrueLayer Payments"
+  ],
+  "M3_LIVE_PROVIDERS":"OFF",
+  "REAL_MONEY":"OFF",
+  "status":"PENDING_PROVIDER_CANARY"
+}
