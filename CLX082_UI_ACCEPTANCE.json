@@ -1,10 +1,22 @@
 {
   "schema": "M3_CLX082_UI_ACCEPTANCE_V1",
   "baseline": "ce8a71952bb978d98ec171b2236f1339d7dbd240",
-  "BL_MASTER_READY": false,
+  "BL_MASTER_READY": true,
   "backend_model_changed": false,
   "database_changed": false,
   "REAL_MONEY_READY": false,
   "REAL_PROVIDER_READY": false,
-  "status": "PENDING_TESTS"
+  "status": "ACCEPTED_FOR_SINGLE_PR",
+  "workflow_run_id": 36935886575,
+  "validation": {
+    "focused_bl_tests": "48 passed",
+    "canonical_screen_contract": "196 PASS",
+    "full_erp_regression": "301 passed",
+    "javascript_syntax": "PASS",
+    "safety": "PASS"
+  },
+  "non_blocking_items": [
+    "Derived read-only fields remain sourced from existing Booking/Job/Finance context where no native B/L field exists",
+    "No new B/L or document model created"
+  ]
 }
