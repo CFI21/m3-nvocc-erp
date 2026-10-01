@@ -43,7 +43,7 @@ function domainSlug(d){return d.toLowerCase().replace(/\s*\/\s*/g,'-').replace(/
 function saveState(){localStorage.setItem('m3clx011-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('m3clx011-recent',JSON.stringify(state.recent.slice(0,15)))}
 function toggleGroup(id){let x=document.querySelector(`[data-content="${CSS.escape(id)}"]`);if(x)x.classList.toggle('collapse')}
 function screenAllowed(s){let r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;return !Array.isArray(s.roles)||!s.roles.length||s.roles.includes(r)}
-function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];return s&&screenAllowed(s)&&(!q||s.name.toLowerCase().includes(q)||s.submenu.toLowerCase().includes(q)||s.domain.toLowerCase().includes(q))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);return s&&aliasOk&&screenAllowed(s)&&(!q||it.label.toLowerCase().includes(q)||sub.name.toLowerCase().includes(q)||d.domain.toLowerCase().includes(q))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\\'")}',{domain:'${d.domain.replaceAll("'","\\'")}',submenu:'${sub.name.replaceAll("'","\\'")}',label:'${it.label.replaceAll("'","\\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(!dcount)continue;let did=domainSlug(d.domain);html+=`<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup('${did}')">▾ ${esc(d.domain)} <span class=count>${dcount}</span></button><div data-content="${esc(did)}">${subHtml}</div></div>`} if(!q||'equipment control container master allocation shortage work items'.includes(q)){html+=`<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup('equipment-control')">▾ Equipment Control <span class=count>4</span></button><div data-content="equipment-control"><button class="subBtn" onclick="toggleGroup('equipment-runtime')">▾ Runtime <span class=count>4</span></button><div data-content="equipment-runtime"><div class="screenLink ${state.equipmentView==='overview'?'active':''}" onclick="showEquipmentWorkspace('overview')">Equipment Overview</div><div class="screenLink ${state.equipmentView==='containers'?'active':''}" onclick="showEquipmentWorkspace('containers')">Container Master</div><div class="screenLink ${state.equipmentView==='allocation'?'active':''}" onclick="showEquipmentWorkspace('allocation')">Allocation & Shortage</div><div class="screenLink ${state.equipmentView==='work'?'active':''}" onclick="showEquipmentWorkspace('work')">Equipment Work Items</div></div></div></div>`} $('nav').innerHTML=html}
+function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];return s&&screenAllowed(s)&&(!q||s.name.toLowerCase().includes(q)||s.submenu.toLowerCase().includes(q)||s.domain.toLowerCase().includes(q))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);return s&&aliasOk&&screenAllowed(s)&&(!q||it.label.toLowerCase().includes(q)||sub.name.toLowerCase().includes(q)||d.domain.toLowerCase().includes(q))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\\'")}',{domain:'${d.domain.replaceAll("'","\\'")}',submenu:'${sub.name.replaceAll("'","\\'")}',label:'${it.label.replaceAll("'","\\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(!dcount)continue;let did=domainSlug(d.domain);html+=`<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup('${did}')">▾ ${esc(d.domain)} <span class=count>${dcount}</span></button><div data-content="${esc(did)}">${subHtml}</div></div>`} if(!q||'equipment control container master allocation shortage work items'.includes(q)){html+=`<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup('equipment-control')">▾ Equipment Control <span class=count>6</span></button><div data-content="equipment-control"><button class="subBtn" onclick="toggleGroup('equipment-runtime')">▾ M3 Native <span class=count>6</span></button><div data-content="equipment-runtime"><div class="screenLink ${state.equipmentView==='overview'?'active':''}" onclick="showEquipmentWorkspace('overview')">Equipment Overview</div><div class="screenLink ${state.equipmentView==='containers'?'active':''}" onclick="showEquipmentWorkspace('containers')">Container Master</div><div class="screenLink ${state.equipmentView==='allocation'?'active':''}" onclick="showEquipmentWorkspace('allocation')">Allocation & Shortage</div><div class="screenLink ${state.equipmentView==='work'?'active':''}" onclick="showEquipmentWorkspace('work')">Equipment Work Items</div><div class="screenLink ${state.equipmentView==='finance'?'active':''}" onclick="showEquipmentWorkspace('finance')">Container Finance</div><div class="screenLink ${state.equipmentView==='policies'?'active':''}" onclick="showEquipmentWorkspace('policies')">System Policy</div></div></div></div>`} $('nav').innerHTML=html}
 function renderBreadcrumb(){let s=state.current,n=state.navContext;if(n){$('breadcrumb').textContent=`M3 NVOCC ERP / ${n.domain} / ${n.submenu} / ${n.label}`;$('topTitle').textContent=n.label;$('pageTitle').textContent=n.label;document.title=`M3 NVOCC ERP — ${n.label}`}else{$('breadcrumb').textContent=`M3 NVOCC ERP / ${s.domain} / ${s.submenu} / ${s.name}`;$('topTitle').textContent=s.name;$('pageTitle').textContent=s.name;document.title=`M3 NVOCC ERP — ${s.name}`}$('favorite').textContent=state.favorites.has(s.screen_id)?'★':'☆';$('favorite').classList.toggle('on',state.favorites.has(s.screen_id))}
 function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,15);saveState()}
 function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);let i=same.findIndex(s=>s.screen_id===state.current.screen_id);return same[i+dir]?.screen_id||null}
@@ -165,7 +165,7 @@ function showJson(title,obj){$('drawerTitle').textContent=title;$('tab-details')
 
 const CLX49_KEYS=new Set(['special-rates-request','booking','bl','switch-bl']);
 const CLX49_BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization'];
-const CLX49_BOOKING_TABS=['Booking Info','Other Info'];
+const CLX49_BOOKING_TABS=['Booking Info','Equipment','Other Info'];
 let clx49Workspace=null,clx49ActiveTab='';
 
 function clx49Headers(w){
@@ -264,15 +264,30 @@ function clx49RenderBooking(tab){
     html+=clx49BookingGroup(r,'Parties',parties);
     html+=clx49BookingGroup(r,'Operational Control',operational,{disablePot:!hasVia});
     html+=clx49BookingGroup(r,'Cargo & Equipment',cargo);
+  }else if(tab==='Equipment'){
+    const eq=w.equipment||{containers:[],financial_summary:{}};
+    html+='<div class="card"><div class="toolbar"><b>Booking Equipment · '+esc(w.context.booking_ref)+'</b><span class="muted">Same Booking/Job context · one authoritative Container Master</span><span class="grow"></span><button class="btn primary" onclick="openBookingEquipmentControl()">Open Allocation / Shortage</button></div></div>';
+    html+='<div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner Type</th><th>Owner</th><th>Branch</th><th>Agent</th><th>Depot</th><th>Status</th><th>Condition</th><th>Financial</th></tr></thead><tbody>'+
+      (eq.containers||[]).map(x=>{const fs=eq.financial_summary?.[x.container_no]||{};const ftxt=Object.entries(fs).map(([cur,v])=>cur+' Net '+Number(v.net||0).toFixed(2)).join(' · ');return '<tr onclick="openEquipmentContainer(\''+String(x.container_no).replaceAll("'","\\'")+'\')" style="cursor:pointer"><td><b>'+esc(x.container_no)+'</b></td><td>'+esc(x.size_type)+'</td><td>'+esc(x.owner_type||x.ownership)+'</td><td>'+esc(x.owner_party_code||x.principal_owner_code||'')+'</td><td>'+esc(x.branch_code||'')+'</td><td>'+esc(x.agent_code||'')+'</td><td>'+esc(x.depot_code||'')+'</td><td>'+esc(x.equipment_status)+'</td><td>'+esc(x.condition)+'</td><td>'+esc(ftxt||'—')+'</td></tr>'}).join('')+
+      '</tbody></table></div>';
+    if(!(eq.containers||[]).length)html+='<div class="card empty">No physical container allocated yet. Use Allocation / Shortage to reserve eligible Container Master stock.</div>';
   }else{
     html+='<div class="card"><b>Other Info</b>'+clx49FieldEditor(r,other)+'</div>';
   }
-  if(r)html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(tab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
+  if(r&&tab!=='Equipment')html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(tab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
   $('gridArea').innerHTML=renderGrid()+html;
   if(tab==='Booking Info'){
     for(const n of ['Via Port','Transshipment Port'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
     clx49BookingTogglePot();
   }
+}
+function openBookingEquipmentControl(){
+  if(!clx49Workspace)return;
+  sessionStorage.setItem('M3_EQ_BOOKING',clx49Workspace.context.booking_ref||'');
+  sessionStorage.setItem('M3_EQ_JOB',clx49Workspace.context.job_ref||'');
+  sessionStorage.setItem('M3_EQ_AGENT',clx49Workspace.context.agent_code||'');
+  sessionStorage.setItem('M3_EQ_BRANCH',clx49Workspace.context.branch_code||'');
+  showEquipmentWorkspace('allocation');
 }
 function clx49RenderSpecialRate(){
   const w=clx49Workspace,r=w.special_rate_request;
@@ -654,26 +669,45 @@ async function showExecutiveHome(){
     </div>`;
 }
 
+function equipmentScopeBar(){
+  const a=sessionStorage.getItem('M3_EQ_AGENT')||'';
+  const b=sessionStorage.getItem('M3_EQ_BRANCH')||'';
+  return '<div class="card"><div class="toolbar"><b>Operational Scope</b><label>Branch <input id="eqBranchScope" value="'+esc(b)+'" placeholder="blank = global/HO"></label><label>Agent <input id="eqAgentScope" value="'+esc(a)+'" placeholder="required for AGENT role"></label><button class="btn" onclick="saveEquipmentScope()">Apply Scope</button><span class="muted">Role '+esc(state.role)+' · HO/global sees all; branch/agent users remain custody-scoped.</span></div></div>';
+}
+function saveEquipmentScope(){
+  sessionStorage.setItem('M3_EQ_BRANCH',$('eqBranchScope')?.value.trim()||'');
+  sessionStorage.setItem('M3_EQ_AGENT',$('eqAgentScope')?.value.trim()||'');
+  showEquipmentWorkspace(state.equipmentView||'overview');
+}
 function equipmentShell(view){
   state.equipmentView=view;
   state.navContext=null;
-  state.current={screen_id:'__equipment__',domain:'Equipment Control',submenu:'Runtime',name:'Equipment Control',actions:[],quick_actions:[]};
-  $('breadcrumb').textContent='M3 NVOCC ERP / Equipment Control / Runtime';
+  state.current={screen_id:'__equipment__',domain:'Equipment Control',submenu:'M3 Native',name:'Equipment Control',actions:[],quick_actions:[]};
+  $('breadcrumb').textContent='M3 NVOCC ERP / Equipment Control';
   $('topTitle').textContent='Equipment Control';
   $('pageTitle').textContent='Equipment Control';
   $('statusPill').textContent='Integrated';
   $('favorite').textContent='☆';$('favorite').classList.remove('on');
   $('prevBtn').disabled=true;$('nextBtn').disabled=true;
-  $('flow').innerHTML=`<div class="equipTabs">
-    <button class="${view==='overview'?'active':''}" onclick="showEquipmentWorkspace('overview')">Overview</button>
-    <button class="${view==='containers'?'active':''}" onclick="showEquipmentWorkspace('containers')">Container Master</button>
-    <button class="${view==='allocation'?'active':''}" onclick="showEquipmentWorkspace('allocation')">Allocation & Shortage</button>
-    <button class="${view==='work'?'active':''}" onclick="showEquipmentWorkspace('work')">Work Items</button>
-  </div>`;
-  $('screenMeta').innerHTML=`<div class="equipNote"><b>Native M3 workspace.</b> Uses the current M3 shell, role, controlled UAT access and authoritative CLX-070 APIs. No separate ERP model or duplicate container inventory.</div>`;
+  $('flow').innerHTML='<div class="equipTabs">'+
+    '<button class="'+(view==='overview'?'active':'')+'" onclick="showEquipmentWorkspace(\'overview\')">Overview</button>'+
+    '<button class="'+(view==='containers'?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Master</button>'+
+    '<button class="'+(view==='allocation'?'active':'')+'" onclick="showEquipmentWorkspace(\'allocation\')">Allocation & Shortage</button>'+
+    '<button class="'+(view==='work'?'active':'')+'" onclick="showEquipmentWorkspace(\'work\')">Work Items</button>'+
+    '<button class="'+(view==='finance'?'active':'')+'" onclick="showEquipmentWorkspace(\'finance\')">Container Finance</button>'+
+    '<button class="'+(view==='policies'?'active':'')+'" onclick="showEquipmentWorkspace(\'policies\')">System Policy</button>'+
+  '</div>';
+  $('screenMeta').innerHTML='<div class="equipNote"><b>One M3 ERP.</b> Container Master, Booking/B-L, custody, ownership, movement and container finance use the same M3 role/scope/policy/audit model. No separate Equipment ERP.</div>';
   renderNav();
 }
-function equipHeaders(){return {'Content-Type':'application/json','X-Role':state.role==='SUPER_ADMIN'?'ADMIN':state.role}}
+function equipHeaders(){
+  const h={'Content-Type':'application/json','X-Role':state.role==='SUPER_ADMIN'?'SUPER_ADMIN':state.role};
+  const a=sessionStorage.getItem('M3_EQ_AGENT')||'';
+  const b=sessionStorage.getItem('M3_EQ_BRANCH')||'';
+  if(a)h['X-Agent-Scope']=a;
+  if(b)h['X-Branch-Scope']=b;
+  return h;
+}
 async function equipmentApi(url,opt={}){
   const r=await fetch(url,{...opt,headers:{...equipHeaders(),...(opt.headers||{})}});
   const txt=await r.text();let x={};try{x=txt?JSON.parse(txt):{}}catch(_){x={detail:txt}}
@@ -681,36 +715,90 @@ async function equipmentApi(url,opt={}){
   return x;
 }
 function equipmentLockedHtml(e){
-  return `<div class="card"><b>Controlled UAT access required</b><p class="muted">${esc(e.message)}</p><div class="toolbar"><input id="equipToken" type="password" placeholder="M3 controlled UAT token"><button class="btn primary" onclick="sessionStorage.setItem('M3_UAT_TOKEN',$('equipToken').value||'');showEquipmentWorkspace(state.equipmentView||'overview')">Use Token</button></div><div class="muted">Production traffic, live providers and real money remain OFF.</div></div>`;
+  return equipmentScopeBar()+'<div class="card"><b>Controlled access / policy gate</b><p class="muted">'+esc(e.message)+'</p><div class="toolbar"><input id="equipToken" type="password" placeholder="M3 controlled UAT token"><button class="btn primary" onclick="sessionStorage.setItem(\'M3_UAT_TOKEN\',$('+"'equipToken'"+').value||\'\');showEquipmentWorkspace(state.equipmentView||\'overview\')">Use Token</button></div><div class="muted">Production traffic, live providers and real money remain OFF.</div></div>';
 }
 async function showEquipmentWorkspace(view='overview'){
   equipmentShell(view);
-  $('gridArea').innerHTML='<div class="card">Loading Equipment Control…</div>';
+  $('gridArea').innerHTML=equipmentScopeBar()+'<div class="card">Loading Equipment Control…</div>';
   try{
     const ready=await equipmentApi('/api/clx070/equipment/readiness');
     if(view==='overview'){
-      const c=ready.counts||{};
-      $('gridArea').innerHTML=`<div class="equipGrid">
-        <div class="equipKpi">Total Fleet<b>${c.total||0}</b></div><div class="equipKpi">Available<b>${c.available||0}</b></div>
-        <div class="equipKpi">Reserved<b>${c.reserved||0}</b></div><div class="equipKpi">In Transit<b>${c.in_transit||0}</b></div>
-        <div class="equipKpi">Repair<b>${c.repair||0}</b></div></div>
-        <div class="card"><b>Equipment Control Flow</b><p>Container Master → Planning → Booking Demand → Allocation → Shortage Resolution → Reposition / Lease / Purchase / Agent Supply / SOC → Container Journey.</p><div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace('containers')">Container Master</button><button class="btn" onclick="showEquipmentWorkspace('allocation')">Allocation & Shortage</button><button class="btn" onclick="showEquipmentWorkspace('work')">Work Items</button></div></div>`;
+      const k=ready.counts||{};
+      $('gridArea').innerHTML=equipmentScopeBar()+'<div class="equipGrid">'+
+        '<div class="equipKpi">Total Fleet<b>'+(k.total||0)+'</b></div><div class="equipKpi">Available<b>'+(k.available||0)+'</b></div>'+
+        '<div class="equipKpi">Reserved<b>'+(k.reserved||0)+'</b></div><div class="equipKpi">In Transit<b>'+(k.in_transit||0)+'</b></div>'+
+        '<div class="equipKpi">Repair<b>'+(k.repair||0)+'</b></div></div>'+
+        '<div class="card"><b>Global Equipment Control</b><p>Principal / Overseas Partner / Leasing Company / Investor / Agent supplied / SOC → one Container Master → Branch / Agent / Depot custody → Booking → B/L → Journey → Finance → Audit.</p></div>';
     }else if(view==='containers'){
       const d=await equipmentApi('/api/clx070/equipment/containers?limit=500');
-      $('gridArea').innerHTML=`<div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace('containers')">Refresh</button></div><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Ownership</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Condition</th><th>Booking</th></tr></thead><tbody>${(d.records||[]).map(x=>`<tr><td><b>${esc(x.container_no)}</b></td><td>${esc(x.size_type)}</td><td>${esc(x.ownership)}</td><td>${esc(x.current_port||'')}</td><td>${esc(x.agent_code||'')}</td><td>${esc(x.depot_code||'')}</td><td>${esc(x.equipment_status)}</td><td>${esc(x.condition)}</td><td>${esc(x.booking_ref||'')}</td></tr>`).join('')}</tbody></table></div>`;
+      $('gridArea').innerHTML=equipmentScopeBar()+'<div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace(\'containers\')">Refresh</button></div><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner Type</th><th>Owner / Provider</th><th>Principal</th><th>Branch</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Booking</th></tr></thead><tbody>'+
+      (d.records||[]).map(x=>'<tr onclick="openEquipmentContainer(\''+String(x.container_no).replaceAll("'","\\'")+'\')" style="cursor:pointer"><td><b>'+esc(x.container_no)+'</b></td><td>'+esc(x.size_type)+'</td><td>'+esc(x.owner_type||x.ownership)+'</td><td>'+esc(x.owner_party_code||'')+'</td><td>'+esc(x.principal_owner_code||x.principal_code||'')+'</td><td>'+esc(x.branch_code||'')+'</td><td>'+esc(x.current_port||'')+'</td><td>'+esc(x.agent_code||'')+'</td><td>'+esc(x.depot_code||'')+'</td><td>'+esc(x.equipment_status)+'</td><td>'+esc(x.booking_ref||'')+'</td></tr>').join('')+
+      '</tbody></table></div>';
     }else if(view==='allocation'){
-      $('gridArea').innerHTML=`<div class="card"><b>Availability / Allocation</b><div class="equipFilters">
-        <label>Port<input id="eqPort" value="Karachi"></label><label>Agent<input id="eqAgent" value="Agent A"></label>
-        <label>Size/Type<select id="eqType"><option>40HC</option><option>20GP</option><option>40RF</option></select></label>
-        <label>Qty<input id="eqQty" type="number" min="1" value="2"></label><label>Safety Stock<input id="eqSafety" type="number" min="0" value="0"></label>
-        <label>Booking Ref<input id="eqBooking" value="CLX070-UAT"></label>
-        <button class="btn" onclick="checkEquipmentAvailability()">Check Availability</button><button class="btn primary" onclick="allocateEquipment()">Allocate</button>
-      </div><div id="eqAllocationResult" class="equipNote">Use actual Container Master stock. Eligible: AVAILABLE + correct type/location + GOOD/VERIFIED condition.</div></div>`;
-    }else{
+      const bk=sessionStorage.getItem('M3_EQ_BOOKING')||'';
+      const ag=sessionStorage.getItem('M3_EQ_AGENT')||'';
+      $('gridArea').innerHTML=equipmentScopeBar()+'<div class="card"><b>Availability / Allocation</b><div class="equipFilters">'+
+        '<label>Port<input id="eqPort" value="Karachi"></label><label>Agent<input id="eqAgent" value="'+esc(ag||'Agent A')+'"></label>'+
+        '<label>Size/Type<select id="eqType"><option>40HC</option><option>20GP</option><option>40RF</option></select></label>'+
+        '<label>Qty<input id="eqQty" type="number" min="1" value="2"></label><label>Safety Stock<input id="eqSafety" type="number" min="0" value="0"></label>'+
+        '<label>Booking Ref<input id="eqBooking" value="'+esc(bk)+'" placeholder="from Booking context"></label>'+
+        '<label>Job Ref<input id="eqJob" value="'+esc(sessionStorage.getItem('M3_EQ_JOB')||'')+'"></label>'+
+        '<button class="btn" onclick="checkEquipmentAvailability()">Check Availability</button><button class="btn primary" onclick="allocateEquipment()">Allocate</button>'+
+      '</div><div id="eqAllocationResult" class="equipNote">Booking/Job context should normally be inherited from Booking. Eligible stock remains policy and custody controlled.</div></div>';
+    }else if(view==='work'){
       const d=await equipmentApi('/api/clx070/equipment/work-items?limit=200');
-      $('gridArea').innerHTML=`<div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace('work')">Refresh</button></div><div class="tablewrap"><table><thead><tr><th>Ref</th><th>Type</th><th>Status</th><th>Booking</th><th>Equipment</th><th>Qty</th><th>From</th><th>To</th><th>Cost</th></tr></thead><tbody>${(d.records||[]).map(x=>`<tr><td>${esc(x.work_ref)}</td><td>${esc(x.work_type)}</td><td>${esc(x.status)}</td><td>${esc(x.booking_ref||'')}</td><td>${esc(x.size_type)}</td><td>${esc(x.qty)}</td><td>${esc(x.source_port||'')}</td><td>${esc(x.destination_port||'')}</td><td>${esc(x.currency)} ${esc(x.estimated_cost)}</td></tr>`).join('')}</tbody></table></div>`;
+      $('gridArea').innerHTML=equipmentScopeBar()+'<div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace(\'work\')">Refresh</button></div><div class="tablewrap"><table><thead><tr><th>Ref</th><th>Type</th><th>Status</th><th>Booking</th><th>Equipment</th><th>Qty</th><th>From</th><th>To</th><th>Cost</th></tr></thead><tbody>'+
+      (d.records||[]).map(x=>'<tr><td>'+esc(x.work_ref)+'</td><td>'+esc(x.work_type)+'</td><td>'+esc(x.status)+'</td><td>'+esc(x.booking_ref||'')+'</td><td>'+esc(x.size_type)+'</td><td>'+esc(x.qty)+'</td><td>'+esc(x.source_port||'')+'</td><td>'+esc(x.destination_port||'')+'</td><td>'+esc(x.currency)+' '+esc(x.estimated_cost)+'</td></tr>').join('')+'</tbody></table></div>';
+    }else if(view==='finance'){
+      $('gridArea').innerHTML=equipmentScopeBar()+'<div class="card"><b>Container Financial Control</b><p class="muted">Open a Container Master row to view/add Revenue, Cost, Commission, Share, movement costs and container P&amp;L against the same physical box.</p><button class="btn primary" onclick="showEquipmentWorkspace(\'containers\')">Open Container Master</button></div>';
+    }else{
+      const d=await equipmentApi('/api/clx070/equipment/policies');
+      $('gridArea').innerHTML=equipmentScopeBar()+'<div class="card"><b>System Policy · '+esc(d.role)+'</b><div class="muted">Role + custody scope + action permission + four-eyes.</div></div><div class="tablewrap"><table><thead><tr><th>Rule</th><th>Action</th><th>Role</th><th>Scope</th><th>Effect</th><th>Four Eyes</th></tr></thead><tbody>'+
+      (d.rules||[]).map(x=>'<tr><td>'+esc(x.rule_code)+'</td><td>'+esc(x.action_code)+'</td><td>'+esc(x.subject_role)+'</td><td>'+esc(x.scope_type)+'</td><td>'+esc(x.effect)+'</td><td>'+esc(x.four_eyes)+'</td></tr>').join('')+'</tbody></table></div>';
     }
   }catch(e){$('gridArea').innerHTML=equipmentLockedHtml(e)}
+}
+
+async function openEquipmentContainer(no){
+  try{
+    const p=await equipmentApi('/api/clx070/equipment/containers/'+encodeURIComponent(no)+'/profile');
+    const x=p.container||{},sum=p.financial_summary||{};
+    $('drawerTitle').textContent='Container '+no;
+    let html='<div class="card"><b>Ownership / Source</b><div class="pre">'+esc(JSON.stringify({owner_type:x.owner_type,owner_party_code:x.owner_party_code,principal:x.principal_owner_code||x.principal_code,overseas_partner:x.overseas_partner_code,leasing_company:x.leasing_company_code,investor:x.investor_code,agent_supplier:x.agent_supplier_code,acquisition:x.acquisition_type,reference:x.acquisition_ref},null,2))+'</div></div>';
+    html+='<div class="card"><b>Custody / Operation</b><div class="pre">'+esc(JSON.stringify({branch:x.branch_code,port:x.current_port,agent:x.agent_code,depot:x.depot_code,status:x.equipment_status,booking:x.booking_ref,condition:x.condition},null,2))+'</div></div>';
+    html+='<div class="card"><b>Technical / CSC</b><div class="pre">'+esc(JSON.stringify({manufacturer:x.manufacturer,manufacture_year:x.manufacture_year,csc_validity:x.csc_validity,csc_plate_no:x.csc_plate_no,classification:x.classification,max_gross_weight:x.max_gross_weight,tare_weight:x.tare_weight,capacity_cbm:x.capacity_cbm,iso_code:x.iso_code},null,2))+'</div></div>';
+    html+='<div class="card"><b>Related Parties</b><div class="pre">'+esc(JSON.stringify(p.parties||[],null,2))+'</div></div>';
+    html+='<div class="card"><b>Container P&amp;L</b><div class="pre">'+esc(JSON.stringify(sum,null,2))+'</div><div class="toolbar">'+
+      '<button class="btn" onclick="addContainerFinance(\''+String(no).replaceAll("'","\\'")+'\',\'REVENUE\')">+ Revenue</button>'+
+      '<button class="btn" onclick="addContainerFinance(\''+String(no).replaceAll("'","\\'")+'\',\'COST\')">+ Cost</button>'+
+      '<button class="btn" onclick="addContainerFinance(\''+String(no).replaceAll("'","\\'")+'\',\'COMMISSION\')">+ Commission</button>'+
+      '<button class="btn" onclick="addContainerFinance(\''+String(no).replaceAll("'","\\'")+'\',\'SHARE\')">+ Share</button>'+
+      '<button class="btn" onclick="addContainerShareRule(\''+String(no).replaceAll("'","\\'")+'\')">Sharing Rule</button></div></div>';
+    html+='<div class="card"><b>Financial Entries</b><div class="tablewrap"><table><thead><tr><th>Ref</th><th>Category</th><th>Charge</th><th>Amount</th><th>Party</th><th>Status</th><th>Action</th></tr></thead><tbody>'+
+      (p.financial_entries||[]).map(e=>'<tr><td>'+esc(e.entry_ref)+'</td><td>'+esc(e.entry_category)+'</td><td>'+esc(e.charge_code)+'</td><td>'+esc(e.currency)+' '+esc(e.amount)+'</td><td>'+esc(e.party_type||'')+' '+esc(e.party_code||'')+'</td><td>'+esc(e.status)+'</td><td>'+(e.status==='DRAFT'&&['FINANCE','ADMIN','SUPER_ADMIN'].includes(state.role)?'<button class="btn" onclick="decideContainerFinance(\''+String(no).replaceAll("'","\\'")+'\',\''+String(e.entry_ref).replaceAll("'","\\'")+'\',\'APPROVE\')">Approve</button>':'')+'</td></tr>').join('')+'</tbody></table></div></div>';
+    $('tab-details').innerHTML=html;$('tab-related').innerHTML='<pre class="pre">'+esc(JSON.stringify({share_rules:p.share_rules,journey_events:p.journey_events},null,2))+'</pre>';$('tab-audit').innerHTML='<div class="card">Container operational and finance changes are recorded in the central M3 audit trail.</div>';
+    drawerTabs('details');$('drawer').classList.add('open');
+  }catch(e){alert(e.message)}
+}
+async function addContainerFinance(no,category){
+  try{
+    const amount=Number(prompt(category+' amount','0'));if(!amount)return;
+    const charge=prompt('Charge code',category==='REVENUE'?'FREIGHT_REVENUE':category==='COST'?'MOVE_COST':category)||category;
+    const party=prompt('Related party code (optional)','')||null;
+    await equipmentApi('/api/clx070/equipment/containers/'+encodeURIComponent(no)+'/finance',{method:'POST',body:JSON.stringify({entry_category:category,charge_code:charge,amount,currency:'USD',party_type:party?'RELATED_PARTY':null,party_code:party,source_type:'M3_UI'})});
+    await openEquipmentContainer(no);
+  }catch(e){alert(e.message)}
+}
+async function decideContainerFinance(no,ref,decision){
+  try{await equipmentApi('/api/clx070/equipment/containers/'+encodeURIComponent(no)+'/finance/'+encodeURIComponent(ref)+'/decision',{method:'POST',body:JSON.stringify({decision,note:'M3 Container Finance approval'})});await openEquipmentContainer(no)}catch(e){alert(e.message)}
+}
+async function addContainerShareRule(no){
+  try{
+    const party=prompt('Party code for commission/share','');if(!party)return;
+    const rate=Number(prompt('Share / commission %','0'));if(rate<0||rate>100)return;
+    await equipmentApi('/api/clx070/equipment/containers/'+encodeURIComponent(no)+'/share-rules',{method:'POST',body:JSON.stringify({party_type:'RELATED_PARTY',party_code:party,basis:'REVENUE',rate_percent:rate,currency:'USD'})});
+    await openEquipmentContainer(no);
+  }catch(e){alert(e.message)}
 }
 async function checkEquipmentAvailability(){
   try{
@@ -721,7 +809,7 @@ async function checkEquipmentAvailability(){
 }
 async function allocateEquipment(){
   try{
-    const r=await equipmentApi('/api/clx070/equipment/allocate',{method:'POST',body:JSON.stringify({booking_ref:$('eqBooking').value,port:$('eqPort').value,agent_code:$('eqAgent').value,size_type:$('eqType').value,qty:Number($('eqQty').value),safety_stock:Number($('eqSafety').value)})});
+    const r=await equipmentApi('/api/clx070/equipment/allocate',{method:'POST',body:JSON.stringify({booking_ref:$('eqBooking').value,job_ref:$('eqJob')?.value||null,port:$('eqPort').value,agent_code:$('eqAgent').value,size_type:$('eqType').value,qty:Number($('eqQty').value),safety_stock:Number($('eqSafety').value)})});
     $('eqAllocationResult').innerHTML=`<span class="oktxt">Allocated ${r.allocated_qty}</span> · shortage ${r.shortage} · ${(r.allocated||[]).map(esc).join(', ')}`;
   }catch(e){$('eqAllocationResult').textContent=e.message}
 }
