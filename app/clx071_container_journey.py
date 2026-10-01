@@ -384,6 +384,9 @@ def exception_decision(exception_ref:str,b:ExceptionDecision,x_role:str=Header("
         e=conn.execute("""SELECT e.*,c.container_no FROM container_journey_exceptions e
                           JOIN containers c ON c.id=e.container_id WHERE e.exception_ref=?""",(exception_ref,)).fetchone()
         if not e:raise HTTPException(404,"Unknown exception")
+        # Enforce the same branch/agent/depot custody scope used by all container journey reads/writes.
+        # Knowing an exception_ref must never allow a scoped actor to mutate another custodian's container.
+        get_container(conn,e["container_no"],a)
         action=b.action.upper()
         if action=="ACKNOWLEDGE":
             conn.execute("UPDATE container_journey_exceptions SET status='ACKNOWLEDGED',acknowledged_at=?,owner_role=?,owner_ref=? WHERE id=?",
