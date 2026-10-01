@@ -691,6 +691,8 @@ function equipmentShell(view){
     <button class="${view==='containers'?'active':''}" onclick="showEquipmentWorkspace('containers')">Container Master</button>
     <button class="${view==='allocation'?'active':''}" onclick="showEquipmentWorkspace('allocation')">Allocation & Shortage</button>
     <button class="${view==='work'?'active':''}" onclick="showEquipmentWorkspace('work')">Work Items</button>
+    <button class="${view==='journey'?'active':''}" onclick="showEquipmentWorkspace('journey')">Container Journey</button>
+    <button class="${view==='exceptions'?'active':''}" onclick="showEquipmentWorkspace('exceptions')">Journey Exceptions</button>
     <button class="${view==='finance'?'active':''}" onclick="showEquipmentWorkspace('finance')">Container P&amp;L</button>
     <button class="${view==='kpi'?'active':''}" onclick="showEquipmentWorkspace('kpi')">KPIs</button>
     <button class="${view==='policy'?'active':''}" onclick="showEquipmentWorkspace('policy')">Policy &amp; SOP</button>
@@ -762,13 +764,21 @@ async function showEquipmentWorkspace(view='overview'){
     }else if(view==='work'){
       const d=await equipmentApi('/api/clx070/equipment/work-items?limit=200');
       $('gridArea').innerHTML=`<div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace('work')">Refresh</button></div><div class="tablewrap"><table><thead><tr><th>Ref</th><th>Type</th><th>Status</th><th>Booking</th><th>Equipment</th><th>Qty</th><th>From</th><th>To</th><th>Cost</th></tr></thead><tbody>${(d.records||[]).map(x=>`<tr><td>${esc(x.work_ref)}</td><td>${esc(x.work_type)}</td><td>${esc(x.status)}</td><td>${esc(x.booking_ref||'')}</td><td>${esc(x.size_type)}</td><td>${esc(x.qty)}</td><td>${esc(x.source_port||'')}</td><td>${esc(x.destination_port||'')}</td><td>${esc(x.currency)} ${esc(x.estimated_cost)}</td></tr>`).join('')}</tbody></table></div>`;
+    }else if(view==='journey'){
+      const d=await equipmentApi('/api/clx070/container-control/containers?limit=500');
+      const opts=(d.records||[]).map(x=>`<option value="${esc(x.container_no)}">${esc(x.container_no)} · ${esc(x.size_type)} · ${esc(x.equipment_status)}</option>`).join('');
+      $('gridArea').innerHTML=`<div class="card"><b>Full Container Journey</b><div class="muted">Same physical Container Master record through Booking, B/L, custody, voyage, financial and exception control.</div>
+      <div class="toolbar"><select id="cjContainer" onchange="loadJourneyControl()"><option value="">Select container</option>${opts}</select><button class="btn" onclick="loadJourneyControl()">Load Journey</button></div><div id="cjArea" class="equipNote">Select a container.</div></div>`;
+    }else if(view==='exceptions'){
+      await renderJourneyExceptions();
     }else if(view==='finance'){
       $('gridArea').innerHTML=`<div class="card"><b>Container-level P&amp;L / Commission / Sharing</b><div class="toolbar"><input id="eqFinanceContainer" placeholder="Container #"><button class="btn primary" onclick="loadContainerFinance()">Load</button></div><div id="eqFinanceResult" class="equipNote">Select a Container Master record. Revenue, direct cost, commission, owner/partner/investor share and movement economics remain linked to the same physical container.</div></div>`;
     }else if(view==='kpi'){
-      const k=await equipmentApi('/api/clx070/container-control/kpis');const x=k.fleet||{},f=k.financial||{},e=k.exceptions||{};
-      $('gridArea').innerHTML=`<div class="equipGrid"><div class="equipKpi">Fleet<b>${x.total||0}</b></div><div class="equipKpi">Utilization<b>${x.utilization_pct||0}%</b></div><div class="equipKpi">Available<b>${x.available||0}</b></div><div class="equipKpi">Repair<b>${x.repair||0}</b></div><div class="equipKpi">Idle >21d<b>${e.idle_gt_21||0}</b></div></div>
+      const [k,jk]=await Promise.all([equipmentApi('/api/clx070/container-control/kpis'),equipmentApi('/api/clx071/journey/kpis')]);const x=k.fleet||{},f=k.financial||{},e=k.exceptions||{};
+      $('gridArea').innerHTML=`<div class="equipGrid"><div class="equipKpi">Fleet<b>${x.total||0}</b></div><div class="equipKpi">Utilization<b>${x.utilization_pct||0}%</b></div><div class="equipKpi">Available<b>${x.available||0}</b></div><div class="equipKpi">Repair<b>${x.repair||0}</b></div><div class="equipKpi">Avg Turnaround<b>${jk.avg_turnaround_days||0}d</b></div></div>
+      <div class="equipGrid"><div class="equipKpi">Open Journey Exceptions<b>${jk.open_exceptions||0}</b></div><div class="equipKpi">High/Critical<b>${jk.high_exceptions||0}</b></div><div class="equipKpi">Missing Events<b>${jk.missing_events||0}</b></div><div class="equipKpi">Empty Return Overdue<b>${jk.empty_return_overdue||0}</b></div><div class="equipKpi">Detention Exposure<b>${Number(jk.detention_exposure||0).toLocaleString()}</b></div></div>
       <div class="equipGrid"><div class="equipKpi">Revenue<b>${Number(f.revenue||0).toLocaleString()}</b></div><div class="equipKpi">Cost<b>${Number(f.cost||0).toLocaleString()}</b></div><div class="equipKpi">Commission<b>${Number(f.commission||0).toLocaleString()}</b></div><div class="equipKpi">Share<b>${Number(f.share||0).toLocaleString()}</b></div><div class="equipKpi">Margin<b>${Number(f.margin||0).toLocaleString()}</b></div></div>
-      <div class="card"><b>Ownership Mix</b><pre class="pre">${esc(JSON.stringify(k.ownership||{},null,2))}</pre></div><div class="card"><b>Exception KPIs</b><pre class="pre">${esc(JSON.stringify(e,null,2))}</pre></div>`;
+      <div class="card"><b>Ownership Mix</b><pre class="pre">${esc(JSON.stringify(k.ownership||{},null,2))}</pre></div><div class="card"><b>Journey Event Mix</b><pre class="pre">${esc(JSON.stringify(jk.event_mix||[],null,2))}</pre></div><div class="card"><b>Exception KPIs</b><pre class="pre">${esc(JSON.stringify(e,null,2))}</pre></div>`;
     }else if(view==='policy'){
       const [p,s]=await Promise.all([equipmentApi('/api/clx070/container-control/policies'),equipmentApi('/api/clx070/container-control/sops')]);
       $('gridArea').innerHTML=`<div class="card"><b>System Policy</b><div class="muted">User → Role → Data Scope → System Policy → Workflow State → Allowed Action</div>
@@ -776,6 +786,61 @@ async function showEquipmentWorkspace(view='overview'){
       <div class="card"><b>Equipment SOPs</b>${(s.sops||[]).map(x=>`<div class="card"><b>${esc(x.code)} · ${esc(x.name)}</b><ol>${(x.steps||[]).map(y=>`<li>${esc(y)}</li>`).join('')}</ol></div>`).join('')}</div>`;
     }
   }catch(e){$('gridArea').innerHTML=equipmentLockedHtml(e)}
+}
+
+async function loadJourneyControl(){
+  try{
+    const no=$('cjContainer')?.value;if(!no)return;
+    const d=await equipmentApi('/api/clx071/journey/containers/'+encodeURIComponent(no));
+    state.journeyContainer=no;
+    const x=d.container||{},det=d.detention||{};
+    const allowed=(d.allowed_next||[]).map(v=>'<option>'+esc(v)+'</option>').join('');
+    const flow=(['AVAILABLE','RESERVED','RELEASED','EMPTY_PICKUP','STUFFED','GATE_IN','LOADED','IN_TRANSIT','TRANSSHIPMENT','DISCHARGED','GATE_OUT_FULL','EMPTY_RETURN','INSPECTION','AVAILABLE']).map(v=>'<span class="pill '+(v===d.state?'active':'')+'">'+esc(v.replaceAll('_',' '))+'</span>').join(' ');
+    const rows=(d.timeline||[]).map(e=>'<tr><td>'+esc(e.event_type)+'</td><td>'+esc(e.planned_time||'')+'</td><td>'+esc(e.actual_time||'')+'</td><td>'+esc(e.port_code||'')+'</td><td>'+esc(e.agent_code||'')+'</td><td>'+esc(e.depot_code||'')+'</td><td>'+esc(e.vessel_name||'')+'</td><td>'+esc(e.voyage_ref||'')+'</td><td>'+esc(e.override_used?'YES':'')+'</td></tr>').join('');
+    $('cjArea').innerHTML='<div class="card"><b>Lifecycle</b><div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:7px">'+flow+'</div></div>'+
+      '<div class="equipGrid"><div class="equipKpi">Current State<b>'+esc(d.state)+'</b></div><div class="equipKpi">Free Days<b>'+esc(det.free_days||0)+'</b></div><div class="equipKpi">Overdue Days<b>'+esc(det.overdue_days||0)+'</b></div><div class="equipKpi">Detention Exposure<b>'+esc(det.estimated_exposure||0)+'</b></div><div class="equipKpi">Exceptions<b>'+esc((d.exceptions||[]).filter(z=>z.status!=="RESOLVED").length)+'</b></div></div>'+
+      '<div class="card"><b>Post Journey Event</b><div class="equipFilters"><label>Next Event<select id="cjEvent">'+allowed+'</select></label><label>Actual Time<input id="cjActual" type="datetime-local"></label><label>Port<input id="cjPort" value="'+esc(x.current_port||'')+'"></label><label>Branch<input id="cjBranch" value="'+esc(x.branch_code||'')+'"></label><label>Agent<input id="cjAgent" value="'+esc(x.agent_code||'')+'"></label><label>Depot<input id="cjDepot" value="'+esc(x.depot_code||'')+'"></label><label>Vessel<input id="cjVessel"></label><label>Voyage<input id="cjVoyage"></label><label>Free Days<input id="cjFreeDays" type="number" min="0" value="'+esc(x.free_days||0)+'"></label><label>Detention Rate<input id="cjDetRate" type="number" min="0" value="'+esc(x.detention_rate||0)+'"></label><label>Expected Empty Return<input id="cjExpectedReturn" type="datetime-local"></label><label>Movement Cost<input id="cjCost" type="number" min="0" value="0"></label><label>Charge Code<input id="cjCharge" value="MOVEMENT"></label><label>Condition<input id="cjCondition" value="'+esc(x.condition||'')+'"></label><label>Damage Hold<select id="cjDamage"><option value="">No change</option><option value="true">ON</option><option value="false">OFF</option></select></label><label>Inspection Hold<select id="cjInspection"><option value="">No change</option><option value="true">ON</option><option value="false">OFF</option></select></label></div><div class="toolbar"><input id="cjNote" placeholder="Movement note / reference" style="min-width:280px"><button class="btn primary" onclick="postJourneyEvent()">Post Event</button></div></div>'+
+      '<div class="card"><b>Plan Future Event</b><div class="toolbar"><select id="cjPlanEvent">'+allowed+'</select><input id="cjPlanTime" type="datetime-local"><button class="btn" onclick="planJourneyEvent()">Save Planned Event</button></div></div>'+
+      '<div class="card"><b>Planned vs Actual Timeline</b><div class="tablewrap"><table><thead><tr><th>Event</th><th>Planned</th><th>Actual</th><th>Port</th><th>Agent</th><th>Depot</th><th>Vessel</th><th>Voyage</th><th>Override</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
+      '<div class="card"><b>Container Exceptions</b><pre class="pre">'+esc(JSON.stringify(d.exceptions||[],null,2))+'</pre></div>';
+  }catch(e){$('cjArea').innerHTML='<div class="badtext">'+esc(e.message)+'</div>'}
+}
+async function postJourneyEvent(){
+  try{
+    const b={event_type:$('cjEvent').value,actual_time:$('cjActual').value||null,port_code:$('cjPort').value||null,branch_code:$('cjBranch').value||null,agent_code:$('cjAgent').value||null,depot_code:$('cjDepot').value||null,vessel_name:$('cjVessel').value||null,voyage_ref:$('cjVoyage').value||null,free_days:Number($('cjFreeDays').value||0),detention_rate:Number($('cjDetRate').value||0),expected_empty_return:$('cjExpectedReturn').value||null,cost_amount:Number($('cjCost').value||0),charge_code:$('cjCharge').value||null,condition:$('cjCondition').value||null,note:$('cjNote').value||null};
+    if($('cjDamage').value!=='')b.damage_hold=$('cjDamage').value==='true';
+    if($('cjInspection').value!=='')b.inspection_hold=$('cjInspection').value==='true';
+    await equipmentApi('/api/clx071/journey/containers/'+encodeURIComponent(state.journeyContainer)+'/events',{method:'POST',body:JSON.stringify(b)});
+    await loadJourneyControl();
+  }catch(e){
+    const msg=e.message||'';if(msg.includes('INVALID_JOURNEY_SEQUENCE')){
+      const reason=prompt('Sequence blocked. Authorized override reason (leave blank to cancel):')||'';
+      if(reason){try{const b={event_type:$('cjEvent').value,actual_time:$('cjActual').value||null,port_code:$('cjPort').value||null,branch_code:$('cjBranch').value||null,agent_code:$('cjAgent').value||null,depot_code:$('cjDepot').value||null,vessel_name:$('cjVessel').value||null,voyage_ref:$('cjVoyage').value||null,cost_amount:Number($('cjCost').value||0),currency:'USD',charge_code:$('cjCharge').value||null,override:true,override_reason:reason,note:$('cjNote').value||null};await equipmentApi('/api/clx071/journey/containers/'+encodeURIComponent(state.journeyContainer)+'/events',{method:'POST',body:JSON.stringify(b)});await loadJourneyControl()}catch(x){alert(x.message)}}}
+    else alert(msg)
+  }
+}
+async function planJourneyEvent(){
+  try{
+    await equipmentApi('/api/clx071/journey/containers/'+encodeURIComponent(state.journeyContainer)+'/plan',{method:'POST',body:JSON.stringify({event_type:$('cjPlanEvent').value,planned_time:$('cjPlanTime').value,port_code:$('cjPort').value||null,branch_code:$('cjBranch').value||null,agent_code:$('cjAgent').value||null,depot_code:$('cjDepot').value||null,voyage_ref:$('cjVoyage').value||null,vessel_name:$('cjVessel').value||null,note:$('cjNote').value||null})});
+    await loadJourneyControl();
+  }catch(e){alert(e.message)}
+}
+async function renderJourneyExceptions(){
+  const [d,k]=await Promise.all([equipmentApi('/api/clx071/journey/exceptions?status=OPEN&limit=300'),equipmentApi('/api/clx071/journey/kpis')]);
+  $('gridArea').innerHTML='<div class="toolbar"><button class="btn primary" onclick="scanJourneyExceptions()">Scan Now</button><button class="btn" onclick="showEquipmentWorkspace(\'exceptions\')">Refresh</button></div>'+
+    '<div class="equipGrid"><div class="equipKpi">Open<b>'+esc(k.open_exceptions||0)+'</b></div><div class="equipKpi">High/Critical<b>'+esc(k.high_exceptions||0)+'</b></div><div class="equipKpi">Missing Events<b>'+esc(k.missing_events||0)+'</b></div><div class="equipKpi">Empty Return Overdue<b>'+esc(k.empty_return_overdue||0)+'</b></div><div class="equipKpi">Detention Exposure<b>'+esc(k.detention_exposure||0)+'</b></div></div>'+
+    '<div class="tablewrap"><table><thead><tr><th>Ref</th><th>Container</th><th>Type</th><th>Severity</th><th>State</th><th>Expected</th><th>Due</th><th>Detail</th><th>Action</th></tr></thead><tbody>'+
+    (d.records||[]).map(x=>'<tr><td>'+esc(x.exception_ref)+'</td><td><b>'+esc(x.container_no)+'</b></td><td>'+esc(x.exception_type)+'</td><td>'+esc(x.severity)+'</td><td>'+esc(x.actual_state||'')+'</td><td>'+esc(x.expected_event||'')+'</td><td>'+esc(x.due_time||'')+'</td><td>'+esc(x.detail)+'</td><td><button class="btn" onclick="journeyExceptionDecision(\''+esc(x.exception_ref)+'\',\'ACKNOWLEDGE\')">Ack</button> <button class="btn" onclick="journeyExceptionDecision(\''+esc(x.exception_ref)+'\',\'RESOLVE\')">Resolve</button></td></tr>').join('')+
+    '</tbody></table></div>';
+}
+async function scanJourneyExceptions(){
+  try{await equipmentApi('/api/clx071/journey/scan-exceptions',{method:'POST',body:'{}'});await renderJourneyExceptions()}catch(e){alert(e.message)}
+}
+async function journeyExceptionDecision(ref,action){
+  try{
+    let body={action};if(action==='RESOLVE'){body.resolution_code=prompt('Resolution code:')||'';if(!body.resolution_code)return;body.note=prompt('Resolution note:')||''}
+    await equipmentApi('/api/clx071/journey/exceptions/'+encodeURIComponent(ref)+'/decision',{method:'POST',body:JSON.stringify(body)});await renderJourneyExceptions();
+  }catch(e){alert(e.message)}
 }
 
 async function searchContainerMaster(){
