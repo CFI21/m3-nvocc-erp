@@ -1,0 +1,65 @@
+name: CLX-081 Booking Master Field Alignment
+
+on:
+  push:
+    branches: [clx081-booking-master-field-alignment]
+  workflow_dispatch:
+
+jobs:
+  clx081:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: pip install -r requirements.txt pytest
+
+      - name: Python compile
+        run: python -m py_compile app/*.py
+
+      - name: Inline JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          h=Path('web/index.html').read_text(encoding='utf-8')
+          blocks=re.findall(r'<script(?:[^>]*)>(.*?)</script>',h,re.S)
+          for i,b in enumerate(blocks):
+              Path(f'/tmp/clx081_{i}.js').write_text(b,encoding='utf-8')
+          PY
+          for f in /tmp/clx081_*.js; do node --check "$f"; done
+
+      - name: CLX-081 focused Booking tests
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx081_booking_master_alignment.py tests/test_clx049_booking_bl_workspace.py tests/test_clx078_ui_consolidation.py tests/test_clx080_web_cache_routing.py tests/test_clx070_final_container_master.py tests/test_clx077_live_dummy_bank.py
+
+      - name: Canonical 196-screen contract
+        env: {PYTHONPATH: .}
+        run: |
+          python - <<'PY'
+          from app.screen_catalog import build_catalog
+          c=build_catalog()
+          assert c['screen_count']==196
+          assert [x['domain'] for x in c['menu']]==['HO Tasks','Agent Tasks','Treasury / AR-AP','Integration & Security','General / Administration','Master Data']
+          ids=[x['screen_id'] for x in c['screens']]
+          assert len(ids)==len(set(ids))
+          print('CLX081_196_SCREEN_PASS')
+          PY
+
+      - name: Complete ERP regression
+        env: {PYTHONPATH: .}
+        run: pytest -q
+
+      - name: Safety assertions
+        run: |
+          grep -q '"reference_field_review_later": true' CLX081_UI_ACCEPTANCE.json
+          grep -q '"reference_field_blocking": false' CLX081_UI_ACCEPTANCE.json
+          grep -q '"REAL_MONEY_READY": false' CLX081_UI_ACCEPTANCE.json
+          grep -q '"REAL_PROVIDER_READY": false' CLX081_UI_ACCEPTANCE.json
+          grep -q '"backend_model_changed": false' CLX081_UI_ACCEPTANCE.json
+          grep -q '"database_changed": false' CLX081_UI_ACCEPTANCE.json
+          echo CLX081_SAFETY_PASS

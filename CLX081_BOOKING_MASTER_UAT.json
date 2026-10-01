@@ -1,0 +1,33 @@
+{
+  "schema": "M3_CLX081_BOOKING_MASTER_UAT_V1",
+  "checks": {
+    "basic_info_alignment": "PASS",
+    "reference_marked_review_later": "PASS",
+    "thru_bl": "PASS",
+    "sailing_date": "PASS",
+    "actual_shipper": "PASS",
+    "two_leg_pot_ts_logic": "PASS",
+    "operational_control": "PASS",
+    "operations_planning_links": "PASS",
+    "same_as_booking_party": "PASS",
+    "lower_workspace": "PASS",
+    "commercial_flow": "PASS",
+    "charge_grid_columns": "PASS",
+    "save_existing_api": "PASS",
+    "equipment_link": "PASS",
+    "finance_link": "PASS",
+    "no_duplicate_model": "PASS",
+    "no_layout_overflow_contract": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36913588684,
+  "focused_tests": "43 passed",
+  "full_regression": "290 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS",
+  "non_blocking_items": [
+    "Reference # semantic/source refinement remains REVIEW_LATER",
+    "Copy has no governed clone-booking backend and remains non-writing reference control"
+  ]
+}
