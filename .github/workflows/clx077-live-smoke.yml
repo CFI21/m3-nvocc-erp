@@ -60,11 +60,11 @@ jobs:
           set -euo pipefail
           WEB="https://m3-nvocc-web-latest.onrender.com"
           for i in $(seq 1 90); do
-            body="$(curl --silent --show-error "$WEB/" || true)"
-            if echo "$body" | grep -q "Dummy Bank Review" && echo "$body" | grep -q "TEST BANK — SIMULATION ONLY — NO REAL MONEY"; then
-              printf '%s' "$body" > /tmp/index.html
-              echo "CLX077_WEB_AVAILABLE"
-              exit 0
+            if curl --silent --show-error "$WEB/" -o /tmp/index.html; then
+              if grep -q "Dummy Bank Review" /tmp/index.html && grep -q "TEST BANK — SIMULATION ONLY — NO REAL MONEY" /tmp/index.html; then
+                echo "CLX077_WEB_AVAILABLE"
+                exit 0
+              fi
             fi
             sleep 5
           done
