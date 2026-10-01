@@ -1,0 +1,18 @@
+{
+  "schema": "M3_CLX078_EQUIPMENT_TOWER_UAT_V1",
+  "location": "HO Tasks / Equipment Control / Global Equipment Tower",
+  "checks": {
+    "container_master": "PENDING",
+    "network_position": "PENDING",
+    "shortage_surplus": "PENDING",
+    "reposition": "PENDING",
+    "lease": "PENDING",
+    "optimization": "PENDING",
+    "journey": "PENDING",
+    "mr": "PENDING",
+    "finance": "PENDING",
+    "kpi": "PENDING"
+  },
+  "duplicate_inventory": false,
+  "status": "PENDING_WORKFLOW"
+}
