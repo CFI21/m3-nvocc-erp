@@ -101,6 +101,17 @@ def accrued(r,asof=None):
     fixed=sum(float(r[k] or 0) for k in ["handling_rate","depot_rate","lift_on_rate","pick_up_rate"])
     return round(recurring+fixed,2),bill,d
 
+@router.get("/contracts")
+def contracts(status:Optional[str]=None,limit:int=Query(200,ge=1,le=1000)):
+    c=connect()
+    try:
+        q="SELECT * FROM equipment_lease_contracts WHERE 1=1";args=[]
+        if status:q+=" AND status=?";args.append(status)
+        q+=" ORDER BY id DESC LIMIT ?";args.append(limit)
+        rows=[dict(r) for r in c.execute(q,args)]
+        return {"count":len(rows),"records":rows}
+    finally:c.close()
+
 @router.post("/contracts")
 def create_contract(b:ContractBody,x_role:str=Header("EQUIPMENT_MANAGER"),x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
  x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
@@ -254,6 +265,52 @@ def scan(x_role:str=Header("EQUIPMENT_MANAGER")):
                         er=ref("LEX");c.execute("""INSERT INTO equipment_lease_exceptions(exception_ref,allocation_id,container_id,exception_type,severity,status,detail,due_date,created_at)
                           VALUES(?,?,?,?, 'HIGH','OPEN',?,?,?)""",(er,r["id"],r["container_id"],typ,f"{typ} for {r['container_no']}",due,now()));created.append(er)
         c.execute("COMMIT");return {"ok":True,"count":len(created),"created":created}
+    except Exception:
+        try:c.execute("ROLLBACK")
+        except Exception:pass
+        raise
+    finally:c.close()
+
+@router.get("/exceptions")
+def exceptions(status:Optional[str]="OPEN",limit:int=Query(300,ge=1,le=1000),x_role:str=Header("VIEWER"),
+ x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),
+ x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
+    c=connect()
+    try:
+        a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope)
+        q="""SELECT e.*,co.container_no FROM equipment_lease_exceptions e LEFT JOIN containers co ON co.id=e.container_id WHERE 1=1""";args=[]
+        if status:q+=" AND e.status=?";args.append(status)
+        q+=" ORDER BY CASE e.severity WHEN 'CRITICAL' THEN 1 WHEN 'HIGH' THEN 2 ELSE 3 END,e.id DESC LIMIT ?";args.append(limit)
+        out=[]
+        for r in c.execute(q,args):
+            if r["container_no"]:
+                try:get_container(c,r["container_no"],a)
+                except HTTPException:continue
+            out.append(dict(r))
+        return {"actor":a,"count":len(out),"records":out}
+    finally:c.close()
+
+@router.post("/exceptions/{exception_ref}/decision")
+def exception_decision(exception_ref:str,b:ExceptionDecision,x_role:str=Header("EQUIPMENT_MANAGER"),x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+ x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
+    c=connect()
+    try:
+        a=actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(c)
+        e=c.execute("""SELECT e.*,co.container_no FROM equipment_lease_exceptions e LEFT JOIN containers co ON co.id=e.container_id WHERE e.exception_ref=?""",(exception_ref,)).fetchone()
+        if not e:raise HTTPException(404,"Unknown lease exception")
+        if e["container_no"]:get_container(c,e["container_no"],a)
+        d=b.action.upper()
+        if d=="ACKNOWLEDGE":
+            c.execute("UPDATE equipment_lease_exceptions SET status='ACKNOWLEDGED',acknowledged_at=?,owner_role=?,owner_ref=? WHERE id=?",
+                      (now(),a["role"],a["user"],e["id"]))
+        elif d=="RESOLVE":
+            if not b.resolution_code:raise HTTPException(422,{"code":"RESOLUTION_CODE_REQUIRED"})
+            c.execute("""UPDATE equipment_lease_exceptions SET status='RESOLVED',resolution_code=?,resolution_note=?,resolved_at=?,
+                         owner_role=COALESCE(owner_role,?),owner_ref=COALESCE(owner_ref,?) WHERE id=?""",
+                      (b.resolution_code,b.note,now(),a["role"],a["user"],e["id"]))
+        else:raise HTTPException(422,"Invalid action")
+        audit(c,a,"LEASE_EXCEPTION_"+d,e["container_id"],None,dict(e),b.model_dump(),{"exception_ref":exception_ref});c.execute("COMMIT")
+        return {"ok":True,"exception_ref":exception_ref,"status":"ACKNOWLEDGED" if d=="ACKNOWLEDGE" else "RESOLVED"}
     except Exception:
         try:c.execute("ROLLBACK")
         except Exception:pass
