@@ -121,7 +121,7 @@ def test_quick_view_related_deep_links_audit_and_same_page_contracts(isolated):
         assert rel["linked_records"]
     v=verify_clx049("AUDITOR")
     assert v["all_jobs_pass"] is True
-    assert v["booking_tab_order"]==["Booking Info","Other Info"]
+    assert v["booking_tab_order"]==["Booking Info","Equipment","Other Info"]
     assert v["bl_tab_order"]==["Booking Info","Release Instruction","Delivery Order","Lock Info","Authorization"]
 
 def test_jobs_50001_50005_complete_cross_domain_business_day(isolated):

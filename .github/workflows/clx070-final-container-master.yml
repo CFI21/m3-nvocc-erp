@@ -1,0 +1,52 @@
+name: CLX-070 Final Container Master Governance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/clx070_container_master_control.py"
+      - "app/clx070_equipment_runtime.py"
+      - "app/clx049_booking_bl_workspace.py"
+      - "app/main.py"
+      - "web/index.html"
+      - "migrations/CLX070_002_container_master_global_governance.sql"
+      - "CLX070_FINAL_CONTAINER_MASTER_SCOPE.md"
+      - "CLX070_EQUIPMENT_SOP.md"
+      - "CLX070_FINAL_CONTAINER_MASTER_MANIFEST.json"
+      - "tests/test_clx070_final_container_master.py"
+      - ".github/workflows/clx070-final-container-master.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/clx070_container_master_control.py"
+      - "app/clx049_booking_bl_workspace.py"
+      - "app/main.py"
+      - "web/index.html"
+      - "migrations/CLX070_002_container_master_global_governance.sql"
+      - "tests/test_clx070_final_container_master.py"
+      - ".github/workflows/clx070-final-container-master.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile and targeted tests
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m py_compile app/*.py
+          pytest -q tests/test_clx070_equipment_runtime.py tests/test_clx070_final_container_master.py tests/test_clx049_booking_bl_workspace.py
+      - name: Architecture safety
+        run: |
+          grep -q "ONE M3 ERP" CLX070_FINAL_CONTAINER_MASTER_MANIFEST.json
+          grep -q '"production_traffic": "OFF"' CLX070_FINAL_CONTAINER_MASTER_MANIFEST.json
+          grep -q "Container Master" CLX070_EQUIPMENT_SOP.md
+          grep -q "CLX49_BOOKING_TABS=\['Booking Info','Equipment','Other Info'\]" web/index.html

@@ -30,7 +30,7 @@ def test_frozen_196_and_menu_order_preserved(isolated):
         assert s['domain']=='Agent Tasks'
 
 def test_exact_booking_and_bl_same_page_tab_order(isolated):
-    assert BOOKING_TABS==['Booking Info','Other Info']
+    assert BOOKING_TABS==['Booking Info','Equipment','Other Info']
     assert BL_TABS==['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization']
     w=workspace('50001','AUDITOR',None)
     assert w['booking_tabs']==BOOKING_TABS
@@ -135,7 +135,7 @@ def test_switch_bl_preserves_source_relationship_and_history(isolated):
 def test_web_contains_exact_same_page_workspace_contract():
     html=open('web/index.html',encoding='utf-8').read()
     assert "const CLX49_BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization']" in html
-    assert "const CLX49_BOOKING_TABS=['Booking Info','Other Info']" in html
+    assert "const CLX49_BOOKING_TABS=['Booking Info','Equipment','Other Info']" in html
     assert "showClx049Workspace" in html
     assert "saveClx049Tab" in html
     assert "openClx49Link" in html

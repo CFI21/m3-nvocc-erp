@@ -176,7 +176,13 @@ def availability(
         require_schema(conn)
         q="""SELECT * FROM containers
              WHERE current_port=? AND size_type=? AND equipment_status='AVAILABLE'
-               AND condition IN ('GOOD','VERIFIED')"""
+               AND condition IN ('GOOD','VERIFIED')
+               AND COALESCE(verification_status,'VERIFIED')='VERIFIED'
+               AND COALESCE(allocate_for_sale,0)=0
+               AND COALESCE(owner_party_code,principal_code) IS NOT NULL
+               AND COALESCE(verification_status,'VERIFIED')='VERIFIED'
+               AND COALESCE(allocate_for_sale,0)=0
+               AND COALESCE(owner_party_code,principal_code) IS NOT NULL"""
         args=[port,size_type]
         if agent_code: q+=" AND agent_code=?"; args.append(agent_code)
         if depot_code: q+=" AND depot_code=?"; args.append(depot_code)
@@ -204,11 +210,20 @@ def allocate(body: AllocateBody, x_role: str=Header("OPS"), x_agent_scope: Optio
     conn=connect()
     try:
         require_schema(conn); tx(conn)
-        job_id=None
+        # Allocation must use the authoritative Booking/Job context.
         if body.job_ref:
-            jr=conn.execute("SELECT id FROM jobs WHERE job_ref=?",(body.job_ref,)).fetchone()
-            if not jr: raise HTTPException(404,"Unknown job_ref")
-            job_id=jr["id"]
+            jr=conn.execute("""SELECT j.id,b.booking_ref,a.code agent_code,j.pol
+                               FROM jobs j JOIN bookings b ON b.id=j.booking_id JOIN agents a ON a.id=j.agent_id
+                               WHERE j.job_ref=?""",(body.job_ref,)).fetchone()
+        else:
+            jr=conn.execute("""SELECT j.id,b.booking_ref,a.code agent_code,j.pol
+                               FROM jobs j JOIN bookings b ON b.id=j.booking_id JOIN agents a ON a.id=j.agent_id
+                               WHERE b.booking_ref=?""",(body.booking_ref,)).fetchone()
+        if not jr: raise HTTPException(404,{"code":"AUTHORITATIVE_BOOKING_JOB_NOT_FOUND"})
+        if body.booking_ref!=jr["booking_ref"]: raise HTTPException(409,{"code":"BOOKING_JOB_MISMATCH","authoritative_booking_ref":jr["booking_ref"]})
+        if role=="AGENT" and (not scope or scope!=jr["agent_code"]): raise HTTPException(404,{"code":"BOOKING_OUTSIDE_AGENT_SCOPE"})
+        job_id=jr["id"]
+        if body.port!=jr["pol"]: raise HTTPException(409,{"code":"ALLOCATION_PORT_BOOKING_POL_MISMATCH","booking_pol":jr["pol"]})
         q="""SELECT * FROM containers
              WHERE current_port=? AND size_type=? AND equipment_status='AVAILABLE'
                AND condition IN ('GOOD','VERIFIED')"""
@@ -290,10 +305,26 @@ def post_movement(container_no: str, body: MovementBody, x_role: str=Header("OPS
           (body.port,body.agent_code,body.depot_code,new_status,body.booking_ref,job_id,now(),c["id"]))
         evt_time=body.event_time or now()
         loc=" / ".join(x for x in [body.port or c["current_port"],body.agent_code or c["agent_code"],body.depot_code or c["depot_code"]] if x)
+        movement_event_id=None
+        movement_event_ref=str(uuid.uuid4())
         if job_id:
-            conn.execute("""INSERT INTO container_events(event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json)
-                            VALUES(?,?,?,?,?,?,?,?,?)""",
-                         (str(uuid.uuid4()),job_id,c["id"],body.event_type,evt_time,loc,new_status,"equipment-runtime",json.dumps(body.detail,sort_keys=True)))
+            cur_evt=conn.execute("""INSERT INTO container_events(event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json)
+                            VALUES(?,?,?,?,?,?,?,?,?) RETURNING id""",
+                         (movement_event_ref,job_id,c["id"],body.event_type,evt_time,loc,new_status,"equipment-runtime",json.dumps(body.detail,sort_keys=True)))
+            movement_event_id=cur_evt.fetchone()["id"]
+        # Optional movement economics are posted against the same physical container.
+        # Supported detail keys: cost_amount, revenue_amount, commission_amount, share_amount,
+        # currency, charge_code, party_type, party_code, source_ref.
+        econ=[("COST","cost_amount"),("REVENUE","revenue_amount"),("COMMISSION","commission_amount"),("SHARE","share_amount")]
+        for entry_type,key in econ:
+            amount=float(body.detail.get(key,0) or 0)
+            if amount:
+                conn.execute("""INSERT INTO container_financial_ledger(entry_ref,container_id,job_id,booking_ref,bl_ref,movement_event_id,entry_type,charge_code,party_type,party_code,amount,currency,quantity,rate,basis,source_type,source_ref,status,created_by,created_at)
+                                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,0,?,'MOVEMENT',?,'ACCRUED',?,?)""",
+                    ("CFL-"+uuid.uuid4().hex[:12].upper(),c["id"],job_id,body.booking_ref or c["booking_ref"],body.detail.get("bl_ref"),
+                     movement_event_id,entry_type,body.detail.get("charge_code") or ("MOVE_"+body.event_type.upper()),
+                     body.detail.get("party_type"),body.detail.get("party_code"),amount,body.detail.get("currency") or "USD",
+                     body.detail.get("basis") or body.event_type,body.detail.get("source_ref") or movement_event_ref,role,now()))
         after=dict(conn.execute("SELECT * FROM containers WHERE id=?",(c["id"],)).fetchone())
         audit(conn,role,scope,"MOVEMENT_EVENT",c["id"],job_id,before,after,{"event_type":body.event_type,"detail":body.detail})
         conn.execute("COMMIT")
@@ -312,6 +343,12 @@ def create_work_item(body: WorkItemBody, x_role: str=Header("OPS"), x_agent_scop
     wt=body.work_type.upper()
     if wt not in {"REPOSITION","LEASE","PURCHASE","REPAIR","AGENT_SUPPLY","SOC","SHORTAGE"}:
         raise HTTPException(422,"Invalid work_type")
+    if role=="AGENT":
+        if not scope: raise HTTPException(403,"AGENT requires X-Agent-Scope")
+        if body.source_agent not in {None,scope} and body.destination_agent not in {None,scope}:
+            raise HTTPException(403,{"code":"WORK_ITEM_OUTSIDE_AGENT_SCOPE"})
+        if wt in {"PURCHASE","LEASE"}:
+            raise HTTPException(403,{"code":"AGENT_CANNOT_CREATE_STRATEGIC_PROCUREMENT"})
     conn=connect()
     try:
         require_schema(conn);tx(conn)
@@ -335,14 +372,18 @@ def create_work_item(body: WorkItemBody, x_role: str=Header("OPS"), x_agent_scop
         conn.close()
 
 @router.get("/work-items")
-def work_items(status: Optional[str]=None, work_type: Optional[str]=None, limit: int=Query(200,ge=1,le=1000), x_role: str=Header("VIEWER")):
-    actor(x_role,None)
+def work_items(status: Optional[str]=None, work_type: Optional[str]=None, limit: int=Query(200,ge=1,le=1000),
+               x_role: str=Header("VIEWER"), x_agent_scope: Optional[str]=Header(None)):
+    role,scope=actor(x_role,x_agent_scope)
     conn=connect()
     try:
         require_schema(conn)
         q="SELECT * FROM equipment_work_items WHERE 1=1";args=[]
         if status:q+=" AND status=?";args.append(status)
         if work_type:q+=" AND work_type=?";args.append(work_type.upper())
+        if role=="AGENT":
+            if not scope: raise HTTPException(403,"AGENT requires X-Agent-Scope")
+            q+=" AND (source_agent=? OR destination_agent=?)";args.extend([scope,scope])
         q+=" ORDER BY id DESC LIMIT ?";args.append(limit)
         rows=[dict(x) for x in conn.execute(q,args).fetchall()]
         for r in rows:

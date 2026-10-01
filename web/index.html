@@ -165,7 +165,7 @@ function showJson(title,obj){$('drawerTitle').textContent=title;$('tab-details')
 
 const CLX49_KEYS=new Set(['special-rates-request','booking','bl','switch-bl']);
 const CLX49_BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization'];
-const CLX49_BOOKING_TABS=['Booking Info','Other Info'];
+const CLX49_BOOKING_TABS=['Booking Info','Equipment','Other Info'];
 let clx49Workspace=null,clx49ActiveTab='';
 
 function clx49Headers(w){
@@ -210,7 +210,7 @@ function clx49RecordForTab(w,tab){
   if(tab==='Authorization')return {module:'bl',record:w.bl,fields:['Draft Approval','Original / Express','Issue Date','Status']};
   return {module:null,record:null};
 }
-function clx49RenderBlTab(tab){
+async function clx49RenderBlTab(tab){
   const w=clx49Workspace;clx49ActiveTab=tab;
   const x=clx49RecordForTab(w,tab),r=x.record;
   let html=clx49ContextHeader(w)+clx49Nav(w);
@@ -220,6 +220,14 @@ function clx49RenderBlTab(tab){
   }
   if(tab==='Authorization'){
     html+='<div class="card"><b>Authorization / Approval Audit</b><div class="muted">Uses the existing B/L transaction and existing audit/governance path.</div><pre class="pre">'+esc(JSON.stringify(w.authorization.audit.slice(0,10),null,2))+'</pre></div>';
+  }
+  if(tab==='Booking Info'){
+    try{
+      const e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(w.context.job_ref));
+      html+='<div class="card"><b>Allocated Equipment — Same Booking / Same B/L Context</b><div class="muted">These are the authoritative Container Master records allocated to this Booking/Job; B/L does not create a second container list.</div><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner</th><th>Principal</th><th>Agent</th><th>Depot</th><th>Status</th></tr></thead><tbody>'+
+        (e.allocated_containers||[]).map(z=>'<tr onclick="showContainerDetail(\''+esc(z.container_no)+'\')"><td><b>'+esc(z.container_no)+'</b></td><td>'+esc(z.size_type)+'</td><td>'+esc(z.owner_party_type||z.ownership)+'</td><td>'+esc(z.principal_code||'')+'</td><td>'+esc(z.agent_code||'')+'</td><td>'+esc(z.depot_code||'')+'</td><td>'+esc(z.equipment_status)+'</td></tr>').join('')+
+        '</tbody></table></div></div>';
+    }catch(e){html+='<div class="card"><b class="badtext">Allocated Equipment unavailable</b><div class="muted">'+esc(e.message)+'</div></div>'}
   }
   html+='<div class="card"><b>'+esc(tab)+'</b>'+clx49FieldEditor(r,x.fields);
   if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\''+x.module+'\','+r.id+','+r.version+')">Save '+esc(tab)+'</button>'+
@@ -247,7 +255,7 @@ function clx49BookingTogglePot(){
   const pot=document.querySelector('[data-clx49-field="POT Agent"]');
   if(pot)pot.disabled=!(via||trans);
 }
-function clx49RenderBooking(tab){
+async function clx49RenderBooking(tab){
   const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
   const basic=['Booking No.','Booking Date','Status','Carrier Booking Ref','POL','Via Port','Transshipment Port','POD','Vessel','Voyage'];
   const parties=['Customer','Booking Party','Shipper','Consignee','Notify Party','Agent'];
@@ -264,10 +272,20 @@ function clx49RenderBooking(tab){
     html+=clx49BookingGroup(r,'Parties',parties);
     html+=clx49BookingGroup(r,'Operational Control',operational,{disablePot:!hasVia});
     html+=clx49BookingGroup(r,'Cargo & Equipment',cargo);
+  }else if(tab==='Equipment'){
+    try{
+      const e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(w.context.job_ref));
+      const req=e.requirement||{},fin=e.financial_summary||{};
+      html+='<div class="card"><b>Booking Equipment Context</b><div class="muted">Inherited from authoritative Booking/Job. No separate equipment booking record and no manual Booking Ref re-entry.</div>'+
+        '<div class="homeGrid"><div class="homeCard">Equipment<b>'+esc(req.equipment||'—')+'</b></div><div class="homeCard">Quantity<b>'+esc(req.quantity||'—')+'</b></div><div class="homeCard">Provider<b>'+esc(req.provider||'—')+'</b></div><div class="homeCard">Allocated<b>'+esc((e.allocated_containers||[]).length)+'</b></div><div class="homeCard">Margin<b>'+esc(fin.margin||0)+'</b></div></div></div>';
+      html+='<div class="card"><b>Allocated Container Master Records</b><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner Type</th><th>Owner Party</th><th>Principal</th><th>Agent</th><th>Depot</th><th>Status</th></tr></thead><tbody>'+
+        (e.allocated_containers||[]).map(x=>'<tr onclick="showContainerDetail(\''+esc(x.container_no)+'\')"><td><b>'+esc(x.container_no)+'</b></td><td>'+esc(x.size_type)+'</td><td>'+esc(x.owner_party_type||x.ownership)+'</td><td>'+esc(x.owner_party_code||'')+'</td><td>'+esc(x.principal_code||'')+'</td><td>'+esc(x.agent_code||'')+'</td><td>'+esc(x.depot_code||'')+'</td><td>'+esc(x.equipment_status)+'</td></tr>').join('')+
+        '</tbody></table></div><div class="formActions"><button class="btn" onclick="showEquipmentWorkspace(\'allocation\')">Open Allocation / Shortage</button><button class="btn" onclick="showEquipmentWorkspace(\'containers\')">Container Master</button><button class="btn" onclick="showEquipmentWorkspace(\'finance\')">Container P&L</button></div></div>';
+    }catch(e){html+='<div class="card"><b class="badtext">Equipment context unavailable</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
   }else{
     html+='<div class="card"><b>Other Info</b>'+clx49FieldEditor(r,other)+'</div>';
   }
-  if(r)html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(tab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
+  if(r&&tab!=='Equipment')html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(tab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
   $('gridArea').innerHTML=renderGrid()+html;
   if(tab==='Booking Info'){
     for(const n of ['Via Port','Transshipment Port'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
@@ -290,8 +308,8 @@ async function showClx049Workspace(){
   const jr=selectedJob();if(!jr)return openDrawer('details');
   try{
     clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers({context:{agent_code:state.selected?.agent_code}})});
-    if(state.current.key==='bl')clx49RenderBlTab(CLX49_BL_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
-    else if(state.current.key==='booking')clx49RenderBooking(CLX49_BOOKING_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
+    if(state.current.key==='bl')await clx49RenderBlTab(CLX49_BL_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
+    else if(state.current.key==='booking')await clx49RenderBooking(CLX49_BOOKING_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
     else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
     else if(state.current.key==='switch-bl')clx49RenderSwitchBl();
   }catch(e){alert(e.message)}
@@ -303,8 +321,8 @@ async function saveClx049Tab(module,id,version){
     await api('/api/v1/'+module+'/'+id,{method:'PUT',headers,body:JSON.stringify({version,fields})});
     const jr=clx49Workspace.context.job_ref;
     clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers(clx49Workspace)});
-    if(state.current.key==='bl')clx49RenderBlTab(clx49ActiveTab||'Booking Info');
-    else if(state.current.key==='booking')clx49RenderBooking(clx49ActiveTab||'Booking Info');
+    if(state.current.key==='bl')await clx49RenderBlTab(clx49ActiveTab||'Booking Info');
+    else if(state.current.key==='booking')await clx49RenderBooking(clx49ActiveTab||'Booking Info');
     else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
     else clx49RenderSwitchBl();
   }catch(e){alert(e.message)}
@@ -316,7 +334,7 @@ async function approveClx049Bl(id,version){
     await api('/api/v1/bl/'+id+'/actions/approve',{method:'POST',headers,body:JSON.stringify({version,reason:'CLX-049 B/L authorization'})});
     const jr=clx49Workspace.context.job_ref;
     clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers(clx49Workspace)});
-    clx49RenderBlTab('Authorization');
+    await clx49RenderBlTab('Authorization');
   }catch(e){alert(e.message)}
 }
 function rowPayload(row){
@@ -654,6 +672,10 @@ async function showExecutiveHome(){
     </div>`;
 }
 
+async function openBookingEquipmentAllocation(jobRef){
+  state.equipmentJobRef=jobRef;
+  await showEquipmentWorkspace('allocation');
+}
 function equipmentShell(view){
   state.equipmentView=view;
   state.navContext=null;
@@ -669,11 +691,23 @@ function equipmentShell(view){
     <button class="${view==='containers'?'active':''}" onclick="showEquipmentWorkspace('containers')">Container Master</button>
     <button class="${view==='allocation'?'active':''}" onclick="showEquipmentWorkspace('allocation')">Allocation & Shortage</button>
     <button class="${view==='work'?'active':''}" onclick="showEquipmentWorkspace('work')">Work Items</button>
+    <button class="${view==='finance'?'active':''}" onclick="showEquipmentWorkspace('finance')">Container P&amp;L</button>
+    <button class="${view==='kpi'?'active':''}" onclick="showEquipmentWorkspace('kpi')">KPIs</button>
+    <button class="${view==='policy'?'active':''}" onclick="showEquipmentWorkspace('policy')">Policy &amp; SOP</button>
   </div>`;
   $('screenMeta').innerHTML=`<div class="equipNote"><b>Native M3 workspace.</b> Uses the current M3 shell, role, controlled UAT access and authoritative CLX-070 APIs. No separate ERP model or duplicate container inventory.</div>`;
   renderNav();
 }
-function equipHeaders(){return {'Content-Type':'application/json','X-Role':state.role==='SUPER_ADMIN'?'ADMIN':state.role}}
+function equipHeaders(){
+  const h={'Content-Type':'application/json','X-Role':state.role};
+  const sess=sessionStorage.getItem('M3_SESSION')||sessionStorage.getItem('M3_SESSION_TOKEN')||'';
+  if(sess)h['X-M3-Session']=sess;
+  const a=sessionStorage.getItem('M3_AGENT_SCOPE')||'';
+  const b=sessionStorage.getItem('M3_BRANCH_SCOPE')||'';
+  const d=sessionStorage.getItem('M3_DEPOT_SCOPE')||'';
+  if(a)h['X-Agent-Scope']=a;if(b)h['X-Branch-Scope']=b;if(d)h['X-Depot-Scope']=d;
+  return h;
+}
 async function equipmentApi(url,opt={}){
   const r=await fetch(url,{...opt,headers:{...equipHeaders(),...(opt.headers||{})}});
   const txt=await r.text();let x={};try{x=txt?JSON.parse(txt):{}}catch(_){x={detail:txt}}
@@ -689,29 +723,214 @@ async function showEquipmentWorkspace(view='overview'){
   try{
     const ready=await equipmentApi('/api/clx070/equipment/readiness');
     if(view==='overview'){
-      const c=ready.counts||{};
+      const [k,p]=await Promise.all([
+        equipmentApi('/api/clx070/container-control/kpis'),
+        equipmentApi('/api/clx070/container-control/policies')
+      ]);
+      const x=k.fleet||{},f=k.financial||{},e=k.exceptions||{};
       $('gridArea').innerHTML=`<div class="equipGrid">
-        <div class="equipKpi">Total Fleet<b>${c.total||0}</b></div><div class="equipKpi">Available<b>${c.available||0}</b></div>
-        <div class="equipKpi">Reserved<b>${c.reserved||0}</b></div><div class="equipKpi">In Transit<b>${c.in_transit||0}</b></div>
-        <div class="equipKpi">Repair<b>${c.repair||0}</b></div></div>
-        <div class="card"><b>Equipment Control Flow</b><p>Container Master → Planning → Booking Demand → Allocation → Shortage Resolution → Reposition / Lease / Purchase / Agent Supply / SOC → Container Journey.</p><div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace('containers')">Container Master</button><button class="btn" onclick="showEquipmentWorkspace('allocation')">Allocation & Shortage</button><button class="btn" onclick="showEquipmentWorkspace('work')">Work Items</button></div></div>`;
+        <div class="equipKpi">Total Fleet<b>${x.total||0}</b></div><div class="equipKpi">Available<b>${x.available||0}</b></div>
+        <div class="equipKpi">Reserved<b>${x.reserved||0}</b></div><div class="equipKpi">In Transit<b>${x.in_transit||0}</b></div>
+        <div class="equipKpi">Utilization<b>${x.utilization_pct||0}%</b></div></div>
+        <div class="equipGrid">
+        <div class="equipKpi">Revenue<b>${Number(f.revenue||0).toLocaleString()}</b></div><div class="equipKpi">Cost<b>${Number(f.cost||0).toLocaleString()}</b></div>
+        <div class="equipKpi">Commission/Share<b>${Number((f.commission||0)+(f.share||0)).toLocaleString()}</b></div><div class="equipKpi">Margin<b>${Number(f.margin||0).toLocaleString()}</b></div>
+        <div class="equipKpi">Idle >21d<b>${e.idle_gt_21||0}</b></div></div>
+        <div class="card"><b>One M3 Equipment Control Flow</b><p>Container Master → Planning → Booking requirement → Availability → Allocation → Shortage Resolution → Reposition / Lease / Purchase / Partner / Agent / SOC → Release/B-L → Container Journey → Empty Return → Available.</p>
+        <div class="muted">HO/global users see the network. Branch/Agent/Depot users operate only their authorized custody scope. Same physical container, same Booking/Job, same B/L context, same audit and financial trail.</div></div>
+        <div class="card"><b>Active policy profile</b><pre class="pre">${esc(JSON.stringify(p.role_policy,null,2))}</pre></div>`;
     }else if(view==='containers'){
-      const d=await equipmentApi('/api/clx070/equipment/containers?limit=500');
-      $('gridArea').innerHTML=`<div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace('containers')">Refresh</button></div><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Ownership</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Condition</th><th>Booking</th></tr></thead><tbody>${(d.records||[]).map(x=>`<tr><td><b>${esc(x.container_no)}</b></td><td>${esc(x.size_type)}</td><td>${esc(x.ownership)}</td><td>${esc(x.current_port||'')}</td><td>${esc(x.agent_code||'')}</td><td>${esc(x.depot_code||'')}</td><td>${esc(x.equipment_status)}</td><td>${esc(x.condition)}</td><td>${esc(x.booking_ref||'')}</td></tr>`).join('')}</tbody></table></div>`;
+      const d=await equipmentApi('/api/clx070/container-control/containers?limit=500');
+      $('gridArea').innerHTML=`<div class="toolbar"><input id="eqCmSearch" placeholder="Container / owner / principal / booking"><button class="btn" onclick="searchContainerMaster()">Search</button><button class="btn" onclick="showEquipmentWorkspace('containers')">Refresh</button><button class="btn primary" onclick="showBulkContainerUpload()">Bulk Container Upload</button></div>
+      <div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner Type</th><th>Owner Party</th><th>Principal</th><th>Branch</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Verification</th><th>Booking</th></tr></thead><tbody>
+      ${(d.records||[]).map(x=>`<tr onclick="showContainerDetail('${esc(x.container_no)}')"><td><b>${esc(x.container_no)}</b></td><td>${esc(x.size_type)}</td><td>${esc(x.owner_party_type||x.ownership)}</td><td>${esc(x.owner_party_code||'')}</td><td>${esc(x.principal_code||'')}</td><td>${esc(x.branch_code||'')}</td><td>${esc(x.current_port||'')}</td><td>${esc(x.agent_code||'')}</td><td>${esc(x.depot_code||'')}</td><td>${esc(x.equipment_status)}</td><td>${esc(x.verification_status||'')}</td><td>${esc(x.booking_ref||'')}</td></tr>`).join('')}</tbody></table></div>`;
     }else if(view==='allocation'){
-      $('gridArea').innerHTML=`<div class="card"><b>Availability / Allocation</b><div class="equipFilters">
-        <label>Port<input id="eqPort" value="Karachi"></label><label>Agent<input id="eqAgent" value="Agent A"></label>
-        <label>Size/Type<select id="eqType"><option>40HC</option><option>20GP</option><option>40RF</option></select></label>
-        <label>Qty<input id="eqQty" type="number" min="1" value="2"></label><label>Safety Stock<input id="eqSafety" type="number" min="0" value="0"></label>
-        <label>Booking Ref<input id="eqBooking" value="CLX070-UAT"></label>
+      let bx=null;
+      if(state.equipmentJobRef){
+        try{bx=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(state.equipmentJobRef))}catch(_){}
+      }
+      const bc=bx?.context||{},rq=bx?.requirement||{};
+      const et=String(rq.equipment||'40HC').toUpperCase().includes('20')?'20GP':(String(rq.equipment||'').toUpperCase().includes('RF')?'40RF':'40HC');
+      const bq=parseInt(rq.quantity||'2',10)||2;
+      $('gridArea').innerHTML=`<div class="card"><b>Availability / Allocation</b><div class="muted">${bx?'Inherited directly from Job '+esc(bc.job_ref)+' / Booking '+esc(bc.booking_ref):'Open from a Booking to inherit the authoritative Job/Booking context.'}</div><div class="equipFilters">
+        <label>Port<input id="eqPort" value="${esc(bc.pol||'Karachi')}" ${bx?'readonly':''}></label><label>Agent<input id="eqAgent" value="${esc(bc.agent_code||'')}" ${bx?'readonly':''}></label>
+        <label>Size/Type<select id="eqType"><option ${et==='40HC'?'selected':''}>40HC</option><option ${et==='20GP'?'selected':''}>20GP</option><option ${et==='40RF'?'selected':''}>40RF</option></select></label>
+        <label>Qty<input id="eqQty" type="number" min="1" value="${bq}"></label><label>Safety Stock<input id="eqSafety" type="number" min="0" value="0"></label>
+        <label>Booking Ref<input id="eqBooking" value="${esc(bc.booking_ref||'')}" ${bx?'readonly':''}></label>
         <button class="btn" onclick="checkEquipmentAvailability()">Check Availability</button><button class="btn primary" onclick="allocateEquipment()">Allocate</button>
-      </div><div id="eqAllocationResult" class="equipNote">Use actual Container Master stock. Eligible: AVAILABLE + correct type/location + GOOD/VERIFIED condition.</div></div>`;
-    }else{
+      </div><div id="eqAllocationResult" class="equipNote">Eligible stock must be AVAILABLE, verified, not allocated for sale, owner-linked and inside the permitted custody scope.</div></div>`;
+    }else if(view==='work'){
       const d=await equipmentApi('/api/clx070/equipment/work-items?limit=200');
       $('gridArea').innerHTML=`<div class="toolbar"><button class="btn" onclick="showEquipmentWorkspace('work')">Refresh</button></div><div class="tablewrap"><table><thead><tr><th>Ref</th><th>Type</th><th>Status</th><th>Booking</th><th>Equipment</th><th>Qty</th><th>From</th><th>To</th><th>Cost</th></tr></thead><tbody>${(d.records||[]).map(x=>`<tr><td>${esc(x.work_ref)}</td><td>${esc(x.work_type)}</td><td>${esc(x.status)}</td><td>${esc(x.booking_ref||'')}</td><td>${esc(x.size_type)}</td><td>${esc(x.qty)}</td><td>${esc(x.source_port||'')}</td><td>${esc(x.destination_port||'')}</td><td>${esc(x.currency)} ${esc(x.estimated_cost)}</td></tr>`).join('')}</tbody></table></div>`;
+    }else if(view==='finance'){
+      $('gridArea').innerHTML=`<div class="card"><b>Container-level P&amp;L / Commission / Sharing</b><div class="toolbar"><input id="eqFinanceContainer" placeholder="Container #"><button class="btn primary" onclick="loadContainerFinance()">Load</button></div><div id="eqFinanceResult" class="equipNote">Select a Container Master record. Revenue, direct cost, commission, owner/partner/investor share and movement economics remain linked to the same physical container.</div></div>`;
+    }else if(view==='kpi'){
+      const k=await equipmentApi('/api/clx070/container-control/kpis');const x=k.fleet||{},f=k.financial||{},e=k.exceptions||{};
+      $('gridArea').innerHTML=`<div class="equipGrid"><div class="equipKpi">Fleet<b>${x.total||0}</b></div><div class="equipKpi">Utilization<b>${x.utilization_pct||0}%</b></div><div class="equipKpi">Available<b>${x.available||0}</b></div><div class="equipKpi">Repair<b>${x.repair||0}</b></div><div class="equipKpi">Idle >21d<b>${e.idle_gt_21||0}</b></div></div>
+      <div class="equipGrid"><div class="equipKpi">Revenue<b>${Number(f.revenue||0).toLocaleString()}</b></div><div class="equipKpi">Cost<b>${Number(f.cost||0).toLocaleString()}</b></div><div class="equipKpi">Commission<b>${Number(f.commission||0).toLocaleString()}</b></div><div class="equipKpi">Share<b>${Number(f.share||0).toLocaleString()}</b></div><div class="equipKpi">Margin<b>${Number(f.margin||0).toLocaleString()}</b></div></div>
+      <div class="card"><b>Ownership Mix</b><pre class="pre">${esc(JSON.stringify(k.ownership||{},null,2))}</pre></div><div class="card"><b>Exception KPIs</b><pre class="pre">${esc(JSON.stringify(e,null,2))}</pre></div>`;
+    }else if(view==='policy'){
+      const [p,s]=await Promise.all([equipmentApi('/api/clx070/container-control/policies'),equipmentApi('/api/clx070/container-control/sops')]);
+      $('gridArea').innerHTML=`<div class="card"><b>System Policy</b><div class="muted">User → Role → Data Scope → System Policy → Workflow State → Allowed Action</div>
+      <div class="tablewrap"><table><thead><tr><th>Policy</th><th>Value</th><th>Description</th></tr></thead><tbody>${(p.policies||[]).map(x=>`<tr><td>${esc(x.policy_key)}</td><td>${esc(x.policy_value)}</td><td>${esc(x.description)}</td></tr>`).join('')}</tbody></table></div></div>
+      <div class="card"><b>Equipment SOPs</b>${(s.sops||[]).map(x=>`<div class="card"><b>${esc(x.code)} · ${esc(x.name)}</b><ol>${(x.steps||[]).map(y=>`<li>${esc(y)}</li>`).join('')}</ol></div>`).join('')}</div>`;
     }
   }catch(e){$('gridArea').innerHTML=equipmentLockedHtml(e)}
 }
+
+async function searchContainerMaster(){
+  try{
+    const q=$('eqCmSearch')?.value||'';
+    const d=await equipmentApi('/api/clx070/container-control/containers?limit=500&q='+encodeURIComponent(q));
+    $('gridArea').querySelector('tbody').innerHTML=(d.records||[]).map(x=>`<tr onclick="showContainerDetail('${esc(x.container_no)}')"><td><b>${esc(x.container_no)}</b></td><td>${esc(x.size_type)}</td><td>${esc(x.owner_party_type||x.ownership)}</td><td>${esc(x.owner_party_code||'')}</td><td>${esc(x.principal_code||'')}</td><td>${esc(x.branch_code||'')}</td><td>${esc(x.current_port||'')}</td><td>${esc(x.agent_code||'')}</td><td>${esc(x.depot_code||'')}</td><td>${esc(x.equipment_status)}</td><td>${esc(x.verification_status||'')}</td><td>${esc(x.booking_ref||'')}</td></tr>`).join('');
+  }catch(e){alert(e.message)}
+}
+function cmInput(label,key,val,type='text',extra=''){
+  const v=val??'';
+  if(type==='checkbox')return '<div class="formField"><label>'+esc(label)+'</label><input data-cm-field="'+esc(key)+'" type="checkbox" '+(v?'checked':'')+' '+extra+'></div>';
+  return '<div class="formField"><label>'+esc(label)+'</label><input data-cm-field="'+esc(key)+'" type="'+type+'" value="'+esc(v)+'" '+extra+'></div>';
+}
+function cmSelect(label,key,val,items){
+  return '<div class="formField"><label>'+esc(label)+'</label><select data-cm-field="'+esc(key)+'">'+items.map(x=>'<option '+(String(x)===String(val)?'selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div>';
+}
+async function showContainerDetail(no){
+  try{
+    const d=await equipmentApi('/api/clx070/container-control/containers/'+encodeURIComponent(no)),x=d.container||{};
+    $('drawerTitle').textContent='Container Master · '+no;drawerTabs('details');$('drawer').classList.add('open');
+    let general='<div class="card"><b>General / Ownership / Custody</b><div class="formGrid">'+
+      cmInput('Container #','container_no',x.container_no,'text','disabled')+
+      cmInput('Size / Type','size_type',x.size_type,'text','disabled')+
+      cmSelect('Owner / Provider Type','owner_party_type',x.owner_party_type||'PRINCIPAL',['PRINCIPAL','OVERSEAS_PARTNER','LEASING_COMPANY','INVESTOR','AGENT_SUPPLIED','SOC'])+
+      cmInput('Owner / Provider Party','owner_party_code',x.owner_party_code)+
+      cmInput('Principal','principal_code',x.principal_code)+
+      cmInput('Branch','branch_code',x.branch_code)+
+      cmInput('Office','office_code',x.office_code)+
+      cmInput('Port','current_port',x.current_port)+
+      cmInput('Agent / Custodian','agent_code',x.agent_code)+
+      cmInput('Depot','depot_code',x.depot_code)+
+      cmInput('Custodian Type','custodian_type',x.custodian_type)+
+      cmInput('Custodian Code','custodian_code',x.custodian_code)+
+      cmInput('Status','equipment_status',x.equipment_status)+
+      cmInput('Condition','condition',x.condition)+
+      cmInput('Available From','available_from',x.available_from,'date')+
+      cmInput('Value','value_amount',x.value_amount,'number')+
+      cmInput('Allocate For Sale','allocate_for_sale',x.allocate_for_sale,'checkbox')+
+      cmInput('Afghan Transit','afghan_transit',x.afghan_transit,'checkbox')+
+      '</div></div>';
+
+    let technical='<div class="card"><b>Technical / Verification</b><div class="formGrid">'+
+      cmInput('Kind','kind',x.kind)+cmInput('CSC Validity','csc_validity',x.csc_validity,'date')+
+      cmInput('CSC Plate #','csc_plate_no',x.csc_plate_no)+cmInput('CSC Safety Approval #','csc_safety_approval_no',x.csc_safety_approval_no)+
+      cmInput('Manufacturing #','manufacturing_no',x.manufacturing_no)+cmInput('Manufacturer','manufacturer',x.manufacturer)+
+      cmInput('Manufacture Date','manufacture_date',x.manufacture_date,'date')+cmInput('Manufacture Year','manufacture_year',x.manufacture_year,'number')+
+      cmInput('Max Gross WT','max_gross_weight',x.max_gross_weight,'number')+cmInput('Tare WT','tare_weight',x.tare_weight,'number')+
+      cmInput('Classification','classification',x.classification)+cmInput('Grade / Payload','grade_payload',x.grade_payload)+
+      cmInput('Capacity','capacity',x.capacity,'number')+cmInput('Stacking Weight','stacking_weight',x.stacking_weight,'number')+
+      cmInput('ISO Code','iso_code',x.iso_code)+cmInput('Test Load','test_load',x.test_load,'number')+
+      cmInput('Model No.','model_no',x.model_no)+cmInput('Machinery','machinery',x.machinery)+
+      cmInput('Inner L','inner_length',x.inner_length,'number')+cmInput('Inner W','inner_width',x.inner_width,'number')+
+      cmInput('Inner H','inner_height',x.inner_height,'number')+cmInput('Per. Inspection Test','periodic_inspection_test',x.periodic_inspection_test)+
+      cmInput('Per. Ins. Last Date','periodic_inspection_last_date',x.periodic_inspection_last_date,'date')+
+      cmInput('Per. Ins. Due Date','periodic_inspection_due_date',x.periodic_inspection_due_date,'date')+
+      cmInput('Tank Kind','tank_kind',x.tank_kind)+cmInput('Stacking Capability','stacking_capability',x.stacking_capability)+
+      cmInput('Verification Status','verification_status',x.verification_status)+
+      '<div class="formField full"><label>Remarks</label><textarea data-cm-field="remarks">'+esc(x.remarks||'')+'</textarea></div>'+
+      '</div></div>';
+
+    let refs='<div class="card"><b>Purchase / Lease / Sale Reference</b><div class="formGrid">'+
+      cmInput('Acquisition Type','acquisition_type',x.acquisition_type,'text','disabled')+
+      cmInput('Acquisition Ref','acquisition_ref',x.acquisition_ref,'text','disabled')+
+      cmInput('Lease Contract Ref','lease_contract_ref',x.lease_contract_ref,'text','disabled')+
+      cmInput('Purchase Order Ref','purchase_order_ref',x.purchase_order_ref,'text','disabled')+
+      cmInput('Supplier / Lessor','supplier_or_lessor',x.supplier_or_lessor,'text','disabled')+
+      cmInput('Purchase Supplier','purchase_supplier_code',x.purchase_supplier_code)+
+      cmInput('Purchase Invoice No.','purchase_invoice_no',x.purchase_invoice_no)+cmInput('Purchase Invoice Date','purchase_invoice_date',x.purchase_invoice_date,'date')+
+      cmInput('Sale Customer','sale_customer_code',x.sale_customer_code)+cmInput('Sale Invoice No.','sale_invoice_no',x.sale_invoice_no)+
+      cmInput('Sale Invoice Date','sale_invoice_date',x.sale_invoice_date,'date')+
+      '</div></div>';
+
+    let party='<div class="card"><b>Related Parties / Agreements</b><div class="tablewrap"><table><thead><tr><th>Role</th><th>Type</th><th>Party</th><th>Agreement</th><th>Commission %</th><th>Revenue Share %</th><th>Cost Share %</th><th>Status</th></tr></thead><tbody>'+
+      (d.party_links||[]).map(p=>'<tr><td>'+esc(p.party_role)+'</td><td>'+esc(p.party_type)+'</td><td>'+esc(p.party_code)+'</td><td>'+esc(p.agreement_ref||'')+'</td><td>'+esc(p.commission_pct)+'</td><td>'+esc(p.revenue_share_pct)+'</td><td>'+esc(p.cost_share_pct)+'</td><td>'+esc(p.status)+'</td></tr>').join('')+
+      '</tbody></table></div><div class="toolbar"><input id="cmPartyRole" placeholder="Role e.g. ECONOMIC_OWNER"><input id="cmPartyType" placeholder="Type"><input id="cmPartyCode" placeholder="Party code"><input id="cmAgreement" placeholder="Agreement ref"><input id="cmCommission" type="number" placeholder="Commission %"><input id="cmRevenueShare" type="number" placeholder="Revenue share %"><button class="btn" onclick="addContainerParty(\''+esc(no)+'\')">Add Party Link</button></div></div>';
+
+    $('tab-details').innerHTML=general+technical+refs+party+'<div class="formActions"><button class="btn primary" onclick="saveContainerMasterDetail(\''+esc(no)+'\')">Save Container Master</button></div>';
+
+    $('tab-related').innerHTML='<div class="card"><b>Container Pictures / Attachments</b><div class="tablewrap"><table><thead><tr><th>Type</th><th>File</th><th>Storage Ref</th><th>Status</th></tr></thead><tbody>'+
+      (d.documents||[]).map(z=>'<tr><td>'+esc(z.document_type)+'</td><td>'+esc(z.file_name)+'</td><td>'+esc(z.storage_ref)+'</td><td>'+esc(z.status)+'</td></tr>').join('')+
+      '</tbody></table></div><div class="toolbar"><input id="cmDocType" placeholder="PICTURE / CSC / INSPECTION"><input id="cmDocName" placeholder="File name"><input id="cmDocRef" placeholder="Storage reference"><button class="btn" onclick="addContainerDocument(\''+esc(no)+'\')">Link Document</button></div></div>'+
+      '<div class="card"><b>Movement Journey</b><pre class="pre">'+esc(JSON.stringify(d.movement_events,null,2))+'</pre></div>';
+
+    const fs=d.financial_summary||{};
+    $('tab-audit').innerHTML='<div class="card"><b>Container P&L</b><div class="equipGrid"><div class="equipKpi">Revenue<b>'+esc(fs.revenue||0)+'</b></div><div class="equipKpi">Cost<b>'+esc(fs.cost||0)+'</b></div><div class="equipKpi">Commission<b>'+esc(fs.commission||0)+'</b></div><div class="equipKpi">Share<b>'+esc(fs.share||0)+'</b></div><div class="equipKpi">Margin<b>'+esc(fs.margin||0)+'</b></div></div>'+
+      '<div class="toolbar"><select id="cmFinType"><option>REVENUE</option><option>COST</option><option>COMMISSION</option><option>SHARE</option></select><input id="cmFinCharge" placeholder="Charge code"><input id="cmFinAmount" type="number" placeholder="Amount"><input id="cmFinCurrency" value="USD" style="width:70px"><input id="cmFinParty" placeholder="Party code"><input id="cmFinSource" placeholder="Source ref"><button class="btn primary" onclick="postContainerFinancial(\''+esc(no)+'\')">Post Entry</button></div></div>'+
+      '<div class="card"><b>Commission / Revenue Sharing Rules</b><pre class="pre">'+esc(JSON.stringify(d.share_rules||[],null,2))+'</pre><div class="toolbar"><select id="cmShareType"><option>AGENT_COMMISSION</option><option>OWNER_REVENUE_SHARE</option><option>INVESTOR_SHARE</option><option>PARTNER_SHARE</option></select><input id="cmShareRate" type="number" placeholder="Rate %"><input id="cmShareFixed" type="number" placeholder="Fixed amount"><input id="cmShareCharge" placeholder="Charge code"><button class="btn" onclick="createContainerShareRule(\''+esc(no)+'\')">Create Rule</button><input id="cmShareBase" type="number" placeholder="Revenue base"><button class="btn" onclick="applyContainerSharing(\''+esc(no)+'\')">Apply Active Rules</button></div></div>'+
+      '<div class="card"><b>Financial Ledger</b><pre class="pre">'+esc(JSON.stringify(d.financial_ledger,null,2))+'</pre></div>';
+  }catch(e){alert(e.message)}
+}
+async function saveContainerMasterDetail(no){
+  try{
+    const fields={};document.querySelectorAll('[data-cm-field]').forEach(el=>{fields[el.dataset.cmField]=el.type==='checkbox'?el.checked:el.value});
+    await equipmentApi('/api/clx070/container-control/containers/'+encodeURIComponent(no),{method:'PATCH',body:JSON.stringify({fields})});
+    await showContainerDetail(no);
+  }catch(e){alert(e.message)}
+}
+async function addContainerParty(no){
+  try{
+    await equipmentApi('/api/clx070/container-control/containers/'+encodeURIComponent(no)+'/party-links',{method:'POST',body:JSON.stringify({
+      party_role:$('cmPartyRole').value,party_type:$('cmPartyType').value,party_code:$('cmPartyCode').value,agreement_ref:$('cmAgreement').value,
+      commission_pct:Number($('cmCommission').value||0),revenue_share_pct:Number($('cmRevenueShare').value||0)
+    })});await showContainerDetail(no);
+  }catch(e){alert(e.message)}
+}
+async function addContainerDocument(no){
+  try{
+    await equipmentApi('/api/clx070/container-control/containers/'+encodeURIComponent(no)+'/documents',{method:'POST',body:JSON.stringify({document_type:$('cmDocType').value,file_name:$('cmDocName').value,storage_ref:$('cmDocRef').value})});
+    await showContainerDetail(no);
+  }catch(e){alert(e.message)}
+}
+async function postContainerFinancial(no){
+  try{
+    await equipmentApi('/api/clx070/container-control/containers/'+encodeURIComponent(no)+'/financial',{method:'POST',body:JSON.stringify({
+      entry_type:$('cmFinType').value,charge_code:$('cmFinCharge').value,amount:Number($('cmFinAmount').value||0),currency:$('cmFinCurrency').value||'USD',
+      party_code:$('cmFinParty').value||null,source_type:'M3_CONTAINER_CONTROL',source_ref:$('cmFinSource').value||null
+    })});await showContainerDetail(no);drawerTabs('audit');
+  }catch(e){alert(e.message)}
+}
+async function createContainerShareRule(no){
+  try{
+    const r=await equipmentApi('/api/clx070/container-control/containers/'+encodeURIComponent(no)+'/share-rules',{method:'POST',body:JSON.stringify({
+      share_type:$('cmShareType').value,basis:'REVENUE',rate_pct:Number($('cmShareRate').value||0),fixed_amount:Number($('cmShareFixed').value||0),charge_code:$('cmShareCharge').value||null
+    })});alert('Rule '+r.rule_ref+' created as '+r.status+'. A different authorized checker must approve it.');await showContainerDetail(no);drawerTabs('audit');
+  }catch(e){alert(e.message)}
+}
+async function applyContainerSharing(no){
+  try{
+    const r=await equipmentApi('/api/clx070/container-control/containers/'+encodeURIComponent(no)+'/apply-sharing',{method:'POST',body:JSON.stringify({
+      base_amount:Number($('cmShareBase').value||0),currency:'USD',charge_code:$('cmShareCharge').value||null,source_ref:'M3-UI-SHARE'
+    })});alert('Posted '+r.count+' commission/share entry(s).');await showContainerDetail(no);drawerTabs('audit');
+  }catch(e){alert(e.message)}
+}
+function showBulkContainerUpload(){
+  $('drawerTitle').textContent='Bulk Container Upload';drawerTabs('details');$('drawer').classList.add('open');
+  $('tab-details').innerHTML='<div class="card"><b>Bulk Container Upload</b><div class="muted">One line per physical container: Container#,SizeType,OwnerType,OwnerParty,Principal,Port,Branch,Agent,Depot,AcquisitionType,AcquisitionRef</div><textarea id="cmBulkText" style="width:100%;min-height:220px;margin-top:8px" placeholder="M3U100001,40HC,PRINCIPAL,M3,M3,Karachi,KHI,Agent A,KHI Depot,PURCHASE,PO-001"></textarea><div class="formActions"><button class="btn primary" onclick="submitBulkContainerUpload()">Validate & Register</button></div></div>';
+  $('tab-related').innerHTML='<div class="card">Registered units enter INSPECTION / PENDING_INSPECTION. They become allocation-eligible only after verification policy is satisfied.</div>';$('tab-audit').innerHTML='';
+}
+async function submitBulkContainerUpload(){
+  try{
+    const lines=($('cmBulkText').value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+    const records=lines.map(line=>{const p=line.split(',').map(x=>x.trim());return {container_no:p[0],size_type:p[1],owner_party_type:p[2],owner_party_code:p[3],principal_code:p[4],current_port:p[5],branch_code:p[6],agent_code:p[7],depot_code:p[8],acquisition_type:p[9]||'LEGACY',acquisition_ref:p[10]||null}});
+    const r=await equipmentApi('/api/clx070/container-control/bulk-register',{method:'POST',body:JSON.stringify({records})});
+    alert('Created '+r.created.length+' container(s); failed '+r.failed.length);await showEquipmentWorkspace('containers');
+  }catch(e){alert(e.message)}
+}
+async function loadContainerFinance(){
+  try{
+    const no=$('eqFinanceContainer').value.trim();if(!no)return;
+    const d=await equipmentApi('/api/clx070/container-control/containers/'+encodeURIComponent(no));
+    $('eqFinanceResult').innerHTML='<b>'+esc(no)+'</b><pre class="pre">'+esc(JSON.stringify({summary:d.financial_summary,ledger:d.financial_ledger,share_rules:d.share_rules,parties:d.party_links},null,2))+'</pre>';
+  }catch(e){$('eqFinanceResult').textContent=e.message}
+}
+
 async function checkEquipmentAvailability(){
   try{
     const q=new URLSearchParams({port:$('eqPort').value,size_type:$('eqType').value,qty:$('eqQty').value,safety_stock:$('eqSafety').value,agent_code:$('eqAgent').value});
@@ -721,7 +940,7 @@ async function checkEquipmentAvailability(){
 }
 async function allocateEquipment(){
   try{
-    const r=await equipmentApi('/api/clx070/equipment/allocate',{method:'POST',body:JSON.stringify({booking_ref:$('eqBooking').value,port:$('eqPort').value,agent_code:$('eqAgent').value,size_type:$('eqType').value,qty:Number($('eqQty').value),safety_stock:Number($('eqSafety').value)})});
+    const r=await equipmentApi('/api/clx070/equipment/allocate',{method:'POST',body:JSON.stringify({booking_ref:$('eqBooking').value,job_ref:state.equipmentJobRef||null,port:$('eqPort').value,agent_code:$('eqAgent').value,size_type:$('eqType').value,qty:Number($('eqQty').value),safety_stock:Number($('eqSafety').value)})});
     $('eqAllocationResult').innerHTML=`<span class="oktxt">Allocated ${r.allocated_qty}</span> · shortage ${r.shortage} · ${(r.allocated||[]).map(esc).join(', ')}`;
   }catch(e){$('eqAllocationResult').textContent=e.message}
 }
