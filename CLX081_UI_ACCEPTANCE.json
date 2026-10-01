@@ -1,12 +1,24 @@
 {
   "schema": "M3_CLX081_UI_ACCEPTANCE_V1",
   "baseline": "9d19e9d4b12f34f59c0903360c3fd6a2777c7b8c",
-  "BOOKING_MASTER_READY": false,
+  "BOOKING_MASTER_READY": true,
   "reference_field_review_later": true,
   "reference_field_blocking": false,
   "backend_model_changed": false,
   "database_changed": false,
   "REAL_MONEY_READY": false,
   "REAL_PROVIDER_READY": false,
-  "status": "PENDING_TESTS"
+  "status": "ACCEPTED_FOR_SINGLE_PR",
+  "workflow_run_id": 36913588684,
+  "validation": {
+    "focused_booking_tests": "43 passed",
+    "canonical_screen_contract": "196 PASS",
+    "full_erp_regression": "290 passed",
+    "javascript_syntax": "PASS",
+    "safety": "PASS"
+  },
+  "non_blocking_items": [
+    "Reference # remains REVIEW_LATER",
+    "Copy remains reference-only because no governed clone-booking API exists"
+  ]
 }
