@@ -1,0 +1,66 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-076",
+  "title": "Live Provider Onboarding + External Integration Activation",
+  "parent_baseline": "176cb3311923c4343dcbf2f21de0eb0fe8e74d8b",
+  "production_core": "ACTIVE",
+  "canary_run": {
+    "github_run_id": 36854034393,
+    "github_job_id": 110342151354,
+    "status": "PASS"
+  },
+  "provider_framework": {
+    "idempotency_unique": "PASS",
+    "callback_duplicate_protection": "PASS",
+    "retry_dlq": "PASS",
+    "circuit_breaker": "PASS",
+    "secret_values_exposed": false
+  },
+  "providers": {
+    "truelayer_data": {
+      "status": "DEFERRED_MISSING_SECURE_CREDENTIALS",
+      "missing": [
+        "M3_TRUELAYER_CLIENT_ID",
+        "M3_TRUELAYER_CLIENT_SECRET",
+        "M3_TRUELAYER_DATA_CONNECTION_ID"
+      ],
+      "activated": false
+    },
+    "openexchangerates": {
+      "status": "DEFERRED_MISSING_SECURE_CREDENTIALS",
+      "missing": [
+        "M3_OXR_APP_ID"
+      ],
+      "activated": false
+    },
+    "avalara": {
+      "status": "DEFERRED_MISSING_SECURE_CREDENTIALS",
+      "missing": [
+        "M3_AVALARA_ACCOUNT_ID",
+        "M3_AVALARA_LICENSE_KEY",
+        "M3_AVALARA_CLIENT_HEADER"
+      ],
+      "activated": false
+    },
+    "truelayer_payments": {
+      "status": "DEFERRED_MISSING_SECURE_CREDENTIALS",
+      "missing": [
+        "M3_TRUELAYER_CLIENT_ID",
+        "M3_TRUELAYER_CLIENT_SECRET",
+        "M3_TRUELAYER_SIGNING_PRIVATE_KEY",
+        "M3_TRUELAYER_SIGNING_KEY_ID"
+      ],
+      "activated": false,
+      "real_money_authorized": false
+    }
+  },
+  "runtime_final_state": {
+    "M3_PRODUCTION_TRAFFIC": "ON",
+    "M3_PROVIDER_SANDBOX_TESTS": "OFF",
+    "M3_LIVE_PROVIDERS": "OFF",
+    "REAL_MONEY": "OFF"
+  },
+  "result": "EXTERNAL_CREDENTIALS_REQUIRED",
+  "core_erp_rollback_required": false,
+  "next_action": "Load provider credentials into secure Render runtime, then rerun CLX-076 provider canary. Do not paste secrets into source control or chat."
+}
