@@ -1,0 +1,16 @@
+{
+  "phase":"CLX-075",
+  "status":"PENDING_FINAL_CI",
+  "required_coverage":[
+    "import/export/transshipment FCL",
+    "SOC/leased/agent/partner/owned equipment",
+    "manual/special rate and approval",
+    "additional cost controlled approval",
+    "booking/job/B-L/release/DO",
+    "container journey/detention/reposition/M&R/lease",
+    "AR/AP/payment/GL/reporting",
+    "exceptions and negative permissions",
+    "maker-checker and branch/agent/depot scope"
+  ],
+  "zero_known_p0_p1_required":true
+}
