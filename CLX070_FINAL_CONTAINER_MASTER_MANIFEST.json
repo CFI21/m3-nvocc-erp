@@ -1,0 +1,21 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-070 FINAL INTEGRATION CORRECTION",
+  "architecture": "ONE M3 ERP / ONE CONTAINER MASTER / SAME BOOKING-JOB-BL-AUDIT-FINANCE CONTEXT",
+  "baseline": "e620935e0e572f133c51c621e530a32d7773fc53",
+  "scope": [
+    "Legacy Container Coding technical and commercial fields",
+    "Principal/Overseas Partner/Lessor/Investor/Agent/SOC owner/provider linkage",
+    "Branch/Agent/Depot custody scope",
+    "Booking Equipment tab using authoritative Job/Booking context",
+    "Container party/document/movement linkage",
+    "Container-level revenue/cost/commission/share ledger",
+    "Container profitability KPIs",
+    "System policies and equipment SOP catalogue"
+  ],
+  "production_traffic": "OFF",
+  "live_providers": "OFF",
+  "real_money": "OFF",
+  "duplicate_erp": false,
+  "duplicate_container_inventory": false
+}
