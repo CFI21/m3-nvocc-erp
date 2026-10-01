@@ -290,10 +290,26 @@ def post_movement(container_no: str, body: MovementBody, x_role: str=Header("OPS
           (body.port,body.agent_code,body.depot_code,new_status,body.booking_ref,job_id,now(),c["id"]))
         evt_time=body.event_time or now()
         loc=" / ".join(x for x in [body.port or c["current_port"],body.agent_code or c["agent_code"],body.depot_code or c["depot_code"]] if x)
+        movement_event_id=None
+        movement_event_ref=str(uuid.uuid4())
         if job_id:
-            conn.execute("""INSERT INTO container_events(event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json)
-                            VALUES(?,?,?,?,?,?,?,?,?)""",
-                         (str(uuid.uuid4()),job_id,c["id"],body.event_type,evt_time,loc,new_status,"equipment-runtime",json.dumps(body.detail,sort_keys=True)))
+            cur_evt=conn.execute("""INSERT INTO container_events(event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json)
+                            VALUES(?,?,?,?,?,?,?,?,?) RETURNING id""",
+                         (movement_event_ref,job_id,c["id"],body.event_type,evt_time,loc,new_status,"equipment-runtime",json.dumps(body.detail,sort_keys=True)))
+            movement_event_id=cur_evt.fetchone()["id"]
+        # Optional movement economics are posted against the same physical container.
+        # Supported detail keys: cost_amount, revenue_amount, commission_amount, share_amount,
+        # currency, charge_code, party_type, party_code, source_ref.
+        econ=[("COST","cost_amount"),("REVENUE","revenue_amount"),("COMMISSION","commission_amount"),("SHARE","share_amount")]
+        for entry_type,key in econ:
+            amount=float(body.detail.get(key,0) or 0)
+            if amount:
+                conn.execute("""INSERT INTO container_financial_ledger(entry_ref,container_id,job_id,booking_ref,bl_ref,movement_event_id,entry_type,charge_code,party_type,party_code,amount,currency,quantity,rate,basis,source_type,source_ref,status,created_by,created_at)
+                                VALUES(?,?,?,?,?,?,?,?,?,?,?,?,1,0,?,'MOVEMENT',?,'ACCRUED',?,?)""",
+                    ("CFL-"+uuid.uuid4().hex[:12].upper(),c["id"],job_id,body.booking_ref or c["booking_ref"],body.detail.get("bl_ref"),
+                     movement_event_id,entry_type,body.detail.get("charge_code") or ("MOVE_"+body.event_type.upper()),
+                     body.detail.get("party_type"),body.detail.get("party_code"),amount,body.detail.get("currency") or "USD",
+                     body.detail.get("basis") or body.event_type,body.detail.get("source_ref") or movement_event_ref,role,now()))
         after=dict(conn.execute("SELECT * FROM containers WHERE id=?",(c["id"],)).fetchone())
         audit(conn,role,scope,"MOVEMENT_EVENT",c["id"],job_id,before,after,{"event_type":body.event_type,"detail":body.detail})
         conn.execute("COMMIT")
