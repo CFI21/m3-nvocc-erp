@@ -1,0 +1,38 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-073",
+  "title": "Equipment Cost Optimization + Reposition Execution Intelligence",
+  "parent": "CLX-072 accepted baseline a0640d99da5dec6e3c5abb86e69b32c414f89404",
+  "architecture": [
+    "ONE authoritative Container Master",
+    "Existing CLX-071 journey retained",
+    "Existing CLX-072 network position/forecast retained",
+    "Existing Booking/Job/B-L/Finance/IAM/Audit retained",
+    "Existing equipment_work_items remains execution queue",
+    "Existing container_financial_ledger remains actual cost source",
+    "No parallel rate master"
+  ],
+  "controls": [
+    "source port/depot/agent option comparison",
+    "distance and lead-time input",
+    "movement/handling/depot/load/discharge/feeder/truck/rail/lease cost components",
+    "reposition vs lease vs agent/partner/SOC supply economics",
+    "detention/idle/aging cost impact",
+    "expected turnaround",
+    "source priority and explainable recommendation",
+    "approval before work-item creation",
+    "planned vs actual cost",
+    "planned vs actual lead time",
+    "forecast accuracy",
+    "shortage avoidance",
+    "utilization improvement",
+    "reposition ROI",
+    "management savings KPIs",
+    "cost/delay overrun exceptions"
+  ],
+  "production_traffic": "OFF",
+  "live_providers": "OFF",
+  "real_money": "OFF",
+  "duplicate_rate_model": false,
+  "duplicate_container_inventory": false
+}
