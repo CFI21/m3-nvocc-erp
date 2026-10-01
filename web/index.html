@@ -1362,8 +1362,7 @@ async function routeFromLocation(historyMode='none'){
   const eq=decodeURIComponent((raw.match(/equipment=([^&]+)/)||[])[1]||'');
   if(eq){await showEquipmentWorkspace(eq,historyMode);return}
   const screen=decodeURIComponent((raw.match(/screen=([^&]+)/)||[])[1]||'');
-  if(screen&&state.byId[screen]){await openScreen(screen,null,historyMode);return}
-  await showExecutiveHome();
+  if(screen&&state.byId[screen])await openScreen(screen,null,historyMode);else await showExecutiveHome();
 }
 async function init(){
   let [m,s]=await Promise.all([api('/api/clx011/menu'),api('/api/clx011/screens')]);
