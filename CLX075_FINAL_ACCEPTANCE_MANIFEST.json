@@ -1,23 +1,64 @@
 {
-  "project":"M3 NVOCC ERP",
-  "phase":"CLX-075",
-  "title":"Final Bulk ERP Completion + Go-Live Readiness",
-  "parent_commit":"2d88ac008af60cc91d1ff0d9ad1b4a689e19b9e1",
-  "status":"PENDING_FINAL_REGRESSION",
-  "production_ready":false,
-  "architecture":{
-    "one_erp":true,
-    "authoritative_booking_job_bl":true,
-    "authoritative_container_master":true,
-    "authoritative_finance_model":true,
-    "authoritative_iam_audit":true,
-    "duplicate_models":false,
-    "new_erp_shell":false
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-075",
+  "title": "Final Bulk ERP Completion + Go-Live Readiness",
+  "parent_commit": "2d88ac008af60cc91d1ff0d9ad1b4a689e19b9e1",
+  "status": "PRODUCTION_CANDIDATE_READY",
+  "production_ready": true,
+  "accepted_at": "2026-10-01",
+  "architecture": {
+    "one_erp": true,
+    "authoritative_booking_job_bl": true,
+    "authoritative_container_master": true,
+    "authoritative_finance_model": true,
+    "authoritative_iam_audit": true,
+    "duplicate_models": false,
+    "new_erp_shell": false
   },
-  "new_completion":["lease contract commercial control","on-hire/off-hire","per-diem/minimum-hire/free-days","lease accrual and settlement","lease exceptions","final readiness controller"],
-  "inherited_verified_scope":["booking/job/B-L","rates/commercial/CRT","finance/GL/treasury","master data/bulk","IAM/security/audit","workflow/exceptions","dashboards/KPI","container journey/network/optimization/M&R","preprod/cutover/rollback"],
-  "production_traffic":"OFF",
-  "live_providers":"OFF",
-  "real_money":"OFF",
-  "activation_authorized":false
+  "completion": [
+    "lease contract commercial control",
+    "on-hire/off-hire",
+    "per-diem/minimum-hire/free-days",
+    "lease accrual and settlement",
+    "lease exceptions",
+    "final readiness/reconciliation/cutover controls"
+  ],
+  "inherited_verified_scope": [
+    "booking/job/B-L",
+    "rates/commercial/CRT",
+    "finance/GL/treasury",
+    "master data/bulk",
+    "IAM/security/audit",
+    "workflow/exceptions",
+    "dashboards/KPI",
+    "container journey/network/optimization/M&R",
+    "preprod/cutover/rollback"
+  ],
+  "evidence": {
+    "github_final_regression_run": 36848876040,
+    "github_final_regression_job": 110325540101,
+    "targeted_tests": "7/7 PASS",
+    "full_regression": "255/255 PASS",
+    "supabase_project": "ozupgknqaqgvprliewxe",
+    "database_status": "ACTIVE_HEALTHY",
+    "migrations": [
+      "clx072_global_equipment_network",
+      "clx073_equipment_cost_optimization",
+      "clx074_depot_inspection_mr",
+      "clx075_final_bulk_readiness",
+      "clx075_logical_backup_restore_rehearsal"
+    ],
+    "restore_rehearsal": "13/13 controls PASS, zero variance",
+    "security": "RLS enabled on new public control tables; anon/authenticated/public direct grants on new control tables = 0; security advisor blockers = 0",
+    "render_governed_path": "GHCR prebuilt image services on Render free tier validated; legacy source-build prod services are not cutover targets"
+  },
+  "production_traffic": "OFF",
+  "live_providers": "OFF",
+  "real_money": "OFF",
+  "activation_authorized": false,
+  "post_merge_verification_required": [
+    "final main GHCR API/web image publish",
+    "Render governed image services refresh and health smoke"
+  ],
+  "next_required_command": "M3 — AUTHORIZE CONTROLLED PRODUCTION ACTIVATION FROM FROZEN ACCEPTED CLX-075 PRODUCTION_READY BASELINE."
 }
