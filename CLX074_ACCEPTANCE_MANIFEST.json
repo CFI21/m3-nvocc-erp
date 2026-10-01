@@ -1,0 +1,37 @@
+{
+  "project":"M3 NVOCC ERP",
+  "phase":"CLX-074",
+  "title":"Depot + Inspection + Damage & M&R Control",
+  "parent":"CLX-073 accepted baseline 2e165b6e4c37c53008c49b828ca0813677f49ab0",
+  "architecture":[
+    "ONE authoritative Container Master",
+    "CLX-071 journey retained",
+    "CLX-072 network retained",
+    "CLX-073 cost optimization retained",
+    "Existing container_documents used for photos/evidence",
+    "Existing container_financial_ledger used for M&R cost/liability",
+    "Existing equipment_work_items used for repair execution",
+    "No duplicate finance or container model"
+  ],
+  "controls":[
+    "empty return/depot inspection",
+    "damage by component/location/severity",
+    "photo/document evidence links",
+    "cleaning and repair requirement",
+    "labour/material/third-party/cleaning estimate",
+    "maker-checker estimate approval",
+    "owner/lessor/agent/customer/shipper/haulier liability attribution",
+    "repair order linked to existing equipment work item",
+    "repair completion and actual cost",
+    "post-repair reinspection and CSC/safety status",
+    "automatic AVAILABLE/HOLD status",
+    "estimate-vs-actual variance",
+    "repair overdue/estimate overrun/reinspection failure exceptions",
+    "damage frequency/depot/M&R KPIs"
+  ],
+  "production_traffic":"OFF",
+  "live_providers":"OFF",
+  "real_money":"OFF",
+  "duplicate_container_model":false,
+  "duplicate_finance_model":false
+}

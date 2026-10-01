@@ -693,6 +693,7 @@ function equipmentShell(view){
     <button class="${view==='work'?'active':''}" onclick="showEquipmentWorkspace('work')">Work Items</button>
     <button class="${view==='network'?'active':''}" onclick="showEquipmentWorkspace('network')">Network Control</button>
     <button class="${view==='optimization'?'active':''}" onclick="showEquipmentWorkspace('optimization')">Cost Optimization</button>
+    <button class="${view==='mr'?'active':''}" onclick="showEquipmentWorkspace('mr')">Depot &amp; M&amp;R</button>
     <button class="${view==='journey'?'active':''}" onclick="showEquipmentWorkspace('journey')">Container Journey</button>
     <button class="${view==='exceptions'?'active':''}" onclick="showEquipmentWorkspace('exceptions')">Journey Exceptions</button>
     <button class="${view==='finance'?'active':''}" onclick="showEquipmentWorkspace('finance')">Container P&amp;L</button>
@@ -811,6 +812,12 @@ async function showEquipmentWorkspace(view='overview'){
       <textarea id="optOptions" style="width:100%;min-height:180px;margin-top:8px" placeholder='One JSON option per line, e.g. {"option_type":"REPOSITION","source_port":"KHI","lead_days":3,"source_priority":1,"components":{"truck":250,"handling":75}}'></textarea>
       <div class="toolbar"><button class="btn primary" onclick="runCostOptimization()">Compare Options</button></div><div id="optResult" class="equipNote">Enter candidate options. Existing movement cost history is used where explicit movement cost is omitted.</div></div>
       <div class="card"><b>Planned vs Actual</b><div class="toolbar"><input id="varWorkRef" placeholder="Equipment Work Ref"><input id="varActualCost" type="number" min="0" placeholder="Actual cost (optional)"><input id="varActualLead" type="number" min="0" placeholder="Actual lead days (optional)"><button class="btn" onclick="measureOptimizationVariance()">Measure</button></div><div id="varResult" class="equipNote">If actual cost/lead are blank, M3 derives them from the existing financial ledger and journey events where linked.</div></div>`;
+    }else if(view==='mr'){
+      const k=await equipmentApi('/api/clx074/mr/kpis');
+      $('gridArea').innerHTML=`<div class="equipGrid"><div class="equipKpi">Inspections<b>${k.inspections||0}</b></div><div class="equipKpi">Damage Items<b>${k.damage_items||0}</b></div><div class="equipKpi">Repair Orders<b>${k.repair_orders||0}</b></div><div class="equipKpi">M&amp;R Cost<b>${Number(k.actual_mr_cost||0).toLocaleString()}</b></div><div class="equipKpi">Open Exceptions<b>${k.open_exceptions||0}</b></div></div>
+      <div class="card"><b>Depot / Inspection / Damage &amp; M&amp;R Control</b><div class="muted">Empty return inspection → damage/photo capture → estimate → maker-checker approval → repair work → reinspection → AVAILABLE. Same Container Master, document store, finance ledger and Equipment Work Items.</div>
+      <div class="toolbar"><input id="mrContainer" placeholder="Container #"><input id="mrDepot" placeholder="Depot"><button class="btn primary" onclick="createMrInspection()">Start Inspection</button><input id="mrInspection" placeholder="Inspection Ref"><button class="btn" onclick="loadMrInspection()">Load</button></div><div id="mrArea" class="equipNote">Select a container or inspection.</div></div>
+      <div class="card"><b>Depot Performance</b><pre class="pre">${esc(JSON.stringify(k.depot_performance||[],null,2))}</pre></div>`;
     }else if(view==='journey'){
       const d=await equipmentApi('/api/clx070/container-control/containers?limit=500');
       const opts=(d.records||[]).map(x=>`<option value="${esc(x.container_no)}">${esc(x.container_no)} · ${esc(x.size_type)} · ${esc(x.equipment_status)}</option>`).join('');
@@ -1055,6 +1062,12 @@ async function allocateEquipment(){
     const r=await equipmentApi('/api/clx070/equipment/allocate',{method:'POST',body:JSON.stringify({booking_ref:$('eqBooking').value,job_ref:state.equipmentJobRef||null,port:$('eqPort').value,agent_code:$('eqAgent').value,size_type:$('eqType').value,qty:Number($('eqQty').value),safety_stock:Number($('eqSafety').value)})});
     $('eqAllocationResult').innerHTML=`<span class="oktxt">Allocated ${r.allocated_qty}</span> · shortage ${r.shortage} · ${(r.allocated||[]).map(esc).join(', ')}`;
   }catch(e){$('eqAllocationResult').textContent=e.message}
+}
+async function createMrInspection(){
+  try{const r=await equipmentApi('/api/clx074/mr/containers/'+encodeURIComponent($('mrContainer').value)+'/inspection',{method:'POST',body:JSON.stringify({depot_code:$('mrDepot').value||null})});$('mrInspection').value=r.inspection_ref;$('mrArea').innerHTML='<b>'+esc(r.inspection_ref)+'</b> created. Add damage/photo/estimate through the controlled M&amp;R API flow.'}catch(e){$('mrArea').textContent=e.message}
+}
+async function loadMrInspection(){
+  try{const ref=$('mrInspection').value;const r=await equipmentApi('/api/clx074/mr/exceptions?status=OPEN');$('mrArea').innerHTML='<b>Inspection '+esc(ref)+'</b><div class="muted">Open M&amp;R exception queue: '+esc(r.count)+'</div>'}catch(e){$('mrArea').textContent=e.message}
 }
 async function runCostOptimization(){
   try{

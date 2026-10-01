@@ -1,0 +1,38 @@
+name: CLX-074 Depot Inspection M&R
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/clx074_*.py"
+      - "app/main.py"
+      - "web/index.html"
+      - "migrations/CLX074_001_depot_inspection_mr.sql"
+      - "CLX074_ACCEPTANCE_MANIFEST.json"
+      - "tests/test_clx074_depot_mr.py"
+      - ".github/workflows/clx074-depot-mr.yml"
+  push:
+    branches: [main]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile and regression
+        env: {PYTHONPATH: .}
+        run: |
+          python -m py_compile app/*.py
+          pytest -q tests/test_clx074_depot_mr.py tests/test_clx073_equipment_cost_optimization.py tests/test_clx072_equipment_network.py tests/test_clx071_container_journey.py tests/test_clx070_final_container_master.py tests/test_clx070_equipment_runtime.py tests/test_clx049_booking_bl_workspace.py tests/test_clx050_operational_uat.py
+      - name: Architecture safety
+        run: |
+          grep -q '"production_traffic":"OFF"' CLX074_ACCEPTANCE_MANIFEST.json
+          grep -q '"duplicate_container_model":false' CLX074_ACCEPTANCE_MANIFEST.json
+          grep -q '"duplicate_finance_model":false' CLX074_ACCEPTANCE_MANIFEST.json
+          ! grep -q "CREATE TABLE IF NOT EXISTS public.containers" migrations/CLX074_001_depot_inspection_mr.sql
+          ! grep -q "CREATE TABLE IF NOT EXISTS public.container_financial_ledger" migrations/CLX074_001_depot_inspection_mr.sql
+          grep -q "Depot &amp; M&amp;R" web/index.html
