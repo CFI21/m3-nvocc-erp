@@ -176,7 +176,10 @@ def availability(
         require_schema(conn)
         q="""SELECT * FROM containers
              WHERE current_port=? AND size_type=? AND equipment_status='AVAILABLE'
-               AND condition IN ('GOOD','VERIFIED')"""
+               AND condition IN ('GOOD','VERIFIED')
+               AND COALESCE(verification_status,'VERIFIED')='VERIFIED'
+               AND COALESCE(allocate_for_sale,0)=0
+               AND COALESCE(owner_party_code,principal_code) IS NOT NULL"""
         args=[port,size_type]
         if agent_code: q+=" AND agent_code=?"; args.append(agent_code)
         if depot_code: q+=" AND depot_code=?"; args.append(depot_code)
@@ -204,11 +207,20 @@ def allocate(body: AllocateBody, x_role: str=Header("OPS"), x_agent_scope: Optio
     conn=connect()
     try:
         require_schema(conn); tx(conn)
-        job_id=None
+        # Allocation must use the authoritative Booking/Job context.
         if body.job_ref:
-            jr=conn.execute("SELECT id FROM jobs WHERE job_ref=?",(body.job_ref,)).fetchone()
-            if not jr: raise HTTPException(404,"Unknown job_ref")
-            job_id=jr["id"]
+            jr=conn.execute("""SELECT j.id,b.booking_ref,a.code agent_code,j.pol
+                               FROM jobs j JOIN bookings b ON b.id=j.booking_id JOIN agents a ON a.id=j.agent_id
+                               WHERE j.job_ref=?""",(body.job_ref,)).fetchone()
+        else:
+            jr=conn.execute("""SELECT j.id,b.booking_ref,a.code agent_code,j.pol
+                               FROM jobs j JOIN bookings b ON b.id=j.booking_id JOIN agents a ON a.id=j.agent_id
+                               WHERE b.booking_ref=?""",(body.booking_ref,)).fetchone()
+        if not jr: raise HTTPException(404,{"code":"AUTHORITATIVE_BOOKING_JOB_NOT_FOUND"})
+        if body.booking_ref!=jr["booking_ref"]: raise HTTPException(409,{"code":"BOOKING_JOB_MISMATCH","authoritative_booking_ref":jr["booking_ref"]})
+        if role=="AGENT" and (not scope or scope!=jr["agent_code"]): raise HTTPException(404,{"code":"BOOKING_OUTSIDE_AGENT_SCOPE"})
+        job_id=jr["id"]
+        if body.port!=jr["pol"]: raise HTTPException(409,{"code":"ALLOCATION_PORT_BOOKING_POL_MISMATCH","booking_pol":jr["pol"]})
         q="""SELECT * FROM containers
              WHERE current_port=? AND size_type=? AND equipment_status='AVAILABLE'
                AND condition IN ('GOOD','VERIFIED')"""
