@@ -114,7 +114,7 @@ def insert_bank_line(c,batch_id,n,key,currency,signed,source_ref,vid):
     si=c.execute("SELECT id FROM gl_bank_statement_items WHERE statement_ref=?",(ref,)).fetchone()
     if not si:
         cur=c.execute("""INSERT INTO gl_bank_statement_items(statement_ref,bank_account_code,txn_date,description,amount,currency,matched)
-          VALUES(?,?, '2026-10-01',?,?,?,1)""",(ref,"DUMMY-"+currency+"-CLX077",MARKER+" "+key,signed,currency))
+          VALUES(?,?, '2026-10-01',?,?,?,1)""",(ref,"1100",MARKER+" "+key,signed,currency))
         if vid:c.execute("INSERT INTO gl_bank_matches(statement_item_id,voucher_id,match_type,matched_amount,actor_role,ts) VALUES(?,?, 'AUTO',?,'CLX077_TEST',?)",(cur.lastrowid,vid,abs(signed),now()))
 def ensure_batch(c,currency,count):
     ref=f"CLX077-IMPORT-{currency}"
