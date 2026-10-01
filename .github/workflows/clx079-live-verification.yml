@@ -1,0 +1,41 @@
+name: CLX-079 Live Verification
+on:
+  push:
+    branches: [clx079-live-verification]
+    paths: [".github/workflows/clx079-live-verification.yml"]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live CLX-079 web
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB=https://m3-nvocc-web-latest.onrender.com
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 "$WEB/" -o /tmp/web.html
+          grep -q "LIVE M3 EQUIPMENT CONTROL — AUTHORITATIVE CONTAINER MASTER" /tmp/web.html
+          grep -q "Global Stock Position" /tmp/web.html
+          grep -q "Recommended Actions" /tmp/web.html
+          grep -q "Operational Exceptions" /tmp/web.html
+          grep -q "Financial & Performance" /tmp/web.html
+          grep -q "Date Horizon" /tmp/web.html
+          grep -q "clx79TowerNav" /tmp/web.html
+          python - <<'PY'
+          from pathlib import Path
+          h=Path('/tmp/web.html').read_text(encoding='utf-8')
+          s=h.index("if(view==='tower'){")
+          e=h.index("}else if(view==='overview'){",s)
+          b=h[s:e]
+          assert 'JSON.stringify' not in b
+          assert '<pre class="pre">' not in b
+          print('CLX079_LIVE_WEB_PASS')
+          PY
+      - name: Verify authoritative equipment API remains live
+        shell: bash
+        run: |
+          set -euo pipefail
+          API=https://m3-nvocc-api-latest-1.onrender.com
+          for path in             /api/clx070/container-control/kpis             /api/clx071/journey/kpis             '/api/clx072/network/position?horizon_days=14'             /api/clx073/optimization/kpis             /api/clx074/mr/kpis             /api/clx075/lease/kpis; do
+            curl --fail --silent --show-error --retry 8 --retry-delay 3 -H 'X-Role: ADMIN' "$API$path" > /dev/null
+          done
+          echo CLX079_LIVE_API_PASS
