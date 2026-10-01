@@ -1,0 +1,49 @@
+name: CLX-078 Live Verification
+on:
+  push:
+    branches: [clx078-live-verification]
+    paths: [".github/workflows/clx078-live-verification.yml"]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live web
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB=https://m3-nvocc-web-latest.onrender.com
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 "$WEB/" -o /tmp/web.html
+          grep -q "CLX-078 UI Consolidation Review" /tmp/web.html
+          grep -q "clx78Workspace" /tmp/web.html
+          grep -q "Global Equipment Tower" /tmp/web.html
+          grep -q "Commercial Ownership / Financial Parties" /tmp/web.html
+          grep -q "Agreed Charges" /tmp/web.html
+          echo CLX078_LIVE_WEB_PASS
+      - name: Verify live API and menu
+        shell: bash
+        run: |
+          set -euo pipefail
+          API=https://m3-nvocc-api-latest-1.onrender.com
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 -H 'X-Role: ADMIN' "$API/api/clx011/menu" -o /tmp/menu.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx049/workspace/50001" -o /tmp/booking.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx070/container-control/kpis" -o /tmp/fleet.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx071/journey/kpis" -o /tmp/journey.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx072/network/kpis?horizon_days=14" -o /tmp/network.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx073/optimization/kpis" -o /tmp/opt.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx074/mr/kpis" -o /tmp/mr.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx075/lease/kpis" -o /tmp/lease.json
+          python - <<'PY'
+          import json
+          m=json.load(open('/tmp/menu.json'))
+          menu=m if isinstance(m,list) else m.get('menu',[])
+          order=[x['domain'] for x in menu]
+          exp=['HO Tasks','Agent Tasks','Treasury / AR-AP','Integration & Security','General / Administration','Master Data']
+          assert order==exp,(order,exp)
+          b=json.load(open('/tmp/booking.json'))
+          assert b.get('booking') is not None
+          assert b.get('context',{}).get('job_ref')=='50001'
+          for p in ['/tmp/fleet.json','/tmp/journey.json','/tmp/network.json','/tmp/opt.json','/tmp/mr.json','/tmp/lease.json']:
+              x=json.load(open(p))
+              assert isinstance(x,dict),p
+          print('CLX078_LIVE_API_TOWER_PASS')
+          PY
