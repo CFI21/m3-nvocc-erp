@@ -68,12 +68,13 @@ def test_final_artifacts_and_hard_stops_exist():
       "CLX075_FINAL_GAP_MATRIX.json",
     ]
     for p in required: assert Path(p).exists(), p
-    m=Path("CLX075_FINAL_ACCEPTANCE_MANIFEST.json").read_text()
-    assert '"production_traffic":"OFF"' in m
-    assert '"live_providers":"OFF"' in m
-    assert '"real_money":"OFF"' in m
-    assert '"duplicate_models":false' in m
-    assert '"new_erp_shell":false' in m
+    import json
+    m=json.loads(Path("CLX075_FINAL_ACCEPTANCE_MANIFEST.json").read_text())
+    assert m["production_traffic"]=="OFF"
+    assert m["live_providers"]=="OFF"
+    assert m["real_money"]=="OFF"
+    assert m["architecture"]["duplicate_models"] is False
+    assert m["architecture"]["new_erp_shell"] is False
 
 def test_ui_preserves_shell_and_adds_lease_control():
     html=Path("web/index.html").read_text()
