@@ -176,8 +176,8 @@ def run(x_role:str=Header("ADMIN")):
 
 def summary_data(c):
     scenarios=[dict(r) for r in c.execute("SELECT * FROM clx077_test_scenarios ORDER BY scenario_no")]
-    accounts=[dict(r) for r in c.execute("SELECT account_ref,currency,opening_balance,current_balance,reserved_balance FROM treasury_accounts WHERE account_ref LIKE 'DUMMY-%-CLX077' ORDER BY account_ref")]
-    unmatched=int(c.execute("SELECT COUNT(*) n FROM bank_import_lines WHERE line_ref LIKE 'CLX077-%' AND status<>'MATCHED'").fetchone()["n"] or 0)
+    accounts=[dict(r) for r in c.execute("SELECT account_ref,currency,opening_balance,current_balance,reserved_balance FROM treasury_accounts WHERE account_ref LIKE ? ORDER BY account_ref",("DUMMY-%-CLX077",))]
+    unmatched=int(c.execute("SELECT COUNT(*) n FROM bank_import_lines WHERE line_ref LIKE ? AND status<>'MATCHED'",("CLX077-%",)).fetchone()["n"] or 0)
     unbalanced=int(c.execute("""SELECT COUNT(*) n FROM gl_vouchers v WHERE v.source_type='CLX077_TEST' AND ABS(v.total_debit-v.total_credit)>.005""").fetchone()["n"] or 0)
     return {"phase":"CLX-077","run_ref":RUN_REF,"scenario_count":len(scenarios),"passed":sum(1 for x in scenarios if x["status"]=="PASS"),"scenarios":scenarios,"dummy_accounts":accounts,"unmatched_bank_items":unmatched,"unbalanced_vouchers":unbalanced,"real_money":False}
 
@@ -186,10 +186,10 @@ def dashboard(x_role:str=Header("AUDITOR")):
     require(x_role);c=connect()
     try:
         d=summary_data(c)
-        d["open_receipts"]=c.execute("SELECT COUNT(*) n FROM treasury_records WHERE source_type='DUMMY_BANK' AND external_ref LIKE 'CLX077_TEST%' AND status NOT IN ('Reconciled','Reversed')").fetchone()["n"]
-        d["open_payments"]=c.execute("SELECT COUNT(*) n FROM sandbox_payment_requests WHERE payment_ref LIKE 'CLX077-%' AND status<>'SIMULATED_RELEASED'").fetchone()["n"]
-        d["simulated_payments"]=c.execute("SELECT COUNT(*) n FROM sandbox_payment_requests WHERE payment_ref LIKE 'CLX077-%' AND status='SIMULATED_RELEASED'").fetchone()["n"]
-        d["provider_events"]=c.execute("SELECT COUNT(*) n FROM provider_live_events WHERE provider_key='m3-dummy-bank' AND idempotency_key LIKE 'CLX077-%'").fetchone()["n"]
+        d["open_receipts"]=c.execute("SELECT COUNT(*) n FROM treasury_records WHERE source_type='DUMMY_BANK' AND external_ref LIKE ? AND status NOT IN ('Reconciled','Reversed')",("CLX077_TEST%",)).fetchone()["n"]
+        d["open_payments"]=c.execute("SELECT COUNT(*) n FROM sandbox_payment_requests WHERE payment_ref LIKE ? AND status<>'SIMULATED_RELEASED'",("CLX077-%",)).fetchone()["n"]
+        d["simulated_payments"]=c.execute("SELECT COUNT(*) n FROM sandbox_payment_requests WHERE payment_ref LIKE ? AND status='SIMULATED_RELEASED'",("CLX077-%",)).fetchone()["n"]
+        d["provider_events"]=c.execute("SELECT COUNT(*) n FROM provider_live_events WHERE provider_key='m3-dummy-bank' AND idempotency_key LIKE ?",("CLX077-%",)).fetchone()["n"]
         d["fx_difference"]=50.0
         d["banner"]="TEST BANK — SIMULATION ONLY — NO REAL MONEY"
         return d
@@ -207,9 +207,9 @@ def reconcile(x_role:str=Header("TREASURY_MANAGER")):
             pay=float(c.execute("SELECT COALESCE(SUM(amount),0) n FROM clx077_test_scenarios WHERE currency=? AND direction='PAYMENT' AND status='PASS'",(cur,)).fetchone()["n"] or 0)
             exp=round(float(rows[cur]["opening_balance"])+rec-pay,2);act=round(float(rows[cur]["current_balance"]),2)
             vals[cur]={"opening":float(rows[cur]["opening_balance"]),"receipts_plus_reversals":rec,"payments":pay,"expected":exp,"actual":act,"variance":round(act-exp,2)}
-        unmatched=int(c.execute("SELECT COUNT(*) n FROM bank_import_lines WHERE line_ref LIKE 'CLX077-%' AND status<>'MATCHED'").fetchone()["n"] or 0)
+        unmatched=int(c.execute("SELECT COUNT(*) n FROM bank_import_lines WHERE line_ref LIKE ? AND status<>'MATCHED'",("CLX077-%",)).fetchone()["n"] or 0)
         unbalanced=int(c.execute("SELECT COUNT(*) n FROM gl_vouchers WHERE source_type='CLX077_TEST' AND ABS(total_debit-total_credit)>.005").fetchone()["n"] or 0)
-        dup=int(c.execute("SELECT COUNT(*) n FROM (SELECT external_ref FROM treasury_records WHERE external_ref LIKE 'CLX077_TEST%' GROUP BY external_ref HAVING COUNT(*)>1) x").fetchone()["n"] or 0)
+        dup=int(c.execute("SELECT COUNT(*) n FROM (SELECT external_ref FROM treasury_records WHERE external_ref LIKE ? GROUP BY external_ref HAVING COUNT(*)>1) x",("CLX077_TEST%",)).fetchone()["n"] or 0)
         ok=all(abs(vals[x]["variance"])<.005 for x in vals) and unmatched==0 and unbalanced==0 and dup==0 and c.execute("SELECT COUNT(*) n FROM clx077_test_scenarios WHERE status='PASS'").fetchone()["n"]==15
         detail={"currencies":vals,"unmatched":unmatched,"unbalanced_vouchers":unbalanced,"duplicate_refs":dup,"scenario_pass":15 if ok else c.execute("SELECT COUNT(*) n FROM clx077_test_scenarios WHERE status='PASS'").fetchone()["n"],"real_money":False}
         c.execute("""INSERT INTO clx077_reconciliation_snapshots(run_ref,opening_eur,opening_usd,receipts_eur,payments_eur,reversals_eur,receipts_usd,payments_usd,reversals_usd,expected_eur,actual_eur,variance_eur,expected_usd,actual_usd,variance_usd,bank_import_unmatched,unbalanced_vouchers,duplicate_refs,status,detail_json,created_at)
@@ -229,7 +229,7 @@ def archive(x_role:str=Header("ADMIN")):
     try:
         assert_safe(c)
         c.execute("UPDATE clx077_test_scenarios SET status='ARCHIVED' WHERE status='PASS'")
-        c.execute("UPDATE treasury_records SET status='TestArchived',updated_at=? WHERE source_type='DUMMY_BANK' AND external_ref LIKE 'CLX077_TEST%'",(now(),))
+        c.execute("UPDATE treasury_records SET status='TestArchived',updated_at=? WHERE source_type='DUMMY_BANK' AND external_ref LIKE ?",(now(),"CLX077_TEST%"))
         audit(c,role,"TEST_DATA_ARCHIVE",after={"marker":MARKER,"audit_deleted":False})
         c.execute("COMMIT");return {"ok":True,"audit_history_deleted":False,"dummy_accounts_retained":True}
     except Exception:
