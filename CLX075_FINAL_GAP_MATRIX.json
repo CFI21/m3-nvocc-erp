@@ -1,0 +1,24 @@
+{
+  "phase":"CLX-075",
+  "status":"PENDING_FINAL_REGRESSION",
+  "workstreams":{
+    "A_equipment_lease":"BUILT_CLX075",
+    "B_end_to_end_operations":"INHERITED_VERIFY",
+    "C_commercial_rates_cost":"INHERITED_VERIFY",
+    "D_finance_accounting_treasury":"INHERITED_VERIFY",
+    "E_master_bulk":"INHERITED_VERIFY",
+    "F_iam_security_audit":"INHERITED_VERIFY",
+    "G_documents_workflow_exceptions":"INHERITED_VERIFY",
+    "H_dashboard_kpi":"INHERITED_VERIFY",
+    "I_ui_ux":"INHERITED_PRESERVE",
+    "J_production_data_readiness":"CLX075_RECONCILIATION_CONTROL",
+    "K_migration_backup_restore":"INHERITED_PLUS_VERIFY",
+    "L_integrations":"INHERITED_PROVIDER_OFF_VERIFY",
+    "M_observability_operations":"INHERITED_PLUS_RUNBOOK",
+    "N_automated_uat":"PENDING",
+    "O_final_regression":"PENDING",
+    "P_cutover_rehearsal":"PENDING",
+    "Q_acceptance_artifacts":"CREATED_PENDING_RESULTS",
+    "R_activation_safety":"LOCKED_OFF"
+  }
+}
