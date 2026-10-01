@@ -1,23 +1,33 @@
 {
   "schema": "M3_CLX081_BOOKING_MASTER_UAT_V1",
   "checks": {
-    "basic_info_alignment": "PENDING",
-    "reference_marked_review_later": "PENDING",
-    "thru_bl": "PENDING",
-    "sailing_date": "PENDING",
-    "actual_shipper": "PENDING",
-    "two_leg_pot_ts_logic": "PENDING",
-    "operational_control": "PENDING",
-    "operations_planning_links": "PENDING",
-    "same_as_booking_party": "PENDING",
-    "lower_workspace": "PENDING",
-    "commercial_flow": "PENDING",
-    "charge_grid_columns": "PENDING",
-    "save_existing_api": "PENDING",
-    "equipment_link": "PENDING",
-    "finance_link": "PENDING",
-    "no_duplicate_model": "PENDING",
-    "no_layout_overflow_contract": "PENDING"
+    "basic_info_alignment": "PASS",
+    "reference_marked_review_later": "PASS",
+    "thru_bl": "PASS",
+    "sailing_date": "PASS",
+    "actual_shipper": "PASS",
+    "two_leg_pot_ts_logic": "PASS",
+    "operational_control": "PASS",
+    "operations_planning_links": "PASS",
+    "same_as_booking_party": "PASS",
+    "lower_workspace": "PASS",
+    "commercial_flow": "PASS",
+    "charge_grid_columns": "PASS",
+    "save_existing_api": "PASS",
+    "equipment_link": "PASS",
+    "finance_link": "PASS",
+    "no_duplicate_model": "PASS",
+    "no_layout_overflow_contract": "PASS"
   },
-  "status": "PENDING_WORKFLOW"
+  "status": "PASS",
+  "workflow_run_id": 36913588684,
+  "focused_tests": "43 passed",
+  "full_regression": "290 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS",
+  "non_blocking_items": [
+    "Reference # semantic/source refinement remains REVIEW_LATER",
+    "Copy has no governed clone-booking backend and remains non-writing reference control"
+  ]
 }
