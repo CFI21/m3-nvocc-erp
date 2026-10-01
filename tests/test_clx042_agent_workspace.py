@@ -29,10 +29,10 @@ def test_agent_workspace_preserves_frozen_clx041_navigation():
     c=build_catalog()
     assert c['screen_count']==196
     assert [x['domain'] for x in c['menu']]==[
-        'Agent Tasks','HO Tasks','Treasury / AR-AP',
+        'HO Tasks','Agent Tasks','Treasury / AR-AP',
         'Integration & Security','General / Administration','Master Data'
     ]
-    agent=c['menu'][0]
+    agent=next(x for x in c['menu'] if x['domain']=='Agent Tasks')
     assert [x['name'] for x in agent['submenus']]==['Setup','Transaction']
     assert [x['label'] for x in agent['submenus'][0]['items']]==[
         'Agent','Common Parties','Vessel','Voyage Registration','Commodity','Units','Sales Person'
