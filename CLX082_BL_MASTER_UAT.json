@@ -1,0 +1,16 @@
+{
+  "schema": "M3_CLX082_BL_MASTER_UAT_V1",
+  "checks": {
+    "bl_basic_info": "PENDING",
+    "parties": "PENDING",
+    "cargo_equipment": "PENDING",
+    "freight_commercial": "PENDING",
+    "booking_bl_context": "PENDING",
+    "authoritative_container_link": "PENDING",
+    "finance_context": "PENDING",
+    "save_existing_bl_api": "PENDING",
+    "preview_read_only": "PENDING",
+    "no_duplicate_model": "PENDING"
+  },
+  "status": "PENDING_WORKFLOW"
+}
