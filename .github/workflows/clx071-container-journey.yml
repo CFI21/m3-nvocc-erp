@@ -1,0 +1,50 @@
+name: CLX-071 Full Container Journey
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/clx071_container_journey.py"
+      - "app/main.py"
+      - "web/index.html"
+      - "migrations/CLX071_001_full_container_journey.sql"
+      - "CLX071_ACCEPTANCE_MANIFEST.json"
+      - "CLX071_CONTAINER_JOURNEY_SOP.md"
+      - "tests/test_clx071_container_journey.py"
+      - ".github/workflows/clx071-container-journey.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/clx071_container_journey.py"
+      - "app/main.py"
+      - "web/index.html"
+      - "migrations/CLX071_001_full_container_journey.sql"
+      - "tests/test_clx071_container_journey.py"
+      - ".github/workflows/clx071-container-journey.yml"
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile and targeted UAT
+        env:
+          PYTHONPATH: .
+        run: |
+          python -m py_compile app/*.py
+          pytest -q tests/test_clx071_container_journey.py tests/test_clx070_final_container_master.py tests/test_clx070_equipment_runtime.py tests/test_clx049_booking_bl_workspace.py tests/test_clx050_operational_uat.py
+      - name: Architecture and production safety
+        run: |
+          grep -q '"production_traffic": "OFF"' CLX071_ACCEPTANCE_MANIFEST.json
+          grep -q '"live_providers": "OFF"' CLX071_ACCEPTANCE_MANIFEST.json
+          grep -q '"real_money": "OFF"' CLX071_ACCEPTANCE_MANIFEST.json
+          grep -q "ONE M3 ERP" CLX071_ACCEPTANCE_MANIFEST.json
+          grep -q "Container Journey" web/index.html
+          grep -q "Journey Exceptions" web/index.html
