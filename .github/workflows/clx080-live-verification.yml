@@ -1,0 +1,68 @@
+name: CLX-080 Live Verification
+on:
+  push:
+    branches: [clx080-live-verification]
+    paths: [".github/workflows/clx080-live-verification.yml"]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live cache headers and exact build SHA
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB=https://m3-nvocc-web-latest.onrender.com
+          SHA=9d19e9d4b12f34f59c0903360c3fd6a2777c7b8c
+          SHORT=${SHA:0:12}
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 -D /tmp/root.headers "$WEB/" -o /tmp/root.html
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 -D /tmp/index.headers "$WEB/index.html" -o /tmp/index.html
+          grep -qi 'cache-control:.*no-store.*no-cache.*must-revalidate.*max-age=0' /tmp/root.headers
+          grep -qi 'cache-control:.*no-store.*no-cache.*must-revalidate.*max-age=0' /tmp/index.headers
+          grep -qi 'pragma: no-cache' /tmp/root.headers
+          grep -q "$SHA" /tmp/root.html
+          grep -q "$SHORT" /tmp/root.html
+          grep -q 'meta name="m3-ui-baseline" content="CLX-080"' /tmp/root.html
+          ! grep -q '__M3_BUILD_SHA__' /tmp/root.html
+          ! grep -q '__M3_BUILD_SHA_SHORT__' /tmp/root.html
+          echo CLX080_LIVE_CACHE_VERSION_PASS
+
+      - name: Verify live routing and current Tower UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          H=/tmp/root.html
+          grep -q "history.pushState(null,'','#equipment='+encodeURIComponent(view))" "$H"
+          grep -q "history.pushState(null,'','#screen='+encodeURIComponent(id))" "$H"
+          grep -q "window.addEventListener('popstate',()=>routeFromLocation('none'))" "$H"
+          grep -q 'LIVE M3 EQUIPMENT CONTROL — AUTHORITATIVE CONTAINER MASTER' "$H"
+          grep -q 'Global Stock Position' "$H"
+          grep -q 'Recommended Actions' "$H"
+          grep -q 'Operational Exceptions' "$H"
+          python - <<'PY'
+          from pathlib import Path
+          h=Path('/tmp/root.html').read_text(encoding='utf-8')
+          s=h.index('function equipmentShell(view)')
+          e=h.index('function equipHeaders()',s)
+          shell=h[s:e]
+          assert 'Allocation & Shortage</button>' not in shell
+          assert 'Work Items</button>' not in shell
+          assert 'controlled UAT access' not in shell
+          print('CLX080_LIVE_ROUTING_TOWER_PASS')
+          PY
+
+      - name: Verify API remains unchanged and live
+        shell: bash
+        run: |
+          set -euo pipefail
+          API=https://m3-nvocc-api-latest-1.onrender.com
+          curl --fail --silent --show-error --retry 8 --retry-delay 3 -H 'X-Role: ADMIN' "$API/api/clx011/menu" -o /tmp/menu.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx070/container-control/kpis" -o /tmp/equipment.json
+          python - <<'PY'
+          import json
+          m=json.load(open('/tmp/menu.json'))
+          menu=m if isinstance(m,list) else m.get('menu',[])
+          assert [x['domain'] for x in menu]==['HO Tasks','Agent Tasks','Treasury / AR-AP','Integration & Security','General / Administration','Master Data']
+          e=json.load(open('/tmp/equipment.json'))
+          assert isinstance(e,dict)
+          print('CLX080_LIVE_API_PASS')
+          PY
