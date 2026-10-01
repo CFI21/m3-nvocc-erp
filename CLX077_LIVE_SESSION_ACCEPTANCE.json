@@ -35,5 +35,13 @@
     "web_digest": "sha256:faa5f84d557b55b3db10bdd2ed472c83abd40ba959ebe502c9814ad11111fec5"
   },
   "live_ui_status_text": "CLX-077 live review active; production core ON; external providers OFF; real money OFF; dummy bank simulation enabled.",
-  "final_live_smoke_pending": true
+  "final_live_smoke_pending": false,
+  "final_verification": {
+    "live_smoke_run_id": 36861283163,
+    "live_smoke": "PASS",
+    "final_regression_run_id": 36861283217,
+    "targeted_acceptance": "PASS",
+    "complete_erp_regression": "PASS",
+    "safety_assertions": "PASS"
+  }
 }
