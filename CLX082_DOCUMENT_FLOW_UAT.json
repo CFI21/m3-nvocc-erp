@@ -1,0 +1,17 @@
+{
+  "schema": "M3_CLX082_DOCUMENT_FLOW_UAT_V1",
+  "checks": {
+    "exact_tab_order": "PENDING",
+    "release_instruction": "PENDING",
+    "delivery_order": "PENDING",
+    "lock_info": "PENDING",
+    "authorization": "PENDING",
+    "maker_checker_audit": "PENDING",
+    "switch_bl_link": "PENDING",
+    "split_bl_link": "PENDING",
+    "booking_link": "PENDING",
+    "container_link": "PENDING",
+    "finance_link": "PENDING"
+  },
+  "status": "PENDING_WORKFLOW"
+}
