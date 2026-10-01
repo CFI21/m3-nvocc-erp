@@ -1,0 +1,303 @@
+{
+  "schema": "M3_CLX082_BL_FIELD_MATRIX_V1",
+  "baseline": "ce8a71952bb978d98ec171b2236f1339d7dbd240",
+  "backend_model_changed": false,
+  "duplicate_bl_model_created": false,
+  "fields": [
+    {
+      "reference": "B/L No.",
+      "current": "B/L No.",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "B/L Type",
+      "current": "Type",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "MBL",
+      "current": "MBL",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "HBL",
+      "current": "HBL",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Booking No.",
+      "current": "Booking No.",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking/job context"
+    },
+    {
+      "reference": "Job Ref",
+      "current": "Job Ref",
+      "status": "DERIVED_READ_ONLY",
+      "source": "job context"
+    },
+    {
+      "reference": "Issue Date",
+      "current": "Issue Date",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Place of Issue",
+      "current": "Place of Issue",
+      "status": "DERIVED_READ_ONLY",
+      "source": "existing context where available"
+    },
+    {
+      "reference": "Status",
+      "current": "Status",
+      "status": "DERIVED_READ_ONLY",
+      "source": "authoritative bl status"
+    },
+    {
+      "reference": "Original / Express",
+      "current": "Original / Express",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Freight Term",
+      "current": "Freight Term",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Service Type",
+      "current": "Freight Type / Service Type",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "Carrier",
+      "current": "Carrier",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "Vessel",
+      "current": "Vessel",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Voyage",
+      "current": "Voyage",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "POL",
+      "current": "POL",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "POT",
+      "current": "POT (1) / Via Port",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "POD",
+      "current": "POD",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Final Destination",
+      "current": "Final Destination / POD",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking/job"
+    },
+    {
+      "reference": "Shipper",
+      "current": "Shipper",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Actual Shipper",
+      "current": "Actual Shipper / Shipper",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "Consignee",
+      "current": "Consignee",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Notify Party",
+      "current": "Notify",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Also Notify",
+      "current": "Also Notify",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking where available"
+    },
+    {
+      "reference": "Forwarding Agent",
+      "current": "Agent",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking/job"
+    },
+    {
+      "reference": "Delivery Agent",
+      "current": "POD Agent / DO Notify",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking/delivery-order"
+    },
+    {
+      "reference": "Principal",
+      "current": "Principal",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "Shipping Line",
+      "current": "Carrier",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "Agent Reference",
+      "current": "Agent Reference",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "Container / Seal",
+      "current": "Container / Seal",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl + container context"
+    },
+    {
+      "reference": "Packages",
+      "current": "Packages",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Package Type",
+      "current": "Package Type",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking where available"
+    },
+    {
+      "reference": "Gross Weight",
+      "current": "Weight",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Net Weight",
+      "current": "Net Weight",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking where available"
+    },
+    {
+      "reference": "Measurement",
+      "current": "Measurement",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Marks & Numbers",
+      "current": "Marks & Numbers",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking where available"
+    },
+    {
+      "reference": "Goods Description",
+      "current": "Cargo Description",
+      "status": "NATIVE_EDITABLE",
+      "source": "transaction_records:bl"
+    },
+    {
+      "reference": "Commodity",
+      "current": "Commodity",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "IMO / DG",
+      "current": "IMO / DG / Dangerous Goods",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking where available"
+    },
+    {
+      "reference": "Prepaid / Collect",
+      "current": "Freight Term",
+      "status": "DERIVED_READ_ONLY",
+      "source": "bl/booking"
+    },
+    {
+      "reference": "Place of Payment",
+      "current": "Place of Payment",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking where available"
+    },
+    {
+      "reference": "Currency",
+      "current": "Currency",
+      "status": "DERIVED_READ_ONLY",
+      "source": "finance/booking where available"
+    },
+    {
+      "reference": "Freight Charges",
+      "current": "linked GL/operational records",
+      "status": "DERIVED_READ_ONLY",
+      "source": "existing finance APIs"
+    },
+    {
+      "reference": "Agent / Principal Allocation",
+      "current": "Financial Flow",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking/finance"
+    },
+    {
+      "reference": "Customer AR",
+      "current": "linked GL records",
+      "status": "DERIVED_READ_ONLY",
+      "source": "existing finance APIs"
+    },
+    {
+      "reference": "Revenue / Cost",
+      "current": "linked GL records",
+      "status": "DERIVED_READ_ONLY",
+      "source": "existing finance APIs"
+    },
+    {
+      "reference": "SOA Context",
+      "current": "Settlement Agent / treasury",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking/treasury"
+    }
+  ],
+  "tabs": [
+    "Booking Info",
+    "Release Instruction",
+    "Delivery Order",
+    "Lock Info",
+    "Authorization"
+  ],
+  "release_instruction_source": "EXISTING_TRANSACTION_RECORD_DELIVERY_ORDER",
+  "delivery_order_source": "EXISTING_TRANSACTION_RECORD_DELIVERY_ORDER",
+  "lock_source": "EXISTING_VESSEL_LOCK_WORKFLOW_STATE_WORKFLOW_HOLDS",
+  "authorization_source": "EXISTING_BL_RECORD_AND_AUDIT_GOVERNANCE",
+  "switch_bl_source": "EXISTING_GOVERNED_SWITCH_BL",
+  "split_bl_source": "EXISTING_GOVERNED_SPLIT_BL"
+}
