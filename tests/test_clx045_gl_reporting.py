@@ -29,7 +29,7 @@ def test_frozen_clx044_navigation_and_196_screen_baseline():
     c=build_catalog()
     assert c['screen_count']==196
     assert [x['domain'] for x in c['menu']]==[
-        'Agent Tasks','HO Tasks','Treasury / AR-AP',
+        'HO Tasks','Agent Tasks','Treasury / AR-AP',
         'Integration & Security','General / Administration','Master Data'
     ]
     ga=next(x for x in c['menu'] if x['domain']=='General / Administration')
