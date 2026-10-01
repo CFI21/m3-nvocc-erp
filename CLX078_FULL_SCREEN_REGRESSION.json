@@ -1,0 +1,10 @@
+{
+  "schema": "M3_CLX078_FULL_SCREEN_REGRESSION_V1",
+  "canonical_screen_count": 196,
+  "full_existing_regression": "PENDING",
+  "clx078_targeted": "PENDING",
+  "no_backend_model_change": true,
+  "no_real_money_change": true,
+  "no_external_provider_activation": true,
+  "status": "PENDING_WORKFLOW"
+}
