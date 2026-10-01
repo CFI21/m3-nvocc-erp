@@ -200,7 +200,7 @@ def reconcile(x_role:str=Header("TREASURY_MANAGER")):
     role=require(x_role,True);c=connect();tx(c)
     try:
         assert_safe(c)
-        rows={r["currency"]:dict(r) for r in c.execute("SELECT currency,opening_balance,current_balance FROM treasury_accounts WHERE account_ref LIKE 'DUMMY-%-CLX077'")}
+        rows={r["currency"]:dict(r) for r in c.execute("SELECT currency,opening_balance,current_balance FROM treasury_accounts WHERE account_ref LIKE ?",("DUMMY-%-CLX077",))}
         vals={}
         for cur in ("EUR","USD"):
             rec=float(c.execute("SELECT COALESCE(SUM(amount),0) n FROM clx077_test_scenarios WHERE currency=? AND direction IN ('RECEIPT','REVERSAL') AND status='PASS'",(cur,)).fetchone()["n"] or 0)
