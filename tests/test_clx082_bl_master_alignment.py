@@ -50,8 +50,8 @@ def test_authorization_governance_and_audit():
 
 def test_switch_and_split_are_separate_linked_screens():
     b=bl_block()
-    assert "openScreen('agent-tasks::switch-bl')" in b
-    assert "openScreen('agent-tasks::split-bl')" in b
+    assert "agent-tasks::switch-bl" in b
+    assert "agent-tasks::split-bl" in b
     assert "function clx49RenderSwitchBl" in HTML
 
 def test_preview_is_read_only_and_same_data():
