@@ -1,8 +1,25 @@
 {
   "schema": "M3_CLX078_LIVE_UI_ACCEPTANCE_V1",
   "baseline": "586ed0e048f547b0c03933aaf7cebcceb38b2b71",
-  "UI_CONSOLIDATION_READY": false,
+  "UI_CONSOLIDATION_READY": true,
   "REAL_MONEY_READY": false,
   "REAL_PROVIDER_READY": false,
-  "status": "PENDING_TESTS_AND_PR"
+  "status": "ACCEPTED_FOR_SINGLE_PR",
+  "workflow_run_id": 36877781892,
+  "validation": {
+    "targeted_ui_tests": "58 passed",
+    "complete_erp_regression": "266 passed",
+    "canonical_screen_contract": "196 PASS",
+    "javascript_syntax": "PASS",
+    "safety": "PASS"
+  },
+  "navigation_order": [
+    "HO Tasks",
+    "Agent Tasks",
+    "Treasury / AR-AP",
+    "Integration & Security",
+    "General / Administration",
+    "Master Data"
+  ],
+  "global_equipment_tower": "HO Tasks / Equipment Control / Global Equipment Tower"
 }
