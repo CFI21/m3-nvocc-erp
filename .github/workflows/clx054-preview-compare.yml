@@ -37,8 +37,8 @@ jobs:
           python - <<'PY'
           import json
           o=json.load(open('/tmp/old-screens.json')); n=json.load(open('/tmp/new-screens.json'))
-          os=o.get('screens',o if isinstance(o,list) else [])
-          ns=n.get('screens',n if isinstance(n,list) else [])
+          os=o if isinstance(o,list) else o.get('screens',[])
+          ns=n if isinstance(n,list) else n.get('screens',[])
           om={x['screen_id']:x for x in os}; nm={x['screen_id']:x for x in ns}
           removed=sorted(set(om)-set(nm)); added=sorted(set(nm)-set(om))
           route_changed=sorted(k for k in set(om)&set(nm) if om[k].get('route')!=nm[k].get('route'))
@@ -57,8 +57,10 @@ jobs:
             'route_changed':route_changed,'name_changed':name_changed
           },indent=2))
           oldmenu=json.load(open('/tmp/old-menu.json')); newmenu=json.load(open('/tmp/new-menu.json'))
-          olddomains=[x['domain'] for x in oldmenu['menu']]
-          newdomains=[x['domain'] for x in newmenu['menu']]
+          olditems=oldmenu if isinstance(oldmenu,list) else oldmenu.get('menu',[])
+          newitems=newmenu if isinstance(newmenu,list) else newmenu.get('menu',[])
+          olddomains=[x['domain'] for x in olditems]
+          newdomains=[x['domain'] for x in newitems]
           print("OLD_MENU="+json.dumps(olddomains))
           print("NEW_MENU="+json.dumps(newdomains))
           print("MENU_ORDER_PRESERVED="+str(olddomains==newdomains))
