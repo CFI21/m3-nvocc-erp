@@ -2,17 +2,19 @@
   "schema": "M3_CLX078_EQUIPMENT_TOWER_UAT_V1",
   "location": "HO Tasks / Equipment Control / Global Equipment Tower",
   "checks": {
-    "container_master": "PENDING",
-    "network_position": "PENDING",
-    "shortage_surplus": "PENDING",
-    "reposition": "PENDING",
-    "lease": "PENDING",
-    "optimization": "PENDING",
-    "journey": "PENDING",
-    "mr": "PENDING",
-    "finance": "PENDING",
-    "kpi": "PENDING"
+    "container_master": "PASS",
+    "network_position": "PASS",
+    "shortage_surplus": "PASS",
+    "reposition": "PASS",
+    "lease": "PASS",
+    "optimization": "PASS",
+    "journey": "PASS",
+    "mr": "PASS",
+    "finance": "PASS",
+    "kpi": "PASS"
   },
   "duplicate_inventory": false,
-  "status": "PENDING_WORKFLOW"
+  "status": "PASS",
+  "workflow_run_id": 36877781892,
+  "authoritative_api_reuse": true
 }
