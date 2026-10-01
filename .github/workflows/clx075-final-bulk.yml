@@ -1,0 +1,47 @@
+name: CLX-075 Final Bulk ERP Completion
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  final-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      - name: Compile full runtime
+        run: python -m py_compile app/*.py
+      - name: Targeted CLX-075 acceptance
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx075_final_bulk.py
+      - name: Complete ERP regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests
+      - name: Architecture and activation safety
+        run: |
+          grep -q '"production_traffic":"OFF"' CLX075_FINAL_ACCEPTANCE_MANIFEST.json
+          grep -q '"live_providers":"OFF"' CLX075_FINAL_ACCEPTANCE_MANIFEST.json
+          grep -q '"real_money":"OFF"' CLX075_FINAL_ACCEPTANCE_MANIFEST.json
+          grep -q '"duplicate_models":false' CLX075_FINAL_ACCEPTANCE_MANIFEST.json
+          ! grep -q "CREATE TABLE IF NOT EXISTS public.containers" migrations/CLX075_001_final_bulk_readiness.sql
+          ! grep -q "CREATE TABLE IF NOT EXISTS public.container_financial_ledger" migrations/CLX075_001_final_bulk_readiness.sql
+          ! grep -q "CREATE TABLE IF NOT EXISTS public.bookings" migrations/CLX075_001_final_bulk_readiness.sql
+          grep -q "Lease Control" web/index.html
+      - name: Acceptance artifact completeness
+        run: |
+          test -s CLX075_FINAL_ACCEPTANCE_MANIFEST.json
+          test -s CLX075_PRODUCTION_READINESS_MANIFEST.json
+          test -s CLX075_CUTOVER_RUNBOOK.md
+          test -s CLX075_ROLLBACK_RUNBOOK.md
+          test -s CLX075_DATA_MIGRATION_RECONCILIATION.json
+          test -s CLX075_UAT_RESULTS.json
+          test -s CLX075_SECURITY_READINESS.json
+          test -s CLX075_OPERATIONS_RUNBOOK.md

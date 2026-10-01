@@ -1,0 +1,70 @@
+{
+  "phase": "CLX-075",
+  "status": "PASS",
+  "run_ref": "CUT075-20261001-01",
+  "supabase_project": "ozupgknqaqgvprliewxe",
+  "migrations": [
+    {
+      "name": "clx072_global_equipment_network",
+      "status": "PASS"
+    },
+    {
+      "name": "clx073_equipment_cost_optimization",
+      "status": "PASS"
+    },
+    {
+      "name": "clx074_depot_inspection_mr",
+      "status": "PASS"
+    },
+    {
+      "name": "clx075_final_bulk_readiness",
+      "status": "PASS"
+    },
+    {
+      "name": "clx075_logical_backup_restore_rehearsal",
+      "status": "PASS"
+    }
+  ],
+  "core_counts": {
+    "customers": 5,
+    "agents": 5,
+    "bookings": 5,
+    "jobs": 5,
+    "bills": 10,
+    "containers": 5,
+    "gl_records": 280,
+    "treasury_records": 185,
+    "audit_events": 17
+  },
+  "integrity": {
+    "duplicate_container_numbers": 0,
+    "orphan_jobs": 0,
+    "orphan_containers": 0,
+    "orphan_container_finance": 0,
+    "status": "PASS"
+  },
+  "restore_rehearsal": {
+    "schema": "m3_restore_verify_clx075",
+    "status": "PASS",
+    "controls_total": 13,
+    "controls_passed": 13,
+    "maximum_variance": 0,
+    "controls": [
+      "audit_events",
+      "bills",
+      "bookings",
+      "container_financial_ledger",
+      "container_inspections",
+      "containers",
+      "equipment_lease_contracts",
+      "equipment_network_targets",
+      "equipment_optimization_runs",
+      "equipment_work_items",
+      "gl_records",
+      "jobs",
+      "treasury_records"
+    ]
+  },
+  "production_data_written": false,
+  "production_traffic_opened": false
+}

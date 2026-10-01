@@ -1,0 +1,31 @@
+{
+  "phase": "CLX-075",
+  "status": "PASS_PRODUCTION_CANDIDATE",
+  "workstreams": {
+    "A_equipment_lease": "PASS_BUILT_CLX075",
+    "B_end_to_end_operations": "PASS_REGRESSION",
+    "C_commercial_rates_cost": "PASS_REGRESSION",
+    "D_finance_accounting_treasury": "PASS_REGRESSION",
+    "E_master_bulk": "PASS_REGRESSION",
+    "F_iam_security_audit": "PASS",
+    "G_documents_workflow_exceptions": "PASS_REGRESSION",
+    "H_dashboard_kpi": "PASS_REGRESSION",
+    "I_ui_ux": "PASS_PRESERVED",
+    "J_production_data_readiness": "PASS_RECONCILED",
+    "K_migration_backup_restore": "PASS",
+    "L_integrations": "PASS_PROVIDER_OFF",
+    "M_observability_operations": "PASS",
+    "N_automated_uat": "PASS_255_TESTS",
+    "O_final_regression": "PASS",
+    "P_cutover_rehearsal": "PASS_TRAFFIC_NOT_OPENED",
+    "Q_acceptance_artifacts": "PASS",
+    "R_activation_safety": "LOCKED_OFF_BY_DESIGN"
+  },
+  "technical_steps_pending": 0,
+  "activation_steps_pending": 1,
+  "remaining_external_manual_dependencies": [
+    "post-merge GHCR API/web image publication and governed Render image-service health confirmation",
+    "live provider credentials/config remain intentionally disabled until explicit activation",
+    "explicit owner production-activation command"
+  ]
+}
