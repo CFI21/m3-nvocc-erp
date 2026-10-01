@@ -1,0 +1,55 @@
+{
+  "project": "M3 NVOCC ERP",
+  "phase": "CLX-071",
+  "title": "Full Container Journey + Movement & Exception Control",
+  "parent": "CLX-070 Final Container Master Governance",
+  "architecture": [
+    "ONE M3 ERP",
+    "ONE authoritative Container Master",
+    "Existing Booking/Job/B-L/Finance/IAM/Audit reused",
+    "No parallel container inventory"
+  ],
+  "lifecycle": [
+    "AVAILABLE",
+    "RESERVED",
+    "RELEASED",
+    "EMPTY_PICKUP",
+    "STUFFED",
+    "GATE_IN",
+    "LOADED",
+    "IN_TRANSIT",
+    "TRANSSHIPMENT",
+    "DISCHARGED",
+    "GATE_OUT_FULL",
+    "EMPTY_RETURN",
+    "INSPECTION",
+    "AVAILABLE"
+  ],
+  "controlled_variants": [
+    "LEASE",
+    "AGENT_SUPPLIED",
+    "OVERSEAS_PARTNER",
+    "SOC",
+    "PURCHASE",
+    "SALE_DISPOSAL"
+  ],
+  "controls": [
+    "planned vs actual movement events",
+    "port/branch/agent/depot custody transfer",
+    "vessel/voyage link",
+    "free days/detention clock",
+    "empty return overdue exception",
+    "damage/inspection holds",
+    "movement cost accrual",
+    "reposition/work-item link",
+    "sequence validation",
+    "missing event exceptions",
+    "authorized override reason + audit",
+    "journey timeline",
+    "operations exception queue",
+    "journey management KPIs"
+  ],
+  "production_traffic": "OFF",
+  "live_providers": "OFF",
+  "real_money": "OFF"
+}
