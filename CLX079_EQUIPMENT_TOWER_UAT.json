@@ -1,0 +1,20 @@
+{
+  "schema": "M3_CLX079_EQUIPMENT_TOWER_UAT_V1",
+  "baseline": "04a442a0691f3f925266c5101f6e0dbf5b0b9669",
+  "backend_changes": false,
+  "duplicate_equipment_model": false,
+  "checks": {
+    "single_primary_navigation": "PENDING",
+    "filter_bar": "PENDING",
+    "grouped_clickable_kpis": "PENDING",
+    "global_stock_position_grid": "PENDING",
+    "recommended_actions_grid": "PENDING",
+    "operational_exceptions_grid": "PENDING",
+    "financial_performance": "PENDING",
+    "human_readable_labels": "PENDING",
+    "authoritative_drill_down": "PENDING",
+    "no_raw_json_in_tower": "PENDING",
+    "live_status_text": "PENDING"
+  },
+  "status": "PENDING_WORKFLOW"
+}
