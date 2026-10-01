@@ -1,0 +1,47 @@
+name: CLX-081 Live Verification
+on:
+  push:
+    branches: [clx081-live-verification]
+    paths: [".github/workflows/clx081-live-verification.yml"]
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live Booking web
+        shell: bash
+        run: |
+          set -euo pipefail
+          WEB=https://m3-nvocc-web-latest.onrender.com
+          SHA=ce8a71952bb978d98ec171b2236f1339d7dbd240
+          curl --fail --silent --show-error --retry 12 --retry-delay 5 -D /tmp/h "$WEB/" -o /tmp/web.html
+          grep -q "$SHA" /tmp/web.html
+          grep -q "CLX-081 Booking Master Field Alignment" /tmp/web.html
+          grep -q "Reference # remains REVIEW_LATER" /tmp/web.html
+          grep -q "'Thru B/L'" /tmp/web.html
+          grep -q "'Sailing Date'" /tmp/web.html
+          grep -q "'Actual Shipper'" /tmp/web.html
+          grep -q "'Detention Tariff'" /tmp/web.html
+          grep -q "if(ts1)ts1.disabled=!pot1" /tmp/web.html
+          grep -q "if(ts2)ts2.disabled=!pot2" /tmp/web.html
+          grep -q "Split Booking" /tmp/web.html
+          grep -q "No parallel charge model" /tmp/web.html
+          grep -qi 'cache-control:.*no-store.*no-cache.*must-revalidate' /tmp/h
+          echo CLX081_LIVE_BOOKING_WEB_PASS
+
+      - name: Verify live Booking/API continuity
+        shell: bash
+        run: |
+          set -euo pipefail
+          API=https://m3-nvocc-api-latest-1.onrender.com
+          curl --fail --silent --show-error --retry 8 --retry-delay 3 -H 'X-Role: ADMIN' "$API/api/clx049/workspace/50001" -o /tmp/b.json
+          curl --fail --silent --show-error -H 'X-Role: ADMIN' "$API/api/clx011/screens" -o /tmp/s.json
+          python - <<'PY'
+          import json
+          b=json.load(open('/tmp/b.json'))
+          assert b.get('booking') is not None
+          assert b.get('context',{}).get('job_ref')=='50001'
+          s=json.load(open('/tmp/s.json'))
+          screens=s if isinstance(s,list) else s.get('screens',[])
+          assert len(screens)==196,len(screens)
+          print('CLX081_LIVE_API_CONTINUITY_PASS')
+          PY
