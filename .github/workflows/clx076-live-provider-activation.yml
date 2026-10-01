@@ -1,0 +1,93 @@
+name: CLX-076 Live Provider Onboarding
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/clx076-live-provider-activation.yml"
+      - "CLX076_PROVIDER_ACTIVATION_MANIFEST.json"
+      - "CLX076_PROVIDER_ACTIVATION_RUNBOOK.md"
+  workflow_dispatch:
+
+jobs:
+  provider-canary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch non-secret provider status
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          curl --fail --silent --show-error --retry 5 --retry-delay 2             -H "X-Role: AUDITOR"             "$API/api/v1/provider-onboarding/status"             -o /tmp/provider-status.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/provider-status.json'))
+          assert d["project"]=="M3 NVOCC ERP", d
+          s=d["safety"]
+          assert s["production_traffic"]=="ON", s
+          assert s["live_providers"]=="OFF", s
+          assert s["real_money"]=="OFF", s
+          assert s["sandbox_tests"]=="ON", s
+          print("PROVIDER_STATUS_PASS")
+          for p in d["providers"]:
+              print(p["provider"], "credentials_complete="+str(p["credentials_complete"]))
+              for k,v in p["configured"].items():
+                  print("  "+k+"="+("PRESENT" if v else "MISSING"))
+          PY
+
+      - name: Controlled provider sandbox canaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          python - <<'PY'
+          import json, subprocess, sys
+          d=json.load(open('/tmp/provider-status.json'))
+          mapping={
+            "truelayer-data":"/api/v1/provider-onboarding/truelayer-data/test",
+            "truelayer-payments":"/api/v1/provider-onboarding/truelayer-payments/test-auth",
+            "openexchangerates":"/api/v1/provider-onboarding/openexchangerates/test",
+            "avalara":"/api/v1/provider-onboarding/avalara/test",
+          }
+          results={}
+          for p in d["providers"]:
+              key=p["provider"]
+              if not p["credentials_complete"]:
+                  results[key]={"status":"DEFERRED_MISSING_CREDENTIALS","missing":[k for k,v in p["configured"].items() if not v]}
+                  continue
+              url="https://m3-nvocc-api-latest-1.onrender.com"+mapping[key]
+              cp=subprocess.run([
+                  "curl","--silent","--show-error","--fail-with-body",
+                  "--max-time","30","-X","POST","-H","X-Role: ADMIN",url
+              ],text=True,capture_output=True)
+              if cp.returncode!=0:
+                  results[key]={"status":"CANARY_FAIL","detail":cp.stdout[-500:] or cp.stderr[-500:]}
+              else:
+                  try: body=json.loads(cp.stdout)
+                  except Exception: body={"raw":"non-json"}
+                  results[key]={"status":"CANARY_PASS","evidence":body}
+          print(json.dumps(results,indent=2,sort_keys=True))
+          open('/tmp/provider-canary-results.json','w').write(json.dumps(results,indent=2,sort_keys=True))
+          failed=[k for k,v in results.items() if v["status"]=="CANARY_FAIL"]
+          if failed:
+              raise SystemExit("Provider canary failure: "+",".join(failed))
+          PY
+
+      - name: Verify provider framework controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          curl --fail --silent --show-error             -H "X-Role: AUDITOR"             "$API/api/v1/provider-onboarding/control-evidence"             -o /tmp/provider-controls.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/provider-controls.json'))
+          assert d["guards"]["provider_idempotency_unique"] is True, d
+          assert d["guards"]["callback_duplicate_unique"] is True, d
+          assert d["retry_dlq"]=="CLX-022 VERIFIED", d
+          assert d["circuit_breaker"]=="CLX-022 VERIFIED", d
+          assert d["secret_values_exposed"] is False, d
+          print("PROVIDER_CONTROL_EVIDENCE_PASS")
+          PY
