@@ -1,0 +1,383 @@
+{
+  "schema": "M3_CLX081_BOOKING_FIELD_MATRIX_V1",
+  "baseline": "9d19e9d4b12f34f59c0903360c3fd6a2777c7b8c",
+  "authoritative_reference": "User-approved Booking master screen shared 2026-10-01",
+  "backend_model_changed": false,
+  "duplicate_fields_created": false,
+  "fields": [
+    {
+      "reference": "Booking #",
+      "current": "Booking No.",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Approval #",
+      "current": "Approval #",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Reference #",
+      "current": "Reference #",
+      "status": "REVIEW_LATER",
+      "source": "transaction_records.fields",
+      "editable": true,
+      "blocking": false
+    },
+    {
+      "reference": "Booking Date",
+      "current": "Booking Date",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Carrier",
+      "current": "Carrier",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Thru B/L",
+      "current": "Thru B/L",
+      "status": "ADDED_UI_EXISTING_FIELDS",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Container Owner",
+      "current": "Container Owner",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Sailing Date",
+      "current": "Sailing Date",
+      "status": "ADDED_UI_EXISTING_FIELDS",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Commodity",
+      "current": "Commodity",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Vessel",
+      "current": "Vessel",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Voyage",
+      "current": "Voyage",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "POL",
+      "current": "POL",
+      "status": "PRESENT",
+      "source": "transaction_records.fields + job routing",
+      "editable": true
+    },
+    {
+      "reference": "Agent (POL)",
+      "current": "POL Agent",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "POD",
+      "current": "POD",
+      "status": "PRESENT",
+      "source": "transaction_records.fields + job routing",
+      "editable": true
+    },
+    {
+      "reference": "Agent (POD)",
+      "current": "POD Agent",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "POT (1)",
+      "current": "POT (1)",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "TS Agent (1)",
+      "current": "TS Agent (1)",
+      "status": "CONDITIONAL",
+      "source": "transaction_records.fields",
+      "editable": true,
+      "rule": "enabled only when POT (1) / legacy via-port leg exists"
+    },
+    {
+      "reference": "POT (2)",
+      "current": "POT (2)",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "TS Agent (2)",
+      "current": "TS Agent (2)",
+      "status": "CONDITIONAL",
+      "source": "transaction_records.fields",
+      "editable": true,
+      "rule": "enabled only when POT (2) exists"
+    },
+    {
+      "reference": "Shipper",
+      "current": "Shipper",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Actual Shipper",
+      "current": "Actual Shipper",
+      "status": "ADDED_UI_EXISTING_FIELDS",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Freight Type",
+      "current": "Freight Type",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Consignee",
+      "current": "Consignee",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Notify Party",
+      "current": "Notify Party",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "SRR",
+      "current": "SRR",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Sending Agent",
+      "current": "Agent",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Receiving Agent",
+      "current": "Receiving Agent",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Agent Reference",
+      "current": "Agent Reference",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Primary Vendor / Carrier",
+      "current": "Primary Vendor / Carrier",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Carrier Booking Ref",
+      "current": "Carrier Booking Ref",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Free Days POL",
+      "current": "Free Days POL",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Free Days POD",
+      "current": "Free Days POD",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Detention Tariff",
+      "current": "Detention Tariff",
+      "status": "ADDED_UI_EXISTING_FIELDS",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Operation",
+      "current": "Operation",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Principal",
+      "current": "Principal",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Booking Party / Customer",
+      "current": "Booking Party",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Billing Party",
+      "current": "Billing Party",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Same as Booking Party",
+      "current": "Same as Booking Party",
+      "status": "ADDED_LOGIC",
+      "source": "transaction_records.fields + UI sync",
+      "editable": true
+    },
+    {
+      "reference": "Settlement Agent",
+      "current": "Settlement Agent",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Rate Basis",
+      "current": "Rate Basis",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Contract / Tariff Ref",
+      "current": "Contract / Tariff Ref",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    },
+    {
+      "reference": "Financial Flow",
+      "current": "Financial Flow",
+      "status": "PRESENT",
+      "source": "transaction_records.fields",
+      "editable": true
+    }
+  ],
+  "lower_workspace": {
+    "tabs": [
+      "Equipment",
+      "Agreed Charges",
+      "Revenue",
+      "Cost",
+      "Financial Auto",
+      "Preview"
+    ],
+    "controls": [
+      {
+        "name": "Copy",
+        "status": "REFERENCE_ONLY_NO_BACKEND_ACTION",
+        "blocking": false
+      },
+      {
+        "name": "Approval Status",
+        "status": "PRESENT_READ_ONLY_FROM_GOVERNED_STATUS"
+      },
+      {
+        "name": "Split Booking",
+        "status": "LINKED_EXISTING",
+        "target": "agent-tasks::split-bl"
+      },
+      {
+        "name": "B/L",
+        "status": "LINKED_EXISTING",
+        "target": "agent-tasks::bl"
+      },
+      {
+        "name": "CRO",
+        "status": "LINKED_EXISTING",
+        "target": "agent-tasks::cro"
+      }
+    ]
+  },
+  "operational_actions": {
+    "Inventory": "Booking Equipment tab",
+    "P&L": "gl-accounts::profit-loss",
+    "Costing": "Booking Cost tab",
+    "LOG": "integration-security::request-response-audit",
+    "Detention": "agent-tasks::detention-collection",
+    "ExRate": "integration-security::fx-rate-feed",
+    "Attachments": "existing allocated-container detail / container_documents",
+    "Vessel Planning": "agent-tasks::planning",
+    "Container Planning": "Booking Equipment tab",
+    "CRO Planning": "agent-tasks::cro",
+    "Slot Planning": "agent-tasks::planning",
+    "Transshipment": "agent-tasks::transshipment-crt",
+    "Delivery Planning": "agent-tasks::delivery-order"
+  },
+  "charge_grid": {
+    "status": "ALIGNED_COLUMNS_USING_EXISTING_SOURCES_ONLY",
+    "sources": [
+      "GET /api/gl/job/{job_ref}/links",
+      "GET /api/clx046/job/{job_ref}/trace"
+    ],
+    "columns": [
+      "Charge",
+      "Rate Source",
+      "Rule / Version",
+      "PP/CC",
+      "Collected By",
+      "Basis",
+      "Equipment",
+      "Qty",
+      "Currency",
+      "Sell / Full Local",
+      "Vendor Cost",
+      "Agent Cost",
+      "Principal Rec.",
+      "Principal Pay.",
+      "Principal Net",
+      "Customer AR"
+    ],
+    "parallel_charge_model_created": false
+  }
+}
