@@ -1,8 +1,8 @@
 from app.screen_catalog import build_catalog
 
 EXPECTED_TOP=[
-    'Agent Tasks',
     'HO Tasks',
+    'Agent Tasks',
     'Treasury / AR-AP',
     'Integration & Security',
     'General / Administration',
