@@ -8,7 +8,7 @@ INSERT INTO public.provider_live_configs(
  auth_env_json,webhook_verification,health_path,scope_note
 ) VALUES(
  'm3-dummy-bank','BANK','M3 DUMMY BANK — TEST ONLY — NO REAL MONEY','INTERNAL_SIMULATION_ONLY',
- 'M3_INTERNAL_DUMMY_BANK','M3_INTERNAL_DUMMY_BANK','',1,0,100,3,3,'CLOSED',0,
+ 'M3_INTERNAL_DUMMY_BANK','M3_INTERNAL_DUMMY_BANK','',1,0,250,3,3,'CLOSED',0,
  'SIMULATION_ONLY',1,now()::text,now()::text,'M3 INTERNAL',NULL,NULL,'NONE','{}','NONE',NULL,
  'CLX077_TEST / DUMMY_BANK only; no external network call; no real money'
 )
