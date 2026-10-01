@@ -5,7 +5,7 @@ from .db import connect
 router=APIRouter(prefix='/api/clx049',tags=['CLX-049 Booking BL Same Page Workspace'])
 
 BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization']
-BOOKING_TABS=['Booking Info','Other Info']
+BOOKING_TABS=['Booking Info','Equipment','Other Info']
 FLOW_KEYS={'special-rates-request','booking','bl','switch-bl','delivery-order','vessel-lock'}
 
 def _payload(r):
@@ -62,11 +62,31 @@ def workspace(job_ref:str,x_role:str=Header('VIEWER'),x_agent_scope:str|None=Hea
         workflow=c.execute('SELECT * FROM workflow_states WHERE job_id=?',(jid,)).fetchone()
         holds=[dict(r) for r in c.execute('SELECT code,active,created_at,cleared_at FROM workflow_holds WHERE job_id=? ORDER BY id',(jid,))]
         sw_hist=[dict(r) for r in c.execute('SELECT * FROM switch_bl_history WHERE job_id=? ORDER BY id DESC',(jid,))]
+        equipment=[dict(r) for r in c.execute("""SELECT * FROM containers
+          WHERE job_id=? OR booking_ref=? ORDER BY container_no""",(jid,j['booking_ref'])).fetchall()]
+        equipment_finance={}
+        for eq in equipment:
+            rows=c.execute("""SELECT entry_category,currency,SUM(CASE WHEN status IN ('APPROVED','POSTED') THEN amount ELSE 0 END) amount
+                              FROM container_financial_entries WHERE container_id=?
+                              GROUP BY entry_category,currency""",(eq['id'],)).fetchall()
+            summary={}
+            for x in rows:
+                cur=summary.setdefault(x['currency'],{'revenue':0.0,'cost':0.0,'commission':0.0,'share':0.0,'net':0.0})
+                cur[x['entry_category'].lower()]=float(x['amount'] or 0)
+            for cur in summary.values():
+                cur['net']=cur['revenue']-cur['cost']-cur['commission']-cur['share']
+            equipment_finance[eq['container_no']]=summary
         return {
           'phase':'CLX-049',
           'context':dict(j),
           'special_rate_request':srr,
           'booking':booking,
+          'equipment':{
+            'containers':equipment,
+            'financial_summary':equipment_finance,
+            'authoritative_source':'containers + container_financial_entries',
+            'same_booking_job_context':True
+          },
           'bl':bl,
           'delivery_order':do,
           'lock_info':{'vessel_lock':lock,'workflow':dict(workflow) if workflow else None,'holds':holds},
@@ -82,6 +102,7 @@ def workspace(job_ref:str,x_role:str=Header('VIEWER'),x_agent_scope:str|None=Hea
           'deep_links':{
             'special_rate_request':'agent-tasks::special-rates-request',
             'booking':'agent-tasks::booking',
+            'equipment':'equipment-control::container-master',
             'bl':'agent-tasks::bl',
             'delivery_order':'agent-tasks::delivery-order',
             'lock_info':'agent-tasks::vessel-lock',
@@ -89,6 +110,7 @@ def workspace(job_ref:str,x_role:str=Header('VIEWER'),x_agent_scope:str|None=Hea
           },
           'authoritative_sources':{
             'booking':'transaction_records:booking + bookings',
+            'equipment':'containers + container_party_links + container_financial_entries',
             'bl':'transaction_records:bl + bills',
             'delivery_order':'transaction_records:delivery-order',
             'lock_info':'transaction_records:vessel-lock + workflow_states + workflow_holds',
