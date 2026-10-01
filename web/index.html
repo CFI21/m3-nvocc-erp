@@ -210,7 +210,7 @@ function clx49RecordForTab(w,tab){
   if(tab==='Authorization')return {module:'bl',record:w.bl,fields:['Draft Approval','Original / Express','Issue Date','Status']};
   return {module:null,record:null};
 }
-function clx49RenderBlTab(tab){
+async function clx49RenderBlTab(tab){
   const w=clx49Workspace;clx49ActiveTab=tab;
   const x=clx49RecordForTab(w,tab),r=x.record;
   let html=clx49ContextHeader(w)+clx49Nav(w);
@@ -220,6 +220,14 @@ function clx49RenderBlTab(tab){
   }
   if(tab==='Authorization'){
     html+='<div class="card"><b>Authorization / Approval Audit</b><div class="muted">Uses the existing B/L transaction and existing audit/governance path.</div><pre class="pre">'+esc(JSON.stringify(w.authorization.audit.slice(0,10),null,2))+'</pre></div>';
+  }
+  if(tab==='Booking Info'){
+    try{
+      const e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(w.context.job_ref));
+      html+='<div class="card"><b>Allocated Equipment — Same Booking / Same B/L Context</b><div class="muted">These are the authoritative Container Master records allocated to this Booking/Job; B/L does not create a second container list.</div><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner</th><th>Principal</th><th>Agent</th><th>Depot</th><th>Status</th></tr></thead><tbody>'+
+        (e.allocated_containers||[]).map(z=>'<tr onclick="showContainerDetail(\''+esc(z.container_no)+'\')"><td><b>'+esc(z.container_no)+'</b></td><td>'+esc(z.size_type)+'</td><td>'+esc(z.owner_party_type||z.ownership)+'</td><td>'+esc(z.principal_code||'')+'</td><td>'+esc(z.agent_code||'')+'</td><td>'+esc(z.depot_code||'')+'</td><td>'+esc(z.equipment_status)+'</td></tr>').join('')+
+        '</tbody></table></div></div>';
+    }catch(e){html+='<div class="card"><b class="badtext">Allocated Equipment unavailable</b><div class="muted">'+esc(e.message)+'</div></div>'}
   }
   html+='<div class="card"><b>'+esc(tab)+'</b>'+clx49FieldEditor(r,x.fields);
   if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\''+x.module+'\','+r.id+','+r.version+')">Save '+esc(tab)+'</button>'+
@@ -300,7 +308,7 @@ async function showClx049Workspace(){
   const jr=selectedJob();if(!jr)return openDrawer('details');
   try{
     clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers({context:{agent_code:state.selected?.agent_code}})});
-    if(state.current.key==='bl')clx49RenderBlTab(CLX49_BL_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
+    if(state.current.key==='bl')await clx49RenderBlTab(CLX49_BL_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
     else if(state.current.key==='booking')await clx49RenderBooking(CLX49_BOOKING_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
     else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
     else if(state.current.key==='switch-bl')clx49RenderSwitchBl();
@@ -313,7 +321,7 @@ async function saveClx049Tab(module,id,version){
     await api('/api/v1/'+module+'/'+id,{method:'PUT',headers,body:JSON.stringify({version,fields})});
     const jr=clx49Workspace.context.job_ref;
     clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers(clx49Workspace)});
-    if(state.current.key==='bl')clx49RenderBlTab(clx49ActiveTab||'Booking Info');
+    if(state.current.key==='bl')await clx49RenderBlTab(clx49ActiveTab||'Booking Info');
     else if(state.current.key==='booking')await clx49RenderBooking(clx49ActiveTab||'Booking Info');
     else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
     else clx49RenderSwitchBl();
@@ -326,7 +334,7 @@ async function approveClx049Bl(id,version){
     await api('/api/v1/bl/'+id+'/actions/approve',{method:'POST',headers,body:JSON.stringify({version,reason:'CLX-049 B/L authorization'})});
     const jr=clx49Workspace.context.job_ref;
     clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers(clx49Workspace)});
-    clx49RenderBlTab('Authorization');
+    await clx49RenderBlTab('Authorization');
   }catch(e){alert(e.message)}
 }
 function rowPayload(row){
