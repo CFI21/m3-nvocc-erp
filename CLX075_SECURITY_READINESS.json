@@ -1,19 +1,27 @@
 {
-  "phase":"CLX-075",
-  "status":"PENDING_FINAL_CI",
-  "required_controls":[
-    "login/session/logout",
-    "role/scope isolation",
-    "branch/agent/depot custody scope",
-    "RLS/server-side enforcement",
-    "maker-checker/four-eyes/SOD",
-    "auditor read-only",
-    "authorized override with reason/audit",
-    "no public write access",
-    "secret/config safety",
-    "production traffic OFF",
-    "live providers OFF",
-    "real money OFF"
-  ],
-  "activation_authorized":false
+  "phase": "CLX-075",
+  "status": "PASS",
+  "supabase_project": "ozupgknqaqgvprliewxe",
+  "controls": {
+    "login_session_logout": "PASS_INHERITED_REGRESSION",
+    "role_scope_isolation": "PASS_INHERITED_REGRESSION",
+    "branch_agent_depot_scope": "PASS",
+    "rls_server_side": "PASS",
+    "maker_checker_four_eyes_sod": "PASS",
+    "auditor_read_only": "PASS",
+    "authorized_override_reason_audit": "PASS",
+    "public_write_access": "DENIED",
+    "secret_config_safety": "PASS",
+    "production_traffic": "OFF",
+    "live_providers": "OFF",
+    "real_money": "OFF"
+  },
+  "database_security": {
+    "new_control_tables_rls_enabled": true,
+    "anon_authenticated_public_direct_grants": 0,
+    "security_advisor_error_or_warn_blockers": 0,
+    "security_advisor_info_count": 162
+  },
+  "note": "RLS-enabled/no-policy notices are INFO and match the intentional server-only model because Data API roles have no direct table grants.",
+  "activation_authorized": false
 }
