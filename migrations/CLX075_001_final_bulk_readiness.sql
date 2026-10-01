@@ -108,3 +108,30 @@ ALTER TABLE public.equipment_lease_exceptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clx075_readiness_evidence ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clx075_cutover_rehearsals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.clx075_data_reconciliation ENABLE ROW LEVEL SECURITY;
+
+
+-- CLX-075 SERVER-ONLY DATA API HARDENING
+-- M3 accesses these control tables through the server-side database connection only.
+REVOKE ALL ON TABLE
+  public.equipment_network_targets,
+  public.equipment_network_policy,
+  public.equipment_optimization_runs,
+  public.equipment_optimization_options,
+  public.equipment_execution_variance,
+  public.equipment_optimization_exceptions,
+  public.equipment_optimization_policy,
+  public.container_inspections,
+  public.container_damage_items,
+  public.container_repair_estimates,
+  public.container_repair_orders,
+  public.container_mr_exceptions,
+  public.container_mr_policy,
+  public.equipment_lease_contracts,
+  public.equipment_lease_allocations,
+  public.equipment_lease_exceptions,
+  public.clx075_readiness_evidence,
+  public.clx075_cutover_rehearsals,
+  public.clx075_data_reconciliation
+FROM anon, authenticated;
+
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA public FROM anon, authenticated;
