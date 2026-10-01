@@ -1,16 +1,30 @@
 {
-  "phase":"CLX-075",
-  "status":"PENDING_FINAL_CI",
-  "required_coverage":[
+  "phase": "CLX-075",
+  "status": "PASS",
+  "github_run_id": 36848876040,
+  "github_job_id": 110325540101,
+  "compile": "PASS",
+  "targeted_acceptance": {
+    "passed": 7,
+    "failed": 0
+  },
+  "complete_erp_regression": {
+    "passed": 255,
+    "failed": 0,
+    "warnings": 1
+  },
+  "architecture_activation_safety": "PASS",
+  "acceptance_artifact_completeness": "PASS",
+  "covered": [
     "import/export/transshipment FCL",
     "SOC/leased/agent/partner/owned equipment",
     "manual/special rate and approval",
-    "additional cost controlled approval",
+    "additional-cost governed flows",
     "booking/job/B-L/release/DO",
     "container journey/detention/reposition/M&R/lease",
     "AR/AP/payment/GL/reporting",
     "exceptions and negative permissions",
     "maker-checker and branch/agent/depot scope"
   ],
-  "zero_known_p0_p1_required":true
+  "zero_known_p0_p1": true
 }
