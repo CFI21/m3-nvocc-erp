@@ -1,0 +1,18 @@
+{
+  "phase": "CLX-077",
+  "marker": "CLX077_TEST",
+  "provider": "DUMMY_BANK",
+  "run_ref": "CLX077-LIVE-001",
+  "dummy_accounts": [
+    "DUMMY-EUR-CLX077",
+    "DUMMY-USD-CLX077"
+  ],
+  "data_rules": [
+    "all test treasury refs start CLX077_TEST",
+    "bank lines start CLX077-BANK",
+    "vouchers start CLX077-S",
+    "payment refs start CLX077-PAY",
+    "audit history never deleted"
+  ],
+  "status": "PENDING_LIVE_RUN"
+}
