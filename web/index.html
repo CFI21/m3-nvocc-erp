@@ -324,10 +324,10 @@ function clx49BookingTogglePot(){
   const trans=document.querySelector('[data-clx49-field="Transshipment Port"]')?.value.trim()||'';
   const pot1=document.querySelector('[data-clx49-field="POT (1)"]')?.value.trim()||via||trans;
   const pot2=document.querySelector('[data-clx49-field="POT (2)"]')?.value.trim()||'';
-  const legacy=document.querySelector('[data-clx49-field="POT Agent"]');
+  const pot=document.querySelector('[data-clx49-field="POT Agent"]');
   const ts1=document.querySelector('[data-clx49-field="TS Agent (1)"]');
   const ts2=document.querySelector('[data-clx49-field="TS Agent (2)"]');
-  if(legacy)legacy.disabled=!(via||trans||pot1);
+  if(pot)pot.disabled=!(via||trans);
   if(ts1)ts1.disabled=!pot1;
   if(ts2)ts2.disabled=!pot2;
 }
@@ -436,7 +436,7 @@ async function clx78BookingBottom(w){
         ['Principal Net',['Principal Net','principal_net']],
         ['Customer AR',['Customer AR','customer_ar']]
       ];
-      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · existing rate / operational / GL sources only · no parallel charge model. Detailed commercial columns populate when supplied by the authoritative source.</div>'+
+      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · existing rate / operational / GL sources only · No parallel charge model. Detailed commercial columns populate when supplied by the authoritative source.</div>'+
         '<div class="tablewrap"><table><thead><tr>'+cols.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'</tr></thead><tbody>'+
         (rows.length?rows.map(r=>'<tr>'+cols.map(x=>'<td>'+esc(pick(r,...x[1]))+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="16">No linked agreed-charge records yet.</td></tr>')+
         '</tbody></table></div></div>';
