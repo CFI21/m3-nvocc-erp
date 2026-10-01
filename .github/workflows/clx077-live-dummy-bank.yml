@@ -11,6 +11,7 @@ on:
       - "CLX077_*"
       - "tests/test_clx077_live_dummy_bank.py"
       - ".github/workflows/clx077-live-dummy-bank.yml"
+      - ".github/workflows/clx077-live-smoke.yml"
   push:
     branches: [main]
 
