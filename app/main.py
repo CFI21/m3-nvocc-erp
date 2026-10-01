@@ -44,6 +44,7 @@ from .clx070_equipment_runtime import router as clx070_equipment_runtime_router
 from .clx070_container_master_control import router as clx070_container_master_control_router
 from .clx071_container_journey import router as clx071_container_journey_router
 from .clx072_equipment_network import router as clx072_equipment_network_router
+from .clx073_equipment_optimization import router as clx073_equipment_optimization_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -76,6 +77,7 @@ app.include_router(clx070_equipment_runtime_router)
 app.include_router(clx070_container_master_control_router)
 app.include_router(clx071_container_journey_router)
 app.include_router(clx072_equipment_network_router)
+app.include_router(clx073_equipment_optimization_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
