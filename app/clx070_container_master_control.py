@@ -199,7 +199,7 @@ def containers(q:Optional[str]=None,owner_party_type:Optional[str]=None,principa
             like=f"%{q}%";args.extend([like,like,like,like])
         sc,sa=scope_clause(a,"c");sql+=sc;args.extend(sa)
         sql+=" ORDER BY c.container_no LIMIT ?";args.append(limit)
-        return {"actor":a,"count":0,"records":rows} if False else {"actor":a,"records":[dict(r) for r in c.execute(sql,args).fetchall()]}
+        rows=[dict(r) for r in c.execute(sql,args).fetchall()];return {"actor":a,"count":len(rows),"records":rows}
     finally:c.close()
 
 @router.get("/containers/{container_no}")
@@ -335,7 +335,7 @@ def bulk_register(b:BulkRegister,x_role:str=Header("OPS"),x_m3_session:Optional[
                 if c.execute("SELECT 1 FROM containers WHERE container_no=?",(b0.container_no,)).fetchone():raise ValueError("duplicate")
                 tech={k:v for k,v in b0.technical.items() if k in TECH_FIELDS}
                 c.execute("""INSERT INTO containers(container_no,job_id,size_type,ownership,principal_code,current_port,agent_code,depot_code,equipment_status,condition,available_from,acquisition_type,acquisition_ref,lease_contract_ref,purchase_order_ref,supplier_or_lessor,unit_cost,currency,idle_days,updated_at,owner_party_type,owner_party_code,branch_code,office_code,value_amount,verification_status)
-                             VALUES(?,NULL,?,?,?,?,?,?,'INSPECTION','PENDING_INSPECTION',NULL,?,?,?,?,?,0,?,0,?,?,?,?,?,?,?,'PENDING')""",
+                             VALUES(?,NULL,?,?,?,?,?,?,'INSPECTION','PENDING_INSPECTION',NULL,?,?,?,?,?,0,?,0,?,?,?,?,?,?,'PENDING')""",
                     (b0.container_no,b0.size_type,"LEASED" if ot=="LEASING_COMPANY" else "OWNED",b0.principal_code or b0.owner_party_code,b0.current_port,b0.agent_code,b0.depot_code,b0.acquisition_type,b0.acquisition_ref,b0.lease_contract_ref,b0.purchase_order_ref,b0.supplier_or_lessor,b0.currency,now(),ot,b0.owner_party_code,b0.branch_code,b0.office_code,b0.value_amount))
                 rr=c.execute("SELECT * FROM containers WHERE container_no=?",(b0.container_no,)).fetchone()
                 if tech:
