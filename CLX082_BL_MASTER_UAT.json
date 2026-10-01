@@ -1,0 +1,22 @@
+{
+  "schema": "M3_CLX082_BL_MASTER_UAT_V1",
+  "checks": {
+    "bl_basic_info": "PASS",
+    "parties": "PASS",
+    "cargo_equipment": "PASS",
+    "freight_commercial": "PASS",
+    "booking_bl_context": "PASS",
+    "authoritative_container_link": "PASS",
+    "finance_context": "PASS",
+    "save_existing_bl_api": "PASS",
+    "preview_read_only": "PASS",
+    "no_duplicate_model": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36935886575,
+  "focused_tests": "48 passed",
+  "full_regression": "301 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS"
+}

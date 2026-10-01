@@ -1,0 +1,18 @@
+{
+  "schema": "M3_CLX082_DOCUMENT_FLOW_UAT_V1",
+  "checks": {
+    "exact_tab_order": "PASS",
+    "release_instruction": "PASS",
+    "delivery_order": "PASS",
+    "lock_info": "PASS",
+    "authorization": "PASS",
+    "maker_checker_audit": "PASS",
+    "switch_bl_link": "PASS",
+    "split_bl_link": "PASS",
+    "booking_link": "PASS",
+    "container_link": "PASS",
+    "finance_link": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36935886575
+}
