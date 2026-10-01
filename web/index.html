@@ -694,6 +694,7 @@ function equipmentShell(view){
     <button class="${view==='network'?'active':''}" onclick="showEquipmentWorkspace('network')">Network Control</button>
     <button class="${view==='optimization'?'active':''}" onclick="showEquipmentWorkspace('optimization')">Cost Optimization</button>
     <button class="${view==='mr'?'active':''}" onclick="showEquipmentWorkspace('mr')">Depot &amp; M&amp;R</button>
+    <button class="${view==='lease'?'active':''}" onclick="showEquipmentWorkspace('lease')">Lease Control</button>
     <button class="${view==='journey'?'active':''}" onclick="showEquipmentWorkspace('journey')">Container Journey</button>
     <button class="${view==='exceptions'?'active':''}" onclick="showEquipmentWorkspace('exceptions')">Journey Exceptions</button>
     <button class="${view==='finance'?'active':''}" onclick="showEquipmentWorkspace('finance')">Container P&amp;L</button>
@@ -818,6 +819,11 @@ async function showEquipmentWorkspace(view='overview'){
       <div class="card"><b>Depot / Inspection / Damage &amp; M&amp;R Control</b><div class="muted">Empty return inspection → damage/photo capture → estimate → maker-checker approval → repair work → reinspection → AVAILABLE. Same Container Master, document store, finance ledger and Equipment Work Items.</div>
       <div class="toolbar"><input id="mrContainer" placeholder="Container #"><input id="mrDepot" placeholder="Depot"><button class="btn primary" onclick="createMrInspection()">Start Inspection</button><input id="mrInspection" placeholder="Inspection Ref"><button class="btn" onclick="loadMrInspection()">Load</button></div><div id="mrArea" class="equipNote">Select a container or inspection.</div></div>
       <div class="card"><b>Depot Performance</b><pre class="pre">${esc(JSON.stringify(k.depot_performance||[],null,2))}</pre></div>`;
+    }else if(view==='lease'){
+      const k=await equipmentApi('/api/clx075/lease/kpis');
+      $('gridArea').innerHTML=`<div class="equipGrid"><div class="equipKpi">Approved Contracts<b>${k.approved_contracts||0}</b></div><div class="equipKpi">On Hire<b>${k.active_on_hire||0}</b></div><div class="equipKpi">Accrued<b>${Number(k.accrued||0).toLocaleString()}</b></div><div class="equipKpi">Outstanding<b>${Number(k.outstanding||0).toLocaleString()}</b></div><div class="equipKpi">Lease Exceptions<b>${k.open_exceptions||0}</b></div></div>
+      <div class="card"><b>Lease / On-Hire / Off-Hire Commercial Control</b><div class="muted">Contracts, per-diem, minimum hire, free days, handling/depot/lift/drop charges, extension, off-hire inspection and lessor settlement use the existing Container Master and container financial ledger.</div>
+      <div class="equipNote">Maker-checker applies before a contract can be used for on-hire. Production traffic and real-money settlement remain OFF.</div></div>`;
     }else if(view==='journey'){
       const d=await equipmentApi('/api/clx070/container-control/containers?limit=500');
       const opts=(d.records||[]).map(x=>`<option value="${esc(x.container_no)}">${esc(x.container_no)} · ${esc(x.size_type)} · ${esc(x.equipment_status)}</option>`).join('');
