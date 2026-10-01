@@ -21,7 +21,7 @@ def test_frozen_baseline_and_menu_order():
     c=build_catalog()
     assert c['screen_count']==196
     assert [x['domain'] for x in c['menu']]==[
-      'Agent Tasks','HO Tasks','Treasury / AR-AP',
+      'HO Tasks','Agent Tasks','Treasury / AR-AP',
       'Integration & Security','General / Administration','Master Data'
     ]
 
