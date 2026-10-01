@@ -70,6 +70,21 @@
 .clx81Status select{padding:4px;border:1px solid #aeb7c4;background:#f2f4f7}
 .clx81ChargeNote{font-size:10px;color:#667085;margin:5px 0}
 
+
+/* CLX-082 B/L master field alignment */
+.clx82Grid{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:6px 8px}
+.clx82Field{display:grid;grid-template-columns:105px 1fr;gap:5px;align-items:center;min-width:0}
+.clx82Field.wide{grid-column:span 2}.clx82Field.full{grid-column:1/-1}
+.clx82Field label{font-size:10px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.clx82Field input,.clx82Field textarea,.clx82Field select{width:100%;padding:5px;border:1px solid #aeb7c4;background:#fff;font-size:11px}
+.clx82Field input[readonly],.clx82Field textarea[readonly]{background:#f2f4f7;color:#667085}
+.clx82Derived{font-size:9px;color:#667085;margin-left:4px}
+.clx82Section{background:#fff;border:1px solid #b8c2cf;margin:6px}.clx82Head{padding:6px 8px;background:#edf0f4;border-bottom:1px solid #c7ced8;font-weight:700}.clx82Body{padding:7px}
+.clx82Subgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.clx82Table{width:100%;border-collapse:collapse;font-size:10px}.clx82Table th,.clx82Table td{border:1px solid #d7dde5;padding:5px 6px;text-align:left}.clx82Table th{background:#f4f6f8}
+.clx82FlowActions{display:flex;gap:5px;flex-wrap:wrap}.clx82FlowActions button{padding:5px 7px;border:1px solid #aeb7c4;background:#fff}
+.clx82Status{display:inline-block;padding:2px 6px;border:1px solid #b8c2cf;border-radius:10px;background:#f8f9fa}
+@media(max-width:1250px){.clx82Grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.clx82Subgrid{grid-template-columns:1fr}}
+
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
@@ -271,10 +286,70 @@ function clx49Nav(w){
     '<button class="btn" onclick="openClx49Link(\''+d.switch_bl+'\',\''+j+'\')">Switch B/L</button>'+
     '</div>';
 }
+function clx82NativeField(record,key,label,opts={}){
+  const p=record?.fields||{},v=p[key]??'';
+  const cls=opts.full?' full':(opts.wide?' wide':'');
+  const type=opts.type||'text';
+  return '<div class="clx82Field'+cls+'"><label>'+esc(label||key)+'</label>'+
+    (opts.textarea?'<textarea data-clx49-field="'+esc(key)+'">'+esc(v)+'</textarea>':'<input type="'+esc(type)+'" data-clx49-field="'+esc(key)+'" value="'+esc(v)+'">')+
+    '</div>';
+}
+function clx82DerivedField(label,value,opts={}){
+  const cls=opts.full?' full':(opts.wide?' wide':'');
+  return '<div class="clx82Field'+cls+'"><label>'+esc(label)+'<span class="clx82Derived">DERIVED</span></label><input readonly value="'+esc(value??'')+'"></div>';
+}
+function clx82BookingValue(w,...keys){
+  const p=w.booking?.fields||{};
+  for(const k of keys){if(p[k]!==undefined&&p[k]!==null&&p[k]!=='')return p[k]}
+  return '';
+}
+function clx82ContextValue(w,key){return w.context?.[key]??''}
+function clx82Table(headers,rows){
+  return '<div class="tablewrap"><table class="clx82Table"><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
+}
+async function clx82FinanceSummary(w){
+  const jr=w.context.job_ref;
+  const [gl,tre]=await Promise.all([
+    api('/api/gl/job/'+encodeURIComponent(jr)+'/links',{headers:{'X-Role':state.role}}).catch(()=>({links:[]})),
+    api('/api/clx046/job/'+encodeURIComponent(jr)+'/trace',{headers:{'X-Role':state.role}}).catch(()=>({gl_sources:[],treasury_records:[]}))
+  ]);
+  const rows=[...(gl.links||[]),...(tre.gl_sources||[]),...(tre.treasury_records||[])];
+  const val=(r,...ks)=>{for(const k of ks)if(r?.[k]!==undefined&&r?.[k]!==null&&r?.[k]!=='')return r[k];return ''};
+  return clx82Table(['Module','Reference','Currency','Amount','Status'],rows.slice(0,30).map(r=>'<tr><td>'+esc(val(r,'module','source_type'))+'</td><td>'+esc(val(r,'external_ref','source_ref','reference'))+'</td><td>'+esc(val(r,'currency'))+'</td><td>'+esc(val(r,'amount','total','balance'))+'</td><td>'+esc(val(r,'status'))+'</td></tr>'));
+}
+function clx82LockPanel(w){
+  const wf=w.lock_info?.workflow||{},holds=w.lock_info?.holds||[];
+  const lock=w.lock_info?.vessel_lock?.fields||{};
+  const rows=holds.map(h=>'<tr><td>'+esc(h.code)+'</td><td>'+esc(h.active?'ACTIVE':'CLEARED')+'</td><td>'+esc(h.created_at||'')+'</td><td>'+esc(h.cleared_at||'')+'</td></tr>');
+  return '<div class="clx82Subgrid"><div>'+
+    '<div class="clx82Grid">'+
+      clx82DerivedField('Lock Status',lock['Status']||wf.documentation_status||'')+
+      clx82DerivedField('Locked By',lock['Locked By']||'')+
+      clx82DerivedField('Lock Date',lock['Lock Date']||'')+
+      clx82DerivedField('Lock Reason',lock['Lock Reason']||'')+
+      clx82DerivedField('Lock Scope',lock['Lock Scope']||'')+
+      clx82DerivedField('Unlock Approval',lock['Unlock Approval']||'')+
+    '</div></div><div>'+clx82Table(['Hold','Status','Created','Cleared'],rows)+'</div></div>';
+}
+function clx82AuthorizationAudit(w){
+  const rows=(w.authorization?.audit||[]).slice(0,20).map(a=>'<tr><td>'+esc(a.ts||'')+'</td><td>'+esc(a.actor_role||'')+'</td><td>'+esc(a.action||'')+'</td><td>'+esc(a.event_id||a.id||'')+'</td></tr>');
+  return clx82Table(['Time','Actor','Action','Event'],rows);
+}
+function clx82BlPreview(w){
+  const b=w.bl?.fields||{},ctx=w.context||{};
+  const lines=[
+    ['B/L No.',b['B/L No.']||ctx.hbl_no],['Type',b['Type']],['MBL',b['MBL']],['HBL',b['HBL']||ctx.hbl_no],
+    ['Shipper',b['Shipper']],['Consignee',b['Consignee']],['Notify',b['Notify']],['POL',b['POL']||ctx.pol],['POD',b['POD']||ctx.pod],
+    ['Vessel',b['Vessel']||ctx.vessel_name],['Voyage',b['Voyage']||ctx.voyage_no],['Container / Seal',b['Container / Seal']],
+    ['Packages',b['Packages']],['Weight',b['Weight']],['Measurement',b['Measurement']],['Cargo Description',b['Cargo Description']],
+    ['Freight Term',b['Freight Term']],['Original / Express',b['Original / Express']],['Issue Date',b['Issue Date']],['Status',w.bl?.status||b['Status']]
+  ];
+  return '<div class="clx82Section"><div class="clx82Head">Read-only B/L Preview</div><div class="clx82Body">'+clx82Table(['Field','Value'],lines.map(x=>'<tr><td>'+esc(x[0])+'</td><td>'+esc(x[1]||'')+'</td></tr>'))+'</div></div>';
+}
 function clx49RecordForTab(w,tab){
-  if(tab==='Booking Info')return {module:'booking',record:w.booking};
+  if(tab==='Booking Info')return {module:'bl',record:w.bl};
   if(tab==='Release Instruction')return {module:'delivery-order',record:w.delivery_order,fields:['Release Instruction','Freight Status','Customs Status','Original BL Status','Telex Release','Payment Block','Valid Until','Release Status','Status']};
-  if(tab==='Delivery Order')return {module:'delivery-order',record:w.delivery_order};
+  if(tab==='Delivery Order')return {module:'delivery-order',record:w.delivery_order,fields:['DO No.','HBL','MBL','Job Ref','Consignee','Notify','Vessel','Voyage','POD','Container','Freight Status','Customs Status','Original BL Status','Telex Release','Payment Block','Release Instruction','Valid Until','Release Status','Status']};
   if(tab==='Lock Info')return {module:'vessel-lock',record:w.lock_info?.vessel_lock};
   if(tab==='Authorization')return {module:'bl',record:w.bl,fields:['Draft Approval','Original / Express','Issue Date','Status']};
   return {module:null,record:null};
@@ -282,28 +357,143 @@ function clx49RecordForTab(w,tab){
 async function clx49RenderBlTab(tab){
   const w=clx49Workspace;clx49ActiveTab=tab;
   const x=clx49RecordForTab(w,tab),r=x.record;
+  const bp=w.booking?.fields||{},bl=w.bl?.fields||{},doF=w.delivery_order?.fields||{};
   let html=clx49ContextHeader(w)+clx49Nav(w);
-  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>B/L WORKSPACE</b><span class="muted">Job '+esc(w.context.job_ref)+' · Booking '+esc(w.context.booking_ref||'—')+' · B/L '+esc(w.context.hbl_no||'—')+'</span><span class="grow"></span><button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Booking</button></div>'+
+  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>B/L MASTER WORKSPACE</b><span class="muted">Job '+esc(w.context.job_ref)+' · Booking '+esc(w.context.booking_ref||'—')+' · B/L '+esc(w.context.hbl_no||'—')+'</span><span class="grow"></span>'+
+    '<button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Booking</button>'+
+    '<button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button>'+
+    '<button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button>'+
+    '<button class="btn" onclick="clx82ShowPreview()">Preview / Print</button></div>'+
+    '<div class="clx78Hint">CLX-082 B/L Master Field Alignment · same authoritative B/L / Delivery Order / Vessel Lock / Audit records · no duplicate document model.</div>'+
     '<div class="clx78Tabs">'+CLX49_BL_TABS.map(t=>'<button class="'+(t===tab?'active':'')+'" onclick="clx49RenderBlTab(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div>';
-  if(tab==='Lock Info'){
-    html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Workflow Holds / Release</div><div class="clx78PanelBody"><pre class="pre">'+esc(JSON.stringify({workflow:w.lock_info.workflow,holds:w.lock_info.holds},null,2))+'</pre></div></div>';
-  }
-  if(tab==='Authorization'){
-    html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Authorization / Approval Audit</div><div class="clx78PanelBody"><div class="muted">Existing B/L governance, maker-checker and audit remain authoritative.</div><pre class="pre">'+esc(JSON.stringify(w.authorization.audit.slice(0,10),null,2))+'</pre></div></div>';
-  }
+
   if(tab==='Booking Info'){
+    html+='<div class="clx82Section"><div class="clx82Head">B/L Basic Info & Routing</div><div class="clx82Body"><div class="clx82Grid">'+
+      clx82NativeField(w.bl,'B/L No.','B/L No.')+
+      clx82NativeField(w.bl,'Type','B/L Type')+
+      clx82NativeField(w.bl,'MBL','MBL')+
+      clx82NativeField(w.bl,'HBL','HBL')+
+      clx82DerivedField('Booking No.',bp['Booking No.']||w.context.booking_ref)+
+      clx82DerivedField('Job Ref',w.context.job_ref)+
+      clx82NativeField(w.bl,'Issue Date','Issue Date',{type:'date'})+
+      clx82DerivedField('Place of Issue',bl['Place of Issue']||'')+
+      clx82DerivedField('Status',w.bl?.status||bl['Status']||'')+
+      clx82NativeField(w.bl,'Original / Express','Original / Express')+
+      clx82NativeField(w.bl,'Freight Term','Freight Term')+
+      clx82DerivedField('Service Type',bp['Service Type']||bp['Freight Type']||'')+
+      clx82DerivedField('Carrier',bp['Carrier']||'')+
+      clx82NativeField(w.bl,'Vessel','Vessel')+
+      clx82NativeField(w.bl,'Voyage','Voyage')+
+      clx82NativeField(w.bl,'POL','POL')+
+      clx82DerivedField('POT',bp['POT (1)']||bp['Via Port']||'')+
+      clx82NativeField(w.bl,'POD','POD')+
+      clx82DerivedField('Final Destination',bp['Final Destination']||bp['POD']||w.context.pod)+
+    '</div></div></div>'+
+    '<div class="clx82Section"><div class="clx82Head">Parties</div><div class="clx82Body"><div class="clx82Grid">'+
+      clx82NativeField(w.bl,'Shipper','Shipper',{wide:true})+
+      clx82DerivedField('Actual Shipper',bp['Actual Shipper']||bp['Shipper']||'',{wide:true})+
+      clx82NativeField(w.bl,'Consignee','Consignee',{wide:true})+
+      clx82NativeField(w.bl,'Notify','Notify Party',{wide:true})+
+      clx82DerivedField('Also Notify',bp['Also Notify']||'',{wide:true})+
+      clx82DerivedField('Forwarding Agent',bp['Agent']||w.context.agent_code||'',{wide:true})+
+      clx82DerivedField('Delivery Agent',doF['Notify']||bp['POD Agent']||'',{wide:true})+
+      clx82DerivedField('Principal',bp['Principal']||'',{wide:true})+
+      clx82DerivedField('Shipping Line',bp['Carrier']||'',{wide:true})+
+      clx82DerivedField('Agent Reference',bp['Agent Reference']||'',{wide:true})+
+    '</div></div></div>'+
+    '<div class="clx82Section"><div class="clx82Head">Cargo & Equipment</div><div class="clx82Body"><div class="clx82Grid">'+
+      clx82NativeField(w.bl,'Container / Seal','Container / Seal',{wide:true})+
+      clx82NativeField(w.bl,'Packages','Packages')+
+      clx82DerivedField('Package Type',bp['Package Type']||'')+
+      clx82NativeField(w.bl,'Weight','Gross Weight')+
+      clx82DerivedField('Net Weight',bp['Net Weight']||'')+
+      clx82NativeField(w.bl,'Measurement','Measurement')+
+      clx82DerivedField('Marks & Numbers',bp['Marks & Numbers']||'',{wide:true})+
+      clx82NativeField(w.bl,'Cargo Description','Goods Description',{textarea:true,full:true})+
+      clx82DerivedField('Commodity',bp['Commodity']||'',{wide:true})+
+      clx82DerivedField('IMO / DG',bp['IMO / DG']||bp['Dangerous Goods']||'',{wide:true})+
+    '</div></div></div>';
     try{
       const e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(w.context.job_ref));
-      html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Allocated Equipment — Same Booking / Same B/L Context</div><div class="clx78PanelBody"><div class="muted">One authoritative container list follows Booking → B/L → release → journey → depot → finance.</div><div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner</th><th>Principal</th><th>Agent</th><th>Depot</th><th>Status</th></tr></thead><tbody>'+
-        (e.allocated_containers||[]).map(z=>'<tr onclick="showContainerDetail(\''+esc(z.container_no)+'\')"><td><b>'+esc(z.container_no)+'</b></td><td>'+esc(z.size_type)+'</td><td>'+esc(z.owner_party_type||z.ownership)+'</td><td>'+esc(z.principal_code||'')+'</td><td>'+esc(z.agent_code||'')+'</td><td>'+esc(z.depot_code||'')+'</td><td>'+esc(z.equipment_status)+'</td></tr>').join('')+
-        '</tbody></table></div></div></div>';
+      html+='<div class="clx82Section"><div class="clx82Head">Authoritative Container Allocation</div><div class="clx82Body">'+clx82Table(['Container','Size/Type','Owner','Seal/Status','Depot','Journey'],(e.allocated_containers||[]).map(z=>'<tr onclick="showContainerDetail(\''+esc(z.container_no)+'\')"><td><b>'+esc(z.container_no)+'</b></td><td>'+esc(z.size_type||'')+'</td><td>'+esc(z.owner_party_type||z.ownership||'')+'</td><td>'+esc(z.equipment_status||'')+'</td><td>'+esc(z.depot_code||'')+'</td><td><button class="btn">Open</button></td></tr>'))+'</div></div>';
     }catch(e){html+='<div class="equipNote badtext">'+esc(e.message)+'</div>'}
+    html+='<div class="clx82Section"><div class="clx82Head">Freight & Commercial Context</div><div class="clx82Body"><div class="clx82Grid">'+
+      clx82DerivedField('Prepaid / Collect',bl['Freight Term']||bp['Freight Term']||'')+
+      clx82DerivedField('Place of Payment',bp['Place of Payment']||'')+
+      clx82DerivedField('Currency',bp['Currency']||'')+
+      clx82DerivedField('Agent / Principal Allocation',bp['Financial Flow']||'')+
+      clx82DerivedField('Customer AR',bp['Customer AR']||'')+
+      clx82DerivedField('Revenue',bp['Revenue']||'')+
+      clx82DerivedField('Cost',bp['Cost']||'')+
+      clx82DerivedField('SOA Context',bp['Settlement Agent']||'')+
+    '</div><div id="clx82FinanceArea" style="margin-top:6px"></div></div></div>';
   }
-  html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">'+esc(tab)+'</div><div class="clx78PanelBody">'+clx49FieldEditor(r,x.fields);
-  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\''+x.module+'\','+r.id+','+r.version+')">Save '+esc(tab)+'</button>'+
-    (tab==='Authorization'?'<button class="btn" onclick="approveClx049Bl('+r.id+','+r.version+')">Approve via Existing B/L Governance</button>':'')+'</div>';
-  html+='</div></div></div>';
+
+  if(tab==='Release Instruction'){
+    html+='<div class="clx82Section"><div class="clx82Head">Release Instruction</div><div class="clx82Body"><div class="clx82Grid">'+
+      clx82NativeField(r,'Release Instruction','Release Type / Instruction',{wide:true})+
+      clx82NativeField(r,'Original BL Status','Original B/L Status')+
+      clx82NativeField(r,'Telex Release','Telex Release')+
+      clx82NativeField(r,'Payment Block','Payment Block')+
+      clx82NativeField(r,'Customs Status','Customs Status')+
+      clx82NativeField(r,'Freight Status','Freight Status')+
+      clx82NativeField(r,'Valid Until','Valid Until',{type:'date'})+
+      clx82NativeField(r,'Release Status','Release Status')+
+      clx82NativeField(r,'Status','Status')+
+    '</div></div></div>';
+  }
+
+  if(tab==='Delivery Order'){
+    html+='<div class="clx82Section"><div class="clx82Head">Delivery Order</div><div class="clx82Body"><div class="clx82Grid">'+
+      clx82NativeField(r,'DO No.','DO No.')+
+      clx82DerivedField('B/L',r?.fields?.['HBL']||w.context.hbl_no)+
+      clx82NativeField(r,'Job Ref','Job Ref')+
+      clx82DerivedField('Customer',w.context.customer_name||'')+
+      clx82NativeField(r,'Consignee','Consignee',{wide:true})+
+      clx82NativeField(r,'Notify','Delivery Party',{wide:true})+
+      clx82NativeField(r,'Container','Container',{wide:true})+
+      clx82NativeField(r,'Valid Until','Validity',{type:'date'})+
+      clx82NativeField(r,'Release Status','Release Status')+
+      clx82NativeField(r,'Payment Block','Payment Block')+
+      clx82NativeField(r,'Customs Status','Customs Status')+
+      clx82NativeField(r,'Freight Status','Freight Status')+
+    '</div></div></div>';
+  }
+
+  if(tab==='Lock Info'){
+    html+='<div class="clx82Section"><div class="clx82Head">Lock Info / Holds / Authorized Release</div><div class="clx82Body">'+clx82LockPanel(w)+'</div></div>';
+    if(r)html+='<div class="clx82Section"><div class="clx82Head">Existing Vessel Lock Record</div><div class="clx82Body">'+clx49FieldEditor(r,['Vessel','Voyage','POL','POD','ETD','ETA','Manifest Status','Documentation Status','Lock Reason','Lock Scope','Locked By','Lock Date','Unlock Approval','Status'])+'</div></div>';
+  }
+
+  if(tab==='Authorization'){
+    html+='<div class="clx82Section"><div class="clx82Head">B/L Authorization</div><div class="clx82Body"><div class="clx82Grid">'+
+      clx82NativeField(r,'Draft Approval','Draft Approval')+
+      clx82NativeField(r,'Original / Express','Original / Express')+
+      clx82NativeField(r,'Issue Date','Issue Date',{type:'date'})+
+      clx82DerivedField('Issue Authorization',w.authorization?.bl_status||r?.status||'')+
+      clx82NativeField(r,'Status','Status')+
+    '</div><div style="margin-top:8px"><b>Maker / Checker / Audit</b>'+clx82AuthorizationAudit(w)+'</div></div></div>';
+  }
+
+  if(r && tab!=='Booking Info'){
+    html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\''+x.module+'\','+r.id+','+r.version+')">Save '+esc(tab)+'</button>'+
+      (tab==='Authorization'?'<button class="btn" onclick="approveClx049Bl('+r.id+','+r.version+')">Approve via Existing B/L Governance</button>':'')+
+      '</div></div>';
+  }else if(r && tab==='Booking Info'){
+    html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'bl\','+r.id+','+r.version+')">Save B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button></div></div>';
+  }
+  html+='</div>';
   $('gridArea').innerHTML=renderGrid()+html;
+  if(tab==='Booking Info'){
+    clx82FinanceSummary(w).then(x=>{const el=$('clx82FinanceArea');if(el)el.innerHTML=x});
+  }
+}
+function clx82ShowPreview(){
+  if(!clx49Workspace)return;
+  const existing=document.getElementById('clx82Preview');
+  if(existing){existing.remove();return}
+  const wrap=document.createElement('div');wrap.id='clx82Preview';wrap.innerHTML=clx82BlPreview(clx49Workspace);
+  $('gridArea').prepend(wrap);
 }
 function clx49BookingGroup(record,title,fields,opts={}){
   if(!record)return '<div class="card empty">No existing authoritative Booking record for this job.</div>';
