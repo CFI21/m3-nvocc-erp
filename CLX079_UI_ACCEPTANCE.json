@@ -1,0 +1,18 @@
+{
+  "schema": "M3_CLX079_UI_ACCEPTANCE_V1",
+  "baseline": "04a442a0691f3f925266c5101f6e0dbf5b0b9669",
+  "EQUIPMENT_TOWER_READY": true,
+  "FULL_ERP_REGRESSION": true,
+  "REAL_MONEY_READY": false,
+  "REAL_PROVIDER_READY": false,
+  "backend_model_changed": false,
+  "status": "ACCEPTED_FOR_SINGLE_PR",
+  "workflow_run_id": 36891273113,
+  "validation": {
+    "focused_tower_tests": "41 passed",
+    "complete_erp_regression": "273 passed",
+    "canonical_screen_contract": "196 PASS",
+    "javascript_syntax": "PASS",
+    "safety": "PASS"
+  }
+}

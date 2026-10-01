@@ -42,6 +42,23 @@
 .clx78TowerTabs{display:flex;gap:3px;flex-wrap:wrap;margin:6px 0}.clx78TowerTabs button{padding:6px 8px;border:1px solid #b8c2cf;background:#fff}.clx78TowerTabs button.active{background:#2f6b55;color:#fff}
 @media(max-width:1250px){.clx78MainGrid{grid-template-columns:1fr}.clx78Fields,.clx78Commercial .clx78Fields{grid-template-columns:repeat(2,minmax(140px,1fr))}.clx78Flow{grid-template-columns:repeat(3,1fr)}}
 
+
+/* CLX-079 Global Equipment Tower refinement */
+.clx79TowerNav{display:flex;gap:2px;flex-wrap:wrap;margin-top:6px}
+.clx79TowerNav button{border:1px solid #aeb7c4;background:#fff;padding:6px 9px;cursor:pointer}
+.clx79TowerNav button.active{background:#2f6b55;color:#fff;font-weight:700}
+.clx79Filters{display:grid;grid-template-columns:repeat(10,minmax(110px,1fr));gap:6px;padding:8px;background:#f4f6f8;border:1px solid #c7ced8;margin:6px 0}
+.clx79Filters label{font-size:10px;font-weight:700}.clx79Filters input,.clx79Filters select{width:100%;padding:5px;border:1px solid #aeb7c4;background:#fff}
+.clx79KpiGroup{margin:6px 0}.clx79KpiTitle{font-size:11px;font-weight:700;color:#344054;margin:0 0 4px 2px}
+.clx79Kpis{display:grid;grid-template-columns:repeat(5,minmax(130px,1fr));gap:6px}
+.clx79Kpi{border:1px solid #c7ced8;background:#fff;padding:9px 10px;cursor:pointer;min-height:58px}
+.clx79Kpi:hover{border-color:#2f6b55;background:#f5faf7}.clx79Kpi span{display:block;font-size:10px;color:#667085}.clx79Kpi b{display:block;font-size:18px;margin-top:3px}
+.clx79Section{border:1px solid #c7ced8;background:#fff;margin:6px 0}.clx79SectionHead{padding:6px 8px;background:#edf0f4;border-bottom:1px solid #c7ced8;font-weight:700}
+.clx79SectionBody{padding:6px}.clx79Table{width:100%;border-collapse:collapse;font-size:10px}.clx79Table th,.clx79Table td{border:1px solid #d7dde5;padding:5px 6px;text-align:left;white-space:nowrap}.clx79Table th{background:#f4f6f8}.clx79Table tr:hover td{background:#f8fbf9}
+.clx79Badge{display:inline-block;padding:2px 6px;border:1px solid #b8c2cf;border-radius:10px;background:#f8f9fa}.clx79Badge.warn{background:#fff4e5;border-color:#e7b66b}.clx79Badge.bad{background:#fff0f0;border-color:#e1a0a0}.clx79Badge.good{background:#edf8f1;border-color:#9ec9ac}
+.clx79Action{border:1px solid #aeb7c4;background:#fff;padding:4px 6px;cursor:pointer}.clx79Action.primary{background:#2f6b55;color:#fff}
+@media(max-width:1450px){.clx79Filters{grid-template-columns:repeat(5,minmax(120px,1fr))}.clx79Kpis{grid-template-columns:repeat(3,minmax(130px,1fr))}}
+
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
@@ -821,32 +838,34 @@ async function openBookingEquipmentAllocation(jobRef){
   state.equipmentJobRef=jobRef;
   await showEquipmentWorkspace('allocation');
 }
+function clx79TowerRoute(view){
+  const m={tower:'Overview',containers:'Global Stock',network:'Network',work:'Reposition',lease:'Lease',journey:'Journey',mr:'Depot & M&R',finance:'Financials',kpi:'KPI',exceptions:'Exceptions'};
+  return m[view]||'Equipment Control';
+}
 function equipmentShell(view){
   state.equipmentView=view;
   state.navContext=null;
   state.current={screen_id:'__equipment__',domain:'HO Tasks',submenu:'Equipment Control',name:view==='tower'?'Global Equipment Tower':'Equipment Control',actions:[],quick_actions:[]};
-  $('breadcrumb').textContent='M3 NVOCC ERP / HO Tasks / Equipment Control / '+(view==='tower'?'Global Equipment Tower':'Runtime');
+  $('breadcrumb').textContent='M3 NVOCC ERP / HO Tasks / Equipment Control / '+clx79TowerRoute(view);
   $('topTitle').textContent=view==='tower'?'Global Equipment Tower':'Equipment Control';
   $('pageTitle').textContent=view==='tower'?'Global Equipment Tower':'Equipment Control';
-  $('statusPill').textContent='Integrated';
+  $('statusPill').textContent='Live';
   $('favorite').textContent='☆';$('favorite').classList.remove('on');
   $('prevBtn').disabled=true;$('nextBtn').disabled=true;
-  $('flow').innerHTML=`<div class="clx78TowerHead"><b>${view==='tower'?'Global Equipment Tower':'Equipment Control'}</b><span class="muted">One authoritative Container Master · CLX-070→075 · no duplicate inventory</span></div><div class="equipTabs">
-    <button class="${view==='tower'?'active':''}" onclick="showEquipmentWorkspace('tower')">Global Equipment Tower</button><button class="${view==='overview'?'active':''}" onclick="showEquipmentWorkspace('overview')">Overview</button>
-    <button class="${view==='containers'?'active':''}" onclick="showEquipmentWorkspace('containers')">Container Master</button>
-    <button class="${view==='allocation'?'active':''}" onclick="showEquipmentWorkspace('allocation')">Allocation & Shortage</button>
-    <button class="${view==='work'?'active':''}" onclick="showEquipmentWorkspace('work')">Work Items</button>
-    <button class="${view==='network'?'active':''}" onclick="showEquipmentWorkspace('network')">Network Control</button>
-    <button class="${view==='optimization'?'active':''}" onclick="showEquipmentWorkspace('optimization')">Cost Optimization</button>
+  $('flow').innerHTML=`<div class="clx78TowerHead"><b>Global Equipment Tower</b><span class="muted">Live M3 Equipment Control · Authoritative Container Master · CLX-070→075 · no duplicate inventory</span></div>
+  <div class="clx79TowerNav">
+    <button class="${view==='tower'?'active':''}" onclick="showEquipmentWorkspace('tower')">Overview</button>
+    <button class="${view==='containers'?'active':''}" onclick="showEquipmentWorkspace('containers')">Global Stock</button>
+    <button title="Network Control" aria-label="Network Control" class="${view==='network'?'active':''}" onclick="showEquipmentWorkspace('network')">Network</button>
+    <button title="Reposition Execution · Cost Optimization" aria-label="Reposition Execution and Cost Optimization" class="${view==='work'?'active':''}" onclick="showEquipmentWorkspace('work')">Reposition</button>
+    <button class="${view==='lease'?'active':''}" onclick="showEquipmentWorkspace('lease')">Lease</button>
+    <button class="${view==='journey'?'active':''}" onclick="showEquipmentWorkspace('journey')">Journey</button>
     <button class="${view==='mr'?'active':''}" onclick="showEquipmentWorkspace('mr')">Depot &amp; M&amp;R</button>
-    <button class="${view==='lease'?'active':''}" onclick="showEquipmentWorkspace('lease')">Lease Control</button>
-    <button class="${view==='journey'?'active':''}" onclick="showEquipmentWorkspace('journey')">Container Journey</button>
-    <button class="${view==='exceptions'?'active':''}" onclick="showEquipmentWorkspace('exceptions')">Journey Exceptions</button>
-    <button class="${view==='finance'?'active':''}" onclick="showEquipmentWorkspace('finance')">Container P&amp;L</button>
-    <button class="${view==='kpi'?'active':''}" onclick="showEquipmentWorkspace('kpi')">KPIs</button>
-    <button class="${view==='policy'?'active':''}" onclick="showEquipmentWorkspace('policy')">Policy &amp; SOP</button>
+    <button title="Container P&amp;L" aria-label="Container P&L" class="${view==='finance'?'active':''}" onclick="showEquipmentWorkspace('finance')">Financials</button>
+    <button title="Policy &amp; SOP · KPI" aria-label="Policy & SOP and KPI" class="${view==='kpi'?'active':''}" onclick="showEquipmentWorkspace('kpi')">KPI</button>
+    <button class="${view==='exceptions'?'active':''}" onclick="showEquipmentWorkspace('exceptions')">Exceptions</button>
   </div>`;
-  $('screenMeta').innerHTML=`<div class="equipNote"><b>Native M3 workspace.</b> Uses the current M3 shell, role, controlled UAT access and authoritative CLX-070/071/072 APIs. No separate ERP model or duplicate container inventory.</div>`;
+  $('screenMeta').innerHTML=`<div class="equipNote"><b>LIVE M3 EQUIPMENT CONTROL — AUTHORITATIVE CONTAINER MASTER.</b> Existing CLX-070/071/072/073/074/075 APIs and role/custody scopes remain authoritative. No separate ERP model or duplicate container inventory. External providers OFF · real money OFF.</div>`;
   renderNav();
 }
 function equipHeaders(){
@@ -868,41 +887,100 @@ async function equipmentApi(url,opt={}){
 function equipmentLockedHtml(e){
   return `<div class="card"><b>Controlled UAT access required</b><p class="muted">${esc(e.message)}</p><div class="toolbar"><input id="equipToken" type="password" placeholder="M3 controlled UAT token"><button class="btn primary" onclick="sessionStorage.setItem('M3_UAT_TOKEN',$('equipToken').value||'');showEquipmentWorkspace(state.equipmentView||'overview')">Use Token</button></div><div class="muted">Production traffic, live providers and real money remain OFF.</div></div>`;
 }
+const clx79TowerFilter=state.clx79TowerFilter||{region:'',country:'',port:'',branch:'',agent:'',depot:'',size_type:'',ownership:'',status:'',horizon:'14'};
+state.clx79TowerFilter=clx79TowerFilter;
+function clx79Human(v){
+  return String(v||'').replaceAll('_',' ').toLowerCase().replace(/\b\w/g,m=>m.toUpperCase());
+}
+function clx79FilterBar(){
+  const f=state.clx79TowerFilter;
+  const inp=(k,l)=>'<label>'+l+'<input id="clx79_'+k+'" value="'+esc(f[k]||'')+'"></label>';
+  return '<div class="clx79Filters">'+inp('region','Region')+inp('country','Country')+inp('port','Port')+inp('branch','Branch')+inp('agent','Agent')+inp('depot','Depot')+
+    inp('size_type','Size-Type')+inp('ownership','Ownership')+inp('status','Status')+
+    '<label>Date Horizon<select id="clx79_horizon"><option value="7" '+(f.horizon==='7'?'selected':'')+'>7 days</option><option value="14" '+(f.horizon==='14'?'selected':'')+'>14 days</option><option value="30" '+(f.horizon==='30'?'selected':'')+'>30 days</option><option value="60" '+(f.horizon==='60'?'selected':'')+'>60 days</option></select></label>'+
+    '<div style="grid-column:1/-1"><button class="clx79Action primary" onclick="clx79ApplyFilters()">Apply Filters</button> <button class="clx79Action" onclick="clx79ClearFilters()">Clear</button></div></div>';
+}
+function clx79ApplyFilters(){
+  for(const k of ['region','country','port','branch','agent','depot','size_type','ownership','status','horizon'])state.clx79TowerFilter[k]=$('clx79_'+k)?.value||'';
+  showEquipmentWorkspace('tower');
+}
+function clx79ClearFilters(){
+  state.clx79TowerFilter={region:'',country:'',port:'',branch:'',agent:'',depot:'',size_type:'',ownership:'',status:'',horizon:'14'};
+  showEquipmentWorkspace('tower');
+}
+function clx79Match(x){
+  const f=state.clx79TowerFilter||{};
+  const val=(...ks)=>ks.map(k=>String(x?.[k]||'').toLowerCase()).join(' ');
+  const checks=[
+    ['region',val('region')],['country',val('country')],['port',val('port','current_port','source_port','destination_port')],
+    ['branch',val('branch','branch_code','source_branch','destination_branch')],['agent',val('agent','agent_code','source_agent','destination_agent')],
+    ['depot',val('depot','depot_code','source_depot','destination_depot')],['size_type',val('size_type')],['ownership',val('ownership','owner_party_type')],['status',val('status','equipment_status')]
+  ];
+  return checks.every(([k,v])=>!f[k]||v.includes(String(f[k]).toLowerCase()));
+}
+function clx79Drill(view,filters={}){
+  state.clx79ContainerFilter={...(state.clx79ContainerFilter||{}),...filters};
+  showEquipmentWorkspace(view);
+}
+function clx79Kpi(label,value,view,filters={},tone=''){
+  return '<div class="clx79Kpi '+tone+'" onclick=\'clx79Drill('+JSON.stringify(view)+','+JSON.stringify(filters)+')\'><span>'+esc(label)+'</span><b>'+esc(value)+'</b></div>';
+}
+function clx79Table(headers,rows){
+  return '<div class="tablewrap"><table class="clx79Table"><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
+}
 async function showEquipmentWorkspace(view='overview'){
   equipmentShell(view);
   $('gridArea').innerHTML='<div class="card">Loading Equipment Control…</div>';
   try{
     const ready=await equipmentApi('/api/clx070/equipment/readiness');
     if(view==='tower'){
-      const [fleet,journey,network,recs,opt,mr,lease]=await Promise.all([
+      const horizon=encodeURIComponent(state.clx79TowerFilter?.horizon||'14');
+      const [fleet,journey,network,recs,opt,mr,lease,pos,jex,mrex,lex,oex,containers]=await Promise.all([
         equipmentApi('/api/clx070/container-control/kpis'),
         equipmentApi('/api/clx071/journey/kpis'),
-        equipmentApi('/api/clx072/network/kpis?horizon_days=14'),
-        equipmentApi('/api/clx072/network/recommendations?horizon_days=14'),
+        equipmentApi('/api/clx072/network/kpis?horizon_days='+horizon),
+        equipmentApi('/api/clx072/network/recommendations?horizon_days='+horizon),
         equipmentApi('/api/clx073/optimization/kpis'),
         equipmentApi('/api/clx074/mr/kpis'),
-        equipmentApi('/api/clx075/lease/kpis')
+        equipmentApi('/api/clx075/lease/kpis'),
+        equipmentApi('/api/clx072/network/position?horizon_days='+horizon),
+        equipmentApi('/api/clx071/journey/exceptions?status=OPEN&limit=200').catch(()=>({records:[]})),
+        equipmentApi('/api/clx074/mr/exceptions?status=OPEN&limit=200').catch(()=>({records:[]})),
+        equipmentApi('/api/clx075/lease/exceptions?status=OPEN&limit=200').catch(()=>({records:[]})),
+        equipmentApi('/api/clx073/optimization/exceptions?status=OPEN&limit=200').catch(()=>({records:[]})),
+        equipmentApi('/api/clx070/container-control/containers?limit=1000')
       ]);
-      const f=fleet.fleet||{}, ff=fleet.financial||{}, n=network||{};
-      $('gridArea').innerHTML=`<div class="equipGrid">
-        <div class="equipKpi">Global Fleet<b>${f.total||0}</b></div><div class="equipKpi">Available<b>${f.available||0}</b></div>
-        <div class="equipKpi">Reserved<b>${f.reserved||0}</b></div><div class="equipKpi">In Transit<b>${f.in_transit||0}</b></div>
-        <div class="equipKpi">Utilization<b>${f.utilization_pct||0}%</b></div></div>
-        <div class="equipGrid">
-        <div class="equipKpi">Shortage<b>${n.shortage_units||0}</b></div><div class="equipKpi">Surplus<b>${n.surplus_units||0}</b></div>
-        <div class="equipKpi">Reposition Actions<b>${n.reposition_recommendations||0}</b></div><div class="equipKpi">Lease On-Hire<b>${lease.active_on_hire||0}</b></div>
-        <div class="equipKpi">Open Exceptions<b>${(journey.open_exceptions||0)+(mr.open_exceptions||0)+(opt.open_cost_delay_exceptions||0)}</b></div></div>
-        <div class="clx78TowerTabs">
-          <button onclick="showEquipmentWorkspace('containers')">Global Container Stock</button><button onclick="showEquipmentWorkspace('network')">Port / Branch / Agent / Depot Position</button>
-          <button onclick="showEquipmentWorkspace('network')">Shortage / Surplus & Demand Forecast</button><button onclick="showEquipmentWorkspace('work')">Reposition Execution</button>
-          <button onclick="showEquipmentWorkspace('lease')">Lease On-Hire / Off-Hire</button><button onclick="showEquipmentWorkspace('optimization')">Cost Optimization</button>
-          <button onclick="showEquipmentWorkspace('journey')">Container Journey</button><button onclick="showEquipmentWorkspace('exceptions')">Detention / Free Days / Empty Return</button>
-          <button onclick="showEquipmentWorkspace('mr')">Depot / Inspection / Damage / M&R</button><button onclick="showEquipmentWorkspace('finance')">Equipment Financials</button>
-          <button onclick="showEquipmentWorkspace('kpi')">Utilization / Turnaround / ROI KPI</button>
-        </div>
-        <div class="card"><b>Global Equipment Network Control</b><div class="muted">Worldwide stock, custody, journey, reposition, lease, M&R and financial decisions are rendered from the existing authoritative CLX-070/071/072/073/074/075 APIs. Booking users see only their Job/Booking equipment context; HO users operate the network tower.</div></div>
-        <div class="card"><b>Financial Snapshot</b><div class="equipGrid"><div class="equipKpi">Revenue<b>${Number(ff.revenue||0).toLocaleString()}</b></div><div class="equipKpi">Cost<b>${Number(ff.cost||0).toLocaleString()}</b></div><div class="equipKpi">Margin<b>${Number(ff.margin||0).toLocaleString()}</b></div><div class="equipKpi">M&R Cost<b>${Number(mr.actual_mr_cost||0).toLocaleString()}</b></div><div class="equipKpi">Optimization Savings<b>${Number(opt.management_savings||0).toLocaleString()}</b></div></div></div>
-        <div class="card"><b>Current Reposition / Supply Recommendations</b><pre class="pre">${esc(JSON.stringify((recs.records||[]).slice(0,20),null,2))}</pre></div>`;
+      const f=fleet.fleet||{},ff=fleet.financial||{},n=network||{};
+      const cr=(containers.records||[]).filter(clx79Match);
+      const pr=(pos.records||[]).filter(clx79Match);
+      const rr=(recs.records||[]).filter(clx79Match);
+      const allEx=[...(jex.records||[]).map(x=>({...x,source:'Journey'})),...(mrex.records||[]).map(x=>({...x,source:'Depot / M&R'})),...(lex.records||[]).map(x=>({...x,source:'Lease'})),...(oex.records||[]).map(x=>({...x,source:'Cost / Optimization'}))].filter(clx79Match);
+      const empty=cr.filter(x=>String(x.journey_state||x.equipment_status||'').toUpperCase().includes('EMPTY')).length;
+      const full=cr.filter(x=>String(x.journey_state||x.equipment_status||'').toUpperCase().includes('FULL')).length;
+      const overdue=allEx.filter(x=>/EMPTY_RETURN|OVERDUE/i.test(String(x.exception_type||x.type||''))).length;
+      const openMr=(mrex.records||[]).length;
+      const recRows=rr.slice(0,50).map((x,i)=>'<tr><td><span class="clx79Badge '+(/LEASE/i.test(x.recommendation_type||'')?'warn':'good')+'">'+esc(clx79Human(x.recommendation_type))+'</span></td><td>'+esc(x.size_type||'')+'</td><td>'+esc(x.qty||0)+'</td><td>'+esc(x.source_port||x.source_branch||'—')+'</td><td>'+esc(x.destination_port||x.destination_branch||'—')+'</td><td>'+esc(x.destination_agent||x.source_agent||'—')+'</td><td>'+esc(x.destination_depot||x.source_depot||'—')+'</td><td>'+esc(x.reason||'')+'</td><td>'+esc(x.estimated_cost||x.cost||'—')+'</td><td>'+esc(x.saving||x.estimated_saving||'—')+'</td><td>'+esc(clx79Human(x.priority||'Normal'))+'</td><td>'+esc(clx79Human(x.status||'Recommended'))+'</td><td><button class="clx79Action" onclick="state.networkRecommendations=' + "'"+ 'dummy' + "'" + '">Review</button></td></tr>');
+      const stockRows=pr.slice(0,100).map(x=>'<tr><td>'+esc(x.port||'—')+'</td><td>'+esc(x.branch||'—')+'</td><td>'+esc(x.agent||'—')+'</td><td>'+esc(x.depot||'—')+'</td><td>'+esc(x.size_type||'—')+'</td><td>'+esc(x.available||0)+'</td><td>'+esc(x.reserved||0)+'</td><td>'+esc(x.empty||0)+'</td><td>'+esc(x.full||0)+'</td><td>'+esc(x.in_transit||0)+'</td><td>'+esc(x.forecast_demand||0)+'</td><td>'+esc(x.shortage||0)+'</td><td>'+esc(x.surplus||0)+'</td><td>'+esc((x.shortage||0)>0?'Action Required':((x.surplus||0)>0?'Surplus':'Balanced'))+'</td></tr>');
+      const exRows=allEx.slice(0,60).map(x=>'<tr><td>'+esc(x.source)+'</td><td>'+esc(clx79Human(x.exception_type||x.type||'Exception'))+'</td><td>'+esc(x.container_no||x.work_ref||x.allocation_ref||x.exception_ref||'—')+'</td><td>'+esc(x.port_code||x.port||x.destination_port||'—')+'</td><td>'+esc(x.severity||'—')+'</td><td>'+esc(x.detail||x.reason||'')+'</td><td>'+esc(clx79Human(x.status||'Open'))+'</td><td><button class="clx79Action" onclick="showEquipmentWorkspace(\'exceptions\')">Open</button></td></tr>');
+      $('gridArea').innerHTML=clx79FilterBar()+
+        '<div class="clx79KpiGroup"><div class="clx79KpiTitle">Fleet</div><div class="clx79Kpis">'+
+          clx79Kpi('Global Fleet',f.total||0,'containers')+clx79Kpi('Available',f.available||0,'containers',{status:'AVAILABLE'})+clx79Kpi('Reserved',f.reserved||0,'containers',{status:'RESERVED'})+clx79Kpi('Empty',empty,'containers')+clx79Kpi('Full',full,'containers')+
+          clx79Kpi('In Transit',f.in_transit||0,'containers',{status:'IN_TRANSIT'})+clx79Kpi('Utilization',(f.utilization_pct||0)+'%','kpi')+
+        '</div></div>'+
+        '<div class="clx79KpiGroup"><div class="clx79KpiTitle">Network & Exceptions</div><div class="clx79Kpis">'+
+          clx79Kpi('Shortage',n.shortage_units||0,'network')+clx79Kpi('Surplus',n.surplus_units||0,'network')+clx79Kpi('Reposition Required',n.reposition_recommendations||0,'work')+clx79Kpi('Lease Required',n.lease_on_hire_units||lease.active_on_hire||0,'lease')+clx79Kpi('Empty Return Overdue',overdue,'exceptions')+
+          clx79Kpi('Open M&R',openMr,'mr')+clx79Kpi('Open Exceptions',allEx.length,'exceptions')+
+        '</div></div>'+
+        '<div class="clx79Section"><div class="clx79SectionHead">Global Stock Position</div><div class="clx79SectionBody">'+clx79Table(['Port','Branch','Agent','Depot','Size-Type','Available','Reserved','Empty','Full','In Transit','Demand','Shortage','Surplus','Reposition Status'],stockRows)+'</div></div>'+
+        '<div class="clx79Section"><div class="clx79SectionHead">Recommended Actions</div><div class="clx79SectionBody">'+clx79Table(['Action','Equipment','Qty','Source','Destination','Agent','Depot','Reason','Est. Cost','Saving','Priority','Status','Action'],recRows)+'</div></div>'+
+        '<div class="clx79Section"><div class="clx79SectionHead">Operational Exceptions</div><div class="clx79SectionBody">'+clx79Table(['Source','Exception','Reference','Port','Severity','Reason','Status','Action'],exRows)+'</div></div>'+
+        '<div class="clx79KpiGroup"><div class="clx79KpiTitle">Financial & Performance</div><div class="clx79Kpis">'+
+          clx79Kpi('Revenue',Number(ff.revenue||0).toLocaleString(),'finance')+clx79Kpi('Cost',Number(ff.cost||0).toLocaleString(),'finance')+clx79Kpi('Margin',Number(ff.margin||0).toLocaleString(),'finance')+
+          clx79Kpi('Reposition Cost',Number(n.reposition_cost||0).toLocaleString(),'finance')+clx79Kpi('Lease Cost',Number(lease.accrued_cost||lease.total_accrued||0).toLocaleString(),'finance')+
+          clx79Kpi('M&R Cost',Number(mr.actual_mr_cost||0).toLocaleString(),'finance')+clx79Kpi('Detention Revenue',Number(ff.detention_revenue||0).toLocaleString(),'finance')+
+          clx79Kpi('Optimization Savings',Number(opt.management_savings||0).toLocaleString(),'kpi')+clx79Kpi('ROI',String(opt.roi_pct||0)+'%','kpi')+
+        '</div></div>';
+      state.networkRecommendations=rr;
     }else if(view==='overview'){
       const [k,p]=await Promise.all([
         equipmentApi('/api/clx070/container-control/kpis'),
@@ -921,8 +999,11 @@ async function showEquipmentWorkspace(view='overview'){
         <div class="muted">HO/global users see the network. Branch/Agent/Depot users operate only their authorized custody scope. Same physical container, same Booking/Job, same B/L context, same audit and financial trail.</div></div>
         <div class="card"><b>Active policy profile</b><pre class="pre">${esc(JSON.stringify(p.role_policy,null,2))}</pre></div>`;
     }else if(view==='containers'){
-      const d=await equipmentApi('/api/clx070/container-control/containers?limit=500');
-      $('gridArea').innerHTML=`<div class="toolbar"><input id="eqCmSearch" placeholder="Container / owner / principal / booking"><button class="btn" onclick="searchContainerMaster()">Search</button><button class="btn" onclick="showEquipmentWorkspace('containers')">Refresh</button><button class="btn primary" onclick="showBulkContainerUpload()">Bulk Container Upload</button></div>
+      const cf=state.clx79ContainerFilter||{};
+      const qs=new URLSearchParams({limit:'500'});
+      if(cf.status)qs.set('status',cf.status);if(cf.port)qs.set('port',cf.port);if(cf.agent_code)qs.set('agent_code',cf.agent_code);if(cf.depot_code)qs.set('depot_code',cf.depot_code);if(cf.owner_party_type)qs.set('owner_party_type',cf.owner_party_type);
+      const d=await equipmentApi('/api/clx070/container-control/containers?'+qs.toString());
+      $('gridArea').innerHTML=`<div class="toolbar"><input id="eqCmSearch" placeholder="Container / owner / principal / booking"><button class="btn" onclick="searchContainerMaster()">Search</button><button class="btn" onclick="state.clx79ContainerFilter={};showEquipmentWorkspace('containers')">Clear Drill Filter</button><button class="btn" onclick="showEquipmentWorkspace('containers')">Refresh</button><button class="btn primary" onclick="showBulkContainerUpload()">Bulk Container Upload</button><span class="muted">Active drill: ${esc(Object.entries(cf).map(([k,v])=>k+'='+v).join(' · ')||'none')}</span></div>
       <div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner Type</th><th>Owner Party</th><th>Principal</th><th>Branch</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Verification</th><th>Booking</th></tr></thead><tbody>
       ${(d.records||[]).map(x=>`<tr onclick="showContainerDetail('${esc(x.container_no)}')"><td><b>${esc(x.container_no)}</b></td><td>${esc(x.size_type)}</td><td>${esc(x.owner_party_type||x.ownership)}</td><td>${esc(x.owner_party_code||'')}</td><td>${esc(x.principal_code||'')}</td><td>${esc(x.branch_code||'')}</td><td>${esc(x.current_port||'')}</td><td>${esc(x.agent_code||'')}</td><td>${esc(x.depot_code||'')}</td><td>${esc(x.equipment_status)}</td><td>${esc(x.verification_status||'')}</td><td>${esc(x.booking_ref||'')}</td></tr>`).join('')}</tbody></table></div>`;
     }else if(view==='allocation'){

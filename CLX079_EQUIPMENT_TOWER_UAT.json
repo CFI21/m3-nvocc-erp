@@ -1,0 +1,26 @@
+{
+  "schema": "M3_CLX079_EQUIPMENT_TOWER_UAT_V1",
+  "baseline": "04a442a0691f3f925266c5101f6e0dbf5b0b9669",
+  "backend_changes": false,
+  "duplicate_equipment_model": false,
+  "checks": {
+    "single_primary_navigation": "PASS",
+    "filter_bar": "PASS",
+    "grouped_clickable_kpis": "PASS",
+    "global_stock_position_grid": "PASS",
+    "recommended_actions_grid": "PASS",
+    "operational_exceptions_grid": "PASS",
+    "financial_performance": "PASS",
+    "human_readable_labels": "PASS",
+    "authoritative_drill_down": "PASS",
+    "no_raw_json_in_tower": "PASS",
+    "live_status_text": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36891273113,
+  "focused_tests": "41 passed",
+  "full_regression": "273 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS"
+}
