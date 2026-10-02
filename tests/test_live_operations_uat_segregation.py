@@ -27,6 +27,7 @@ def test_management_snapshot_ignores_uat_financial_exposure(tmp_path,monkeypatch
     monkeypatch.setattr(db,'DB_PATH',tmp_path/'uat-kpi.db')
     seed_run(True)
     c=db.connect()
+    c.executescript(open('migrations/CLX025_001_operations_workbench.sql').read())
     baseline=_snapshot_payload(c,'ADMIN')
     customer_id=c.execute("select id from customers order by id limit 1").fetchone()['id']
     agent_id=c.execute("select id from agents order by id limit 1").fetchone()['id']
