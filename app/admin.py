@@ -305,8 +305,19 @@ def agent_users(agent_code:str):
     party=c.execute("""SELECT record_key,display_name,status FROM md_records
       WHERE domain='common-party' AND lower(trim(display_name))=lower(trim(?)) AND status='ACTIVE'
       ORDER BY record_key LIMIT 1""",(agent['display_name'],)).fetchone()
+    pending=[]
+    for ar in c.execute("""SELECT ar.review_ref,ar.status,ar.due_date,u.user_ref,u.username,u.display_name,u.email
+      FROM iam_access_reviews ar JOIN iam_users u ON u.id=ar.user_id
+      WHERE ar.status='APPROVED_PENDING_ACTIVATION' ORDER BY ar.id"""):
+        full=c.execute("SELECT scope FROM iam_access_reviews WHERE review_ref=?",(ar['review_ref'],)).fetchone()
+        sc=json.loads(full['scope']) if full and full['scope'] else {}
+        if sc.get('kind')=='AGENT_USER_INVITE' and sc.get('agent_code')==agent_code:
+            pending.append({'review_ref':ar['review_ref'],'status':ar['status'],'due_date':ar['due_date'],
+              'user_ref':ar['user_ref'],'username':ar['username'],'display_name':ar['display_name'],'email':ar['email'],
+              'agent_code':sc.get('agent_code'),'common_party_key':sc.get('common_party_key'),
+              'office_code':sc.get('office_code'),'country_code':sc.get('country_code')})
     out={'agent_code':agent_code,'agent_name':agent['display_name'],'agent_status':agent['status'],
-         'party_match':dict(party) if party else None,'users':rows,
+         'party_match':dict(party) if party else None,'users':rows,'pending_requests':pending,
          'user_onboarding_route':'administration::users',
          'scope_onboarding_route':'administration::customer-agent-access',
          'governance':'EXISTING_IAM_MAKER_CHECKER_MFA_AUDIT',
