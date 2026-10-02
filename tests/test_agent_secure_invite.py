@@ -158,6 +158,22 @@ def test_expired_reissued_token_is_rejected(isolated):
         activate_agent_user_invite(AgentUserActivate(invite_token=reissued['invite_token'],new_password='UserSelectedCredential-2026'))
     assert expired.value.status_code==410
 
+def test_agent_users_exposes_safe_pending_handoff_metadata(isolated):
+    maker=session_for('md.maker')
+    checker=session_for('md.checker')
+    out=request_agent_user_invite(invite(),maker)
+    decide_agent_user_invite(out['review_ref'],AgentUserInviteDecision(decision='APPROVE'),checker)
+    from app.admin import agent_users
+    data=agent_users('220')
+    assert len(data['pending_requests'])==1
+    pending=data['pending_requests'][0]
+    assert pending['review_ref']==out['review_ref']
+    assert pending['status']=='APPROVED_PENDING_ACTIVATION'
+    assert pending['agent_code']=='220'
+    assert pending['common_party_key']=='ANCML'
+    assert 'invite_token_hash' not in pending
+    assert 'invite_token' not in pending
+
 def test_duplicate_email_and_196_screens(isolated):
     maker=session_for('admin')
     request_agent_user_invite(invite(),maker)
