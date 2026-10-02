@@ -1,0 +1,148 @@
+{
+  "schema": "M3_CLX085_KPI_SOURCE_MATRIX_V1",
+  "baseline": "e6aec0503929783b22d835dcec0221013b5a43cd",
+  "backend_model_changed": false,
+  "database_changed": false,
+  "new_management_model_created": false,
+  "new_kpi_ledger_created": false,
+  "new_exception_model_created": false,
+  "sources": {
+    "jobs_and_risk": "GET /api/v1/control-tower",
+    "exceptions": "GET /api/v1/operations-workbench",
+    "management_trends": "GET /api/v1/management-kpi/trends",
+    "management_alerts": "GET /api/v1/management-kpi/alerts",
+    "approvals": "GET /api/clx034/workbench?status=PENDING",
+    "container_kpi": "GET /api/clx070/container-control/kpis",
+    "journey_kpi": "GET /api/clx071/journey/kpis",
+    "journey_exceptions": "GET /api/clx071/journey/exceptions",
+    "provider_safety": "GET /api/clx077/dummy-bank/safety",
+    "booking_bl_operational": "GET /api/clx011/screen-data?screen_id=...",
+    "financial": "GET /api/clx011/screen-data for existing GL invoice/bills/receipt/payment + SOA"
+  },
+  "kpis": [
+    {
+      "metric": "Bookings",
+      "formula": "count(authoritative booking rows)",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Active Jobs",
+      "formula": "control-tower.summary.jobs_open",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "B/L",
+      "formula": "count(authoritative B/L rows)",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Container Allocation",
+      "formula": "CLX-070 KPI",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Equipment Availability",
+      "formula": "CLX-070 KPI",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Journey milestones",
+      "formula": "CLX-071 KPI",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Revenue",
+      "formula": "sum existing GL invoices",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Cost",
+      "formula": "sum existing GL bills",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Gross Profit",
+      "formula": "Revenue-Cost",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Margin",
+      "formula": "Gross Profit/Revenue",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Customer AR",
+      "formula": "sum invoice Outstanding",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Vendor AP",
+      "formula": "sum bill Outstanding",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Cash Received",
+      "formula": "sum existing GL receipts",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Cash Paid",
+      "formula": "sum existing GL payments",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Quote-to-Booking",
+      "formula": "requires reliable global quote denominator",
+      "status": "REVIEW_LATER",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Approved Rate Utilization",
+      "formula": "source not globally normalized",
+      "status": "REVIEW_LATER",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Booking-to-B/L",
+      "formula": "B/L count / Booking count",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    },
+    {
+      "metric": "Management Alerts",
+      "formula": "existing CLX-028 alerts",
+      "status": "PRESENT",
+      "refresh_context": "on Executive Home refresh / source request"
+    }
+  ],
+  "filters": {
+    "period": "UI_CURRENT/30_DAYS",
+    "branch": "SOURCE_SUPPORTED_ONLY",
+    "agent": "SOURCE_SUPPORTED_ONLY",
+    "principal": "SOURCE_SUPPORTED_ONLY",
+    "customer": "SOURCE_SUPPORTED_ONLY",
+    "trade_lane": "SOURCE_SUPPORTED_ONLY",
+    "pol": "SOURCE_SUPPORTED_ONLY",
+    "pod": "SOURCE_SUPPORTED_ONLY",
+    "vessel": "SOURCE_SUPPORTED_ONLY",
+    "status": "SOURCE_SUPPORTED_ONLY"
+  },
+  "no_manual_kpi_override": true,
+  "role_scope": "EXISTING_API_ROLE_SCOPE",
+  "live_providers": "OFF",
+  "real_money": "OFF"
+}

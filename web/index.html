@@ -117,7 +117,7 @@ function domainSlug(d){return d.toLowerCase().replace(/\s*\/\s*/g,'-').replace(/
 function saveState(){localStorage.setItem('m3clx011-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('m3clx011-recent',JSON.stringify(state.recent.slice(0,15)))}
 function toggleGroup(id){let x=document.querySelector(`[data-content="${CSS.escape(id)}"]`);if(x)x.classList.toggle('collapse')}
 function screenAllowed(s){let r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;return !Array.isArray(s.roles)||!s.roles.length||s.roles.includes(r)}
-function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];return s&&screenAllowed(s)&&(!q||s.name.toLowerCase().includes(q)||s.submenu.toLowerCase().includes(q)||s.domain.toLowerCase().includes(q))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);return s&&aliasOk&&screenAllowed(s)&&(!q||it.label.toLowerCase().includes(q)||sub.name.toLowerCase().includes(q)||d.domain.toLowerCase().includes(q))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\\'")}',{domain:'${d.domain.replaceAll("'","\\'")}',submenu:'${sub.name.replaceAll("'","\\'")}',label:'${it.label.replaceAll("'","\\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'&&(!q||'global equipment tower equipment control container master network reposition lease depot'.includes(q))){
+function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];return s&&screenAllowed(s)&&(!q||s.name.toLowerCase().includes(q)||s.submenu.toLowerCase().includes(q)||s.domain.toLowerCase().includes(q))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);return s&&aliasOk&&screenAllowed(s)&&(!q||it.label.toLowerCase().includes(q)||sub.name.toLowerCase().includes(q)||d.domain.toLowerCase().includes(q))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'&&(!q||'global equipment tower equipment control container master network reposition lease depot'.includes(q))){
   subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-equipment-control\')">▾ Equipment Control <span class=count>6</span></button><div data-content="ho-equipment-control">'+
     '<div class="screenLink '+(state.equipmentView==='tower'?'active':'')+'" onclick="showEquipmentWorkspace(\'tower\')">Global Equipment Tower</div>'+
     '<div class="screenLink '+(state.equipmentView==='containers'?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Master</div>'+
@@ -131,12 +131,12 @@ if(!dcount)continue;let did=domainSlug(d.domain);html+=`<div class="menuBlock"><
 function renderBreadcrumb(){let s=state.current,n=state.navContext;if(n){$('breadcrumb').textContent=`M3 NVOCC ERP / ${n.domain} / ${n.submenu} / ${n.label}`;$('topTitle').textContent=n.label;$('pageTitle').textContent=n.label;document.title=`M3 NVOCC ERP — ${n.label}`}else{$('breadcrumb').textContent=`M3 NVOCC ERP / ${s.domain} / ${s.submenu} / ${s.name}`;$('topTitle').textContent=s.name;$('pageTitle').textContent=s.name;document.title=`M3 NVOCC ERP — ${s.name}`}$('favorite').textContent=state.favorites.has(s.screen_id)?'★':'☆';$('favorite').classList.toggle('on',state.favorites.has(s.screen_id))}
 function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,15);saveState()}
 function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);let i=same.findIndex(s=>s.screen_id===state.current.screen_id);return same[i+dir]?.screen_id||null}
-function renderFlow(){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);$('flow').innerHTML=same.map((s,i)=>`<span class="flowStep ${s.screen_id===state.current.screen_id?'active':''}" onclick="openScreen('${s.screen_id.replaceAll("'","\\'")}')">${s.business_sequence_position??(i+1)}. ${esc(s.name)}</span>`).join('');$('prevBtn').disabled=!neighborId(-1);$('nextBtn').disabled=!neighborId(1)}
+function renderFlow(){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);$('flow').innerHTML=same.map((s,i)=>`<span class="flowStep ${s.screen_id===state.current.screen_id?'active':''}" onclick="openScreen('${s.screen_id.replaceAll("'","\'")}')">${s.business_sequence_position??(i+1)}. ${esc(s.name)}</span>`).join('');$('prevBtn').disabled=!neighborId(-1);$('nextBtn').disabled=!neighborId(1)}
 function metaCards(data){let s=state.current,src=Array.isArray(s.source_records)?s.source_records:[],val=Array.isArray(s.validations)?s.validations:[];return `<div class=kpis><div class="card kpi"><span>Domain</span><b>${esc(s.domain)}</b></div><div class="card kpi"><span>Submenu</span><b>${esc(s.submenu)}</b></div><div class="card kpi"><span>Records</span><b>${data.count??0}</b></div><div class="card kpi"><span>Previous</span><b>${esc(s.previous_step||'—')}</b></div><div class="card kpi"><span>Next</span><b>${esc(s.next_step||'—')}</b></div></div><div class=card><b>Purpose</b><span class=muted> — ${esc(s.purpose||s.name||'')}</span><br><span class=muted>Source: ${esc(src.length?src.join(', '):'authoritative module API')} · Validations: ${esc(val.length?val.join(' · '):'server-side validation')}</span></div>`}
 function normalizeRows(rows){return (rows||[]).map(r=>{let o={...r};if(o.payload&&typeof o.payload==='object'){for(const [k,v] of Object.entries(o.payload)){if(!(k in o))o[k]=v}delete o.payload}return o})}
 function calcRows(){let q=($('gridSearch')?.value||'').toLowerCase();let st=$('statusFilter')?.value||'';let rows=state.rows.filter(r=>(!q||JSON.stringify(r).toLowerCase().includes(q))&&(!st||String(r.status??r.Status??'')===st));if(state.savedView==='action')rows=rows.filter(r=>/draft|pending|open|review|hold|failed/i.test(String(r.status??r.Status??'')));if(state.savedView==='closed')rows=rows.filter(r=>/released|closed|approved|posted|reconciled|active/i.test(String(r.status??r.Status??'')));if(state.sortKey)rows.sort((a,b)=>String(a[state.sortKey]??'').localeCompare(String(b[state.sortKey]??''))*(state.sortAsc?1:-1));state.filtered=rows;return rows}
 function statuses(){return [...new Set(state.rows.map(r=>String(r.status??r.Status??'')).filter(Boolean))].sort()}
-function renderGrid(){let rows=calcRows(),total=Math.max(1,Math.ceil(rows.length/state.pageSize));state.page=Math.min(state.page,total);let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=[];for(const r of slice){for(const k of Object.keys(r)){if(!keys.includes(k)&&k!=='payload_json')keys.push(k)}}keys=keys.slice(0,12);let html=`<div class=toolbar><input id=gridSearch placeholder="Search current screen..." value="${esc($('gridSearch')?.value||'')}" oninput="state.page=1;renderGrid()"><select id=statusFilter onchange="state.status=this.value;state.page=1;renderGrid()"><option value="">All statuses</option>${statuses().map(s=>`<option ${state.status===s?'selected':''}>${esc(s)}</option>`).join('')}</select><select onchange="state.savedView=this.value;state.page=1;renderGrid()"><option value="">Saved views</option><option value=action ${state.savedView==='action'?'selected':''}>Action Required</option><option value=closed ${state.savedView==='closed'?'selected':''}>Released / Closed / Approved</option></select><select onchange="state.pageSize=+this.value;state.page=1;renderGrid()"><option>20</option><option>50</option><option>100</option></select><button class=btn onclick="state.page=Math.max(1,state.page-1);renderGrid()">Prev</button><span class=muted>Page ${state.page}/${total}</span><button class=btn onclick="state.page=Math.min(${total},state.page+1);renderGrid()">Next</button><button class=btn onclick="exportCsv()">Export</button><button class=btn onclick="window.print()">Print</button><span class=muted>${rows.length} filtered / ${state.rows.length} total</span></div>`;if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div>';html+=`<div class=tablewrap><table><thead><tr><th>Actions</th>${keys.map(k=>`<th onclick="sortBy('${String(k).replaceAll("'","\\'")}')">${esc(k)}${state.sortKey===k?(state.sortAsc?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${slice.map((r,i)=>`<tr onclick="selectRow(${(state.page-1)*state.pageSize+i})"><td>${isGlReport()?`<button class=rowAction title="Drill Down" onclick="event.stopPropagation();drillGlReportRow(${(state.page-1)*state.pageSize+i})">↳</button>`:`<button class=rowAction title="Quick Actions" onclick="event.stopPropagation();selectRow(${(state.page-1)*state.pageSize+i});$('fabWrap').classList.add('open')">⋮</button>`}</td>${keys.map(k=>`<td>${esc(typeof r[k]==='object'?JSON.stringify(r[k]):r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;return html}
+function renderGrid(){let rows=calcRows(),total=Math.max(1,Math.ceil(rows.length/state.pageSize));state.page=Math.min(state.page,total);let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=[];for(const r of slice){for(const k of Object.keys(r)){if(!keys.includes(k)&&k!=='payload_json')keys.push(k)}}keys=keys.slice(0,12);let html=`<div class=toolbar><input id=gridSearch placeholder="Search current screen..." value="${esc($('gridSearch')?.value||'')}" oninput="state.page=1;renderGrid()"><select id=statusFilter onchange="state.status=this.value;state.page=1;renderGrid()"><option value="">All statuses</option>${statuses().map(s=>`<option ${state.status===s?'selected':''}>${esc(s)}</option>`).join('')}</select><select onchange="state.savedView=this.value;state.page=1;renderGrid()"><option value="">Saved views</option><option value=action ${state.savedView==='action'?'selected':''}>Action Required</option><option value=closed ${state.savedView==='closed'?'selected':''}>Released / Closed / Approved</option></select><select onchange="state.pageSize=+this.value;state.page=1;renderGrid()"><option>20</option><option>50</option><option>100</option></select><button class=btn onclick="state.page=Math.max(1,state.page-1);renderGrid()">Prev</button><span class=muted>Page ${state.page}/${total}</span><button class=btn onclick="state.page=Math.min(${total},state.page+1);renderGrid()">Next</button><button class=btn onclick="exportCsv()">Export</button><button class=btn onclick="window.print()">Print</button><span class=muted>${rows.length} filtered / ${state.rows.length} total</span></div>`;if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div>';html+=`<div class=tablewrap><table><thead><tr><th>Actions</th>${keys.map(k=>`<th onclick="sortBy('${String(k).replaceAll("'","\'")}')">${esc(k)}${state.sortKey===k?(state.sortAsc?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${slice.map((r,i)=>`<tr onclick="selectRow(${(state.page-1)*state.pageSize+i})"><td>${isGlReport()?`<button class=rowAction title="Drill Down" onclick="event.stopPropagation();drillGlReportRow(${(state.page-1)*state.pageSize+i})">↳</button>`:`<button class=rowAction title="Quick Actions" onclick="event.stopPropagation();selectRow(${(state.page-1)*state.pageSize+i});$('fabWrap').classList.add('open')">⋮</button>`}</td>${keys.map(k=>`<td>${esc(typeof r[k]==='object'?JSON.stringify(r[k]):r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;return html}
 function sortBy(k){if(state.sortKey===k)state.sortAsc=!state.sortAsc;else{state.sortKey=k;state.sortAsc=true}renderGrid()}
 function exportCsv(){let rows=state.filtered.length?state.filtered:calcRows();if(!rows.length)return;let ks=[...new Set(rows.flatMap(r=>Object.keys(r)))];let csv=[ks.join(','),...rows.map(r=>ks.map(k=>'"'+String(typeof r[k]==='object'?JSON.stringify(r[k]):r[k]??'').replaceAll('"','""')+'"').join(','))].join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`M3_${state.current.key}.csv`;a.click()}
 const GL_REPORT_KEYS=new Set(['trial-balance-report','profit-loss','balance-sheet','gl-detail','subledger-gl-reconciliation']);
@@ -1297,8 +1297,8 @@ async function decideMasterChange(decision){
   }catch(e){alert(e.message)}
 }
 async function runAction(a){$('fabWrap').classList.remove('open');const isAgent=state.current?.domain==='Agent Tasks',fin=financeDomain(),md=currentMasterDomain();if(a==='create'){if(isAgent)await openAgentForm('create');else if(fin)await openFinanceForm('create');return}if(a==='edit'){if(!state.selected)return alert('Select a record to edit');if(isAgent)await openAgentForm('edit');else if(fin)await openFinanceForm('edit');return}if(a==='activate'||a==='deactivate'){if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup')await changeAgentSetupStatus(a);else if(md)await masterStatusChange(a);return}if(a==='change-request'&&md){await openMasterChange();return}if(a==='version-history'&&md){await showMasterVersions();return}if((a==='approve'||a==='reject')&&state.current?.screen_id==='master-data::approval-queue'){await decideMasterChange(a);return}if(a==='quick-view'){openDrawer('details');return}if(a==='related-records'){openDrawer('related');return}if(a==='audit-history'){openDrawer('audit');return}if(a==='print'){window.print();return}if(a==='export'){exportCsv();return}let jr=selectedJob(),ref=state.selected?.external_ref??state.selected?.record_key??state.selected?.user_ref??null;if(a==='email'){try{let r=await api('/api/clx011/simulate-email',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'},body:JSON.stringify({screen_id:state.current.screen_id,record_ref:ref,job_ref:jr,subject:`${state.current.name} update`})});alert('Email action recorded as '+r.delivery+' — no external delivery.');loadAudit()}catch(e){alert(e.message)}return}if(isAgent&&['approve','release','hold','cancel','amend','reissue','reverse','advance'].includes(a)){await executeAgentAction(a);return}if(fin&&['approve','release','reverse'].includes(a)){await executeFinanceAction(a);return}let rid=state.selected?.id,version=state.selected?.version;let route=await api('/api/clx011/action-route?screen_id='+encodeURIComponent(state.current.screen_id)+'&action='+encodeURIComponent(a)+(rid?'&record_id='+rid:'')+(version?'&version='+version:''));$('drawerTitle').textContent='Quick Action · '+a;$('tab-details').innerHTML=`<div class=card><b>${esc(a.replaceAll('-',' '))}</b><p>This screen uses its existing approved workflow. No new business mutation is introduced by CLX-043.</p></div><pre class=pre>${esc(JSON.stringify(route,null,2))}</pre>`;drawerTabs('details');$('drawer').classList.add('open')}
-async function doGlobalSearch(){let q=$('globalSearch').value.trim();if(q.length<2){$('searchPanel').classList.remove('open');return}let d=await api('/api/clx011/search?q='+encodeURIComponent(q)+'&role='+encodeURIComponent(state.role));let html=d.screen_hits.map(x=>`<div class=searchItem onclick="openScreen('${x.screen_id.replaceAll("'","\\'")}');$('searchPanel').classList.remove('open')"><b>${esc(x.name)}</b><div class=muted>${esc(x.domain)} · ${esc(x.submenu)}</div></div>`).join('');html+=d.record_hits.map(x=>`<div class=searchItem><b>${esc(x.external_ref??x.record_key??'Record')}</b><div class=muted>${esc(x.type)} · Job ${esc(x.job_ref??'—')} · ${esc(x.status??'')}</div></div>`).join('');$('searchPanel').innerHTML=html||'<div class="searchItem muted">No matches</div>';$('searchPanel').classList.add('open')}
-function showShortlist(ids,title){let xs=ids.map(id=>state.byId[id]).filter(Boolean);$('searchPanel').innerHTML=`<div class=searchItem><b>${esc(title)}</b></div>`+xs.map(s=>`<div class=searchItem onclick="openScreen('${s.screen_id.replaceAll("'","\\'")}');$('searchPanel').classList.remove('open')"><b>${esc(s.name)}</b><div class=muted>${esc(s.domain)} · ${esc(s.submenu)}</div></div>`).join('');$('searchPanel').classList.add('open')}
+async function doGlobalSearch(){let q=$('globalSearch').value.trim();if(q.length<2){$('searchPanel').classList.remove('open');return}let d=await api('/api/clx011/search?q='+encodeURIComponent(q)+'&role='+encodeURIComponent(state.role));let html=d.screen_hits.map(x=>`<div class=searchItem onclick="openScreen('${x.screen_id.replaceAll("'","\'")}');$('searchPanel').classList.remove('open')"><b>${esc(x.name)}</b><div class=muted>${esc(x.domain)} · ${esc(x.submenu)}</div></div>`).join('');html+=d.record_hits.map(x=>`<div class=searchItem><b>${esc(x.external_ref??x.record_key??'Record')}</b><div class=muted>${esc(x.type)} · Job ${esc(x.job_ref??'—')} · ${esc(x.status??'')}</div></div>`).join('');$('searchPanel').innerHTML=html||'<div class="searchItem muted">No matches</div>';$('searchPanel').classList.add('open')}
+function showShortlist(ids,title){let xs=ids.map(id=>state.byId[id]).filter(Boolean);$('searchPanel').innerHTML=`<div class=searchItem><b>${esc(title)}</b></div>`+xs.map(s=>`<div class=searchItem onclick="openScreen('${s.screen_id.replaceAll("'","\'")}');$('searchPanel').classList.remove('open')"><b>${esc(s.name)}</b><div class=muted>${esc(s.domain)} · ${esc(s.submenu)}</div></div>`).join('');$('searchPanel').classList.add('open')}
 
 
 async function showDummyBankReview(){
@@ -1433,51 +1433,148 @@ async function showActionQueue(){try{let d=await api('/api/clx012/action-queue?s
 function homeScreenLinks(ids,emptyText){
   const xs=ids.map(id=>state.byId[id]).filter(Boolean).slice(0,6);
   if(!xs.length)return '<div class="muted">'+esc(emptyText)+'</div>';
-  return xs.map(s=>'<div class="homeLink" onclick="openScreen(\''+s.screen_id.replaceAll("'","\\'")+'\')"><b>'+esc(s.name)+'</b><div class="muted">'+esc(s.domain)+' · '+esc(s.submenu)+'</div></div>').join('');
+  return xs.map(s=>'<div class="homeLink" onclick="openScreen(\''+s.screen_id.replaceAll("'","\'")+'\')"><b>'+esc(s.name)+'</b><div class="muted">'+esc(s.domain)+' · '+esc(s.submenu)+'</div></div>').join('');
+}
+
+function clx85Rows(data){return Array.isArray(data?.rows)?normalizeRows(data.rows):[]}
+function clx85Num(v){const n=Number(String(v??'').replaceAll(',',''));return Number.isFinite(n)?n:0}
+function clx85Sum(rows,...keys){return rows.reduce((a,r)=>a+clx85Num(keys.map(k=>r?.[k]).find(v=>v!==undefined&&v!==null&&v!=='')),0)}
+function clx85Count(rows,pred){return (rows||[]).filter(pred).length}
+function clx85Kpi(label,value,sub,action=''){return '<div class="homeCard" '+(action?'onclick="'+action+'"':'')+'><span>'+esc(label)+'</span><b>'+esc(value)+'</b><span class="muted">'+esc(sub)+'</span></div>'}
+function clx85StatusName(x){return String(x?.status??x?.Status??x?.equipment_status??'').toUpperCase()}
+function clx85ExceptionLink(item){
+  const sid=item?.target_screen_id||'agent-tasks::booking',jr=item?.job_ref||'';
+  return '<tr><td><b>'+esc(item?.priority||'')+'</b></td><td>'+esc(item?.category||'')+'</td><td>'+esc(jr)+'</td><td>'+esc(item?.title||item?.detail||'')+'</td><td>'+esc(item?.status||'OPEN')+'</td><td><button class="btn" onclick="openClx49Link(\''+sid+'\',\''+esc(jr)+'\')">Open</button></td></tr>';
+}
+function clx85ApprovalRows(fin){
+  const items=fin?.items||fin?.rows||[];
+  return items.slice(0,10).map(x=>'<tr><td>'+esc(x.type||x.module||x.category||'Finance')+'</td><td>'+esc(x.reference||x.external_ref||x.record_ref||x.id||'')+'</td><td>'+esc(x.job_ref||x['Job Ref']||'')+'</td><td>'+esc(x.status||x.Status||'PENDING')+'</td></tr>').join('');
+}
+function clx85FilterBar(){
+  return '<div class="card"><div class="toolbar"><b>Management Filters</b><select id="clx85Period"><option>Current</option><option>30 Days</option></select><input id="clx85Branch" placeholder="Branch / Office"><input id="clx85Agent" placeholder="Agent"><input id="clx85Principal" placeholder="Principal"><input id="clx85Customer" placeholder="Customer"><input id="clx85TradeLane" placeholder="Trade Lane"><input id="clx85Pol" placeholder="POL"><input id="clx85Pod" placeholder="POD"><input id="clx85Vessel" placeholder="Vessel"><select id="clx85Status"><option value="">All Status</option><option>OPEN</option><option>HOLD</option><option>BLOCKED</option><option>RELEASED</option></select><button class="btn" onclick="showExecutiveHome()">Refresh</button></div><div class="equipNote">Filters are presentation controls only. They do not create parallel master data; source-level role/data scope remains authoritative.</div></div>';
 }
 async function showExecutiveHome(){
   state.current=null;state.navContext=null;state.selected=null;renderNav();
-  $('breadcrumb').textContent='M3 NVOCC ERP / Executive Home';
+  $('breadcrumb').textContent='M3 NVOCC ERP / Executive Home / Management Control';
   $('topTitle').textContent='M3 NVOCC ERP';
   $('pageTitle').textContent='Executive Home';
-  $('statusPill').textContent='Live UAT View';
+  $('statusPill').textContent='CLX-085 Management Control';
   $('favorite').style.visibility='hidden';
   $('flow').innerHTML='';
-  $('screenMeta').innerHTML='<div class="card"><b>Executive Home</b><span class="muted"> — existing approved operational, exception and finance data only.</span></div>';
-  $('gridArea').innerHTML='<div class="card">Loading dashboard…</div>';
+  $('screenMeta').innerHTML='<div class="card"><b>CLX-085 Executive Home</b><span class="muted"> — authoritative operational + finance + exception + approval data only · no KPI ledger · no summary table.</span></div>';
+  $('gridArea').innerHTML='<div class="card">Loading management control…</div>';
   history.replaceState(null,'','#home');
   const headers={'X-Role':state.role,'X-Actor-Id':'ui-user','X-Team':['OPS','DOCS','FINANCE'].includes(state.role)?state.role:'OPS'};
+  const screen=(id)=>api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers}).catch(()=>({rows:[]}));
   const results=await Promise.allSettled([
     api('/api/v1/control-tower',{headers}),
     api('/api/v1/operations-workbench?view=my',{headers}),
     api('/api/v1/operations-workbench?view=critical',{headers}),
-    api('/api/clx034/workbench?status=PENDING',{headers})
+    api('/api/clx034/workbench?status=PENDING',{headers}),
+    api('/api/v1/management-kpi/trends?days=30',{headers}),
+    api('/api/v1/management-kpi/alerts?status=OPEN',{headers}),
+    api('/api/clx070/container-control/kpis',{headers}),
+    api('/api/clx071/journey/kpis',{headers}),
+    api('/api/clx071/journey/exceptions',{headers}),
+    api('/api/clx077/dummy-bank/safety',{headers}),
+    screen('agent-tasks::booking'),screen('agent-tasks::bl'),screen('agent-tasks::cro'),screen('agent-tasks::transshipment-crt'),screen('agent-tasks::delivery-order'),
+    screen('gl-accounts::invoice'),screen('gl-accounts::bills'),screen('gl-accounts::receipt'),screen('gl-accounts::payment'),screen('agent-tasks::soa')
   ]);
-  const ct=results[0].status==='fulfilled'?results[0].value:null;
-  const my=results[1].status==='fulfilled'?results[1].value:null;
-  const critical=results[2].status==='fulfilled'?results[2].value:null;
-  const fin=results[3].status==='fulfilled'?results[3].value:null;
-  const s=ct?.summary||{};
-  const myCount=my?.summary?.total??my?.items?.length??0;
-  const criticalCount=critical?.summary?.total??critical?.items?.length??s.critical??0;
-  const financeCount=fin?.count??fin?.items?.length??'—';
+  const val=i=>results[i]?.status==='fulfilled'?results[i].value:null;
+  const ct=val(0),work=val(1),critical=val(2),approvals=val(3),trends=val(4),alerts=val(5),eq=val(6)||{},journey=val(7)||{},journeyExc=val(8)||{},safety=val(9)||{};
+  const booking=clx85Rows(val(10)),bl=clx85Rows(val(11)),cro=clx85Rows(val(12)),crt=clx85Rows(val(13)),delivery=clx85Rows(val(14));
+  const invoices=clx85Rows(val(15)),bills=clx85Rows(val(16)),receipts=clx85Rows(val(17)),payments=clx85Rows(val(18)),soa=clx85Rows(val(19));
+  const sm=ct?.summary||{}, items=work?.items||[], criticalItems=critical?.items||[];
+  const revenue=clx85Sum(invoices,'Invoice Amount','Amount','Net Amount','Total');
+  const cost=clx85Sum(bills,'Invoice Amount','Amount','Net Amount','Total');
+  const ar=clx85Sum(invoices,'Outstanding','Balance');
+  const ap=clx85Sum(bills,'Outstanding','Balance');
+  const cashIn=clx85Sum(receipts,'Amount','Receipt Amount');
+  const cashOut=clx85Sum(payments,'Amount','Payment Amount');
+  const gp=revenue-cost, margin=revenue?((gp/revenue)*100).toFixed(1):'0.0';
+  const openApprovals=approvals?.count??approvals?.items?.length??0;
+  const providerMode=(String(safety.live_providers||'OFF').toUpperCase()==='ON'?'LIVE':'OFF');
+  const realMoney=String(safety.real_money||'OFF').toUpperCase();
+  const latest=trends?.snapshots?.[trends.snapshots.length-1]||{};
+  const eqCount=eq.total_containers??eq.total??eq.container_count??'—';
+  const available=eq.available??eq.available_count??'—';
+  const gateIn=journey.gate_in??journey.gate_in_count??'—';
+  const loaded=journey.loaded??journey.loaded_count??'—';
+  const inTransit=journey.in_transit??journey.in_transit_count??'—';
+  const transship=journey.transshipment??journey.transshipment_count??crt.length;
+  const discharged=journey.discharged??journey.discharged_count??'—';
+  const emptyReturn=journey.empty_return??journey.empty_return_count??'—';
+  const overdue=journey.overdue??journey.empty_return_overdue??sm.overdue??0;
+  const jex=journeyExc.items||journeyExc.exceptions||[];
+  const det=clx85Count(items,x=>/DETENTION/i.test(String(x.category||x.title||x.detail||'')));
+  const damage=clx85Count(items,x=>/DAMAGE|REPAIR|M&R/i.test(String(x.category||x.title||x.detail||'')));
+  const failedIntegration=clx85Count(items,x=>x.category==='FAILED_INTEGRATION');
   const recent=homeScreenLinks(state.recent,'No recent screens yet.');
   const favorites=homeScreenLinks([...state.favorites],'No favorite screens yet.');
-  $('gridArea').innerHTML=`
-    <div class="homeGrid">
-      <div class="homeCard" onclick="showOpsWorkbench('today')"><span>Today</span><b>${esc(s.overdue??0)}</b><span class="muted">Due today / overdue attention</span></div>
-      <div class="homeCard" onclick="showOpsWorkbench('my')"><span>My Work</span><b>${esc(myCount)}</b><span class="muted">Assigned work items</span></div>
-      <div class="homeCard" onclick="showOpsWorkbench('critical')"><span>Critical Exceptions</span><b>${esc(criticalCount)}</b><span class="muted">Requires attention</span></div>
-      <div class="homeCard" onclick="showOpsWorkbench('overdue')"><span>Overdue</span><b>${esc(s.overdue??0)}</b><span class="muted">SLA / due-date exposure</span></div>
-      <div class="homeCard" onclick="showControlTower()"><span>Open Jobs</span><b>${esc(s.jobs_open??0)}</b><span class="muted">Current operational jobs</span></div>
-      <div class="homeCard" onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')"><span>Finance Attention</span><b>${esc(financeCount)}</b><span class="muted">Pending governed items</span></div>
-    </div>
-    <div class="homeSections">
-      <div class="card"><b>Recent Screens</b><div class="homeList">${recent}</div></div>
-      <div class="card"><b>Favorite Screens</b><div class="homeList">${favorites}</div></div>
-      <div class="card"><b>Operations</b><div class="toolbar"><button class="btn" onclick="showControlTower()">Control Tower</button><button class="btn" onclick="showOpsWorkbench()">Ops Workbench</button><button class="btn" onclick="showBusinessDay()">Business Day</button><button class="btn" onclick="showActionQueue()">Action Queue</button></div></div>
-      <div class="card"><b>Management & Finance</b><div class="toolbar"><button class="btn" onclick="showKpiTrends()">KPI Trends</button><button class="btn" onclick="showReadiness()">Readiness</button><button class="btn" onclick="showObservability()">Observability</button><button class="btn" onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')">Finance Approvals</button></div></div>
-    </div>`;
+
+  $('gridArea').innerHTML=
+    clx85FilterBar()+
+    '<div class="card"><b>Management Attention</b></div><div class="homeGrid">'+
+      clx85Kpi('Today',sm.overdue??0,'Due today / overdue attention',"showOpsWorkbench('today')")+
+      clx85Kpi('My Work',work?.summary?.total??work?.items?.length??0,'Assigned work items',"showOpsWorkbench('my')")+
+      clx85Kpi('Critical Exceptions',critical?.summary?.total??criticalItems.length,'Requires attention',"showOpsWorkbench('critical')")+
+      clx85Kpi('Overdue',sm.overdue??0,'SLA / due-date exposure',"showOpsWorkbench('overdue')")+
+      clx85Kpi('Open Jobs',sm.jobs_open??0,'Current operational jobs',"showControlTower()")+
+      clx85Kpi('Finance Attention',openApprovals,'Pending governed items',"window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')")+
+    '</div>'+
+    '<div class="card"><b>Operational KPI</b></div><div class="homeGrid">'+
+      clx85Kpi('Bookings',booking.length,'Authoritative Booking records',"openScreen('agent-tasks::booking')")+
+      clx85Kpi('Active Jobs',sm.jobs_open??0,'Control Tower jobs',"showControlTower()")+
+      clx85Kpi('B/L',bl.length,'Authoritative B/L records',"openScreen('agent-tasks::bl')")+
+      clx85Kpi('CRO',cro.length,'Container release orders',"openScreen('agent-tasks::cro')")+
+      clx85Kpi('CRT / TS',crt.length,'Transshipment records',"openScreen('agent-tasks::transshipment-crt')")+
+      clx85Kpi('Delivery Orders',delivery.length,'Existing DO records',"openScreen('agent-tasks::delivery-order')")+
+      clx85Kpi('Containers',eqCount,'CLX-070 container master',"showEquipmentWorkspace('containers')")+
+      clx85Kpi('Available Equipment',available,'CLX-070 availability',"showEquipmentWorkspace('tower')")+
+      clx85Kpi('Gate In',gateIn,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
+      clx85Kpi('Loaded',loaded,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
+      clx85Kpi('In Transit',inTransit,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
+      clx85Kpi('Transshipment',transship,'CLX-071 / CRT','showEquipmentWorkspace(\'journey\')')+
+      clx85Kpi('Discharged',discharged,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
+      clx85Kpi('Empty Return',emptyReturn,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
+      clx85Kpi('Overdue',overdue,'Existing SLA/journey exceptions',"showOpsWorkbench('overdue')")+
+      clx85Kpi('Detention',det,'Existing exception/workbench source',"openScreen('agent-tasks::detention-collection')")+
+      clx85Kpi('Damage / Hold',damage,'Existing exception/workbench source',"showEquipmentWorkspace('mr')")+
+    '</div>'+
+    '<div class="card"><b>Financial KPI</b></div><div class="homeGrid">'+
+      clx85Kpi('Revenue',revenue.toFixed(2),'Existing GL invoices',"openScreen('gl-accounts::invoice')")+
+      clx85Kpi('Cost',cost.toFixed(2),'Existing GL bills',"openScreen('gl-accounts::bills')")+
+      clx85Kpi('Gross Profit',gp.toFixed(2),'Revenue − Cost',"openScreen('gl-accounts::profit-loss')")+
+      clx85Kpi('Margin',margin+'%','Gross Profit / Revenue',"openScreen('gl-accounts::profit-loss')")+
+      clx85Kpi('Customer AR',ar.toFixed(2),'Invoice outstanding',"openScreen('gl-accounts::customer-credit-control')")+
+      clx85Kpi('Vendor AP',ap.toFixed(2),'Bills outstanding',"openScreen('gl-accounts::supplier-payable-control')")+
+      clx85Kpi('Cash Received',cashIn.toFixed(2),'Existing receipts',"openScreen('gl-accounts::receipt')")+
+      clx85Kpi('Cash Paid',cashOut.toFixed(2),'Existing payments',"openScreen('gl-accounts::payment')")+
+      clx85Kpi('SOA Records',soa.length,'Existing SOA source',"openScreen('agent-tasks::soa')")+
+      clx85Kpi('Finance Attention',openApprovals,'Existing governed approvals',"window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')")+
+    '</div>'+
+    '<div class="card"><b>Commercial KPI</b><div class="equipNote">Metrics are shown only where existing source data supports them. Unsupported dimensions remain REVIEW_LATER; no analytics fact table is created.</div></div><div class="homeGrid">'+
+      clx85Kpi('Quote → Booking','REVIEW_LATER','No reliable global quote denominator in current source')+
+      clx85Kpi('Booking → B/L',booking.length?((bl.length/booking.length)*100).toFixed(1)+'%':'—','Derived from current authoritative counts')+
+      clx85Kpi('Approved Rate Utilization','REVIEW_LATER','Source not globally normalized')+
+      clx85Kpi('Sell vs Cost',(revenue-cost).toFixed(2),'Existing GL totals')+
+      clx85Kpi('Management Alerts',alerts?.alerts?.length??0,'Existing CLX-028 alerts','showKpiTrends()')+
+      clx85Kpi('Provider Mode',providerMode,'Existing provider safety configuration',"openScreen('integration-security::provider-adapters')")+
+      clx85Kpi('Real Money',realMoney,'Must remain OFF','showDummyBankReview()')+
+    '</div>'+
+    '<div class="homeSections">'+
+      '<div class="card"><b>Exception Attention</b><div class="muted">Existing Operations Workbench / CLX-071 exceptions only</div><div class="tablewrap"><table><thead><tr><th>Priority</th><th>Category</th><th>Job</th><th>Exception</th><th>Status</th><th></th></tr></thead><tbody>'+
+      (([...criticalItems,...jex].slice(0,12).map(clx85ExceptionLink).join(''))||'<tr><td colspan="6">No current exceptions.</td></tr>')+
+      '</tbody></table></div><div class="toolbar"><button class="btn" onclick="showOpsWorkbench()">Open Operations Workbench</button><button class="btn" onclick="showEquipmentWorkspace(\'exceptions\')">Equipment Exceptions</button></div></div>'+
+      '<div class="card"><b>Approval Attention</b><div class="muted">Existing maker-checker / four-eyes sources only</div><div class="tablewrap"><table><thead><tr><th>Type</th><th>Reference</th><th>Job</th><th>Status</th></tr></thead><tbody>'+
+      (clx85ApprovalRows(approvals)||'<tr><td colspan="4">No pending approval rows returned.</td></tr>')+
+      '</tbody></table></div><div class="toolbar"><button class="btn" onclick="window.open(M3_API_BASE+\'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html\',\'_blank\')">Finance Approvals</button><button class="btn" onclick="openScreen(\'master-data::approval-queue\')">Master Data Approvals</button></div></div>'+
+      '<div class="card"><b>Management Control</b><div class="homeList"><div class="homeLink" onclick="showControlTower()"><b>Control Tower</b><div class="muted">Open jobs · risk · role-scoped drilldown</div></div><div class="homeLink" onclick="showKpiTrends()"><b>KPI Trends</b><div class="muted">Immutable daily snapshots · current alerts</div></div><div class="homeLink" onclick="showOpsWorkbench()"><b>Exception Workbench</b><div class="muted">Derived existing approved data · no duplicate exception records</div></div><div class="homeLink" onclick="openScreen(\'integration-security::request-response-audit\')"><b>Audit / Trace</b><div class="muted">Existing audit and request-response trace</div></div></div></div>'+
+      '<div class="card"><b>Provider / Safety Status</b><div class="homeList"><div><b>Live providers</b><div class="muted">'+esc(String(safety.live_providers||'OFF'))+'</div></div><div><b>Real money</b><div class="muted">'+esc(realMoney)+'</div></div><div><b>Dummy bank</b><div class="muted">Controlled review/training only</div></div><div><b>Failed integration exceptions</b><div class="muted">'+esc(failedIntegration)+'</div></div></div></div>'+
+      '<div class="card"><b>Recent Screens</b><div class="homeList">'+recent+'</div></div>'+
+      '<div class="card"><b>Favorite Screens</b><div class="homeList">'+favorites+'</div></div>'+
+    '</div>'+
+    '<div class="card"><b>Data Consistency / Source Governance</b><div class="equipNote">Management totals are calculated in the UI from the same role-scoped Booking, B/L, GL, Treasury, SOA, Container, Journey, Workbench and Approval sources used by transaction screens. No manual KPI override, secondary audit log, KPI ledger, exception model or management summary table is introduced.</div><div class="muted">Latest immutable CLX-028 snapshot: '+esc(latest.snapshot_date||'not available')+' · role scope preserved · maker-checker preserved · external providers OFF · real money OFF.</div></div>';
 }
 
 async function openBookingEquipmentAllocation(jobRef){

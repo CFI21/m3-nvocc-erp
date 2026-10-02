@@ -1,0 +1,20 @@
+{
+  "schema": "M3_CLX085_EXCEPTION_CONTROL_UAT_V1",
+  "checks": {
+    "exception_dashboard": "PASS",
+    "existing_exception_sources_only": "PASS",
+    "approval_attention": "PASS",
+    "maker_checker_preserved": "PASS",
+    "audit_trace_links": "PASS",
+    "failed_integration": "PASS",
+    "container_journey_exception_links": "PASS",
+    "no_duplicate_exception_model": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36995194938,
+  "focused_tests": "53 passed",
+  "full_regression": "325 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS"
+}
