@@ -89,6 +89,20 @@ def test_super_admin_self_approval_is_four_eyes_blocked(isolated):
         decide_agent_user_invite(out['review_ref'],AgentUserInviteDecision(decision='APPROVE'),maker)
     assert same.value.detail['code']=='FOUR_EYES_VIOLATION'
 
+def test_retry_recovers_pre_review_partial_invite(isolated):
+    c=db.connect()
+    office=c.execute("SELECT id FROM iam_offices WHERE office_code='RTM'").fetchone()['id']
+    c.execute("""INSERT INTO iam_users(user_ref,username,display_name,email,password_hash,status,home_office_id,mfa_required)
+      VALUES('USR-AGT-PARTIAL','ancml@786','ANCML','minbox@ancline.net','unusable','INVITED_PENDING_CHECKER',?,1)""",(office,))
+    c.close()
+    out=request_agent_user_invite(invite(),session_for('md.maker'))
+    assert out['user_ref']=='USR-AGT-PARTIAL'
+    assert out['status']=='INVITE_PENDING_CHECKER'
+    c=db.connect()
+    assert c.execute("SELECT COUNT(*) n FROM iam_users WHERE username='ancml@786'").fetchone()['n']==1
+    assert c.execute("SELECT COUNT(*) n FROM iam_access_reviews WHERE user_id=(SELECT id FROM iam_users WHERE username='ancml@786') AND status='PENDING'").fetchone()['n']==1
+    c.close()
+
 def test_duplicate_email_and_196_screens(isolated):
     maker=session_for('admin')
     request_agent_user_invite(invite(),maker)
