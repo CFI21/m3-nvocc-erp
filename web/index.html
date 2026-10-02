@@ -1027,7 +1027,7 @@ async function saveAgentForm(mode){
       const key=$('clx42RecordKey').value.trim();const name=$('clx42Name').value.trim();
       if(!key||!name)throw new Error('Record Key and Name are required');
       const payload={name};document.querySelectorAll('[data-clx42-master]').forEach(el=>{if(el.value.trim())payload[el.dataset.clx42Master]=el.value.trim()});
-      await api(schema.change_api,{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-User':'ui-user'},body:JSON.stringify({domain:schema.master_domain,record_key:key,operation:mode==='create'?'CREATE':'UPDATE',payload,reason:'CLX-042 governed Agent Setup form'})});
+      await api(schema.change_api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:schema.master_domain,record_key:key,operation:mode==='create'?'CREATE':'UPDATE',payload,reason:'CLX-042 governed Agent Setup form'})});
     }
     $('drawer').classList.remove('open');await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
@@ -1036,7 +1036,7 @@ async function changeAgentSetupStatus(operation){
   if(!state.selected?.record_key)return alert('Select a setup master record first');
   try{
     const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode=edit');
-    await api(schema.change_api,{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-User':'ui-user'},body:JSON.stringify({domain:schema.master_domain,record_key:state.selected.record_key,operation:operation.toUpperCase(),payload:{},reason:'CLX-042 governed Agent Setup status change'})});
+    await api(schema.change_api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:schema.master_domain,record_key:state.selected.record_key,operation:operation.toUpperCase(),payload:{},reason:'CLX-042 governed Agent Setup status change'})});
     alert(operation.toUpperCase()+' change request created for independent approval.');
   }catch(e){alert(e.message)}
 }
@@ -1314,14 +1314,14 @@ async function saveMasterChange(isUpdate){
     const key=$('clx43MasterKey').value.trim(),name=$('clx43MasterName').value.trim(),reason=$('clx43MasterReason').value.trim();
     if(!key||!name||!reason)throw new Error('Record Key, Name and Reason are required');
     const payload={name};if($('clx43MasterFrom').value.trim())payload.effective_from=$('clx43MasterFrom').value.trim();if($('clx43MasterTo').value.trim())payload.effective_to=$('clx43MasterTo').value.trim();
-    await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-User':'ui-user'},body:JSON.stringify({domain,record_key:key,operation:isUpdate?'UPDATE':'CREATE',payload,reason})});
+    await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain,record_key:key,operation:isUpdate?'UPDATE':'CREATE',payload,reason})});
     $('drawer').classList.remove('open');await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
 }
 async function masterStatusChange(operation){
   const domain=currentMasterDomain();if(!domain||!state.selected?.record_key)return alert('Select a master record first');
   try{
-    await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-User':'ui-user'},body:JSON.stringify({domain,record_key:state.selected.record_key,operation:operation.toUpperCase(),payload:{},reason:'CLX-043 governed status change'})});
+    await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain,record_key:state.selected.record_key,operation:operation.toUpperCase(),payload:{},reason:'CLX-043 governed status change'})});
     alert(operation.toUpperCase()+' change request created for independent approval.');
   }catch(e){alert(e.message)}
 }
@@ -1332,7 +1332,7 @@ async function showMasterVersions(){
 async function decideMasterChange(decision){
   const ref=state.selected?.change_ref;if(!ref)return alert('Select a pending change first');
   try{
-    await api('/api/masterdata/changes/'+encodeURIComponent(ref)+'/decision',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-User':'ui-checker'},body:JSON.stringify({decision:decision.toUpperCase(),comment:'CLX-043 governed approval decision'})});
+    await api('/api/masterdata/changes/'+encodeURIComponent(ref)+'/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision:decision.toUpperCase(),comment:'CLX-043 governed approval decision'})});
     await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
 }
