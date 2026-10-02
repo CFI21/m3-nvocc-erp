@@ -1,0 +1,38 @@
+{
+  "schema": "M3_AGENT_USER_ONBOARDING_ALIGNMENT_V1",
+  "frozen_runtime": "4b964819cae79acb143d22281d64890bcc86390b",
+  "source_evidence": {
+    "agents_rows": 159,
+    "active_agents": 159,
+    "users_rows": 75,
+    "users_with_agent_value": 42,
+    "unique_agent_names_in_user_file": 34,
+    "unique_exact_agent_matches": 33,
+    "parties_rows": 1009,
+    "exact_agent_name_party_matches": 48
+  },
+  "design": {
+    "authoritative_parent": "agent",
+    "user_type": "named_user_only",
+    "shared_generic_login": false,
+    "multiple_users_per_agent": true,
+    "pending_user_status": "INACTIVE",
+    "activation": "independent_checker_only",
+    "role": "AGENT",
+    "scope": [
+      "office",
+      "country",
+      "organization",
+      "agent_party"
+    ],
+    "mfa_required": true,
+    "immutable_iam_audit": true,
+    "no_schema_change": true
+  },
+  "production_data_imported": false,
+  "ancline": "UNTOUCHED",
+  "live_providers": "OFF",
+  "real_money": "OFF",
+  "AGENT_USER_ONBOARDING_READY": false,
+  "status": "IMPLEMENTATION_CANDIDATE_REQUIRES_CI_UAT"
+}
