@@ -1,0 +1,16 @@
+{
+  "schema": "M3_CLX085_EXECUTIVE_HOME_UAT_V1",
+  "checks": {
+    "executive_home": "PENDING_CI",
+    "operational_kpi": "PENDING_CI",
+    "financial_kpi": "PENDING_CI",
+    "commercial_kpi": "PENDING_CI",
+    "management_filters": "PENDING_CI",
+    "drilldown": "PENDING_CI",
+    "provider_status": "PENDING_CI",
+    "role_scope": "PENDING_CI",
+    "data_reconciliation": "PENDING_CI",
+    "no_new_summary_table": "PENDING_CI"
+  },
+  "status": "PENDING_CI"
+}

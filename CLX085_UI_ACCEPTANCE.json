@@ -1,0 +1,18 @@
+{
+  "schema": "M3_CLX085_UI_ACCEPTANCE_V1",
+  "baseline": "e6aec0503929783b22d835dcec0221013b5a43cd",
+  "MANAGEMENT_CONTROL_READY": false,
+  "backend_model_changed": false,
+  "database_changed": false,
+  "REAL_MONEY_READY": false,
+  "REAL_PROVIDER_READY": false,
+  "status": "PENDING_CI",
+  "validation": {
+    "focused_management_tests": "PENDING",
+    "canonical_screen_contract": "PENDING",
+    "full_erp_regression": "PENDING",
+    "javascript_syntax": "PENDING",
+    "safety": "PENDING"
+  },
+  "acceptance_rule": "Set MANAGEMENT_CONTROL_READY=true only if Executive Home + KPI + Exception + Approval + Drilldown + Role Scope pass with no P0/P1 defects."
+}

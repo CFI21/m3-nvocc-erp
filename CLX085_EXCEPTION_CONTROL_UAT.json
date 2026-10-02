@@ -1,0 +1,14 @@
+{
+  "schema": "M3_CLX085_EXCEPTION_CONTROL_UAT_V1",
+  "checks": {
+    "exception_dashboard": "PENDING_CI",
+    "existing_exception_sources_only": "PENDING_CI",
+    "approval_attention": "PENDING_CI",
+    "maker_checker_preserved": "PENDING_CI",
+    "audit_trace_links": "PENDING_CI",
+    "failed_integration": "PENDING_CI",
+    "container_journey_exception_links": "PENDING_CI",
+    "no_duplicate_exception_model": "PENDING_CI"
+  },
+  "status": "PENDING_CI"
+}

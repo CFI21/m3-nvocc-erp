@@ -1435,49 +1435,138 @@ function homeScreenLinks(ids,emptyText){
   if(!xs.length)return '<div class="muted">'+esc(emptyText)+'</div>';
   return xs.map(s=>'<div class="homeLink" onclick="openScreen(\''+s.screen_id.replaceAll("'","\\'")+'\')"><b>'+esc(s.name)+'</b><div class="muted">'+esc(s.domain)+' · '+esc(s.submenu)+'</div></div>').join('');
 }
+
+function clx85Rows(data){return Array.isArray(data?.rows)?normalizeRows(data.rows):[]}
+function clx85Num(v){const n=Number(String(v??'').replaceAll(',',''));return Number.isFinite(n)?n:0}
+function clx85Sum(rows,...keys){return rows.reduce((a,r)=>a+clx85Num(keys.map(k=>r?.[k]).find(v=>v!==undefined&&v!==null&&v!=='')),0)}
+function clx85Count(rows,pred){return (rows||[]).filter(pred).length}
+function clx85Kpi(label,value,sub,action=''){return '<div class="homeCard" '+(action?'onclick="'+action+'"':'')+'><span>'+esc(label)+'</span><b>'+esc(value)+'</b><span class="muted">'+esc(sub)+'</span></div>'}
+function clx85StatusName(x){return String(x?.status??x?.Status??x?.equipment_status??'').toUpperCase()}
+function clx85ExceptionLink(item){
+  const sid=item?.target_screen_id||'agent-tasks::booking',jr=item?.job_ref||'';
+  return '<tr><td><b>'+esc(item?.priority||'')+'</b></td><td>'+esc(item?.category||'')+'</td><td>'+esc(jr)+'</td><td>'+esc(item?.title||item?.detail||'')+'</td><td>'+esc(item?.status||'OPEN')+'</td><td><button class="btn" onclick="openClx49Link(\''+sid+'\',\''+esc(jr)+'\')">Open</button></td></tr>';
+}
+function clx85ApprovalRows(fin){
+  const items=fin?.items||fin?.rows||[];
+  return items.slice(0,10).map(x=>'<tr><td>'+esc(x.type||x.module||x.category||'Finance')+'</td><td>'+esc(x.reference||x.external_ref||x.record_ref||x.id||'')+'</td><td>'+esc(x.job_ref||x['Job Ref']||'')+'</td><td>'+esc(x.status||x.Status||'PENDING')+'</td></tr>').join('');
+}
+function clx85FilterBar(){
+  return '<div class="card"><div class="toolbar"><b>Management Filters</b><select id="clx85Period"><option>Current</option><option>30 Days</option></select><input id="clx85Branch" placeholder="Branch / Office"><input id="clx85Agent" placeholder="Agent"><input id="clx85Principal" placeholder="Principal"><input id="clx85Customer" placeholder="Customer"><input id="clx85TradeLane" placeholder="Trade Lane"><input id="clx85Pol" placeholder="POL"><input id="clx85Pod" placeholder="POD"><input id="clx85Vessel" placeholder="Vessel"><select id="clx85Status"><option value="">All Status</option><option>OPEN</option><option>HOLD</option><option>BLOCKED</option><option>RELEASED</option></select><button class="btn" onclick="showExecutiveHome()">Refresh</button></div><div class="equipNote">Filters are presentation controls only. They do not create parallel master data; source-level role/data scope remains authoritative.</div></div>';
+}
 async function showExecutiveHome(){
   state.current=null;state.navContext=null;state.selected=null;renderNav();
-  $('breadcrumb').textContent='M3 NVOCC ERP / Executive Home';
+  $('breadcrumb').textContent='M3 NVOCC ERP / Executive Home / Management Control';
   $('topTitle').textContent='M3 NVOCC ERP';
   $('pageTitle').textContent='Executive Home';
-  $('statusPill').textContent='Live UAT View';
+  $('statusPill').textContent='CLX-085 Management Control';
   $('favorite').style.visibility='hidden';
   $('flow').innerHTML='';
-  $('screenMeta').innerHTML='<div class="card"><b>Executive Home</b><span class="muted"> — existing approved operational, exception and finance data only.</span></div>';
-  $('gridArea').innerHTML='<div class="card">Loading dashboard…</div>';
+  $('screenMeta').innerHTML='<div class="card"><b>CLX-085 Executive Home</b><span class="muted"> — authoritative operational + finance + exception + approval data only · no KPI ledger · no summary table.</span></div>';
+  $('gridArea').innerHTML='<div class="card">Loading management control…</div>';
   history.replaceState(null,'','#home');
   const headers={'X-Role':state.role,'X-Actor-Id':'ui-user','X-Team':['OPS','DOCS','FINANCE'].includes(state.role)?state.role:'OPS'};
+  const screen=(id)=>api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers}).catch(()=>({rows:[]}));
   const results=await Promise.allSettled([
     api('/api/v1/control-tower',{headers}),
-    api('/api/v1/operations-workbench?view=my',{headers}),
+    api('/api/v1/operations-workbench',{headers}),
     api('/api/v1/operations-workbench?view=critical',{headers}),
-    api('/api/clx034/workbench?status=PENDING',{headers})
+    api('/api/clx034/workbench?status=PENDING',{headers}),
+    api('/api/v1/management-kpi/trends?days=30',{headers}),
+    api('/api/v1/management-kpi/alerts?status=OPEN',{headers}),
+    api('/api/clx070/container-control/kpis',{headers}),
+    api('/api/clx071/journey/kpis',{headers}),
+    api('/api/clx071/journey/exceptions',{headers}),
+    api('/api/clx077/dummy-bank/safety',{headers}),
+    screen('agent-tasks::booking'),screen('agent-tasks::bl'),screen('agent-tasks::cro'),screen('agent-tasks::transshipment-crt'),screen('agent-tasks::delivery-order'),
+    screen('gl-accounts::invoice'),screen('gl-accounts::bills'),screen('gl-accounts::receipt'),screen('gl-accounts::payment'),screen('agent-tasks::soa')
   ]);
-  const ct=results[0].status==='fulfilled'?results[0].value:null;
-  const my=results[1].status==='fulfilled'?results[1].value:null;
-  const critical=results[2].status==='fulfilled'?results[2].value:null;
-  const fin=results[3].status==='fulfilled'?results[3].value:null;
-  const s=ct?.summary||{};
-  const myCount=my?.summary?.total??my?.items?.length??0;
-  const criticalCount=critical?.summary?.total??critical?.items?.length??s.critical??0;
-  const financeCount=fin?.count??fin?.items?.length??'—';
+  const val=i=>results[i]?.status==='fulfilled'?results[i].value:null;
+  const ct=val(0),work=val(1),critical=val(2),approvals=val(3),trends=val(4),alerts=val(5),eq=val(6)||{},journey=val(7)||{},journeyExc=val(8)||{},safety=val(9)||{};
+  const booking=clx85Rows(val(10)),bl=clx85Rows(val(11)),cro=clx85Rows(val(12)),crt=clx85Rows(val(13)),delivery=clx85Rows(val(14));
+  const invoices=clx85Rows(val(15)),bills=clx85Rows(val(16)),receipts=clx85Rows(val(17)),payments=clx85Rows(val(18)),soa=clx85Rows(val(19));
+  const sm=ct?.summary||{}, items=work?.items||[], criticalItems=critical?.items||[];
+  const revenue=clx85Sum(invoices,'Invoice Amount','Amount','Net Amount','Total');
+  const cost=clx85Sum(bills,'Invoice Amount','Amount','Net Amount','Total');
+  const ar=clx85Sum(invoices,'Outstanding','Balance');
+  const ap=clx85Sum(bills,'Outstanding','Balance');
+  const cashIn=clx85Sum(receipts,'Amount','Receipt Amount');
+  const cashOut=clx85Sum(payments,'Amount','Payment Amount');
+  const gp=revenue-cost, margin=revenue?((gp/revenue)*100).toFixed(1):'0.0';
+  const openApprovals=approvals?.count??approvals?.items?.length??0;
+  const providerMode=(String(safety.live_providers||'OFF').toUpperCase()==='ON'?'LIVE':'OFF');
+  const realMoney=String(safety.real_money||'OFF').toUpperCase();
+  const latest=trends?.snapshots?.[trends.snapshots.length-1]||{};
+  const eqCount=eq.total_containers??eq.total??eq.container_count??'—';
+  const available=eq.available??eq.available_count??'—';
+  const gateIn=journey.gate_in??journey.gate_in_count??'—';
+  const loaded=journey.loaded??journey.loaded_count??'—';
+  const inTransit=journey.in_transit??journey.in_transit_count??'—';
+  const transship=journey.transshipment??journey.transshipment_count??crt.length;
+  const discharged=journey.discharged??journey.discharged_count??'—';
+  const emptyReturn=journey.empty_return??journey.empty_return_count??'—';
+  const overdue=journey.overdue??journey.empty_return_overdue??sm.overdue??0;
+  const jex=journeyExc.items||journeyExc.exceptions||[];
+  const det=clx85Count(items,x=>/DETENTION/i.test(String(x.category||x.title||x.detail||'')));
+  const damage=clx85Count(items,x=>/DAMAGE|REPAIR|M&R/i.test(String(x.category||x.title||x.detail||'')));
+  const failedIntegration=clx85Count(items,x=>x.category==='FAILED_INTEGRATION');
   const recent=homeScreenLinks(state.recent,'No recent screens yet.');
   const favorites=homeScreenLinks([...state.favorites],'No favorite screens yet.');
-  $('gridArea').innerHTML=`
-    <div class="homeGrid">
-      <div class="homeCard" onclick="showOpsWorkbench('today')"><span>Today</span><b>${esc(s.overdue??0)}</b><span class="muted">Due today / overdue attention</span></div>
-      <div class="homeCard" onclick="showOpsWorkbench('my')"><span>My Work</span><b>${esc(myCount)}</b><span class="muted">Assigned work items</span></div>
-      <div class="homeCard" onclick="showOpsWorkbench('critical')"><span>Critical Exceptions</span><b>${esc(criticalCount)}</b><span class="muted">Requires attention</span></div>
-      <div class="homeCard" onclick="showOpsWorkbench('overdue')"><span>Overdue</span><b>${esc(s.overdue??0)}</b><span class="muted">SLA / due-date exposure</span></div>
-      <div class="homeCard" onclick="showControlTower()"><span>Open Jobs</span><b>${esc(s.jobs_open??0)}</b><span class="muted">Current operational jobs</span></div>
-      <div class="homeCard" onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')"><span>Finance Attention</span><b>${esc(financeCount)}</b><span class="muted">Pending governed items</span></div>
-    </div>
-    <div class="homeSections">
-      <div class="card"><b>Recent Screens</b><div class="homeList">${recent}</div></div>
-      <div class="card"><b>Favorite Screens</b><div class="homeList">${favorites}</div></div>
-      <div class="card"><b>Operations</b><div class="toolbar"><button class="btn" onclick="showControlTower()">Control Tower</button><button class="btn" onclick="showOpsWorkbench()">Ops Workbench</button><button class="btn" onclick="showBusinessDay()">Business Day</button><button class="btn" onclick="showActionQueue()">Action Queue</button></div></div>
-      <div class="card"><b>Management & Finance</b><div class="toolbar"><button class="btn" onclick="showKpiTrends()">KPI Trends</button><button class="btn" onclick="showReadiness()">Readiness</button><button class="btn" onclick="showObservability()">Observability</button><button class="btn" onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')">Finance Approvals</button></div></div>
-    </div>`;
+
+  $('gridArea').innerHTML=
+    clx85FilterBar()+
+    '<div class="card"><b>Operational KPI</b></div><div class="homeGrid">'+
+      clx85Kpi('Bookings',booking.length,'Authoritative Booking records',"openScreen('agent-tasks::booking')")+
+      clx85Kpi('Active Jobs',sm.jobs_open??0,'Control Tower jobs',"showControlTower()")+
+      clx85Kpi('B/L',bl.length,'Authoritative B/L records',"openScreen('agent-tasks::bl')")+
+      clx85Kpi('CRO',cro.length,'Container release orders',"openScreen('agent-tasks::cro')")+
+      clx85Kpi('CRT / TS',crt.length,'Transshipment records',"openScreen('agent-tasks::transshipment-crt')")+
+      clx85Kpi('Delivery Orders',delivery.length,'Existing DO records',"openScreen('agent-tasks::delivery-order')")+
+      clx85Kpi('Containers',eqCount,'CLX-070 container master',"showEquipmentWorkspace('containers')")+
+      clx85Kpi('Available Equipment',available,'CLX-070 availability',"showEquipmentWorkspace('tower')")+
+      clx85Kpi('Gate In',gateIn,'CLX-071 journey','showEquipmentWorkspace(\\'journey\\')')+
+      clx85Kpi('Loaded',loaded,'CLX-071 journey','showEquipmentWorkspace(\\'journey\\')')+
+      clx85Kpi('In Transit',inTransit,'CLX-071 journey','showEquipmentWorkspace(\\'journey\\')')+
+      clx85Kpi('Transshipment',transship,'CLX-071 / CRT','showEquipmentWorkspace(\\'journey\\')')+
+      clx85Kpi('Discharged',discharged,'CLX-071 journey','showEquipmentWorkspace(\\'journey\\')')+
+      clx85Kpi('Empty Return',emptyReturn,'CLX-071 journey','showEquipmentWorkspace(\\'journey\\')')+
+      clx85Kpi('Overdue',overdue,'Existing SLA/journey exceptions',"showOpsWorkbench('overdue')")+
+      clx85Kpi('Detention',det,'Existing exception/workbench source',"openScreen('agent-tasks::detention-collection')")+
+      clx85Kpi('Damage / Hold',damage,'Existing exception/workbench source',"showEquipmentWorkspace('mr')")+
+    '</div>'+
+    '<div class="card"><b>Financial KPI</b></div><div class="homeGrid">'+
+      clx85Kpi('Revenue',revenue.toFixed(2),'Existing GL invoices',"openScreen('gl-accounts::invoice')")+
+      clx85Kpi('Cost',cost.toFixed(2),'Existing GL bills',"openScreen('gl-accounts::bills')")+
+      clx85Kpi('Gross Profit',gp.toFixed(2),'Revenue − Cost',"openScreen('gl-accounts::profit-loss')")+
+      clx85Kpi('Margin',margin+'%','Gross Profit / Revenue',"openScreen('gl-accounts::profit-loss')")+
+      clx85Kpi('Customer AR',ar.toFixed(2),'Invoice outstanding',"openScreen('gl-accounts::customer-credit-control')")+
+      clx85Kpi('Vendor AP',ap.toFixed(2),'Bills outstanding',"openScreen('gl-accounts::supplier-payable-control')")+
+      clx85Kpi('Cash Received',cashIn.toFixed(2),'Existing receipts',"openScreen('gl-accounts::receipt')")+
+      clx85Kpi('Cash Paid',cashOut.toFixed(2),'Existing payments',"openScreen('gl-accounts::payment')")+
+      clx85Kpi('SOA Records',soa.length,'Existing SOA source',"openScreen('agent-tasks::soa')")+
+      clx85Kpi('Finance Attention',openApprovals,'Existing governed approvals',"window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')")+
+    '</div>'+
+    '<div class="card"><b>Commercial KPI</b><div class="equipNote">Metrics are shown only where existing source data supports them. Unsupported dimensions remain REVIEW_LATER; no analytics fact table is created.</div></div><div class="homeGrid">'+
+      clx85Kpi('Quote → Booking','REVIEW_LATER','No reliable global quote denominator in current source')+
+      clx85Kpi('Booking → B/L',booking.length?((bl.length/booking.length)*100).toFixed(1)+'%':'—','Derived from current authoritative counts')+
+      clx85Kpi('Approved Rate Utilization','REVIEW_LATER','Source not globally normalized')+
+      clx85Kpi('Sell vs Cost',(revenue-cost).toFixed(2),'Existing GL totals')+
+      clx85Kpi('Management Alerts',alerts?.alerts?.length??0,'Existing CLX-028 alerts','showKpiTrends()')+
+      clx85Kpi('Provider Mode',providerMode,'Existing provider safety configuration',"openScreen('integration-security::provider-adapters')")+
+      clx85Kpi('Real Money',realMoney,'Must remain OFF','showDummyBankReview()')+
+    '</div>'+
+    '<div class="homeSections">'+
+      '<div class="card"><b>Exception Attention</b><div class="muted">Existing Operations Workbench / CLX-071 exceptions only</div><div class="tablewrap"><table><thead><tr><th>Priority</th><th>Category</th><th>Job</th><th>Exception</th><th>Status</th><th></th></tr></thead><tbody>'+
+      (([...criticalItems,...jex].slice(0,12).map(clx85ExceptionLink).join(''))||'<tr><td colspan="6">No current exceptions.</td></tr>')+
+      '</tbody></table></div><div class="toolbar"><button class="btn" onclick="showOpsWorkbench()">Open Operations Workbench</button><button class="btn" onclick="showEquipmentWorkspace(\\'exceptions\\')">Equipment Exceptions</button></div></div>'+
+      '<div class="card"><b>Approval Attention</b><div class="muted">Existing maker-checker / four-eyes sources only</div><div class="tablewrap"><table><thead><tr><th>Type</th><th>Reference</th><th>Job</th><th>Status</th></tr></thead><tbody>'+
+      (clx85ApprovalRows(approvals)||'<tr><td colspan="4">No pending approval rows returned.</td></tr>')+
+      '</tbody></table></div><div class="toolbar"><button class="btn" onclick="window.open(M3_API_BASE+\\'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html\\',\\'_blank\\')">Finance Approvals</button><button class="btn" onclick="openScreen(\\'master-data::approval-queue\\')">Master Data Approvals</button></div></div>'+
+      '<div class="card"><b>Management Control</b><div class="homeList"><div class="homeLink" onclick="showControlTower()"><b>Control Tower</b><div class="muted">Open jobs · risk · role-scoped drilldown</div></div><div class="homeLink" onclick="showKpiTrends()"><b>KPI Trends</b><div class="muted">Immutable daily snapshots · current alerts</div></div><div class="homeLink" onclick="showOpsWorkbench()"><b>Exception Workbench</b><div class="muted">Derived existing approved data · no duplicate exception records</div></div><div class="homeLink" onclick="openScreen(\\'integration-security::request-response-audit\\')"><b>Audit / Trace</b><div class="muted">Existing audit and request-response trace</div></div></div></div>'+
+      '<div class="card"><b>Provider / Safety Status</b><div class="homeList"><div><b>Live providers</b><div class="muted">'+esc(String(safety.live_providers||'OFF'))+'</div></div><div><b>Real money</b><div class="muted">'+esc(realMoney)+'</div></div><div><b>Dummy bank</b><div class="muted">Controlled review/training only</div></div><div><b>Failed integration exceptions</b><div class="muted">'+esc(failedIntegration)+'</div></div></div></div>'+
+      '<div class="card"><b>Recent Screens</b><div class="homeList">'+recent+'</div></div>'+
+      '<div class="card"><b>Favorite Screens</b><div class="homeList">'+favorites+'</div></div>'+
+    '</div>'+
+    '<div class="card"><b>Data Consistency / Source Governance</b><div class="equipNote">Management totals are calculated in the UI from the same role-scoped Booking, B/L, GL, Treasury, SOA, Container, Journey, Workbench and Approval sources used by transaction screens. No manual KPI override, secondary audit log, KPI ledger, exception model or management summary table is introduced.</div><div class="muted">Latest immutable CLX-028 snapshot: '+esc(latest.snapshot_date||'not available')+' · role scope preserved · maker-checker preserved · external providers OFF · real money OFF.</div></div>';
 }
 
 async function openBookingEquipmentAllocation(jobRef){
