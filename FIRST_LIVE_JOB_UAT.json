@@ -1,0 +1,30 @@
+{
+  "schema": "M3_FIRST_LIVE_JOB_UAT_V1",
+  "final_live_runtime": "4b964819cae79acb143d22281d64890bcc86390b",
+  "status": "NOT_RUN_WAITING_REAL_DATA",
+  "current_controlled_jobs": [
+    "50001",
+    "50002",
+    "50003",
+    "50004",
+    "50005"
+  ],
+  "flow": [
+    "Booking",
+    "CRO",
+    "Container",
+    "B/L",
+    "Release",
+    "Delivery Order",
+    "Invoice",
+    "Bill",
+    "Receipt",
+    "Payment",
+    "SOA",
+    "GL/Treasury"
+  ],
+  "real_money": "OFF",
+  "live_providers": "OFF",
+  "production_writes_performed": false,
+  "note": "No real customer/agent/voyage/opening-balance dataset exists yet, so a real-life production job was intentionally not created."
+}
