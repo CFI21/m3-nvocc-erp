@@ -448,6 +448,20 @@ async function renderAgentUsersChild(){
   }
 }
 
+async function reissueAgentInviteToken(reviewRef){
+  if(!confirm('Reissue the one-time activation token? The previous token becomes invalid immediately.'))return;
+  try{
+    const d=await api('/api/admin/agent-user-invites/'+encodeURIComponent(reviewRef)+'/reissue-token',{method:'POST'});
+    const value=d.invite_token||'';
+    if(!value)throw new Error('No activation token returned');
+    window.prompt('Copy the one-time activation token now. It will not be shown again after this prompt is closed.',value);
+    d.invite_token='';
+    await renderAgentUsersChild();
+  }catch(e){
+    alert('Token reissue failed: '+e.message);
+  }
+}
+
 const CLX49_KEYS=new Set(['special-rates-request','booking','bl','switch-bl']);
 const CLX49_BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization'];
 const CLX49_BOOKING_TABS=['Booking Info','Equipment','Other Info'];
