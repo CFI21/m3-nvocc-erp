@@ -130,7 +130,7 @@ def test_unreferenced_master_four_eyes_version_and_audit(isolated):
     cr=create_change(Change(domain='carrier',record_key='CLX-NEW-CARRIER',operation='CREATE',payload={'name':'CLX New Carrier','scac':'CLXN'},reason='create'),x_m3_session=maker_session())
     with pytest.raises(HTTPException) as same:
         decide(cr['change_ref'],Decision(decision='APPROVE'),x_m3_session=maker_session())
-    assert same.value.detail['code']=='FOUR_EYES_VIOLATION'
+    assert same.value.detail['code']=='CHECKER_PERMISSION_DENIED'
     approved=decide(cr['change_ref'],Decision(decision='APPROVE',comment='approved'),x_m3_session=checker_session())
     assert approved['version']==1
     dr=create_change(Change(domain='carrier',record_key='CLX-NEW-CARRIER',operation='DEACTIVATE',payload={},reason='retire'),x_m3_session=maker_session())
