@@ -1,0 +1,21 @@
+{
+  "schema": "M3_BOOKING_BASED_CUSTOMER_AGENT_PARTY_LINK_V1",
+  "baseline": "2566e8f297ac573f5045ee3ecaaf8cb7c8821e40",
+  "model": {
+    "customer_master": "INDEPENDENT",
+    "agent_master": "INDEPENDENT",
+    "customer_agent_relationship": "BOOKING_JOB_ONLY",
+    "common_party_matching": "SEPARATE_CUSTOMER_AND_AGENT_RESOLUTION",
+    "permanent_customer_agent_link": false,
+    "agent_user_customer_master_grant": false,
+    "many_to_many_via_bookings": true,
+    "downstream_context": "JOB_AUTHORITATIVE"
+  },
+  "no_schema_change": true,
+  "no_production_data_write": true,
+  "providers": "OFF",
+  "real_money": "OFF",
+  "ancline": "UNTOUCHED",
+  "BOOKING_PARTY_LINK_READY": false,
+  "status": "CANDIDATE_REQUIRES_CI_UAT"
+}
