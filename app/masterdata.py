@@ -49,7 +49,7 @@ def audit(c,actor,action,domain=None,key=None,change_ref=None,before=None,after=
     c.execute('INSERT INTO md_audit(event_ref,ts,actor,action,domain,record_key,change_ref,before_json,after_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?,?,?)',(event,ts,actor,action,domain,key,change_ref,j(before) if before is not None else None,j(after) if after is not None else None,h(base)))
 def authenticated_actor(c,token):
     sess=iam_session(c,token)
-    roles={r['role_code'] for r in iam_roles_for(c,sess['user_id']) if r['status']=='ACTIVE'}
+    roles={r['role_code'] for r in iam_roles_for(c,sess['user_id'])}
     return sess,roles
 
 def can_make_roles(roles): return bool(roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'})
