@@ -22,6 +22,10 @@ def isolated(tmp_path,monkeypatch):
 
 def admin_session():
     return login(Login(username='admin',password='Admin123!',mfa_code='123456'))['session_token']
+def maker_session():
+    return login(Login(username='md.maker',password='Maker123!',mfa_code='123456'))['session_token']
+def checker_session():
+    return login(Login(username='md.checker',password='Checker123!',mfa_code='123456'))['session_token']
 
 def test_frozen_196_top_level_and_all_admin_master_screens_load(isolated):
     c=build_catalog()
@@ -89,23 +93,23 @@ def test_admin_sensitive_self_temp_access_and_self_deactivation_blocked(isolated
     assert st.value.detail['code']=='SELF_DEACTIVATION_BLOCKED'
 
 def test_master_pending_duplicate_name_prevention(isolated):
-    a=create_change(Change(domain='carrier',record_key='NEW-CAR-1',operation='CREATE',payload={'name':'New Carrier'},reason='CLX048'),x_role='MASTER_DATA',x_user='md.maker')
+    a=create_change(Change(domain='carrier',record_key='NEW-CAR-1',operation='CREATE',payload={'name':'New Carrier'},reason='CLX048'),x_m3_session=maker_session())
     assert a['status']=='PENDING'
     with pytest.raises(HTTPException) as e:
-        create_change(Change(domain='carrier',record_key='NEW-CAR-2',operation='CREATE',payload={'name':'New Carrier'},reason='CLX048 duplicate'),x_role='MASTER_DATA',x_user='other.maker')
+        create_change(Change(domain='carrier',record_key='NEW-CAR-2',operation='CREATE',payload={'name':'New Carrier'},reason='CLX048 duplicate'),x_m3_session=maker_session())
     assert e.value.detail['code']=='PENDING_DUPLICATE_DISPLAY_NAME'
 
 def test_master_reference_integrity_validation(isolated):
     with pytest.raises(HTTPException) as bank:
-        create_change(Change(domain='bank-account',record_key='BAD-BA',operation='CREATE',payload={'name':'Bad Account','bank':'NO-BANK','currency':'USD'},reason='CLX048'),x_role='MASTER_DATA',x_user='md.maker')
+        create_change(Change(domain='bank-account',record_key='BAD-BA',operation='CREATE',payload={'name':'Bad Account','bank':'NO-BANK','currency':'USD'},reason='CLX048'),x_m3_session=maker_session())
     assert 'BANK_REFERENCE_NOT_ACTIVE' in bank.value.detail['codes']
 
     with pytest.raises(HTTPException) as route:
-        create_change(Change(domain='route',record_key='BAD-ROUTE',operation='CREATE',payload={'name':'Bad Route','pol':'XXXXX','pod':'NLRTM'},reason='CLX048'),x_role='MASTER_DATA',x_user='md.maker')
+        create_change(Change(domain='route',record_key='BAD-ROUTE',operation='CREATE',payload={'name':'Bad Route','pol':'XXXXX','pod':'NLRTM'},reason='CLX048'),x_m3_session=maker_session())
     assert 'POL_REFERENCE_NOT_ACTIVE' in route.value.detail['codes']
 
 def test_master_approval_rechecks_duplicate_at_apply_time(isolated):
-    cr=create_change(Change(domain='carrier',record_key='RACE-1',operation='CREATE',payload={'name':'Race Carrier'},reason='CLX048 race'),x_role='MASTER_DATA',x_user='md.maker')
+    cr=create_change(Change(domain='carrier',record_key='RACE-1',operation='CREATE',payload={'name':'Race Carrier'},reason='CLX048 race'),x_m3_session=maker_session())
     c=db.connect()
     try:
         ts='2026-09-26T12:00:00+00:00'
@@ -114,23 +118,23 @@ def test_master_approval_rechecks_duplicate_at_apply_time(isolated):
         c.commit()
     finally:c.close()
     with pytest.raises(HTTPException) as e:
-        decide(cr['change_ref'],Decision(decision='APPROVE',comment='checker'),x_role='MASTER_DATA_MANAGER',x_user='md.checker')
+        decide(cr['change_ref'],Decision(decision='APPROVE',comment='checker'),x_m3_session=checker_session())
     assert e.value.detail['code']=='DUPLICATE_DISPLAY_NAME'
 
 def test_used_master_cannot_be_deactivated(isolated):
     with pytest.raises(HTTPException) as e:
-        create_change(Change(domain='customer',record_key='CLX-CUS-001',operation='DEACTIVATE',payload={},reason='still used'),x_role='MASTER_DATA',x_user='md.maker')
+        create_change(Change(domain='customer',record_key='CLX-CUS-001',operation='DEACTIVATE',payload={},reason='still used'),x_m3_session=maker_session())
     assert e.value.detail['code']=='MASTER_IN_USE'
 
 def test_unreferenced_master_four_eyes_version_and_audit(isolated):
-    cr=create_change(Change(domain='carrier',record_key='CLX-NEW-CARRIER',operation='CREATE',payload={'name':'CLX New Carrier','scac':'CLXN'},reason='create'),x_role='MASTER_DATA',x_user='md.maker')
+    cr=create_change(Change(domain='carrier',record_key='CLX-NEW-CARRIER',operation='CREATE',payload={'name':'CLX New Carrier','scac':'CLXN'},reason='create'),x_m3_session=maker_session())
     with pytest.raises(HTTPException) as same:
-        decide(cr['change_ref'],Decision(decision='APPROVE'),x_role='MASTER_DATA_MANAGER',x_user='md.maker')
+        decide(cr['change_ref'],Decision(decision='APPROVE'),x_m3_session=maker_session())
     assert same.value.detail['code']=='FOUR_EYES_VIOLATION'
-    approved=decide(cr['change_ref'],Decision(decision='APPROVE',comment='approved'),x_role='MASTER_DATA_MANAGER',x_user='md.checker')
+    approved=decide(cr['change_ref'],Decision(decision='APPROVE',comment='approved'),x_m3_session=checker_session())
     assert approved['version']==1
-    dr=create_change(Change(domain='carrier',record_key='CLX-NEW-CARRIER',operation='DEACTIVATE',payload={},reason='retire'),x_role='MASTER_DATA',x_user='md.maker')
-    done=decide(dr['change_ref'],Decision(decision='APPROVE'),x_role='MASTER_DATA_MANAGER',x_user='md.checker')
+    dr=create_change(Change(domain='carrier',record_key='CLX-NEW-CARRIER',operation='DEACTIVATE',payload={},reason='retire'),x_m3_session=maker_session())
+    done=decide(dr['change_ref'],Decision(decision='APPROVE'),x_m3_session=checker_session())
     assert done['version']==2
     row=next(x for x in records('carrier') if x['record_key']=='CLX-NEW-CARRIER')
     assert row['status']=='INACTIVE'
@@ -139,8 +143,8 @@ def test_unreferenced_master_four_eyes_version_and_audit(isolated):
 def test_master_and_iam_audits_are_immutable(isolated):
     token=admin_session()
     assign(Assign(username='md.maker',role_code='VIEWER',office_code='RTM',valid_to='2027-12-31'),token)
-    cr=create_change(Change(domain='carrier',record_key='AUD-CAR',operation='CREATE',payload={'name':'Audit Carrier'},reason='audit'),x_role='MASTER_DATA',x_user='md.maker')
-    decide(cr['change_ref'],Decision(decision='APPROVE'),x_role='MASTER_DATA_MANAGER',x_user='md.checker')
+    cr=create_change(Change(domain='carrier',record_key='AUD-CAR',operation='CREATE',payload={'name':'Audit Carrier'},reason='audit'),x_m3_session=maker_session())
+    decide(cr['change_ref'],Decision(decision='APPROVE'),x_m3_session=checker_session())
     c=db.connect()
     try:
         ia=c.execute('SELECT id FROM iam_audit_events ORDER BY id DESC LIMIT 1').fetchone()
