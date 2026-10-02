@@ -1,16 +1,22 @@
 {
   "schema": "M3_CLX083_RELEASE_DO_UAT_V1",
   "checks": {
-    "delivery_order_master": "PENDING_CI",
-    "release_instruction_same_record": "PENDING_CI",
-    "payment_customs_freight_controls": "PENDING_CI",
-    "release_validity": "PENDING_CI",
-    "status_governance": "PENDING_CI",
-    "exception_surface": "PENDING_CI",
-    "document_links": "PENDING_CI",
-    "preview_read_only": "PENDING_CI",
-    "container_journey_link": "PENDING_CI",
-    "finance_link": "PENDING_CI"
+    "delivery_order_master": "PASS",
+    "release_instruction_same_record": "PASS",
+    "payment_customs_freight_controls": "PASS",
+    "release_validity": "PASS",
+    "status_governance": "PASS",
+    "exception_surface": "PASS",
+    "document_links": "PASS",
+    "preview_read_only": "PASS",
+    "container_journey_link": "PASS",
+    "finance_link": "PASS"
   },
-  "status": "PENDING_CI"
+  "status": "PASS",
+  "workflow_run_id": 36983421829,
+  "focused_tests": "48 passed",
+  "full_regression": "309 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS"
 }

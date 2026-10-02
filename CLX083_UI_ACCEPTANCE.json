@@ -1,18 +1,34 @@
 {
   "schema": "M3_CLX083_UI_ACCEPTANCE_V1",
   "baseline": "8b047979a439cbda9686327e2ad41a329297ee7f",
-  "OPERATIONAL_DOCUMENT_FLOW_READY": false,
+  "OPERATIONAL_DOCUMENT_FLOW_READY": true,
   "backend_model_changed": false,
   "database_changed": false,
   "REAL_MONEY_READY": false,
   "REAL_PROVIDER_READY": false,
-  "status": "PENDING_CI",
+  "status": "ACCEPTED_FOR_SINGLE_PR",
+  "workflow_run_id": 36983421829,
   "validation": {
-    "focused_operational_tests": "PENDING",
-    "canonical_screen_contract": "PENDING",
-    "full_erp_regression": "PENDING",
-    "javascript_syntax": "PENDING",
-    "safety": "PENDING"
+    "focused_operational_tests": "48 passed",
+    "canonical_screen_contract": "196 PASS",
+    "full_erp_regression": "309 passed",
+    "javascript_syntax": "PASS",
+    "safety": "PASS"
   },
-  "acceptance_rule": "Set OPERATIONAL_DOCUMENT_FLOW_READY=true only after CRO + Release + CRT + Delivery Order + Container Journey links pass with no P0/P1 defects."
+  "no_p0_p1_defects": true,
+  "accepted_scope": [
+    "CRO master",
+    "CRO equipment allocation",
+    "container release controls",
+    "CRT/transshipment",
+    "conditional POT logic",
+    "Delivery Order master",
+    "same-record Release Instruction",
+    "container journey links",
+    "finance/SOA/audit links",
+    "read-only print/preview"
+  ],
+  "non_blocking_items": [
+    "Fields absent from a native transaction remain derived/read-only from existing Job/Booking/Container context; no duplicate operational fields or models were created."
+  ]
 }
