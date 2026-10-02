@@ -1,21 +1,36 @@
 {
   "schema": "M3_CLX086_PRODUCTION_SMOKE_V1",
-  "status": "PENDING_DEPLOY",
+  "status": "PASS",
   "target_api": "https://m3-nvocc-api-latest-1.onrender.com",
   "target_web": "https://m3-nvocc-web-latest.onrender.com",
   "api_service_id": "srv-dar9fh17lnhs73ahlh60",
   "web_service_id": "srv-darbgkvlk1mc738rohng",
   "checks": {
-    "deploy_exact_sha": "PENDING",
-    "api_health": "PENDING",
-    "web_health": "PENDING",
-    "auth_session": "PENDING",
-    "executive_home": "PENDING",
-    "booking_bl": "PENDING",
-    "operations": "PENDING",
-    "finance": "PENDING",
-    "management": "PENDING",
-    "provider_safety": "PENDING",
-    "cache_version": "PENDING"
+    "deploy_exact_sha": "PASS",
+    "api_health": "PASS",
+    "web_health": "PASS",
+    "auth_session": "PASS",
+    "executive_home": "PASS",
+    "booking_bl": "PASS",
+    "operations": "PASS",
+    "finance": "PASS",
+    "management": "PASS",
+    "provider_safety": "PASS",
+    "cache_version": "PASS"
+  },
+  "deployed_sha": "4b964819cae79acb143d22281d64890bcc86390b",
+  "api_deploy_id": "dep-davoqcrncjis73f6r5hg",
+  "web_deploy_id": "dep-davoqe49v7es738kd200",
+  "api_image_digest": "sha256:40cd66f0c0733634f9c4956caa84208c7487cf208d104bf184a5ab06cd93f4b8",
+  "web_image_digest": "sha256:f05cde79a8fc76f0ffe5b6223e0ef2bdf2217bd2c8b5d8cd8412ebb1c16157a0",
+  "post_deploy_live_smoke_run_id": 36997797869,
+  "post_deploy_live_smoke_job_id": 110809375229,
+  "post_deploy_dummy_bank_review_run_id": 36997797920,
+  "post_deploy_dummy_bank_review_job_id": 110809382537,
+  "full_erp_regression_after_deploy": "331 passed",
+  "targeted_live_review_after_deploy": "5 passed",
+  "render_5xx_since_deploy": {
+    "api": 0,
+    "web": 0
   }
 }
