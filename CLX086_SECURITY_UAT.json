@@ -1,0 +1,17 @@
+{
+  "schema": "M3_CLX086_SECURITY_UAT_V1",
+  "project_ref": "ozupgknqaqgvprliewxe",
+  "status": "PASS_WITH_EXISTING_SERVER_ONLY_RLS_MODEL",
+  "all_listed_public_tables_rls_enabled": true,
+  "role_scope": "PRESERVED_EXISTING_API_IAM",
+  "maker_checker": "PRESERVED",
+  "four_eyes": "PRESERVED",
+  "public_write": "DENY_BY_SERVER_ONLY_RLS_MODEL",
+  "audit_immutability": "PRESERVED",
+  "provider_state": {
+    "live_real_providers": "OFF",
+    "dummy_bank": "ON_CONTROLLED",
+    "real_money": "OFF"
+  },
+  "note": "Supabase advisor reports RLS-enabled/no-policy informational findings on server-only tables; this matches the existing CLX-051 server-only RLS hardening model and is not changed by CLX-086."
+}

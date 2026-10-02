@@ -1,0 +1,16 @@
+{
+  "schema": "M3_CLX086_FULL_ERP_UAT_V1",
+  "status": "PENDING_CI",
+  "checks": {
+    "booking_bl": "PENDING_CI",
+    "cro_crt_release_do": "PENDING_CI",
+    "container_equipment": "PENDING_CI",
+    "finance_soa_gl_treasury": "PENDING_CI",
+    "executive_kpi_exception_approval": "PENDING_CI",
+    "audit_masterdata": "PENDING_CI",
+    "navigation_196": "PENDING_CI",
+    "javascript": "PENDING_CI",
+    "python_compile": "PENDING_CI",
+    "full_regression": "PENDING_CI"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schema": "M3_CLX086_PRODUCTION_SMOKE_V1",
+  "status": "PENDING_DEPLOY",
+  "target_api": "https://m3-nvocc-api-latest-1.onrender.com",
+  "target_web": "https://m3-nvocc-web-latest.onrender.com",
+  "api_service_id": "srv-dar9fh17lnhs73ahlh60",
+  "web_service_id": "srv-darbgkvlk1mc738rohng",
+  "checks": {
+    "deploy_exact_sha": "PENDING",
+    "api_health": "PENDING",
+    "web_health": "PENDING",
+    "auth_session": "PENDING",
+    "executive_home": "PENDING",
+    "booking_bl": "PENDING",
+    "operations": "PENDING",
+    "finance": "PENDING",
+    "management": "PENDING",
+    "provider_safety": "PENDING",
+    "cache_version": "PENDING"
+  }
+}

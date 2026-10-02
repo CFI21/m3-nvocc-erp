@@ -1,0 +1,50 @@
+name: CLX-086 Final Bulk-to-Live Gate
+on:
+  push:
+    branches: [clx086-final-bulk-live]
+  workflow_dispatch:
+jobs:
+  clx086:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.12"}
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - run: pip install -r requirements.txt pytest
+      - name: Python compile
+        run: python -m py_compile app/*.py
+      - name: Inline JavaScript syntax
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          h=Path('web/index.html').read_text(encoding='utf-8')
+          for i,b in enumerate(re.findall(r'<script(?:[^>]*)>(.*?)</script>',h,re.S)):
+              Path(f'/tmp/clx086_{i}.js').write_text(b,encoding='utf-8')
+          PY
+          for f in /tmp/clx086_*.js; do node --check "$f"; done
+      - name: CLX-086 focused final UAT
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx086_final_bulk_live.py tests/test_clx085_management_control_alignment.py tests/test_clx084_finance_master_alignment.py tests/test_clx083_operational_master_alignment.py tests/test_clx082_bl_master_alignment.py tests/test_clx081_booking_master_alignment.py tests/test_clx075_final_bulk.py tests/test_clx077_live_dummy_bank.py tests/test_clx051_production_readiness.py
+      - name: Canonical 196-screen contract
+        env: {PYTHONPATH: .}
+        run: |
+          python - <<'PY'
+          from app.screen_catalog import build_catalog
+          c=build_catalog()
+          assert c['screen_count']==196
+          assert len({x['screen_id'] for x in c['screens']})==196
+          print('CLX086_196_SCREEN_PASS')
+          PY
+      - name: Complete ERP regression
+        env: {PYTHONPATH: .}
+        run: pytest -q
+      - name: Safety assertions
+        run: |
+          grep -q '"live_providers": "OFF"' CLX086_FINAL_LIVE_ACCEPTANCE.json
+          grep -q '"real_money": "OFF"' CLX086_FINAL_LIVE_ACCEPTANCE.json
+          grep -q '"status": "PASS_NO_INPUT"' CLX086_BULK_IMPORT_REPORT.json
+          grep -q '"status": "PASS"' CLX086_DATA_RECONCILIATION.json
+          echo CLX086_SAFETY_PASS

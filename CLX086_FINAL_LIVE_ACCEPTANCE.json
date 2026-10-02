@@ -1,0 +1,19 @@
+{
+  "schema": "M3_CLX086_FINAL_LIVE_ACCEPTANCE_V1",
+  "parent_baseline": "cc4963e73dcad8d584218b0a5aab445318a61885",
+  "M3_ERP_FINAL_LIVE": false,
+  "status": "PENDING_CI_AND_DEPLOY",
+  "zero_p0_p1": null,
+  "bulk_import": "PASS_NO_INPUT",
+  "data_reconciliation": "PASS",
+  "full_erp_uat": "PENDING",
+  "security": "PASS",
+  "backup_restore_readiness": "PASS_EXISTING_EVIDENCE",
+  "production_deploy": "PENDING",
+  "live_smoke": "PENDING",
+  "production_user_traffic": "PENDING",
+  "live_providers": "OFF",
+  "real_money": "OFF",
+  "ancline": "UNTOUCHED",
+  "final_live_sha": null
+}

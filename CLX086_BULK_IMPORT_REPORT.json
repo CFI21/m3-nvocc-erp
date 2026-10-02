@@ -1,0 +1,18 @@
+{
+  "schema": "M3_CLX086_BULK_IMPORT_REPORT_V1",
+  "parent_baseline": "cc4963e73dcad8d584218b0a5aab445318a61885",
+  "batch_ref": "CLX086-NO-EXTERNAL-FILES",
+  "production_event_id": "1d63501f-e0ca-421a-b5b7-68bc3dd31c81",
+  "source_files": 0,
+  "create_count": 0,
+  "update_count": 0,
+  "reject_count": 0,
+  "warning_count": 0,
+  "dry_run": true,
+  "write_mode": "NO_OP_PRESERVE_EXISTING_AUTHORITATIVE_DATA",
+  "status": "PASS_NO_INPUT",
+  "reason": "No approved external CSV/XLSX bulk files were supplied in the repository or conversation. Production was not reseeded and no records were fabricated.",
+  "authoritative_route_policy": "Future actual master-data imports must use existing /api/masterdata/changes maker-checker routes; operational/finance records remain on existing authoritative APIs.",
+  "duplicate_prevention": "PASS",
+  "no_reseed": true
+}

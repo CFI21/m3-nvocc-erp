@@ -56,7 +56,8 @@ HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
 MODULES={m['key']:m for m in META['modules']}
 PRIMARY=META['primary_keys']
-app=FastAPI(title='M3 NVOCC ERP CLX-018 Production Web/API Integration',version='0.18.0',description='Dedicated M3 production web/API integration. Production traffic, live providers and real money remain blocked.')
+CLX086_FINAL_BUILD_BASELINE='cc4963e73dcad8d584218b0a5aab445318a61885'
+app=FastAPI(title='M3 NVOCC ERP CLX-018 Production Web/API Integration',version='0.86.0',description='Dedicated M3 production web/API integration. Production traffic, live providers and real money remain blocked.')
 app.add_middleware(
     CORSMiddleware,
     allow_origins=['https://m3-nvocc-web-latest.onrender.com'],
