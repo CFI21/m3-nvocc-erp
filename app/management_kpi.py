@@ -36,7 +36,9 @@ def _match(value,op,threshold):
     return {"GT":value>threshold,"GTE":value>=threshold,"LT":value<threshold,"LTE":value<=threshold,"EQ":value==threshold}[op]
 
 def _snapshot_payload(c,role):
-    jobs=_job_rows(c,role,None,None); items=_derive(c,role,None,None)
+    jobs=_job_rows(c,role,None,None)
+    real_job_refs={x.get("job_ref") for x in jobs}
+    items=[x for x in _derive(c,role,None,None) if not x.get("job_ref") or x.get("job_ref") in real_job_refs]
     active=[x for x in items if x.get("status") not in ("RESOLVED","CLOSED")]
     summary=_summarize(jobs,items)
     payload={
@@ -145,6 +147,6 @@ def acknowledge(alert_key:str,x_role:str=Header("VIEWER"),x_actor_id:str=Header(
 def control_status(x_role:str=Header("AUDITOR")):
     _management_role(x_role)
     return {"phase":"CLX-028","daily_snapshot_immutable":True,"trends_read_only":True,"alerts_in_app_only":True,
-      "external_notifications":False,"underlying_business_mutation":False,"screen_catalog_preserved":193,
+      "external_notifications":False,"underlying_business_mutation":False,"screen_catalog_preserved":196,
       "role_scope_preserved":True,"maker_checker_preserved":True,"four_eyes_preserved":True,
       "live_provider_activation":False,"real_money":False}

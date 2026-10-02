@@ -17,11 +17,12 @@ def _job_rows(c,role:str,agent_scope:Optional[str],customer_scope:Optional[str])
       w.documentation_status,w.vgm_status,w.customs_status,w.transshipment_status,w.release_status,w.closed,
       f.payment_status,f.outstanding,f.credit_hold,f.currency
       FROM jobs j
+      JOIN bookings b ON b.id=j.booking_id
       JOIN customers c ON c.id=j.customer_id
       JOIN agents a ON a.id=j.agent_id
       JOIN workflow_states w ON w.job_id=j.id
       JOIN finance_states f ON f.job_id=j.id
-      WHERE 1=1"""+clause+" ORDER BY j.job_ref",args).fetchall()]
+      WHERE j.job_ref<>'92200' AND COALESCE(b.booking_ref,'') NOT LIKE 'UAT-%'"""+clause+" ORDER BY j.job_ref",args).fetchall()]
 
 def _counter(values):
     c=collections.Counter(values)
