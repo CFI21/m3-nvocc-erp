@@ -16,7 +16,7 @@ def run():
     for code,name,office in [('RTM-HQ','Rotterdam HQ','RTM'),('DXB-MAIN','Dubai Main','DXB'),('KHI-MAIN','Karachi Main','KHI'),('SIN-MAIN','Singapore Main','SIN')]:c.execute('INSERT OR IGNORE INTO iam_branches(branch_code,name,office_id) VALUES(?,?,?)',(code,name,offices[office]))
     branches={r['branch_code']:r['id'] for r in c.execute('SELECT * FROM iam_branches')}
     for code,name,b in [('OPS-RTM','Operations','RTM-HQ'),('FIN-RTM','Finance','RTM-HQ'),('OPS-DXB','Operations','DXB-MAIN'),('FIN-DXB','Finance','DXB-MAIN')]:c.execute('INSERT OR IGNORE INTO iam_departments(department_code,name,branch_id) VALUES(?,?,?)',(code,name,branches[b]))
-    roles=[('SUPER_ADMIN','Super Administrator',1),('ORG_ADMIN','Organization Administrator',1),('OFFICE_ADMIN','Office Administrator',1),('MASTER_DATA_MANAGER','Master Data Manager',1),('MASTER_DATA','Master Data Maker',0),('OPS','Operations',0),('FINANCE','Finance',1),('GL_ACCOUNTANT','GL Accountant',1),('GL_MANAGER','GL Manager',1),('TREASURY','Treasury',1),('AUDITOR','Auditor',0),('VIEWER','Read Only',0)]
+    roles=[('SUPER_ADMIN','Super Administrator',1),('ORG_ADMIN','Organization Administrator',1),('OFFICE_ADMIN','Office Administrator',1),('MASTER_DATA_MANAGER','Master Data Manager',1),('MASTER_DATA','Master Data Maker',0),('OPS','Operations',0),('FINANCE','Finance',1),('GL_ACCOUNTANT','GL Accountant',1),('GL_MANAGER','GL Manager',1),('TREASURY','Treasury',1),('AUDITOR','Auditor',0),('VIEWER','Read Only',0),('AGENT','Agent User',0)]
     for rc,n,s in roles:c.execute('INSERT OR IGNORE INTO iam_roles(role_code,name,sensitive) VALUES(?,?,?)',(rc,n,s))
     for m in ['agent-tasks','gl','treasury','integration','identity','organization','security','masterdata']:
         for a in ['view','create','edit','approve','release','admin']:
@@ -38,11 +38,12 @@ def run():
     for code,module,action,sensitive in gl_entitlements:
         c.execute('INSERT OR IGNORE INTO iam_permissions(permission_code,module,action,sensitive) VALUES(?,?,?,?)',(code,module,action,sensitive))
     rolesq={r['role_code']:r['id'] for r in c.execute('SELECT * FROM iam_roles')}; ps=list(c.execute('SELECT * FROM iam_permissions'))
-    rp={'SUPER_ADMIN':'*','ORG_ADMIN':['identity','organization','security','masterdata','agent-tasks','treasury','integration'],'OFFICE_ADMIN':['identity','organization','agent-tasks'],'MASTER_DATA_MANAGER':['masterdata'],'MASTER_DATA':['masterdata'],'OPS':['agent-tasks'],'FINANCE':[],'GL_ACCOUNTANT':['gl'],'GL_MANAGER':['gl'],'TREASURY':['treasury'],'AUDITOR':['agent-tasks','gl','treasury','integration','identity','organization','security','masterdata'],'VIEWER':['agent-tasks']}
+    rp={'SUPER_ADMIN':'*','ORG_ADMIN':['identity','organization','security','masterdata','agent-tasks','treasury','integration'],'OFFICE_ADMIN':['identity','organization','agent-tasks'],'MASTER_DATA_MANAGER':['masterdata'],'MASTER_DATA':['masterdata'],'OPS':['agent-tasks'],'FINANCE':[],'GL_ACCOUNTANT':['gl'],'GL_MANAGER':['gl'],'TREASURY':['treasury'],'AUDITOR':['agent-tasks','gl','treasury','integration','identity','organization','security','masterdata'],'VIEWER':['agent-tasks'],'AGENT':['agent-tasks']}
     for role,mods in rp.items():
         for p in ps:
             allow=mods=='*' or p['module'] in mods
             if role in ('AUDITOR','VIEWER') and p['action']!='view':allow=False
+            if role=='AGENT' and p['action'] not in ('view','create','edit'):allow=False
             if role=='MASTER_DATA' and p['action'] in ('approve','admin'):allow=False
             if role=='GL_ACCOUNTANT' and p['module']=='gl' and p['action'] not in ('view','create','edit'):allow=False
             if role=='GL_MANAGER' and p['module']=='gl' and p['action'] not in ('view','create','edit','approve','release','admin'):allow=False
@@ -72,7 +73,7 @@ def run():
       ('SOD-PAYMENT-MAKER-RELEASER','CAP:PAYMENT_MAKER','CAP:PAYMENT_RELEASER','Payment maker cannot release the same payment','CRITICAL')
     ]:
         c.execute('INSERT OR IGNORE INTO iam_sod_conflicts(conflict_code,role_a,role_b,reason,severity,status) VALUES(?,?,?,?,?,?)',(code,a,b,reason,severity,'ACTIVE'))
-    for rc,scope,res,act in [('SUPER_ADMIN','GLOBAL','*','*'),('OPS','OFFICE','agent-tasks','*'),('FINANCE','OFFICE','finance','view'),('GL_ACCOUNTANT','OFFICE','gl','create'),('GL_MANAGER','OFFICE','gl','*'),('TREASURY','OFFICE','treasury','*'),('AUDITOR','GLOBAL','*','view'),('MASTER_DATA_MANAGER','GLOBAL','masterdata','*'),('MASTER_DATA','GLOBAL','masterdata','create')]:c.execute('INSERT OR IGNORE INTO iam_scope_rules(rule_ref,role_code,scope_type,scope_value,resource,action,effect,priority) VALUES(?,?,?,?,?,?,?,?)',(f'RULE-{rc}',rc,scope,None,res,act,'ALLOW',100))
+    for rc,scope,res,act in [('SUPER_ADMIN','GLOBAL','*','*'),('OPS','OFFICE','agent-tasks','*'),('FINANCE','OFFICE','finance','view'),('GL_ACCOUNTANT','OFFICE','gl','create'),('GL_MANAGER','OFFICE','gl','*'),('TREASURY','OFFICE','treasury','*'),('AUDITOR','GLOBAL','*','view'),('MASTER_DATA_MANAGER','GLOBAL','masterdata','*'),('MASTER_DATA','GLOBAL','masterdata','create'),('AGENT','AGENT','agent-tasks','view')]:c.execute('INSERT OR IGNORE INTO iam_scope_rules(rule_ref,role_code,scope_type,scope_value,resource,action,effect,priority) VALUES(?,?,?,?,?,?,?,?)',(f'RULE-{rc}',rc,scope,None,res,act,'ALLOW',100))
     for role,cur,limit,action in [('FINANCE','USD',100000,'APPROVE_VOUCHER'),('TREASURY','USD',75000,'RELEASE_PAYMENT'),('OFFICE_ADMIN','USD',10000,'APPROVE_EXPENSE')]:c.execute('INSERT OR IGNORE INTO iam_approval_limits(role_code,currency,amount_limit,action) VALUES(?,?,?,?)',(role,cur,limit,action))
     c.execute('INSERT OR IGNORE INTO iam_party_access(user_id,party_type,party_key,access_level) VALUES(?,?,?,?)',(uq['ops.rtm'],'CUSTOMER','CLX-CUS-001','EDIT'))
     c.execute('INSERT OR IGNORE INTO iam_party_access(user_id,party_type,party_key,access_level) VALUES(?,?,?,?)',(uq['ops.rtm'],'AGENT','CLX-AGT-SIN','VIEW'))

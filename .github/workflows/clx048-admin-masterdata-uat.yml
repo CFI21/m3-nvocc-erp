@@ -16,7 +16,7 @@ jobs:
       - name: CLX-048 General Administration + Master Data hardening
         env:
           PYTHONPATH: .
-        run: pytest -q tests/test_clx048_admin_masterdata.py tests/test_masterdata_session_security.py
+        run: pytest -q tests/test_clx048_admin_masterdata.py tests/test_masterdata_session_security.py tests/test_agent_secure_invite.py
       - name: Preserve frozen CLX-047 through governed baseline
         env:
           PYTHONPATH: .
