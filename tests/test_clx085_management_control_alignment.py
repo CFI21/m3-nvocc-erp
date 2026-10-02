@@ -34,7 +34,7 @@ def test_exception_approval_provider_audit_sections():
         assert target in b,target
 
 def test_management_filters_no_parallel_master():
-    b=home_block()
+    b=HTML
     for x in ["Management Filters","Branch / Office","Agent","Principal","Customer","Trade Lane","POL","POD","Vessel","All Status"]:
         assert x in b,x
     assert "do not create parallel master data" in b.lower()

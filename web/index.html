@@ -1468,7 +1468,7 @@ async function showExecutiveHome(){
   const screen=(id)=>api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers}).catch(()=>({rows:[]}));
   const results=await Promise.allSettled([
     api('/api/v1/control-tower',{headers}),
-    api('/api/v1/operations-workbench',{headers}),
+    api('/api/v1/operations-workbench?view=my',{headers}),
     api('/api/v1/operations-workbench?view=critical',{headers}),
     api('/api/clx034/workbench?status=PENDING',{headers}),
     api('/api/v1/management-kpi/trends?days=30',{headers}),
