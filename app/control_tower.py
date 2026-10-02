@@ -12,6 +12,7 @@ router=APIRouter(prefix="/api/v1/control-tower",tags=["CLX-027 Management Contro
 
 def _job_rows(c,role:str,agent_scope:Optional[str],customer_scope:Optional[str]):
     clause,args=_scope(role,agent_scope,customer_scope)
+    base_args=['92200','UAT-%']
     return [dict(r) for r in c.execute("""SELECT j.id,j.job_ref,j.operational_status,
       c.code customer_code,c.name customer_name,a.code agent_code,a.name agent_name,
       w.documentation_status,w.vgm_status,w.customs_status,w.transshipment_status,w.release_status,w.closed,
@@ -22,7 +23,7 @@ def _job_rows(c,role:str,agent_scope:Optional[str],customer_scope:Optional[str])
       JOIN agents a ON a.id=j.agent_id
       JOIN workflow_states w ON w.job_id=j.id
       JOIN finance_states f ON f.job_id=j.id
-      WHERE j.job_ref<>'92200' AND COALESCE(b.booking_ref,'') NOT LIKE 'UAT-%'"""+clause+" ORDER BY j.job_ref",args).fetchall()]
+      WHERE j.job_ref<>? AND COALESCE(b.booking_ref,'') NOT LIKE ?"""+clause+" ORDER BY j.job_ref",base_args+args).fetchall()]
 
 def _counter(values):
     c=collections.Counter(values)
