@@ -10,7 +10,7 @@ from app.admin_seed import run as admin_seed_run
 from app.masterdata_seed import run as masterdata_seed_run
 from app.admin import (
     AgentUserInvite, AgentUserInviteDecision, AgentUserActivate,
-    request_agent_user_invite, decide_agent_user_invite, activate_agent_user_invite
+    request_agent_user_invite, decide_agent_user_invite, reissue_agent_user_invite_token, activate_agent_user_invite
 )
 from app.screen_catalog import build_catalog
 
@@ -102,6 +102,61 @@ def test_retry_recovers_pre_review_partial_invite(isolated):
     assert c.execute("SELECT COUNT(*) n FROM iam_users WHERE username='ancml@786'").fetchone()['n']==1
     assert c.execute("SELECT COUNT(*) n FROM iam_access_reviews WHERE user_id=(SELECT id FROM iam_users WHERE username='ancml@786') AND status='PENDING'").fetchone()['n']==1
     c.close()
+
+def test_reissue_invalidates_old_token_and_enforces_password_policy(isolated):
+    maker=session_for('md.maker')
+    checker=session_for('md.checker')
+    out=request_agent_user_invite(invite(),maker)
+    approved=decide_agent_user_invite(out['review_ref'],AgentUserInviteDecision(decision='APPROVE'),checker)
+    old_token=approved['invite_token']
+    reissued=reissue_agent_user_invite_token(out['review_ref'],checker)
+    assert reissued['status']=='INVITE_PENDING'
+    assert reissued['display_once'] is True
+    assert reissued['invite_token']!=old_token
+    with pytest.raises(HTTPException) as old:
+        activate_agent_user_invite(AgentUserActivate(invite_token=old_token,new_password='UserSelectedCredential-2026'))
+    assert old.value.status_code==401
+    with pytest.raises(HTTPException) as short:
+        activate_agent_user_invite(AgentUserActivate(invite_token=reissued['invite_token'],new_password='short'))
+    assert short.value.detail['code']=='PASSWORD_POLICY_MIN_LENGTH'
+    activated=activate_agent_user_invite(AgentUserActivate(invite_token=reissued['invite_token'],new_password='UserSelectedCredential-2026'))
+    assert activated['status']=='ACTIVE'
+    with pytest.raises(HTTPException):
+        activate_agent_user_invite(AgentUserActivate(invite_token=reissued['invite_token'],new_password='AnotherUserSelectedCredential-2026'))
+
+def test_reissue_requires_checker_and_pending_activation(isolated):
+    maker=session_for('md.maker')
+    checker=session_for('md.checker')
+    out=request_agent_user_invite(invite(),maker)
+    with pytest.raises(HTTPException) as denied:
+        reissue_agent_user_invite_token(out['review_ref'],maker)
+    assert denied.value.detail['code']=='INVITE_REISSUE_PERMISSION_DENIED'
+    approved=decide_agent_user_invite(out['review_ref'],AgentUserInviteDecision(decision='APPROVE'),checker)
+    reissued=reissue_agent_user_invite_token(out['review_ref'],checker)
+    c=db.connect()
+    ar=c.execute("SELECT scope,status FROM iam_access_reviews WHERE review_ref=?",(out['review_ref'],)).fetchone()
+    scope=json.loads(ar['scope'])
+    assert ar['status']=='APPROVED_PENDING_ACTIVATION'
+    assert scope['invite_token_hash']!=reissued['invite_token']
+    assert scope['invite_token_hash']==__import__('hashlib').sha256(reissued['invite_token'].encode()).hexdigest()
+    assert scope['token_reissue_count']==1
+    c.close()
+
+def test_expired_reissued_token_is_rejected(isolated):
+    maker=session_for('md.maker')
+    checker=session_for('md.checker')
+    out=request_agent_user_invite(invite(),maker)
+    decide_agent_user_invite(out['review_ref'],AgentUserInviteDecision(decision='APPROVE'),checker)
+    reissued=reissue_agent_user_invite_token(out['review_ref'],checker)
+    c=db.connect()
+    ar=c.execute("SELECT scope FROM iam_access_reviews WHERE review_ref=?",(out['review_ref'],)).fetchone()
+    scope=json.loads(ar['scope'])
+    scope['invite_expires_at']='2000-01-01T00:00:00+00:00'
+    c.execute("UPDATE iam_access_reviews SET scope=? WHERE review_ref=?",(json.dumps(scope,sort_keys=True),out['review_ref']))
+    c.close()
+    with pytest.raises(HTTPException) as expired:
+        activate_agent_user_invite(AgentUserActivate(invite_token=reissued['invite_token'],new_password='UserSelectedCredential-2026'))
+    assert expired.value.status_code==410
 
 def test_duplicate_email_and_196_screens(isolated):
     maker=session_for('admin')
