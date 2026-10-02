@@ -50,7 +50,7 @@ def test_agent_role_limited_permissions(isolated):
     c.close()
 
 def test_invite_stays_inactive_until_activation(isolated):
-    out=request_agent_user_invite(invite(),session_for('admin'))
+    out=request_agent_user_invite(invite(),session_for('md.maker'))
     assert out['status']=='INVITE_PENDING_CHECKER' and out['login_active'] is False
     c=db.connect()
     u=c.execute("SELECT * FROM iam_users WHERE username='ancml@786'").fetchone()
@@ -59,7 +59,7 @@ def test_invite_stays_inactive_until_activation(isolated):
     c.close()
 
 def test_four_eyes_agent_only_scope_and_one_time_activation(isolated):
-    maker=session_for('admin')
+    maker=session_for('md.maker')
     checker=session_for('md.checker')
     out=request_agent_user_invite(invite(),maker)
     with pytest.raises(HTTPException) as same:
