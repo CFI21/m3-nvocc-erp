@@ -1,0 +1,320 @@
+{
+  "schema": "M3_CLX083_OPERATIONAL_FIELD_MATRIX_V1",
+  "baseline": "8b047979a439cbda9686327e2ad41a329297ee7f",
+  "backend_model_changed": false,
+  "database_changed": false,
+  "duplicate_operational_model_created": false,
+  "classification_legend": [
+    "PRESENT",
+    "DERIVED_READ_ONLY",
+    "CONDITIONAL",
+    "REVIEW_LATER"
+  ],
+  "cro": {
+    "source": "EXISTING_TRANSACTION_RECORD_CRO + BOOKING/JOB + CLX070_CONTAINER_CONTEXT",
+    "fields": [
+      {
+        "reference": "CRO No.",
+        "status": "PRESENT",
+        "source": "cro"
+      },
+      {
+        "reference": "Booking No.",
+        "status": "DERIVED_READ_ONLY",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "Job Ref",
+        "status": "PRESENT",
+        "source": "job"
+      },
+      {
+        "reference": "Customer",
+        "status": "DERIVED_READ_ONLY",
+        "source": "job identity"
+      },
+      {
+        "reference": "Carrier",
+        "status": "PRESENT",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "Principal",
+        "status": "PRESENT",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "Vessel",
+        "status": "PRESENT",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "Voyage",
+        "status": "PRESENT",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "POL",
+        "status": "PRESENT",
+        "source": "cro/job"
+      },
+      {
+        "reference": "POT",
+        "status": "CONDITIONAL",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "POD",
+        "status": "PRESENT",
+        "source": "cro/job"
+      },
+      {
+        "reference": "Depot",
+        "status": "PRESENT",
+        "source": "cro/container"
+      },
+      {
+        "reference": "Empty Pickup Location",
+        "status": "PRESENT",
+        "source": "cro"
+      },
+      {
+        "reference": "Release Date",
+        "status": "PRESENT",
+        "source": "cro"
+      },
+      {
+        "reference": "Valid Until",
+        "status": "PRESENT",
+        "source": "cro"
+      },
+      {
+        "reference": "Container Qty",
+        "status": "PRESENT",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "Size-Type",
+        "status": "PRESENT",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "Container Owner",
+        "status": "DERIVED_READ_ONLY",
+        "source": "container master"
+      },
+      {
+        "reference": "Free Days",
+        "status": "PRESENT",
+        "source": "cro/booking"
+      },
+      {
+        "reference": "Special Instruction",
+        "status": "PRESENT",
+        "source": "cro"
+      },
+      {
+        "reference": "CRO Status",
+        "status": "PRESENT",
+        "source": "cro status"
+      }
+    ]
+  },
+  "crt": {
+    "source": "EXISTING_CRT/TRANSSHIPMENT_TRANSACTION + BOOKING + CLX071_JOURNEY_CONTEXT",
+    "fields": [
+      {
+        "reference": "CRT No.",
+        "status": "PRESENT",
+        "source": "crt"
+      },
+      {
+        "reference": "Job",
+        "status": "PRESENT",
+        "source": "job"
+      },
+      {
+        "reference": "Booking",
+        "status": "DERIVED_READ_ONLY",
+        "source": "booking"
+      },
+      {
+        "reference": "B/L",
+        "status": "DERIVED_READ_ONLY",
+        "source": "bl/job context"
+      },
+      {
+        "reference": "Container",
+        "status": "PRESENT",
+        "source": "crt/container"
+      },
+      {
+        "reference": "Original Vessel-Voyage",
+        "status": "PRESENT",
+        "source": "crt/booking"
+      },
+      {
+        "reference": "POT",
+        "status": "CONDITIONAL",
+        "source": "crt/booking"
+      },
+      {
+        "reference": "Next Vessel-Voyage",
+        "status": "CONDITIONAL",
+        "source": "crt"
+      },
+      {
+        "reference": "TS Agent",
+        "status": "CONDITIONAL",
+        "source": "crt/booking"
+      },
+      {
+        "reference": "Discharge Date",
+        "status": "PRESENT",
+        "source": "crt"
+      },
+      {
+        "reference": "Connection ETD",
+        "status": "CONDITIONAL",
+        "source": "crt"
+      },
+      {
+        "reference": "Connection ETA",
+        "status": "CONDITIONAL",
+        "source": "crt"
+      },
+      {
+        "reference": "Status",
+        "status": "PRESENT",
+        "source": "crt status"
+      },
+      {
+        "reference": "Hold",
+        "status": "PRESENT",
+        "source": "existing hold fields"
+      },
+      {
+        "reference": "Exception",
+        "status": "PRESENT",
+        "source": "existing exception fields"
+      },
+      {
+        "reference": "Remarks",
+        "status": "PRESENT",
+        "source": "crt"
+      }
+    ]
+  },
+  "delivery_order": {
+    "source": "EXISTING_TRANSACTION_RECORD_DELIVERY_ORDER",
+    "release_instruction_same_record": true,
+    "fields": [
+      {
+        "reference": "DO No.",
+        "status": "PRESENT",
+        "source": "delivery-order"
+      },
+      {
+        "reference": "Job Ref",
+        "status": "PRESENT",
+        "source": "job"
+      },
+      {
+        "reference": "Booking",
+        "status": "DERIVED_READ_ONLY",
+        "source": "booking"
+      },
+      {
+        "reference": "B/L",
+        "status": "PRESENT",
+        "source": "delivery-order/bl"
+      },
+      {
+        "reference": "Customer",
+        "status": "DERIVED_READ_ONLY",
+        "source": "job identity"
+      },
+      {
+        "reference": "Consignee",
+        "status": "PRESENT",
+        "source": "delivery-order"
+      },
+      {
+        "reference": "Delivery Party",
+        "status": "PRESENT",
+        "source": "delivery-order"
+      },
+      {
+        "reference": "Container",
+        "status": "PRESENT",
+        "source": "delivery-order/container"
+      },
+      {
+        "reference": "Size-Type",
+        "status": "DERIVED_READ_ONLY",
+        "source": "container"
+      },
+      {
+        "reference": "POD",
+        "status": "PRESENT",
+        "source": "delivery-order/job"
+      },
+      {
+        "reference": "Depot",
+        "status": "PRESENT",
+        "source": "delivery-order/container"
+      },
+      {
+        "reference": "Valid Until",
+        "status": "PRESENT",
+        "source": "delivery-order"
+      },
+      {
+        "reference": "Payment Status",
+        "status": "PRESENT",
+        "source": "delivery-order/finance status"
+      },
+      {
+        "reference": "Customs Status",
+        "status": "PRESENT",
+        "source": "delivery-order"
+      },
+      {
+        "reference": "Freight Status",
+        "status": "PRESENT",
+        "source": "delivery-order"
+      },
+      {
+        "reference": "Release Status",
+        "status": "PRESENT",
+        "source": "delivery-order"
+      },
+      {
+        "reference": "Empty Return Location",
+        "status": "PRESENT",
+        "source": "delivery-order/container"
+      },
+      {
+        "reference": "Free Days",
+        "status": "PRESENT",
+        "source": "delivery-order/booking"
+      },
+      {
+        "reference": "Remarks",
+        "status": "PRESENT",
+        "source": "delivery-order"
+      }
+    ]
+  },
+  "links": {
+    "booking": "agent-tasks::booking",
+    "bl": "agent-tasks::bl",
+    "cro": "agent-tasks::cro",
+    "crt": "agent-tasks::transshipment-crt",
+    "delivery_order": "agent-tasks::delivery-order",
+    "container_journey": "agent-tasks::container-activity",
+    "invoice": "gl-accounts::invoice",
+    "soa": "agent-tasks::soa",
+    "audit": "integration-security::request-response-audit"
+  }
+}

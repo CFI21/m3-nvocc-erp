@@ -1,0 +1,20 @@
+{
+  "schema": "M3_CLX083_CRO_CRT_UAT_V1",
+  "checks": {
+    "cro_master_alignment": "PASS",
+    "cro_equipment_authoritative_link": "PASS",
+    "container_release_controls": "PASS",
+    "crt_master_alignment": "PASS",
+    "pot_conditional_logic": "PASS",
+    "transshipment_journey_link": "PASS",
+    "no_parallel_inventory": "PASS",
+    "no_new_model": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36983421829,
+  "focused_tests": "48 passed",
+  "full_regression": "309 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS"
+}
