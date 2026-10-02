@@ -1,0 +1,20 @@
+{
+  "schema": "M3_CLX084_JOB_COSTING_UAT_V1",
+  "checks": {
+    "job_costing_master": "PASS",
+    "existing_charge_sources_only": "PASS",
+    "revenue_control": "PASS",
+    "cost_control": "PASS",
+    "agent_principal_allocation": "PASS",
+    "job_pnl_read_only": "PASS",
+    "manual_additional_cost_governance": "PASS",
+    "no_parallel_costing_model": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36992198279,
+  "focused_tests": "60 passed",
+  "full_regression": "318 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS"
+}

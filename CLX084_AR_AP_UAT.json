@@ -1,0 +1,21 @@
+{
+  "schema": "M3_CLX084_AR_AP_UAT_V1",
+  "checks": {
+    "invoice_master": "PASS",
+    "bill_ap_master": "PASS",
+    "receipt_payment_links": "PASS",
+    "gl_posting_links": "PASS",
+    "treasury_links": "PASS",
+    "maker_checker": "PASS",
+    "preview_read_only": "PASS",
+    "role_access_inherited": "PASS",
+    "no_duplicate_finance_data": "PASS"
+  },
+  "status": "PASS",
+  "workflow_run_id": 36992198279,
+  "focused_tests": "60 passed",
+  "full_regression": "318 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS"
+}
