@@ -1,15 +1,21 @@
 {
   "schema": "M3_CLX084_AR_AP_UAT_V1",
   "checks": {
-    "invoice_master": "PENDING_CI",
-    "bill_ap_master": "PENDING_CI",
-    "receipt_payment_links": "PENDING_CI",
-    "gl_posting_links": "PENDING_CI",
-    "treasury_links": "PENDING_CI",
-    "maker_checker": "PENDING_CI",
-    "preview_read_only": "PENDING_CI",
-    "role_access_inherited": "PENDING_CI",
-    "no_duplicate_finance_data": "PENDING_CI"
+    "invoice_master": "PASS",
+    "bill_ap_master": "PASS",
+    "receipt_payment_links": "PASS",
+    "gl_posting_links": "PASS",
+    "treasury_links": "PASS",
+    "maker_checker": "PASS",
+    "preview_read_only": "PASS",
+    "role_access_inherited": "PASS",
+    "no_duplicate_finance_data": "PASS"
   },
-  "status": "PENDING_CI"
+  "status": "PASS",
+  "workflow_run_id": 36992198279,
+  "focused_tests": "60 passed",
+  "full_regression": "318 passed",
+  "canonical_screen_contract": "196 PASS",
+  "javascript_syntax": "PASS",
+  "safety": "PASS"
 }

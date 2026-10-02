@@ -1,18 +1,35 @@
 {
   "schema": "M3_CLX084_SOA_UI_ACCEPTANCE_V1",
   "baseline": "d97ff08e67d107768d3d4d8f7699f0e5c57f45f9",
-  "FINANCE_MASTER_FLOW_READY": false,
+  "FINANCE_MASTER_FLOW_READY": true,
   "backend_model_changed": false,
   "database_changed": false,
   "REAL_MONEY_READY": false,
   "REAL_PROVIDER_READY": false,
-  "status": "PENDING_CI",
+  "status": "ACCEPTED_FOR_SINGLE_PR",
+  "workflow_run_id": 36992198279,
+  "no_p0_p1_defects": true,
   "validation": {
-    "focused_finance_tests": "PENDING",
-    "canonical_screen_contract": "PENDING",
-    "full_erp_regression": "PENDING",
-    "javascript_syntax": "PENDING",
-    "safety": "PENDING"
+    "focused_finance_tests": "60 passed",
+    "canonical_screen_contract": "196 PASS",
+    "full_erp_regression": "318 passed",
+    "javascript_syntax": "PASS",
+    "safety": "PASS"
   },
-  "acceptance_rule": "Set FINANCE_MASTER_FLOW_READY=true only if Job Costing + Invoice + Bills/AP + SOA + GL/Treasury links pass with no P0/P1 defects."
+  "accepted_scope": [
+    "Job Costing master",
+    "Revenue control",
+    "Cost control",
+    "Customer Invoice master",
+    "Vendor Bill/AP master",
+    "Agent/Principal allocation",
+    "SOA master",
+    "Payment/Receipt links",
+    "Maker-checker",
+    "Read-only Job P&L",
+    "Read-only print/preview"
+  ],
+  "non_blocking_items": [
+    "Fields not native to Invoice/Bills/SOA remain derived/read-only from existing Job/Booking/GL/Treasury context; no duplicate finance ledger, costing table, invoice model, bill model, or SOA model was created."
+  ]
 }
