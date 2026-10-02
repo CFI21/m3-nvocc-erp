@@ -6,7 +6,7 @@ from app.seed import run as seed_run
 from app.admin_seed import run as admin_seed_run
 from app.masterdata_seed import run as masterdata_seed_run
 from app.admin import Login, login
-from app.masterdata import Change, Decision, create_change, decide
+from app.masterdata import Change, Decision, AliasMerge, SequenceNext, create_change, decide, alias_merge, sequence_next
 
 @pytest.fixture()
 def isolated(tmp_path,monkeypatch):
@@ -67,3 +67,31 @@ def test_same_super_admin_cannot_make_and_self_approve(isolated):
         decide(cr['change_ref'],Decision(decision='APPROVE'),x_m3_session=admin)
     assert e.value.status_code==409
     assert e.value.detail['code']=='FOUR_EYES_VIOLATION'
+
+
+def test_alias_merge_requires_session_and_checker(isolated):
+    with pytest.raises(HTTPException) as no_session:
+        alias_merge(AliasMerge(domain='carrier',source_key='CAR-001',target_key='CAR-002',reason='security-test'),x_m3_session=None)
+    assert no_session.value.status_code==401
+    import inspect
+    params=inspect.signature(alias_merge).parameters
+    assert 'x_role' not in params and 'x_user' not in params
+
+def test_sequence_next_requires_authenticated_maker(isolated):
+    with pytest.raises(HTTPException) as no_session:
+        sequence_next(SequenceNext(sequence_code='JOB'),x_m3_session=None)
+    assert no_session.value.status_code==401
+    maker=token('md.maker','Maker123!')
+    out=sequence_next(SequenceNext(sequence_code='JOB'),x_m3_session=maker)
+    assert out['sequence_code']=='JOB'
+    assert out['value']=='50006'
+
+def test_alias_merge_checker_path_uses_authenticated_user(isolated):
+    maker=token('md.maker','Maker123!')
+    checker=token('md.checker','Checker123!')
+    for key,name in [('SEC-ALIAS-A','Alias Source'),('SEC-ALIAS-B','Alias Target')]:
+        cr=create_change(Change(domain='carrier',record_key=key,operation='CREATE',payload={'name':name},reason='alias-test'),x_m3_session=maker)
+        decide(cr['change_ref'],Decision(decision='APPROVE'),x_m3_session=checker)
+    out=alias_merge(AliasMerge(domain='carrier',source_key='SEC-ALIAS-A',target_key='SEC-ALIAS-B',reason='dedupe'),x_m3_session=checker)
+    assert out['source_status']=='INACTIVE'
+    assert out['target_key']=='SEC-ALIAS-B'
