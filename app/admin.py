@@ -59,6 +59,17 @@ class Login(BaseModel): username:str; password:str; mfa_code:Optional[str]=None
 class Assign(BaseModel): username:str; role_code:str; office_code:Optional[str]=None; valid_to:Optional[str]=None
 class UserStatus(BaseModel): status:str=Field(pattern='^(ACTIVE|SUSPENDED|INACTIVE)$')
 class TempAccess(BaseModel): username:str; permission_code:str; valid_from:str; valid_to:str; reason:str
+class AgentUserInvite(BaseModel):
+    username:str
+    display_name:str
+    email:str
+    agent_code:str
+class AgentUserInviteDecision(BaseModel):
+    decision:str
+    comment:Optional[str]=None
+class AgentUserActivate(BaseModel):
+    invite_token:str
+    new_password:str=Field(min_length=12)
 
 ADMIN_SCREENS=['dashboard','users','user-status','roles','permission-matrix','role-assignments','organizations','countries','legal-entities','offices','branches','departments','office-membership','data-scope-rules','customer-agent-access','approval-limits','maker-checker','approval-delegations','temporary-access','access-reviews','sessions','password-policy','mfa-policy','sso-readiness','login-audit','service-accounts','api-clients','audit']
 
@@ -103,8 +114,137 @@ def set_user_status(username:str,b:UserStatus,x_m3_session:Optional[str]=Header(
     if u['id']==s['user_id'] and b.status!='ACTIVE': c.close(); raise HTTPException(409,{'code':'SELF_DEACTIVATION_BLOCKED'})
     before={'status':u['status'],'version':u['version']}; c.execute('UPDATE iam_users SET status=?,version=version+1 WHERE id=?',(b.status,u['id'])); audit(c,s['user_ref'],'USER_STATUS','USER',u['user_ref'],before,{'status':b.status}); c.close(); return {'status':b.status,'user_ref':u['user_ref']}
 
+def _ensure_agent_role(c):
+    c.execute("""INSERT INTO iam_roles(role_code,name,description,status,sensitive)
+      VALUES('AGENT','Agent User','Scoped external/partner agent user','ACTIVE',0)
+      ON CONFLICT(role_code) DO NOTHING""")
+    role=c.execute("SELECT * FROM iam_roles WHERE role_code='AGENT' AND status='ACTIVE'").fetchone()
+    for code in ('agent-tasks:view','agent-tasks:create','agent-tasks:edit'):
+        p=c.execute("SELECT id FROM iam_permissions WHERE permission_code=?",(code,)).fetchone()
+        if p:
+            c.execute("""INSERT INTO iam_role_permissions(role_id,permission_id,effect)
+              VALUES(?,?,'ALLOW') ON CONFLICT(role_id,permission_id) DO NOTHING""",(role['id'],p['id']))
+    return role
+
+def _ensure_agent_office(c,agent_code,agent):
+    p=json.loads(agent['payload_json'])
+    country=(p.get('country') or '').strip().upper()
+    port=(p.get('port') or '').strip().upper()
+    if not country or not port:
+        raise HTTPException(422,{'code':'AGENT_COUNTRY_PORT_REQUIRED'})
+    country_names={'MY':'Malaysia'}
+    c.execute("""INSERT INTO iam_countries(country_code,name,status)
+      VALUES(?,?, 'ACTIVE') ON CONFLICT(country_code) DO NOTHING""",(country,country_names.get(country,country)))
+    co=c.execute("SELECT * FROM iam_countries WHERE country_code=? AND status='ACTIVE'",(country,)).fetchone()
+    org=c.execute("SELECT * FROM iam_organizations WHERE org_code='M3-GLOBAL' AND status='ACTIVE'").fetchone()
+    if not co or not org: raise HTTPException(409,{'code':'AGENT_SCOPE_REFERENCE_NOT_ACTIVE'})
+    office_code=f'AGT-{agent_code}'
+    timezone={'MY':'Asia/Kuala_Lumpur'}.get(country,'UTC')
+    c.execute("""INSERT INTO iam_offices(office_code,name,organization_id,country_id,timezone,status)
+      VALUES(?,?,?,?,?,'ACTIVE') ON CONFLICT(office_code) DO NOTHING""",
+      (office_code,agent['display_name'],org['id'],co['id'],timezone))
+    office=c.execute("SELECT * FROM iam_offices WHERE office_code=? AND status='ACTIVE'",(office_code,)).fetchone()
+    if not office: raise HTTPException(409,{'code':'AGENT_OFFICE_NOT_ACTIVE'})
+    return office,co,org,port
+
+def _identity_maker(c,s):
+    roles={r['role_code'] for r in roles_for(c,s['user_id'])}
+    return bool(roles & {'SUPER_ADMIN','ORG_ADMIN','OFFICE_ADMIN'})
+
+def _identity_checker(c,s):
+    roles={r['role_code'] for r in roles_for(c,s['user_id'])}
+    return bool(roles & {'SUPER_ADMIN','MASTER_DATA_MANAGER','ORG_ADMIN'})
+
 def _agent_master(c,agent_code):
     return c.execute("SELECT * FROM md_records WHERE domain='agent' AND record_key=? AND status='ACTIVE'",(agent_code,)).fetchone()
+
+@router.post('/agent-user-invites',status_code=201)
+def request_agent_user_invite(b:AgentUserInvite,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect(); s=session(c,x_m3_session)
+    if not _identity_maker(c,s): c.close(); raise HTTPException(403,{'code':'IDENTITY_MAKER_PERMISSION_DENIED'})
+    agent=_agent_master(c,b.agent_code)
+    if not agent: c.close(); raise HTTPException(404,{'code':'AGENT_MASTER_NOT_FOUND'})
+    ap=json.loads(agent['payload_json'])
+    if ap.get('common_party_key') is None: c.close(); raise HTTPException(409,{'code':'AGENT_COMMON_PARTY_REQUIRED'})
+    party=c.execute("SELECT * FROM md_records WHERE domain='common-party' AND record_key=? AND status='ACTIVE'",(ap['common_party_key'],)).fetchone()
+    if not party: c.close(); raise HTTPException(409,{'code':'COMMON_PARTY_NOT_ACTIVE'})
+    if c.execute("SELECT 1 FROM iam_users WHERE lower(username)=lower(?) OR lower(email)=lower(?)",(b.username.strip(),b.email.strip())).fetchone():
+        c.close(); raise HTTPException(409,{'code':'DUPLICATE_USERNAME_OR_EMAIL'})
+    role=_ensure_agent_role(c)
+    office,co,org,port=_ensure_agent_office(c,b.agent_code,agent)
+    user_ref='USR-AGT-'+uuid.uuid4().hex[:10].upper()
+    unusable=phash(secrets.token_urlsafe(64))
+    cur=c.execute("""INSERT INTO iam_users(user_ref,username,display_name,email,password_hash,status,home_office_id,mfa_required,failed_attempts,version)
+      VALUES(?,?,?,?,?,'INVITED_PENDING_CHECKER',?,1,0,1)""",
+      (user_ref,b.username.strip(),b.display_name.strip(),b.email.strip(),unusable,office['id']))
+    uid=cur.lastrowid
+    review_ref='AUI-'+uuid.uuid4().hex[:10].upper()
+    due=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=2)).date().isoformat()
+    scope={'kind':'AGENT_USER_INVITE','maker_user_ref':s['user_ref'],'agent_code':b.agent_code,
+      'common_party_key':ap['common_party_key'],'office_code':office['office_code'],'country_code':co['country_code'],
+      'organization_id':org['id'],'port_code':port,'role_code':'AGENT','user_ref':user_ref}
+    c.execute("""INSERT INTO iam_access_reviews(review_ref,user_id,scope,status,reviewer,due_date)
+      VALUES(?,?,?,'PENDING','INDEPENDENT_CHECKER',?)""",(review_ref,uid,json.dumps(scope,sort_keys=True),due))
+    audit(c,s['user_ref'],'AGENT_USER_INVITE_REQUEST','USER',user_ref,after={'status':'INVITED_PENDING_CHECKER','agent_code':b.agent_code,'common_party_key':ap['common_party_key']},scope={'review_ref':review_ref})
+    c.close()
+    return {'review_ref':review_ref,'user_ref':user_ref,'status':'INVITE_PENDING_CHECKER','login_active':False,'mfa_required':True,'agent_code':b.agent_code,'common_party_key':ap['common_party_key']}
+
+@router.post('/agent-user-invites/{review_ref}/decision')
+def decide_agent_user_invite(review_ref:str,b:AgentUserInviteDecision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if b.decision not in {'APPROVE','REJECT'}: raise HTTPException(422,{'code':'INVALID_DECISION'})
+    c=connect(); s=session(c,x_m3_session)
+    if not _identity_checker(c,s): c.close(); raise HTTPException(403,{'code':'IDENTITY_CHECKER_PERMISSION_DENIED'})
+    ar=c.execute("SELECT * FROM iam_access_reviews WHERE review_ref=? AND status='PENDING'",(review_ref,)).fetchone()
+    if not ar: c.close(); raise HTTPException(404,{'code':'PENDING_INVITE_REVIEW_NOT_FOUND'})
+    scope=json.loads(ar['scope'])
+    if scope.get('kind')!='AGENT_USER_INVITE': c.close(); raise HTTPException(409,{'code':'WRONG_REVIEW_KIND'})
+    if scope.get('maker_user_ref')==s['user_ref']: c.close(); raise HTTPException(409,{'code':'FOUR_EYES_VIOLATION'})
+    u=c.execute("SELECT * FROM iam_users WHERE id=?",(ar['user_id'],)).fetchone()
+    if b.decision=='REJECT':
+        c.execute("UPDATE iam_access_reviews SET status='REJECTED',completed_at=?,result=? WHERE id=?",(now(),b.comment or 'REJECTED',ar['id']))
+        c.execute("UPDATE iam_users SET status='INVITE_REJECTED',version=version+1 WHERE id=?",(u['id'],))
+        audit(c,s['user_ref'],'AGENT_USER_INVITE_REJECT','USER',u['user_ref'],before={'status':u['status']},after={'status':'INVITE_REJECTED'},scope={'review_ref':review_ref})
+        c.close(); return {'review_ref':review_ref,'status':'REJECTED','login_active':False}
+    role=_ensure_agent_role(c)
+    office=c.execute("SELECT * FROM iam_offices WHERE office_code=? AND status='ACTIVE'",(scope['office_code'],)).fetchone()
+    co=c.execute("SELECT * FROM iam_countries WHERE country_code=? AND status='ACTIVE'",(scope['country_code'],)).fetchone()
+    agent=_agent_master(c,scope['agent_code'])
+    party=c.execute("SELECT * FROM md_records WHERE domain='common-party' AND record_key=? AND status='ACTIVE'",(scope['common_party_key'],)).fetchone()
+    if not role or not office or not co or not agent or not party: c.close(); raise HTTPException(409,{'code':'INVITE_REFERENCE_NOT_ACTIVE'})
+    c.execute("""INSERT INTO iam_user_roles(user_id,role_id,office_id,country_id,organization_id,valid_from,status,assigned_by)
+      VALUES(?,?,?,?,?,?,'ACTIVE',?) ON CONFLICT(user_id,role_id,office_id,country_id,organization_id) DO NOTHING""",
+      (u['id'],role['id'],office['id'],co['id'],scope['organization_id'],now(),s['user_ref']))
+    c.execute("""INSERT INTO iam_office_membership(user_id,office_id,membership_type,status)
+      VALUES(?,?,'PRIMARY','ACTIVE') ON CONFLICT(user_id,office_id) DO NOTHING""",(u['id'],office['id']))
+    c.execute("""INSERT INTO iam_party_access(user_id,party_type,party_key,access_level,status)
+      VALUES(?,'AGENT',?,'EDIT','ACTIVE') ON CONFLICT(user_id,party_type,party_key) DO UPDATE SET access_level='EDIT',status='ACTIVE'""",(u['id'],scope['agent_code']))
+    token=secrets.token_urlsafe(32)
+    scope['invite_token_hash']=ih(token); scope['invite_expires_at']=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=48)).isoformat(); scope['invite_used']=False
+    c.execute("UPDATE iam_access_reviews SET scope=?,status='APPROVED_PENDING_ACTIVATION',completed_at=?,result=? WHERE id=?",
+      (json.dumps(scope,sort_keys=True),now(),b.comment or 'APPROVED',ar['id']))
+    c.execute("UPDATE iam_users SET status='INVITED',version=version+1 WHERE id=?",(u['id'],))
+    audit(c,s['user_ref'],'AGENT_USER_INVITE_APPROVE','USER',u['user_ref'],before={'status':u['status']},after={'status':'INVITED','agent_code':scope['agent_code'],'role':'AGENT'},scope={'review_ref':review_ref})
+    c.close()
+    return {'review_ref':review_ref,'status':'INVITE_PENDING','user_ref':u['user_ref'],'login_active':False,'mfa_required':True,'agent_code':scope['agent_code'],'common_party_key':scope['common_party_key'],'invite_token':token,'expires_at':scope['invite_expires_at']}
+
+@router.post('/agent-user-invites/activate')
+def activate_agent_user_invite(b:AgentUserActivate):
+    c=connect(); rows=list(c.execute("SELECT * FROM iam_access_reviews WHERE status='APPROVED_PENDING_ACTIVATION'"))
+    match=None; scope=None
+    for ar in rows:
+        sc=json.loads(ar['scope'])
+        if sc.get('kind')=='AGENT_USER_INVITE' and sc.get('invite_token_hash')==ih(b.invite_token):
+            match=ar; scope=sc; break
+    if not match: c.close(); raise HTTPException(401,{'code':'INVITE_TOKEN_INVALID'})
+    if scope.get('invite_used'): c.close(); raise HTTPException(409,{'code':'INVITE_TOKEN_USED'})
+    if datetime.datetime.fromisoformat(scope['invite_expires_at']) < datetime.datetime.now(datetime.timezone.utc):
+        c.close(); raise HTTPException(410,{'code':'INVITE_TOKEN_EXPIRED'})
+    u=c.execute("SELECT * FROM iam_users WHERE id=?",(match['user_id'],)).fetchone()
+    c.execute("UPDATE iam_users SET password_hash=?,status='ACTIVE',failed_attempts=0,version=version+1 WHERE id=?",(phash(b.new_password),u['id']))
+    scope['invite_used']=True; scope['activated_at']=now()
+    c.execute("UPDATE iam_access_reviews SET scope=?,status='COMPLETED',result='ACTIVATED' WHERE id=?",(json.dumps(scope,sort_keys=True),match['id']))
+    audit(c,u['user_ref'],'AGENT_USER_ACTIVATE','USER',u['user_ref'],before={'status':u['status']},after={'status':'ACTIVE','mfa_required':True},scope={'review_ref':match['review_ref']})
+    c.close(); return {'status':'ACTIVE','user_ref':u['user_ref'],'mfa_required':True,'agent_code':scope['agent_code']}
 
 @router.get('/agents/{agent_code}/users')
 def agent_users(agent_code:str):
