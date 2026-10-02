@@ -211,8 +211,178 @@ async function openScreen(id,navContext=null,historyMode='push'){
     api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});
   }catch(e){$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
 }
+
+const CLX83_OPERATIONAL_KEYS=new Set(['cro','crt','export-crt','transshipment-crt','delivery-order']);
+let clx83PreviewState=null;
+function clx83Pick(base,...names){for(const n of names){const v=base?.[n];if(v!==undefined&&v!==null&&String(v)!=='')return v}return ''}
+function clx83RO(label,value,opts={}){
+  const full=opts.full?' full':'';
+  const v=value??'';
+  return '<div class="formField'+full+'"><label>'+esc(label)+'</label>'+(opts.textarea?'<textarea disabled>'+esc(v)+'</textarea>':'<input value="'+esc(v)+'" disabled>')+'</div>';
+}
+function clx83Section(title,body){return '<div class="clx82Section"><div class="clx82Head">'+esc(title)+'</div><div class="clx82Body">'+body+'</div></div>'}
+function clx83Grid(items){return '<div class="clx82Grid">'+items.join('')+'</div>'}
+function clx83Link(screen,label,jr){return '<button class="btn" onclick="openClx49Link(\''+screen+'\',\''+esc(jr||'')+'\')">'+esc(label)+'</button>'}
+function clx83Status(base){
+  return clx83Grid([
+    clx83RO('Current Status',clx83Pick(base,'Status','status')),
+    clx83RO('Release Status',clx83Pick(base,'Release Status')),
+    clx83RO('Payment Hold',clx83Pick(base,'Payment Hold','Payment Block')),
+    clx83RO('Document Hold',clx83Pick(base,'Document Hold')),
+    clx83RO('Equipment Hold',clx83Pick(base,'Equipment Hold')),
+    clx83RO('Exception',clx83Pick(base,'Exception','Exception Status'),{full:true})
+  ])+'<div class="equipNote">Status transitions remain server-authoritative. DRAFT / REQUESTED / APPROVED / RELEASED / USED / EXPIRED / CANCELLED / HOLD are displayed only when returned by the existing workflow/API; CLX-083 does not create new backend states.</div>';
+}
+function clx83PreviewHtml(title,base){
+  const rows=Object.entries(base||{}).filter(([k])=>!['id','version','payload_json'].includes(k)).map(([k,v])=>'<tr><td><b>'+esc(k)+'</b></td><td>'+esc(typeof v==='object'?JSON.stringify(v):v)+'</td></tr>').join('');
+  return '<div id="clx83Preview" class="clx82Section"><div class="clx82Head">Read-only '+esc(title)+' Preview</div><div class="clx82Body"><div class="equipNote">Preview uses the currently selected authoritative transaction values. It has no save controls and no secondary document dataset.</div><div class="tablewrap"><table><tbody>'+rows+'</tbody></table></div><div class="formActions"><button class="btn" onclick="window.print()">Print</button><button class="btn" onclick="clx83TogglePreview()">Close Preview</button></div></div></div>';
+}
+function clx83TogglePreview(){
+  const old=document.getElementById('clx83Preview');if(old){old.remove();return}
+  if(!clx83PreviewState)return;
+  $('gridArea').insertAdjacentHTML('afterbegin',clx83PreviewHtml(clx83PreviewState.title,clx83PreviewState.base));
+}
+async function renderClx083OperationalMaster(){
+  if(!state.current||!CLX83_OPERATIONAL_KEYS.has(state.current.key)||!state.selected)return false;
+  const base={...rowPayload(state.selected)};
+  const jr=selectedJob()||clx83Pick(base,'Job Ref','Job');
+  let related=null,equipment=null;
+  try{if(jr)related=await api('/api/clx011/related/'+encodeURIComponent(jr))}catch(_){}
+  try{if(jr)equipment=await api('/api/clx070/container-control/booking-context/'+encodeURIComponent(jr))}catch(_){}
+  const ident=related?.identity||{};
+  const key=state.current.key;
+  const isCro=key==='cro';
+  const isCrt=['crt','export-crt','transshipment-crt'].includes(key);
+  const isDo=key==='delivery-order';
+  let out='<div class="clx78Workspace">';
+  if(isCro){
+    out+=clx83Section('CRO Basic Info / Routing',clx83Grid([
+      clx83RO('CRO No.',clx83Pick(base,'CRO No.','CRO No','CRO')),
+      clx83RO('Booking No.',clx83Pick(base,'Booking No.','Booking')),
+      clx83RO('Job Ref',jr),
+      clx83RO('Customer',clx83Pick(base,'Customer')||ident.customer_name),
+      clx83RO('Carrier',clx83Pick(base,'Carrier')),
+      clx83RO('Principal',clx83Pick(base,'Principal')),
+      clx83RO('Vessel',clx83Pick(base,'Vessel')),
+      clx83RO('Voyage',clx83Pick(base,'Voyage')),
+      clx83RO('POL',clx83Pick(base,'POL')||ident.pol),
+      clx83RO('POT',clx83Pick(base,'POT','POT (1)','Via Port')),
+      clx83RO('POD',clx83Pick(base,'POD')||ident.pod),
+      clx83RO('Depot',clx83Pick(base,'Depot')),
+      clx83RO('Empty Pickup Location',clx83Pick(base,'Empty Pickup Location','Pickup Location')),
+      clx83RO('Release Date',clx83Pick(base,'Release Date')),
+      clx83RO('Valid Until',clx83Pick(base,'Valid Until')),
+      clx83RO('Container Qty',clx83Pick(base,'Container Qty','Quantity')),
+      clx83RO('Size / Type',clx83Pick(base,'Size/Type','Size-Type','Container Type')),
+      clx83RO('Container Owner',clx83Pick(base,'Container Owner','Owner')),
+      clx83RO('Free Days',clx83Pick(base,'Free Days')),
+      clx83RO('CRO Status',clx83Pick(base,'CRO Status','Status')),
+      clx83RO('Special Instruction',clx83Pick(base,'Special Instruction','Instructions','Remarks'),{full:true,textarea:true})
+    ]));
+    const allocated=equipment?.allocated_containers||[];
+    out+=clx83Section('CRO Equipment Allocation','<div class="equipNote">Requested equipment stays on the existing CRO/Booking record; allocated equipment below comes from the CLX-070 authoritative container master.</div>'+
+      clx83Grid([
+        clx83RO('Requested Qty',clx83Pick(base,'Container Qty','Quantity')),
+        clx83RO('Requested Size / Type',clx83Pick(base,'Size/Type','Size-Type','Container Type')),
+        clx83RO('Allocated Count',allocated.length),
+        clx83RO('Reservation Status',clx83Pick(base,'Reservation Status')),
+        clx83RO('Release Status',clx83Pick(base,'Release Status'))
+      ])+
+      '<div class="tablewrap"><table><thead><tr><th>Container No.</th><th>Size / Type</th><th>Owner</th><th>Depot</th><th>Availability / Status</th></tr></thead><tbody>'+
+      (allocated.length?allocated.map(z=>'<tr><td><b>'+esc(z.container_no||'')+'</b></td><td>'+esc(z.size_type||'')+'</td><td>'+esc(z.owner_party_type||z.ownership||'')+'</td><td>'+esc(z.depot_code||'')+'</td><td>'+esc(z.equipment_status||'')+'</td></tr>').join(''):'<tr><td colspan="5" class="muted">No allocated container returned for this job.</td></tr>')+
+      '</tbody></table></div>');
+    out+=clx83Section('Container Release Control',clx83Grid([
+      clx83RO('Empty Release',clx83Pick(base,'Empty Release')),
+      clx83RO('Pickup Authorization',clx83Pick(base,'Pickup Authorization')),
+      clx83RO('Validity',clx83Pick(base,'Valid Until','Validity')),
+      clx83RO('Payment Hold',clx83Pick(base,'Payment Hold','Payment Block')),
+      clx83RO('Document Hold',clx83Pick(base,'Document Hold')),
+      clx83RO('Equipment Hold',clx83Pick(base,'Equipment Hold')),
+      clx83RO('Depot Release Status',clx83Pick(base,'Depot Release Status','Release Status')),
+      clx83RO('Released By',clx83Pick(base,'Released By')),
+      clx83RO('Released Date',clx83Pick(base,'Released Date','Release Date')),
+      clx83RO('Authorized Override',clx83Pick(base,'Authorized Override')),
+      clx83RO('Override Reason',clx83Pick(base,'Override Reason'),{full:true})
+    ]));
+  }
+  if(isCrt){
+    const pot=clx83Pick(base,'POT','POT (1)','Via Port','Transshipment Port');
+    out+=clx83Section('CRT / Transshipment Master',clx83Grid([
+      clx83RO('CRT No.',clx83Pick(base,'CRT No.','TS CRT No.','Export CRT No.')),
+      clx83RO('Job',jr),
+      clx83RO('Booking',clx83Pick(base,'Booking No.','Booking')),
+      clx83RO('B/L',clx83Pick(base,'B/L','BL','HBL','MBL')),
+      clx83RO('Container',clx83Pick(base,'Container','Container No.')),
+      clx83RO('Original Vessel / Voyage',[clx83Pick(base,'Original Vessel','Vessel'),clx83Pick(base,'Original Voyage','Voyage')].filter(Boolean).join(' / ')),
+      clx83RO('POT',pot),
+      clx83RO('Next Vessel / Voyage',[clx83Pick(base,'Next Vessel','Connecting Vessel'),clx83Pick(base,'Next Voyage','Connecting Voyage')].filter(Boolean).join(' / ')),
+      clx83RO('TS Agent',clx83Pick(base,'TS Agent','Transshipment Agent')),
+      clx83RO('Discharge Date',clx83Pick(base,'Discharge Date')),
+      clx83RO('Connection ETD',clx83Pick(base,'Connection ETD','ETD')),
+      clx83RO('Connection ETA',clx83Pick(base,'Connection ETA','ETA')),
+      clx83RO('Status',clx83Pick(base,'Status')),
+      clx83RO('Hold',clx83Pick(base,'Hold','Hold Status')),
+      clx83RO('Exception',clx83Pick(base,'Exception','Exception Status')),
+      clx83RO('Remarks',clx83Pick(base,'Remarks'),{full:true,textarea:true})
+    ]));
+    out+=clx83Section('POT Conditional Logic',pot?
+      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing CRT/booking record.</div>':
+      '<div class="equipNote">Direct shipment / no POT detected. POT, TS Agent and connecting vessel/voyage controls remain inactive; no transshipment data is forced.</div>');
+  }
+  if(isDo){
+    out+=clx83Section('Delivery Order Master',clx83Grid([
+      clx83RO('DO No.',clx83Pick(base,'DO No.','DO No')),
+      clx83RO('Job Ref',jr),
+      clx83RO('Booking',clx83Pick(base,'Booking No.','Booking')),
+      clx83RO('B/L',clx83Pick(base,'B/L','BL','HBL','MBL')),
+      clx83RO('Customer',clx83Pick(base,'Customer')||ident.customer_name),
+      clx83RO('Consignee',clx83Pick(base,'Consignee'),{full:true}),
+      clx83RO('Delivery Party',clx83Pick(base,'Delivery Party','Notify'),{full:true}),
+      clx83RO('Container',clx83Pick(base,'Container','Container No.')),
+      clx83RO('Size / Type',clx83Pick(base,'Size/Type','Size-Type','Container Type')),
+      clx83RO('POD',clx83Pick(base,'POD')||ident.pod),
+      clx83RO('Depot',clx83Pick(base,'Depot')),
+      clx83RO('Valid Until',clx83Pick(base,'Valid Until','Validity')),
+      clx83RO('Payment Status',clx83Pick(base,'Payment Status','Freight Status')),
+      clx83RO('Customs Status',clx83Pick(base,'Customs Status')),
+      clx83RO('Freight Status',clx83Pick(base,'Freight Status')),
+      clx83RO('Release Status',clx83Pick(base,'Release Status')),
+      clx83RO('Empty Return Location',clx83Pick(base,'Empty Return Location','Return Depot')),
+      clx83RO('Free Days',clx83Pick(base,'Free Days')),
+      clx83RO('Remarks',clx83Pick(base,'Remarks','Release Instruction'),{full:true,textarea:true})
+    ]));
+    out+=clx83Section('Release Instruction — Same Authoritative Delivery Record',clx83Grid([
+      clx83RO('Release Type / Instruction',clx83Pick(base,'Release Instruction','Release Type')),
+      clx83RO('Original B/L Status',clx83Pick(base,'Original BL Status')),
+      clx83RO('Telex Release',clx83Pick(base,'Telex Release')),
+      clx83RO('Payment Block',clx83Pick(base,'Payment Block')),
+      clx83RO('Customs Status',clx83Pick(base,'Customs Status')),
+      clx83RO('Freight Status',clx83Pick(base,'Freight Status')),
+      clx83RO('Valid Until',clx83Pick(base,'Valid Until')),
+      clx83RO('Release Status',clx83Pick(base,'Release Status'))
+    ]));
+  }
+  out+=clx83Section('Status Governance / Exception Control',clx83Status(base));
+  out+=clx83Section('Authoritative Document & Journey Links','<div class="formActions">'+
+    clx83Link('agent-tasks::booking','Booking',jr)+
+    clx83Link('agent-tasks::bl','B/L',jr)+
+    clx83Link('agent-tasks::cro','CRO',jr)+
+    clx83Link('agent-tasks::transshipment-crt','CRT / Transshipment',jr)+
+    clx83Link('agent-tasks::delivery-order','Delivery Order',jr)+
+    clx83Link('agent-tasks::container-activity','Container Journey',jr)+
+    clx83Link('gl-accounts::invoice','Invoice',jr)+
+    clx83Link('agent-tasks::soa','SOA',jr)+
+    clx83Link('integration-security::request-response-audit','Audit',jr)+
+    '</div><div class="equipNote">All links preserve the existing job context. No second event history, finance ledger or document record is created.</div>');
+  out+='<div class="card"><div class="formActions"><button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button><button class="btn" onclick="clx83TogglePreview()">Print / Preview</button></div></div></div>';
+  clx83PreviewState={title:state.current.name,base};
+  $('gridArea').insertAdjacentHTML('beforeend',out);
+  return true;
+}
+
 async function renderInlineAgentScreen(){
   if(!state.current||state.current.domain!=='Agent Tasks'||!state.selected)return;
+  if(await renderClx083OperationalMaster())return;
   try{
     const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode=edit');
     const base={...rowPayload(state.selected)};
@@ -239,7 +409,7 @@ async function renderInlineAgentScreen(){
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
 async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}openDrawer('details')}
+async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}openDrawer('details')}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
 async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
 async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}

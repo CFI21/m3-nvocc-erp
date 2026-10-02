@@ -1,0 +1,18 @@
+{
+  "schema": "M3_CLX083_UI_ACCEPTANCE_V1",
+  "baseline": "8b047979a439cbda9686327e2ad41a329297ee7f",
+  "OPERATIONAL_DOCUMENT_FLOW_READY": false,
+  "backend_model_changed": false,
+  "database_changed": false,
+  "REAL_MONEY_READY": false,
+  "REAL_PROVIDER_READY": false,
+  "status": "PENDING_CI",
+  "validation": {
+    "focused_operational_tests": "PENDING",
+    "canonical_screen_contract": "PENDING",
+    "full_erp_regression": "PENDING",
+    "javascript_syntax": "PENDING",
+    "safety": "PENDING"
+  },
+  "acceptance_rule": "Set OPERATIONAL_DOCUMENT_FLOW_READY=true only after CRO + Release + CRT + Delivery Order + Container Journey links pass with no P0/P1 defects."
+}

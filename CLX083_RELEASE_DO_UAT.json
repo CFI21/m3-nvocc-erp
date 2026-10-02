@@ -1,0 +1,16 @@
+{
+  "schema": "M3_CLX083_RELEASE_DO_UAT_V1",
+  "checks": {
+    "delivery_order_master": "PENDING_CI",
+    "release_instruction_same_record": "PENDING_CI",
+    "payment_customs_freight_controls": "PENDING_CI",
+    "release_validity": "PENDING_CI",
+    "status_governance": "PENDING_CI",
+    "exception_surface": "PENDING_CI",
+    "document_links": "PENDING_CI",
+    "preview_read_only": "PENDING_CI",
+    "container_journey_link": "PENDING_CI",
+    "finance_link": "PENDING_CI"
+  },
+  "status": "PENDING_CI"
+}

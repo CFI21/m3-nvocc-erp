@@ -1,0 +1,14 @@
+{
+  "schema": "M3_CLX083_CRO_CRT_UAT_V1",
+  "checks": {
+    "cro_master_alignment": "PENDING_CI",
+    "cro_equipment_authoritative_link": "PENDING_CI",
+    "container_release_controls": "PENDING_CI",
+    "crt_master_alignment": "PENDING_CI",
+    "pot_conditional_logic": "PENDING_CI",
+    "transshipment_journey_link": "PENDING_CI",
+    "no_parallel_inventory": "PENDING_CI",
+    "no_new_model": "PENDING_CI"
+  },
+  "status": "PENDING_CI"
+}
