@@ -96,6 +96,13 @@ def reference_errors(c,domain,payload):
         if not c.execute("SELECT 1 FROM iam_countries WHERE country_code=? AND status='ACTIVE'",(payload.get('country'),)).fetchone(): errs.append('COUNTRY_REFERENCE_NOT_ACTIVE')
     return errs
 
+def sync_operational_projection(c,domain,key,payload,status='ACTIVE'):
+    if domain!='agent': return
+    name=payload.get('name') or payload.get('display_name') or key
+    if status=='ACTIVE':
+        c.execute("""INSERT INTO agents(code,name) VALUES(?,?)
+          ON CONFLICT(code) DO UPDATE SET name=excluded.name""",(key,name))
+
 def usage_count(c,domain,key):
     n=c.execute('SELECT COUNT(*) n FROM md_usage WHERE domain=? AND record_key=?',(domain,key)).fetchone()['n']
     if domain=='customer': n+=c.execute('SELECT COUNT(*) n FROM jobs j JOIN customers x ON x.id=j.customer_id WHERE x.code=?',(key,)).fetchone()['n']
@@ -176,7 +183,20 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
         ver=current['version']+1;c.execute("UPDATE md_records SET status='INACTIVE',version=?,effective_to=COALESCE(?,?),approved_by=?,approved_at=?,updated_at=? WHERE id=?",(ver,payload.get('effective_to'),ts[:10],user,ts,ts,current['id']));payload=json.loads(current['payload_json'])
     else:
         ver=current['version']+1;c.execute("UPDATE md_records SET status='ACTIVE',version=?,effective_to=NULL,approved_by=?,approved_at=?,updated_at=? WHERE id=?",(ver,user,ts,ts,current['id']));payload=json.loads(current['payload_json'])
-    status='INACTIVE' if ch['operation']=='DEACTIVATE' else 'ACTIVE';c.execute('INSERT INTO md_versions(domain,record_key,version,payload_json,status,changed_by,change_ref,ts) VALUES(?,?,?,?,?,?,?,?)',(ch['domain'],ch['record_key'],ver,j(payload),status,user,change_ref,ts));c.execute("UPDATE md_change_requests SET status='APPROVED',checker=?,decision_comment=?,decided_at=?,applied_at=? WHERE id=?",(user,b.comment,ts,ts,ch['id']));audit(c,user,'CHANGE_APPROVE_APPLY',ch['domain'],ch['record_key'],change_ref,before,payload);c.close();return {'status':'APPROVED','version':ver}
+    status='INACTIVE' if ch['operation']=='DEACTIVATE' else 'ACTIVE';sync_operational_projection(c,ch['domain'],ch['record_key'],payload,status);c.execute('INSERT INTO md_versions(domain,record_key,version,payload_json,status,changed_by,change_ref,ts) VALUES(?,?,?,?,?,?,?,?)',(ch['domain'],ch['record_key'],ver,j(payload),status,user,change_ref,ts));c.execute("UPDATE md_change_requests SET status='APPROVED',checker=?,decision_comment=?,decided_at=?,applied_at=? WHERE id=?",(user,b.comment,ts,ts,ch['id']));audit(c,user,'CHANGE_APPROVE_APPLY',ch['domain'],ch['record_key'],change_ref,before,payload);c.close();return {'status':'APPROVED','version':ver}
+@router.post('/projections/agents/sync')
+def sync_agent_projections(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    if not can_approve_roles(roles): c.close(); raise HTTPException(403,{'code':'CHECKER_PERMISSION_DENIED'})
+    synced=0
+    for r in c.execute("SELECT record_key,display_name,payload_json FROM md_records WHERE domain='agent' AND status='ACTIVE' ORDER BY record_key"):
+        p=json.loads(r['payload_json'] or '{}')
+        if not p.get('name'): p['name']=r['display_name']
+        sync_operational_projection(c,'agent',r['record_key'],p,'ACTIVE'); synced+=1
+    audit(c,user,'AGENT_OPERATIONAL_PROJECTION_SYNC','agent',None,None,None,{'synced':synced})
+    c.close()
+    return {'domain':'agent','projection':'agents','synced':synced,'authoritative_source':'md_records','new_master_model':False}
+
 @router.get('/versions/{domain}/{record_key}')
 def versions(domain:str,record_key:str):c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_versions WHERE domain=? AND record_key=? ORDER BY version DESC',(domain,record_key))];c.close();return x
 @router.get('/quality')
