@@ -35,6 +35,34 @@
   "ancline": "UNTOUCHED",
   "live_providers": "OFF",
   "real_money": "OFF",
-  "AGENT_USER_ONBOARDING_READY": false,
-  "status": "IMPLEMENTATION_CANDIDATE_REQUIRES_CI_UAT"
+  "AGENT_USER_ONBOARDING_READY": true,
+  "status": "PASS",
+  "ci_evidence": {
+    "build_first": {
+      "run_id": 37007287192,
+      "job_id": 110838437617,
+      "status": "PASS"
+    },
+    "agent_workspace": {
+      "run_id": 37007287370,
+      "job_id": 110838438398,
+      "status": "PASS"
+    },
+    "admin_master_data": {
+      "run_id": 37007287400,
+      "job_id": 110838438263,
+      "status": "PASS"
+    },
+    "integration_security": {
+      "run_id": 37007286943,
+      "job_id": 110838437129,
+      "status": "PASS"
+    },
+    "full_erp_operational": {
+      "run_id": 37007287412,
+      "job_id": 110838438427,
+      "status": "PASS"
+    }
+  },
+  "production_runtime_change_pending_merge": true
 }
