@@ -440,11 +440,25 @@ async function renderAgentUsersChild(){
       '<div class="tablewrap"><table><thead><tr><th>User</th><th>Name</th><th>Email</th><th>Office</th><th>Roles</th><th>Agent Access</th><th>Status</th><th>MFA</th></tr></thead><tbody>'+
       (rows.length?rows.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.display_name)+'</td><td>'+esc(u.email)+'</td><td>'+esc(u.office_code)+'</td><td>'+esc(u.roles||'')+'</td><td>'+esc(u.access_level||'')+'</td><td>'+esc(u.status)+'</td><td>'+esc(u.mfa_required?'Required':'No')+'</td></tr>').join(''):'<tr><td colspan="8" class="muted">No named users are linked to this Agent yet.</td></tr>')+
       '</tbody></table></div>';
-    if(pending.length)html+='<div class="card"><b>Pending checker approval</b><pre class="pre">'+esc(JSON.stringify(pending,null,2))+'</pre></div>';
+    if(pending.length)html+='<div class="card"><b>Secure activation handoff</b><div class="equipNote">Use the controlled reissue action to display a replacement activation token once.</div><div class="tablewrap"><table><thead><tr><th>User</th><th>Email</th><th>Review</th><th>Status</th><th>Action</th></tr></thead><tbody>'+pending.map(p=>'<tr><td>'+esc(p.username||p.user_ref)+'</td><td>'+esc(p.email||'')+'</td><td>'+esc(p.review_ref)+'</td><td>'+esc(p.status)+'</td><td><button class="btn primary" onclick="reissueAgentInviteToken(\''+esc(p.review_ref)+'\')">Reissue token</button></td></tr>').join('')+'</tbody></table></div></div>';
     html+='<div class="formActions"><button class="btn" onclick="openScreen(\'administration::users\')">Open Administration Users</button><button class="btn" onclick="openScreen(\'administration::customer-agent-access\')">Open Agent Access</button></div></div>';
     $('gridArea').insertAdjacentHTML('beforeend',html);
   }catch(e){
     $('gridArea').insertAdjacentHTML('beforeend','<div class="card"><b>Agent Users</b><div class="muted">'+esc(e.message)+'</div></div>');
+  }
+}
+
+async function reissueAgentInviteToken(reviewRef){
+  if(!confirm('Reissue the one-time activation token? The previous token becomes invalid immediately.'))return;
+  try{
+    const d=await api('/api/admin/agent-user-invites/'+encodeURIComponent(reviewRef)+'/reissue-token',{method:'POST'});
+    const value=d.invite_token||'';
+    if(!value)throw new Error('No activation token returned');
+    window.prompt('Copy the one-time activation token now. It will not be shown again after this prompt is closed.',value);
+    d.invite_token='';
+    await renderAgentUsersChild();
+  }catch(e){
+    alert('Token reissue failed: '+e.message);
   }
 }
 
