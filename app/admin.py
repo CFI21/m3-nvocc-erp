@@ -65,7 +65,10 @@ class AgentUserRequest(BaseModel):
     email:str
     office_code:str
     temporary_password:str=Field(min_length=12)
-    access_level:str=Field(default='EDIT',pattern='^(VIEW|EDIT)
+    access_level:str='EDIT'
+class AgentUserDecision(BaseModel):
+    decision:str
+    comment:Optional[str]=None
 
 ADMIN_SCREENS=['dashboard','users','user-status','roles','permission-matrix','role-assignments','organizations','countries','legal-entities','offices','branches','departments','office-membership','data-scope-rules','customer-agent-access','approval-limits','maker-checker','approval-delegations','temporary-access','access-reviews','sessions','password-policy','mfa-policy','sso-readiness','login-audit','service-accounts','api-clients','audit']
 
@@ -146,6 +149,7 @@ def agent_users(agent_code:str):
 
 @router.post('/agents/{agent_code}/users/requests',status_code=201)
 def request_agent_user(agent_code:str,b:AgentUserRequest,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if b.access_level not in {'VIEW','EDIT'}: raise HTTPException(422,{'code':'INVALID_AGENT_ACCESS_LEVEL'})
     c=connect();s=session(c,x_m3_session)
     if not permission(c,s['user_id'],'identity','admin',s['office_code']):
         c.close();raise HTTPException(403,{'code':'PERMISSION_DENIED'})
@@ -181,6 +185,7 @@ def request_agent_user(agent_code:str,b:AgentUserRequest,x_m3_session:Optional[s
 
 @router.post('/agent-user-requests/{review_ref}/decision')
 def decide_agent_user(review_ref:str,b:AgentUserDecision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if b.decision not in {'APPROVE','REJECT'}: raise HTTPException(422,{'code':'INVALID_DECISION'})
     c=connect();s=session(c,x_m3_session)
     if not permission(c,s['user_id'],'identity','admin',s['office_code']):
         c.close();raise HTTPException(403,{'code':'PERMISSION_DENIED'})
