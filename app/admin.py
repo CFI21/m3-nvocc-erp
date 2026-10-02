@@ -149,7 +149,7 @@ def _ensure_agent_office(c,agent_code,agent):
 
 def _identity_maker(c,s):
     roles={r['role_code'] for r in roles_for(c,s['user_id'])}
-    return bool(roles & {'SUPER_ADMIN','ORG_ADMIN','OFFICE_ADMIN'})
+    return bool(roles & {'SUPER_ADMIN','ORG_ADMIN','OFFICE_ADMIN','MASTER_DATA'})
 
 def _identity_checker(c,s):
     roles={r['role_code'] for r in roles_for(c,s['user_id'])}
