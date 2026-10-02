@@ -69,7 +69,7 @@ class AgentUserInviteDecision(BaseModel):
     comment:Optional[str]=None
 class AgentUserActivate(BaseModel):
     invite_token:str
-    new_password:str=Field(min_length=12)
+    new_password:str=Field(min_length=1)
 
 ADMIN_SCREENS=['dashboard','users','user-status','roles','permission-matrix','role-assignments','organizations','countries','legal-entities','offices','branches','departments','office-membership','data-scope-rules','customer-agent-access','approval-limits','maker-checker','approval-delegations','temporary-access','access-reviews','sessions','password-policy','mfa-policy','sso-readiness','login-audit','service-accounts','api-clients','audit']
 
@@ -236,6 +236,34 @@ def decide_agent_user_invite(review_ref:str,b:AgentUserInviteDecision,x_m3_sessi
     c.close()
     return {'review_ref':review_ref,'status':'INVITE_PENDING','user_ref':u['user_ref'],'login_active':False,'mfa_required':True,'agent_code':scope['agent_code'],'common_party_key':scope['common_party_key'],'invite_token':token,'expires_at':scope['invite_expires_at']}
 
+@router.post('/agent-user-invites/{review_ref}/reissue-token')
+def reissue_agent_user_invite_token(review_ref:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect(); s=session(c,x_m3_session)
+    if not _identity_checker(c,s): c.close(); raise HTTPException(403,{'code':'INVITE_REISSUE_PERMISSION_DENIED'})
+    ar=c.execute("SELECT * FROM iam_access_reviews WHERE review_ref=? AND status='APPROVED_PENDING_ACTIVATION'",(review_ref,)).fetchone()
+    if not ar: c.close(); raise HTTPException(404,{'code':'APPROVED_PENDING_INVITE_NOT_FOUND'})
+    scope=json.loads(ar['scope'])
+    if scope.get('kind')!='AGENT_USER_INVITE': c.close(); raise HTTPException(409,{'code':'WRONG_REVIEW_KIND'})
+    u=c.execute("SELECT * FROM iam_users WHERE id=?",(ar['user_id'],)).fetchone()
+    if not u or u['status']!='INVITED': c.close(); raise HTTPException(409,{'code':'INVITED_USER_STATE_REQUIRED'})
+    token=secrets.token_urlsafe(32)
+    expires=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=48)).isoformat()
+    scope['invite_token_hash']=ih(token)
+    scope['invite_expires_at']=expires
+    scope['invite_used']=False
+    scope['token_reissued_at']=now()
+    scope['token_reissued_by']=s['user_ref']
+    scope['token_reissue_count']=int(scope.get('token_reissue_count') or 0)+1
+    c.execute("UPDATE iam_access_reviews SET scope=?,result='TOKEN_REISSUED' WHERE id=?",(json.dumps(scope,sort_keys=True),ar['id']))
+    audit(c,s['user_ref'],'AGENT_USER_INVITE_TOKEN_REISSUE','USER',u['user_ref'],
+      before={'status':u['status']},
+      after={'status':'INVITED','token_state':'REISSUED','expires_at':expires},
+      scope={'review_ref':review_ref,'agent_code':scope.get('agent_code'),'common_party_key':scope.get('common_party_key')})
+    c.close()
+    return {'review_ref':review_ref,'user_ref':u['user_ref'],'status':'INVITE_PENDING','login_active':False,
+      'mfa_required':True,'agent_code':scope['agent_code'],'common_party_key':scope['common_party_key'],
+      'invite_token':token,'expires_at':expires,'display_once':True}
+
 @router.post('/agent-user-invites/activate')
 def activate_agent_user_invite(b:AgentUserActivate):
     c=connect(); rows=list(c.execute("SELECT * FROM iam_access_reviews WHERE status='APPROVED_PENDING_ACTIVATION'"))
@@ -249,6 +277,9 @@ def activate_agent_user_invite(b:AgentUserActivate):
     if datetime.datetime.fromisoformat(scope['invite_expires_at']) < datetime.datetime.now(datetime.timezone.utc):
         c.close(); raise HTTPException(410,{'code':'INVITE_TOKEN_EXPIRED'})
     u=c.execute("SELECT * FROM iam_users WHERE id=?",(match['user_id'],)).fetchone()
+    minimum=int(policy(c,'password_min_length','10'))
+    if len(b.new_password)<minimum:
+        c.close(); raise HTTPException(422,{'code':'PASSWORD_POLICY_MIN_LENGTH','minimum':minimum})
     c.execute("UPDATE iam_users SET password_hash=?,status='ACTIVE',failed_attempts=0,version=version+1 WHERE id=?",(phash(b.new_password),u['id']))
     scope['invite_used']=True; scope['activated_at']=now()
     c.execute("UPDATE iam_access_reviews SET scope=?,status='COMPLETED',result='ACTIVATED' WHERE id=?",(json.dumps(scope,sort_keys=True),match['id']))
