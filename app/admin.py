@@ -168,16 +168,25 @@ def request_agent_user_invite(b:AgentUserInvite,x_m3_session:Optional[str]=Heade
     if ap.get('common_party_key') is None: c.close(); raise HTTPException(409,{'code':'AGENT_COMMON_PARTY_REQUIRED'})
     party=c.execute("SELECT * FROM md_records WHERE domain='common-party' AND record_key=? AND status='ACTIVE'",(ap['common_party_key'],)).fetchone()
     if not party: c.close(); raise HTTPException(409,{'code':'COMMON_PARTY_NOT_ACTIVE'})
-    if c.execute("SELECT 1 FROM iam_users WHERE lower(username)=lower(?) OR lower(email)=lower(?)",(b.username.strip(),b.email.strip())).fetchone():
-        c.close(); raise HTTPException(409,{'code':'DUPLICATE_USERNAME_OR_EMAIL'})
+    existing_user=c.execute("SELECT * FROM iam_users WHERE lower(username)=lower(?) OR lower(email)=lower(?)",(b.username.strip(),b.email.strip())).fetchone()
     role=_ensure_agent_role(c)
     office,co,org,port=_ensure_agent_office(c,b.agent_code,agent)
-    user_ref='USR-AGT-'+uuid.uuid4().hex[:10].upper()
-    unusable=phash(secrets.token_urlsafe(64))
-    cur=c.execute("""INSERT INTO iam_users(user_ref,username,display_name,email,password_hash,status,home_office_id,mfa_required,failed_attempts,version)
-      VALUES(?,?,?,?,?,'INVITED_PENDING_CHECKER',?,1,0,1)""",
-      (user_ref,b.username.strip(),b.display_name.strip(),b.email.strip(),unusable,office['id']))
-    uid=cur.lastrowid
+    if existing_user:
+        exact=(existing_user['username'].lower()==b.username.strip().lower() and existing_user['email'].lower()==b.email.strip().lower())
+        pending_review=c.execute("SELECT 1 FROM iam_access_reviews WHERE user_id=? AND status IN ('PENDING','APPROVED_PENDING_ACTIVATION')",(existing_user['id'],)).fetchone()
+        if not exact or existing_user['status']!='INVITED_PENDING_CHECKER' or pending_review:
+            c.close(); raise HTTPException(409,{'code':'DUPLICATE_USERNAME_OR_EMAIL'})
+        user_ref=existing_user['user_ref']; uid=existing_user['id']
+        c.execute("UPDATE iam_users SET display_name=?,home_office_id=?,mfa_required=1 WHERE id=?",(b.display_name.strip(),office['id'],uid))
+    else:
+        user_ref='USR-AGT-'+uuid.uuid4().hex[:10].upper()
+        unusable=phash(secrets.token_urlsafe(64))
+        c.execute("""INSERT INTO iam_users(user_ref,username,display_name,email,password_hash,status,home_office_id,mfa_required,failed_attempts,version)
+          VALUES(?,?,?,?,?,'INVITED_PENDING_CHECKER',?,1,0,1)""",
+          (user_ref,b.username.strip(),b.display_name.strip(),b.email.strip(),unusable,office['id']))
+        created=c.execute("SELECT id FROM iam_users WHERE user_ref=?",(user_ref,)).fetchone()
+        if not created: c.close(); raise HTTPException(500,{'code':'INVITE_USER_CREATE_FAILED'})
+        uid=created['id']
     review_ref='AUI-'+uuid.uuid4().hex[:10].upper()
     due=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=2)).date().isoformat()
     scope={'kind':'AGENT_USER_INVITE','maker_user_ref':s['user_ref'],'agent_code':b.agent_code,
