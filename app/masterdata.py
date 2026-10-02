@@ -119,7 +119,7 @@ def records(domain:str):
     c.close();return rows
 @router.post('/changes')
 def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    c=connect();init_schema(c);sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
     if b.domain not in DOMAINS:c.close();raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
     if not can_make_roles(roles):c.close();raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
     existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
@@ -148,7 +148,7 @@ def changes(status:Optional[str]=None):
     c.close();return out
 @router.post('/changes/{change_ref}/decision')
 def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    c=connect();init_schema(c);sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
     if not can_approve_roles(roles):c.close();raise HTTPException(403,{'code':'CHECKER_PERMISSION_DENIED'})
     ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
     if not ch:c.close();raise HTTPException(404,'Change not found')
