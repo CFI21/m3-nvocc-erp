@@ -16,17 +16,19 @@
     "user_type": "named_user_only",
     "shared_generic_login": false,
     "multiple_users_per_agent": true,
-    "pending_user_status": "INACTIVE",
-    "activation": "independent_checker_only",
-    "role": "AGENT",
-    "scope": [
-      "office",
-      "country",
-      "organization",
-      "agent_party"
+    "existing_iam_user_creation_and_activation_preserved": true,
+    "role_scope_model": [
+      "iam_user_roles",
+      "iam_office_membership",
+      "iam_party_access"
     ],
-    "mfa_required": true,
-    "immutable_iam_audit": true,
+    "agent_child_users_view": true,
+    "agent_child_links_to": [
+      "administration::users",
+      "administration::customer-agent-access"
+    ],
+    "mfa_preserved": true,
+    "immutable_iam_audit_preserved": true,
     "no_schema_change": true
   },
   "production_data_imported": false,

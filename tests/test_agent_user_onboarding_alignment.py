@@ -4,12 +4,11 @@ def test_agent_user_alignment_source_contract():
     admin=Path('app/admin.py').read_text()
     web=Path('web/index.html').read_text()
     assert "/agents/{agent_code}/users" in admin
-    assert "/agents/{agent_code}/users/requests" in admin
-    assert "/agent-user-requests/{review_ref}/decision" in admin
-    assert "FOUR_EYES_VIOLATION" in admin
-    assert "party_type,'AGENT'" in admin or "party_type='AGENT'" in admin
-    assert "status='INACTIVE'" in admin
-    assert "mfa_required" in admin
+    assert "party_type='AGENT'" in admin
+    assert "shared_login_allowed" in admin
+    assert "multiple_named_users_allowed" in admin
+    assert "administration::users" in admin
+    assert "administration::customer-agent-access" in admin
     assert "renderAgentUsersChild" in web
     assert "Shared generic logins are not created" in web
 
