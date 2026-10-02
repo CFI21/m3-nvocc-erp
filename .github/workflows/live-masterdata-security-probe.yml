@@ -1,0 +1,26 @@
+name: M3 Live Masterdata Security Probe
+on:
+  push:
+    branches: [live-masterdata-security-probe]
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Missing session must be rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          BODY='{"domain":"carrier","record_key":"SEC-PROBE-NOSESSION","operation":"CREATE","payload":{"name":"Security Probe"},"reason":"live-security-probe"}'
+          CODE=$(curl -sS -o /tmp/no.json -w "%{http_code}" -X POST "$API/api/masterdata/changes" -H 'Content-Type: application/json' -d "$BODY")
+          test "$CODE" = "401"
+          grep -q 'SESSION_REQUIRED' /tmp/no.json
+      - name: Invalid session must be rejected
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          BODY='{"domain":"carrier","record_key":"SEC-PROBE-BADSESSION","operation":"CREATE","payload":{"name":"Security Probe"},"reason":"live-security-probe"}'
+          CODE=$(curl -sS -o /tmp/bad.json -w "%{http_code}" -X POST "$API/api/masterdata/changes" -H 'Content-Type: application/json' -H 'X-M3-Session: definitely-invalid' -H 'X-Role: SUPER_ADMIN' -H 'X-User: fake-user' -d "$BODY")
+          test "$CODE" = "401"
+          grep -q 'SESSION_INVALID' /tmp/bad.json
