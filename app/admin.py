@@ -102,6 +102,37 @@ def set_user_status(username:str,b:UserStatus,x_m3_session:Optional[str]=Header(
     if not u: c.close(); raise HTTPException(404,'User not found')
     if u['id']==s['user_id'] and b.status!='ACTIVE': c.close(); raise HTTPException(409,{'code':'SELF_DEACTIVATION_BLOCKED'})
     before={'status':u['status'],'version':u['version']}; c.execute('UPDATE iam_users SET status=?,version=version+1 WHERE id=?',(b.status,u['id'])); audit(c,s['user_ref'],'USER_STATUS','USER',u['user_ref'],before,{'status':b.status}); c.close(); return {'status':b.status,'user_ref':u['user_ref']}
+
+def _agent_master(c,agent_code):
+    return c.execute("SELECT * FROM md_records WHERE domain='agent' AND record_key=? AND status='ACTIVE'",(agent_code,)).fetchone()
+
+@router.get('/agents/{agent_code}/users')
+def agent_users(agent_code:str):
+    c=connect()
+    agent=_agent_master(c,agent_code)
+    if not agent:
+        c.close(); raise HTTPException(404,{'code':'AGENT_MASTER_NOT_FOUND'})
+    rows=[dict(r) for r in c.execute("""SELECT u.user_ref,u.username,u.display_name,u.email,u.status,u.mfa_required,u.version,
+      o.office_code,p.access_level,p.status party_access_status,GROUP_CONCAT(DISTINCT r.role_code) roles
+      FROM iam_party_access p
+      JOIN iam_users u ON u.id=p.user_id
+      JOIN iam_offices o ON o.id=u.home_office_id
+      LEFT JOIN iam_user_roles ur ON ur.user_id=u.id AND ur.status='ACTIVE'
+      LEFT JOIN iam_roles r ON r.id=ur.role_id
+      WHERE p.party_type='AGENT' AND p.party_key=?
+      GROUP BY u.id,u.user_ref,u.username,u.display_name,u.email,u.status,u.mfa_required,u.version,o.office_code,p.access_level,p.status
+      ORDER BY u.display_name,u.username""",(agent_code,))]
+    party=c.execute("""SELECT record_key,display_name,status FROM md_records
+      WHERE domain='common-party' AND lower(trim(display_name))=lower(trim(?)) AND status='ACTIVE'
+      ORDER BY record_key LIMIT 1""",(agent['display_name'],)).fetchone()
+    out={'agent_code':agent_code,'agent_name':agent['display_name'],'agent_status':agent['status'],
+         'party_match':dict(party) if party else None,'users':rows,
+         'user_onboarding_route':'administration::users',
+         'scope_onboarding_route':'administration::customer-agent-access',
+         'governance':'EXISTING_IAM_MAKER_CHECKER_MFA_AUDIT',
+         'shared_login_allowed':False,'multiple_named_users_allowed':True}
+    c.close(); return out
+
 @router.get('/roles')
 def roles(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_roles ORDER BY id')];c.close();return x
 @router.get('/permissions')

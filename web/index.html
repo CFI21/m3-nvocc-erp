@@ -414,13 +414,39 @@ async function renderInlineAgentScreen(){
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
 async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}openDrawer('details')}
+async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
 async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
 async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
 async function loadAudit(){let jr=selectedJob();try{let x=await api('/api/clx011/events?limit=40');let html=`<div class=card><b>CLX-011 screen/action audit</b></div><pre class=pre>${esc(JSON.stringify(x.slice(0,20),null,2))}</pre>`;if(jr){let y=await api('/api/v1/system/events/audit?job_ref='+jr+'&limit=30');html+=`<div class=card><b>Job ${jr} domain audit</b></div><pre class=pre>${esc(JSON.stringify(y,null,2))}</pre>`}$('tab-audit').innerHTML=html}catch(e){$('tab-audit').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
 function showJson(title,obj){$('drawerTitle').textContent=title;$('tab-details').innerHTML='<pre class=pre>'+esc(JSON.stringify(JSON.parse(obj),null,2))+'</pre>';drawerTabs('details')}
 
+
+
+async function renderAgentUsersChild(){
+  if(!state.current||!state.selected)return;
+  const key=state.current.key||'';
+  if(!['agent','agents'].includes(key))return;
+  const code=state.selected.record_key||state.selected.code||state.selected.AgentCode||state.selected.agent_code;
+  if(!code)return;
+  try{
+    const d=await api('/api/admin/agents/'+encodeURIComponent(code)+'/users');
+    const rows=d.users||[];
+    const pending=d.pending_requests||[];
+    const party=d.party_match?esc(d.party_match.record_key+' · '+d.party_match.display_name):'<span class="warntext">No exact Common Party link</span>';
+    let html='<div class="card"><div class="toolbar"><b>Users under Agent '+esc(d.agent_code)+'</b><span class="muted">'+esc(d.agent_name||'')+'</span><span class="grow"></span><span class="pill">'+rows.length+' active/link record(s)</span><span class="pill">'+pending.length+' pending</span></div>'+
+      '<div class="equipNote">Agent is the authoritative parent. Named users receive AGENT role + approved office scope + this Agent party scope only after independent checker approval. Shared generic logins are not created.</div>'+
+      '<div class="toolbar"><b>Party link:</b><span>'+party+'</span></div>'+
+      '<div class="tablewrap"><table><thead><tr><th>User</th><th>Name</th><th>Email</th><th>Office</th><th>Roles</th><th>Agent Access</th><th>Status</th><th>MFA</th></tr></thead><tbody>'+
+      (rows.length?rows.map(u=>'<tr><td>'+esc(u.username)+'</td><td>'+esc(u.display_name)+'</td><td>'+esc(u.email)+'</td><td>'+esc(u.office_code)+'</td><td>'+esc(u.roles||'')+'</td><td>'+esc(u.access_level||'')+'</td><td>'+esc(u.status)+'</td><td>'+esc(u.mfa_required?'Required':'No')+'</td></tr>').join(''):'<tr><td colspan="8" class="muted">No named users are linked to this Agent yet.</td></tr>')+
+      '</tbody></table></div>';
+    if(pending.length)html+='<div class="card"><b>Pending checker approval</b><pre class="pre">'+esc(JSON.stringify(pending,null,2))+'</pre></div>';
+    html+='<div class="formActions"><button class="btn" onclick="openScreen(\'administration::users\')">Open Administration Users</button><button class="btn" onclick="openScreen(\'administration::customer-agent-access\')">Open Agent Access</button></div></div>';
+    $('gridArea').insertAdjacentHTML('beforeend',html);
+  }catch(e){
+    $('gridArea').insertAdjacentHTML('beforeend','<div class="card"><b>Agent Users</b><div class="muted">'+esc(e.message)+'</div></div>');
+  }
+}
 
 const CLX49_KEYS=new Set(['special-rates-request','booking','bl','switch-bl']);
 const CLX49_BL_TABS=['Booking Info','Release Instruction','Delivery Order','Lock Info','Authorization'];
