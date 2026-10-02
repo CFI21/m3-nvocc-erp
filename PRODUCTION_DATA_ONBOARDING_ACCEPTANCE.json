@@ -1,0 +1,19 @@
+{
+  "schema": "M3_PRODUCTION_DATA_ONBOARDING_ACCEPTANCE_V1",
+  "final_live_runtime": "4b964819cae79acb143d22281d64890bcc86390b",
+  "PRODUCTION_DATA_READY": false,
+  "status": "BLOCKED_WAITING_REAL_MASTER_DATA_USERS_AND_OPENING_BALANCES",
+  "p0_p1_data_integrity_defects": 0,
+  "p0_p1_financial_balance_defects": 0,
+  "existing_runtime_health": "FINAL_LIVE_ACCEPTED",
+  "production_traffic": "ON",
+  "live_providers": "OFF",
+  "real_money": "OFF",
+  "ancline": "UNTOUCHED",
+  "required_to_unblock": [
+    "Approved M3 real master-data files",
+    "Approved opening AR/AP/SOA/GL/bank balances",
+    "Real named users with role/branch/agent/party scopes",
+    "Controlled first real job data"
+  ]
+}

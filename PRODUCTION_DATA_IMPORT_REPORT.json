@@ -1,0 +1,27 @@
+{
+  "schema": "M3_PRODUCTION_DATA_IMPORT_REPORT_V1",
+  "final_live_runtime": "4b964819cae79acb143d22281d64890bcc86390b",
+  "status": "BLOCKED_WAITING_REAL_DATA",
+  "source_files_found": 0,
+  "excluded_files": [
+    {
+      "name": "ANC SOA JULY 2026.xlsx",
+      "reason": "ANC/ANCLINE data; strict project separation"
+    },
+    {
+      "name": "CargoWise_Shipment_Worksheet_Functional(1).xlsx",
+      "reason": "functional/reference worksheet; not approved M3 production master data"
+    }
+  ],
+  "dry_run": {
+    "accepted": 0,
+    "rejected": 0,
+    "warnings": 0,
+    "duplicates": 0,
+    "broken_references": 0,
+    "writes_performed": 0
+  },
+  "production_writes_performed": false,
+  "maker_checker_changes_created": 0,
+  "note": "No approved real M3 master-data file was supplied; no import/upsert was executed."
+}

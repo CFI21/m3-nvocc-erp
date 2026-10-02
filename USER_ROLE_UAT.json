@@ -1,0 +1,58 @@
+{
+  "schema": "M3_USER_ROLE_UAT_V1",
+  "final_live_runtime": "4b964819cae79acb143d22281d64890bcc86390b",
+  "status": "BLOCKED_WAITING_REAL_USERS",
+  "current_users": [
+    {
+      "username": "admin",
+      "email": "admin@m3.test",
+      "roles": [
+        "SUPER_ADMIN"
+      ]
+    },
+    {
+      "username": "ops.rtm",
+      "email": "ops.rtm@m3.test",
+      "roles": [
+        "OPS"
+      ]
+    },
+    {
+      "username": "finance.dxb",
+      "email": "finance.dxb@m3.test",
+      "roles": [
+        "FINANCE"
+      ]
+    },
+    {
+      "username": "auditor",
+      "email": "auditor@m3.test",
+      "roles": [
+        "AUDITOR"
+      ]
+    },
+    {
+      "username": "md.maker",
+      "email": "md.maker@m3.test",
+      "roles": [
+        "MASTER_DATA"
+      ]
+    },
+    {
+      "username": "md.checker",
+      "email": "md.checker@m3.test",
+      "roles": [
+        "MASTER_DATA_MANAGER"
+      ]
+    }
+  ],
+  "missing_real_role_onboarding": [
+    "DOCS",
+    "GL",
+    "TREASURY",
+    "AGENT",
+    "VIEWER"
+  ],
+  "production_writes_performed": false,
+  "note": "Current accounts are test identities. Real named users, office/branch scope and party scope were not supplied."
+}

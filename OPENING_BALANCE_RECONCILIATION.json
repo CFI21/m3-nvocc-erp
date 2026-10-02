@@ -1,0 +1,18 @@
+{
+  "schema": "M3_OPENING_BALANCE_RECONCILIATION_V1",
+  "final_live_runtime": "4b964819cae79acb143d22281d64890bcc86390b",
+  "status": "BLOCKED_WAITING_APPROVED_OPENING_BALANCES",
+  "existing_seed_context": {
+    "ar_open": 6654.4,
+    "ap_open": 4202.8,
+    "bank_opening": 523500,
+    "bank_current": 535540
+  },
+  "existing_gl_control": {
+    "debit": 193630,
+    "credit": 193630,
+    "variance": 0
+  },
+  "writes_performed": false,
+  "note": "Existing balances belong to controlled test/seed data and were not adopted as real opening balances."
+}
