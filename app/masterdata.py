@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from typing import Optional, Any
 import json, uuid, datetime, hashlib
 from .db import connect
+from .admin import session as iam_session, roles_for as iam_roles_for
 
 router=APIRouter(prefix='/api/masterdata',tags=['CLX-010 Master Data Governance'])
 
@@ -46,9 +47,13 @@ def init_schema(c):
 def audit(c,actor,action,domain=None,key=None,change_ref=None,before=None,after=None):
     event=str(uuid.uuid4()); ts=now(); base=j({'event':event,'ts':ts,'actor':actor,'action':action,'domain':domain,'key':key,'change_ref':change_ref,'before':before,'after':after})
     c.execute('INSERT INTO md_audit(event_ref,ts,actor,action,domain,record_key,change_ref,before_json,after_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?,?,?)',(event,ts,actor,action,domain,key,change_ref,j(before) if before is not None else None,j(after) if after is not None else None,h(base)))
-def actor(role,user): return (role or 'VIEWER').upper(),(user or (role or 'viewer').lower())
-def can_make(role): return role in {'ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'}
-def can_approve(role): return role in {'ADMIN','SUPER_ADMIN','MASTER_DATA_MANAGER'}
+def authenticated_actor(c,token):
+    sess=iam_session(c,token)
+    roles={r['role_code'] for r in iam_roles_for(c,sess['user_id'])}
+    return sess,roles
+
+def can_make_roles(roles): return bool(roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'})
+def can_approve_roles(roles): return bool(roles & {'SUPER_ADMIN','MASTER_DATA_MANAGER'})
 def validate_payload(domain,payload,existing=None):
     errs=[]; merged=dict(existing or {}); merged.update(payload)
     if domain not in ('configuration','reference-sequence') and not (merged.get('name') or merged.get('display_name')): errs.append('DISPLAY_NAME_REQUIRED')
@@ -113,11 +118,11 @@ def records(domain:str):
         d=dict(r);d['payload']=json.loads(d.pop('payload_json'));rows.append(d)
     c.close();return rows
 @router.post('/changes')
-def create_change(b:Change,x_role:Optional[str]=Header(None,alias='X-Role'),x_user:Optional[str]=Header(None,alias='X-User')):
-    role,user=actor(x_role,x_user)
-    if b.domain not in DOMAINS:raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
-    if not can_make(role):raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
-    c=connect();init_schema(c);existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
+def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect();init_schema(c);sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    if b.domain not in DOMAINS:c.close();raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
+    if not can_make_roles(roles):c.close();raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+    existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
     if b.operation=='CREATE' and existing:c.close();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
     if b.operation!='CREATE' and not existing:c.close();raise HTTPException(404,{'code':'MASTER_RECORD_NOT_FOUND'})
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
@@ -142,10 +147,10 @@ def changes(status:Optional[str]=None):
     for r in c.execute(q,args):d=dict(r);d['payload']=json.loads(d.pop('payload_json'));out.append(d)
     c.close();return out
 @router.post('/changes/{change_ref}/decision')
-def decide(change_ref:str,b:Decision,x_role:Optional[str]=Header(None,alias='X-Role'),x_user:Optional[str]=Header(None,alias='X-User')):
-    role,user=actor(x_role,x_user)
-    if not can_approve(role):raise HTTPException(403,{'code':'CHECKER_PERMISSION_DENIED'})
-    c=connect();init_schema(c);ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
+def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect();init_schema(c);sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    if not can_approve_roles(roles):c.close();raise HTTPException(403,{'code':'CHECKER_PERMISSION_DENIED'})
+    ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
     if not ch:c.close();raise HTTPException(404,'Change not found')
     if ch['status']!='PENDING':c.close();raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
     if ch['maker']==user:c.close();raise HTTPException(409,{'code':'FOUR_EYES_VIOLATION'})
