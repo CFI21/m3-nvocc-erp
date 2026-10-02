@@ -1,0 +1,172 @@
+{
+  "schema": "M3_CLX084_FINANCE_FIELD_MATRIX_V1",
+  "baseline": "d97ff08e67d107768d3d4d8f7699f0e5c57f45f9",
+  "backend_model_changed": false,
+  "database_changed": false,
+  "duplicate_finance_model_created": false,
+  "authoritative_sources": [
+    "GET /api/gl/job/{job_ref}/links",
+    "GET /api/clx046/job/{job_ref}/trace",
+    "existing /api/v1/gl/{module} records",
+    "existing agent-tasks::soa record"
+  ],
+  "classification_legend": [
+    "PRESENT",
+    "DERIVED_READ_ONLY",
+    "CONDITIONAL",
+    "REVIEW_LATER"
+  ],
+  "job_costing": [
+    {
+      "reference": "Job Ref",
+      "status": "PRESENT",
+      "source": "job"
+    },
+    {
+      "reference": "Booking",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "B/L",
+      "status": "DERIVED_READ_ONLY",
+      "source": "bl/job"
+    },
+    {
+      "reference": "Customer",
+      "status": "DERIVED_READ_ONLY",
+      "source": "job identity"
+    },
+    {
+      "reference": "Principal",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking/finance"
+    },
+    {
+      "reference": "Agent",
+      "status": "DERIVED_READ_ONLY",
+      "source": "job identity"
+    },
+    {
+      "reference": "Carrier",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "Vessel",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "Voyage",
+      "status": "DERIVED_READ_ONLY",
+      "source": "booking"
+    },
+    {
+      "reference": "POL",
+      "status": "DERIVED_READ_ONLY",
+      "source": "job"
+    },
+    {
+      "reference": "POD",
+      "status": "DERIVED_READ_ONLY",
+      "source": "job"
+    },
+    {
+      "reference": "Charge Code",
+      "status": "PRESENT",
+      "source": "linked charge/gl source"
+    },
+    {
+      "reference": "Description",
+      "status": "PRESENT",
+      "source": "gl/charge"
+    },
+    {
+      "reference": "Rate Source",
+      "status": "PRESENT",
+      "source": "linked source"
+    },
+    {
+      "reference": "Basis",
+      "status": "PRESENT",
+      "source": "linked source"
+    },
+    {
+      "reference": "Qty",
+      "status": "PRESENT",
+      "source": "linked source"
+    },
+    {
+      "reference": "Equipment",
+      "status": "PRESENT",
+      "source": "linked source"
+    },
+    {
+      "reference": "Currency",
+      "status": "PRESENT",
+      "source": "gl/charge"
+    },
+    {
+      "reference": "Sell Rate",
+      "status": "PRESENT",
+      "source": "linked source"
+    },
+    {
+      "reference": "Cost Rate",
+      "status": "PRESENT",
+      "source": "linked source"
+    },
+    {
+      "reference": "Revenue",
+      "status": "DERIVED_READ_ONLY",
+      "source": "GL invoice"
+    },
+    {
+      "reference": "Cost",
+      "status": "DERIVED_READ_ONLY",
+      "source": "GL bills"
+    },
+    {
+      "reference": "Margin",
+      "status": "DERIVED_READ_ONLY",
+      "source": "computed view only"
+    },
+    {
+      "reference": "Local Amount",
+      "status": "PRESENT",
+      "source": "GL line"
+    },
+    {
+      "reference": "FX Rate",
+      "status": "PRESENT",
+      "source": "GL"
+    },
+    {
+      "reference": "Tax Context",
+      "status": "PRESENT",
+      "source": "GL"
+    },
+    {
+      "reference": "Status",
+      "status": "PRESENT",
+      "source": "GL/transaction status"
+    }
+  ],
+  "invoice": {
+    "source": "EXISTING_GL_INVOICE_RECORD",
+    "no_duplicate_model": true
+  },
+  "bills": {
+    "source": "EXISTING_GL_BILLS_RECORD",
+    "no_duplicate_model": true
+  },
+  "soa": {
+    "source": "EXISTING_AGENT_SOA + TREASURY_TRACE",
+    "no_duplicate_model": true
+  },
+  "manual_cost_governance": "POST_APPROVAL_ADDITIONAL_COST_ONLY_VIA_EXISTING_GOVERNED_CHANGE_CRT_ADJUSTMENT_ROUTE_WITH_REASON_AUDIT_AND_AUTHORIZED_ROLE",
+  "maker_checker": "EXISTING_ACTION_ROUTE_AND_ROLE_GOVERNANCE",
+  "real_money": false,
+  "external_providers": false
+}

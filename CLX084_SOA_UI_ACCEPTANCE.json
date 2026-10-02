@@ -1,0 +1,18 @@
+{
+  "schema": "M3_CLX084_SOA_UI_ACCEPTANCE_V1",
+  "baseline": "d97ff08e67d107768d3d4d8f7699f0e5c57f45f9",
+  "FINANCE_MASTER_FLOW_READY": false,
+  "backend_model_changed": false,
+  "database_changed": false,
+  "REAL_MONEY_READY": false,
+  "REAL_PROVIDER_READY": false,
+  "status": "PENDING_CI",
+  "validation": {
+    "focused_finance_tests": "PENDING",
+    "canonical_screen_contract": "PENDING",
+    "full_erp_regression": "PENDING",
+    "javascript_syntax": "PENDING",
+    "safety": "PENDING"
+  },
+  "acceptance_rule": "Set FINANCE_MASTER_FLOW_READY=true only if Job Costing + Invoice + Bills/AP + SOA + GL/Treasury links pass with no P0/P1 defects."
+}

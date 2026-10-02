@@ -1,0 +1,14 @@
+{
+  "schema": "M3_CLX084_JOB_COSTING_UAT_V1",
+  "checks": {
+    "job_costing_master": "PENDING_CI",
+    "existing_charge_sources_only": "PENDING_CI",
+    "revenue_control": "PENDING_CI",
+    "cost_control": "PENDING_CI",
+    "agent_principal_allocation": "PENDING_CI",
+    "job_pnl_read_only": "PENDING_CI",
+    "manual_additional_cost_governance": "PENDING_CI",
+    "no_parallel_costing_model": "PENDING_CI"
+  },
+  "status": "PENDING_CI"
+}

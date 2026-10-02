@@ -1,0 +1,15 @@
+{
+  "schema": "M3_CLX084_AR_AP_UAT_V1",
+  "checks": {
+    "invoice_master": "PENDING_CI",
+    "bill_ap_master": "PENDING_CI",
+    "receipt_payment_links": "PENDING_CI",
+    "gl_posting_links": "PENDING_CI",
+    "treasury_links": "PENDING_CI",
+    "maker_checker": "PENDING_CI",
+    "preview_read_only": "PENDING_CI",
+    "role_access_inherited": "PENDING_CI",
+    "no_duplicate_finance_data": "PENDING_CI"
+  },
+  "status": "PENDING_CI"
+}

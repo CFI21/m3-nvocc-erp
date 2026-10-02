@@ -200,6 +200,11 @@ async function openScreen(id,navContext=null,historyMode='push'){
       state.selected=state.rows[0];
       await renderQuickActions();
       await showClx049Workspace();
+    }else if(CLX84_FINANCE_KEYS.has(s.key)&&state.rows.length){
+      state.selected=state.rows[0];
+      await renderQuickActions();
+      $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Finance Master</b><span class="muted">CLX-084 · existing authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';
+      await renderClx084FinanceMaster();
     }else if(s.domain==='Agent Tasks'&&state.rows.length){
       state.selected=state.rows[0];
       await renderQuickActions();
@@ -409,7 +414,7 @@ async function renderInlineAgentScreen(){
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
 async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}openDrawer('details')}
+async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}openDrawer('details')}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
 async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
 async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
@@ -1007,6 +1012,195 @@ async function executeAgentAction(a){
     await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
 }
+
+const CLX84_FINANCE_KEYS=new Set(['invoice','bills','soa']);
+let clx84PreviewState=null;
+function clx84Num(v){const n=Number(String(v??'').replaceAll(',',''));return Number.isFinite(n)?n:0}
+function clx84Money(v,curr=''){const n=clx84Num(v);return (curr?esc(curr)+' ':'')+n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}
+function clx84Pick(base,...names){for(const n of names){const v=base?.[n];if(v!==undefined&&v!==null&&String(v)!=='')return v}return ''}
+function clx84RO(label,value,opts={}){
+  const full=opts.full?' full':'';
+  return '<div class="formField'+full+'"><label>'+esc(label)+'</label>'+(opts.textarea?'<textarea disabled>'+esc(value??'')+'</textarea>':'<input value="'+esc(value??'')+'" disabled>')+'</div>';
+}
+function clx84Section(title,body){return '<div class="clx82Section"><div class="clx82Head">'+esc(title)+'</div><div class="clx82Body">'+body+'</div></div>'}
+function clx84Grid(items){return '<div class="clx82Grid">'+items.join('')+'</div>'}
+function clx84Link(screen,label,jr){return '<button class="btn" onclick="openClx49Link(\''+screen+'\',\''+esc(jr||'')+'\')">'+esc(label)+'</button>'}
+function clx84Rows(title,rows){
+  const r=rows||[]; if(!r.length)return '<div class="equipNote">'+esc(title)+' · no linked records returned.</div>';
+  const heads=[...new Set(r.flatMap(x=>Object.keys(x)))].slice(0,10);
+  return '<div class="equipNote"><b>'+esc(title)+'</b></div><div class="tablewrap"><table><thead><tr>'+heads.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+
+    r.map(x=>'<tr>'+heads.map(h=>'<td>'+esc(typeof x[h]==='object'?JSON.stringify(x[h]):x[h]??'')+'</td>').join('')+'</tr>').join('')+
+    '</tbody></table></div>';
+}
+function clx84PreviewHtml(title,base){
+  const rows=Object.entries(base||{}).filter(([k])=>!['id','version','payload_json'].includes(k)).map(([k,v])=>'<tr><td><b>'+esc(k)+'</b></td><td>'+esc(typeof v==='object'?JSON.stringify(v):v)+'</td></tr>').join('');
+  return '<div id="clx84Preview" class="clx82Section"><div class="clx82Head">Read-only '+esc(title)+' Preview</div><div class="clx82Body"><div class="equipNote">Preview uses the same selected authoritative finance/SOA record. No second financial dataset is created.</div><div class="tablewrap"><table><tbody>'+rows+'</tbody></table></div><div class="formActions"><button class="btn" onclick="window.print()">Print</button><button class="btn" onclick="clx84TogglePreview()">Close Preview</button></div></div></div>';
+}
+function clx84TogglePreview(){
+  const old=document.getElementById('clx84Preview');if(old){old.remove();return}
+  if(!clx84PreviewState)return;
+  $('gridArea').insertAdjacentHTML('afterbegin',clx84PreviewHtml(clx84PreviewState.title,clx84PreviewState.base));
+}
+async function renderClx084FinanceMaster(){
+  if(!state.current||!CLX84_FINANCE_KEYS.has(state.current.key)||!state.selected)return false;
+  const base={...rowPayload(state.selected)};
+  const jr=selectedJob()||clx84Pick(base,'Job Ref','Job');
+  let related=null,gl={links:[],operational_sources:[]},tre={gl_sources:[],treasury_records:[],report_lines:[],operational_sources:[]};
+  try{if(jr)related=await api('/api/clx011/related/'+encodeURIComponent(jr))}catch(_){}
+  try{if(jr)gl=await api('/api/gl/job/'+encodeURIComponent(jr)+'/links',{headers:{'X-Role':state.role}})}catch(_){}
+  try{if(jr)tre=await api('/api/clx046/job/'+encodeURIComponent(jr)+'/trace',{headers:{'X-Role':state.role}})}catch(_){}
+  const ident=related?.identity||{}, key=state.current.key, curr=clx84Pick(base,'Currency');
+  const gls=tre.gl_sources||[], trs=tre.treasury_records||[], reports=tre.gl_report_lines||tre.report_lines||[], links=gl.links||[];
+  const invoiceRows=gls.filter(x=>x.module==='invoice'), billRows=gls.filter(x=>x.module==='bills'), receiptRows=gls.filter(x=>x.module==='receipt'), paymentRows=gls.filter(x=>x.module==='payment');
+  const amount=clx84Pick(base,'Invoice Amount','Amount','Net Amount','Total');
+  const tax=clx84Pick(base,'Tax Amount','Tax');
+  const outstanding=clx84Pick(base,'Outstanding','Balance');
+  const paid=Math.max(0,clx84Num(amount)-clx84Num(outstanding));
+  const revenue=key==='invoice'?clx84Num(amount):invoiceRows.reduce((a,x)=>a+clx84Num(x.amount??x['Amount']??x['Invoice Amount']),0);
+  const cost=key==='bills'?clx84Num(amount):billRows.reduce((a,x)=>a+clx84Num(x.amount??x['Amount']??x['Invoice Amount']),0);
+  const cashReceived=receiptRows.reduce((a,x)=>a+clx84Num(x.amount??x['Amount']),0);
+  const cashPaid=paymentRows.reduce((a,x)=>a+clx84Num(x.amount??x['Amount']),0);
+  const gp=revenue-cost, margin=revenue?gp/revenue*100:0;
+  let out='<div class="clx78Workspace">';
+  if(key==='invoice'){
+    out+=clx84Section('Customer Invoice Master',clx84Grid([
+      clx84RO('Invoice No.',clx84Pick(base,'Invoice No.','Invoice No')),
+      clx84RO('Job Ref',jr),
+      clx84RO('Booking',clx84Pick(base,'Booking Ref','Booking')),
+      clx84RO('B/L',clx84Pick(base,'B/L','HBL','MBL')),
+      clx84RO('Customer',clx84Pick(base,'Customer','Customer / Supplier')||ident.customer_name),
+      clx84RO('Billing Party',clx84Pick(base,'Billing Party','Customer / Supplier','Customer')),
+      clx84RO('Invoice Date',clx84Pick(base,'Voucher / Inv Date','Date','Invoice Date')),
+      clx84RO('Due Date',clx84Pick(base,'Due Date')),
+      clx84RO('Currency',curr),
+      clx84RO('FX Rate',clx84Pick(base,'Exchange Rate','FX Rate')),
+      clx84RO('Subtotal',clx84Pick(base,'Invoice Amount','Amount')),
+      clx84RO('Tax',tax),
+      clx84RO('Total',clx84Pick(base,'Net Amount','Invoice Amount','Amount')),
+      clx84RO('Paid',paid),
+      clx84RO('Outstanding',outstanding),
+      clx84RO('Credit Note',clx84Pick(base,'Credit Note','Credit Note Ref')),
+      clx84RO('Status',clx84Pick(base,'Status','status')),
+      clx84RO('Remarks',clx84Pick(base,'Narration','Remarks'),{full:true,textarea:true})
+    ]));
+    out+=clx84Section('Invoice Charge Lines',clx84Rows('Existing GL account/charge lines',Array.isArray(base['Account Lines'])?base['Account Lines']:links));
+  }
+  if(key==='bills'){
+    out+=clx84Section('Vendor Bill / AP Master',clx84Grid([
+      clx84RO('Bill No.',clx84Pick(base,'Bill No.','Bill No','Invoice No.')),
+      clx84RO('Vendor / Supplier',clx84Pick(base,'Supplier','Customer / Supplier')),
+      clx84RO('Carrier',clx84Pick(base,'Carrier')),
+      clx84RO('Agent',clx84Pick(base,'Agent')||ident.agent_code),
+      clx84RO('Job Ref',jr),
+      clx84RO('Booking',clx84Pick(base,'Booking Ref','Booking')),
+      clx84RO('B/L',clx84Pick(base,'B/L','HBL','MBL')),
+      clx84RO('Bill Date',clx84Pick(base,'Voucher / Inv Date','Date','Bill Date')),
+      clx84RO('Due Date',clx84Pick(base,'Due Date')),
+      clx84RO('Currency',curr),
+      clx84RO('FX Rate',clx84Pick(base,'Exchange Rate','FX Rate')),
+      clx84RO('Subtotal',clx84Pick(base,'Invoice Amount','Amount')),
+      clx84RO('Tax',tax),
+      clx84RO('Total',clx84Pick(base,'Net Amount','Invoice Amount','Amount')),
+      clx84RO('Paid',paid),
+      clx84RO('Outstanding',outstanding),
+      clx84RO('Dispute',clx84Pick(base,'Dispute','Dispute Status')),
+      clx84RO('Hold',clx84Pick(base,'Hold','Payment Hold')),
+      clx84RO('Status',clx84Pick(base,'Status','status'))
+    ]));
+    out+=clx84Section('Bill Charge Lines',clx84Rows('Existing GL account/cost lines',Array.isArray(base['Account Lines'])?base['Account Lines']:links));
+  }
+  if(key==='soa'){
+    out+=clx84Section('SOA Master',clx84Grid([
+      clx84RO('Party',clx84Pick(base,'Party','Agent','Customer','Principal')),
+      clx84RO('Party Type',clx84Pick(base,'Party Type')),
+      clx84RO('Period',clx84Pick(base,'Period','Statement Period')),
+      clx84RO('Opening Balance',clx84Pick(base,'Opening Balance')),
+      clx84RO('Debit',clx84Pick(base,'Debit')),
+      clx84RO('Credit',clx84Pick(base,'Credit')),
+      clx84RO('Invoices',clx84Pick(base,'Invoices')),
+      clx84RO('Bills',clx84Pick(base,'Bills')),
+      clx84RO('Receipts',clx84Pick(base,'Receipts')),
+      clx84RO('Payments',clx84Pick(base,'Payments')),
+      clx84RO('Adjustments',clx84Pick(base,'Adjustments')),
+      clx84RO('FX Difference',clx84Pick(base,'FX Difference')),
+      clx84RO('Closing Balance',clx84Pick(base,'Closing Balance','Balance')),
+      clx84RO('Unallocated Items',clx84Pick(base,'Unallocated Items')),
+      clx84RO('Disputed Items',clx84Pick(base,'Disputed Items')),
+      clx84RO('Status',clx84Pick(base,'Status','status'))
+    ]));
+    out+=clx84Section('SOA Linked Treasury / GL Activity',clx84Rows('Existing treasury records',trs)+clx84Rows('Existing GL sources',gls));
+  }
+  out+=clx84Section('Job Costing Master — Existing Sources Only',
+    '<div class="equipNote">No parallel costing table. Commercial detail is read from existing Booking/Job charge links plus GL/Treasury trace.</div>'+
+    clx84Grid([
+      clx84RO('Job Ref',jr),clx84RO('Booking',clx84Pick(base,'Booking Ref','Booking')),
+      clx84RO('B/L',clx84Pick(base,'B/L','HBL','MBL')),clx84RO('Customer',clx84Pick(base,'Customer')||ident.customer_name),
+      clx84RO('Principal',clx84Pick(base,'Principal')),clx84RO('Agent',clx84Pick(base,'Agent')||ident.agent_code),
+      clx84RO('Carrier',clx84Pick(base,'Carrier')),clx84RO('Vessel',clx84Pick(base,'Vessel')),
+      clx84RO('Voyage',clx84Pick(base,'Voyage')),clx84RO('POL',clx84Pick(base,'POL')||ident.pol),
+      clx84RO('POD',clx84Pick(base,'POD')||ident.pod),clx84RO('Charge Code',clx84Pick(base,'Charge Code')),
+      clx84RO('Description',clx84Pick(base,'Description','Narration')),clx84RO('Rate Source',clx84Pick(base,'Rate Source','Source Ref')),
+      clx84RO('Basis',clx84Pick(base,'Basis')),clx84RO('Qty',clx84Pick(base,'Qty','Quantity')),
+      clx84RO('Equipment',clx84Pick(base,'Equipment')),clx84RO('Currency',curr),
+      clx84RO('Sell Rate',clx84Pick(base,'Sell Rate','Sell / Full Local')),clx84RO('Cost Rate',clx84Pick(base,'Cost Rate','Vendor Cost')),
+      clx84RO('Revenue',revenue),clx84RO('Cost',cost),clx84RO('Margin',margin.toFixed(2)+'%'),
+      clx84RO('Local Amount',clx84Pick(base,'Amount LC','Local Amount')),clx84RO('FX Rate',clx84Pick(base,'Exchange Rate','FX Rate')),
+      clx84RO('Tax Context',clx84Pick(base,'TaxType','Tax','Tax Amount')),clx84RO('Status',clx84Pick(base,'Status','status'))
+    ])+clx84Rows('Existing job charge / GL links',links));
+  out+=clx84Section('Revenue Control',clx84Grid([
+    clx84RO('Approved Selling Charges',revenue),
+    clx84RO('Customer AR',key==='invoice'?outstanding:clx84Pick(base,'Customer AR')),
+    clx84RO('Accrued Revenue',clx84Pick(base,'Accrued Revenue')),
+    clx84RO('Invoiced Revenue',revenue),
+    clx84RO('Unbilled Revenue',clx84Pick(base,'Unbilled Revenue')),
+    clx84RO('Credit Note Impact',clx84Pick(base,'Credit Note Impact')),
+    clx84RO('Collection Status',key==='invoice'?(clx84Num(outstanding)>0?'OUTSTANDING':'COLLECTED'):clx84Pick(base,'Collection Status'))
+  ]));
+  out+=clx84Section('Cost Control',clx84Grid([
+    clx84RO('Vendor / Carrier / Agent Cost',cost),
+    clx84RO('Accrued Cost',clx84Pick(base,'Accrued Cost')),
+    clx84RO('Billed Cost',cost),
+    clx84RO('Unbilled Cost',clx84Pick(base,'Unbilled Cost')),
+    clx84RO('Vendor AP',key==='bills'?outstanding:clx84Pick(base,'Vendor AP')),
+    clx84RO('Payment Status',key==='bills'?(clx84Num(outstanding)>0?'OUTSTANDING':'PAID'):clx84Pick(base,'Payment Status')),
+    clx84RO('Cost Variance',clx84Pick(base,'Cost Variance'))
+  ]));
+  out+=clx84Section('Agent / Principal Allocation',clx84Grid([
+    clx84RO('Sell',clx84Pick(base,'Sell','Sell / Full Local')),
+    clx84RO('Cost',clx84Pick(base,'Cost','Vendor Cost')),
+    clx84RO('Principal Receivable',clx84Pick(base,'Principal Rec.','Principal Receivable')),
+    clx84RO('Principal Payable',clx84Pick(base,'Principal Pay.','Principal Payable')),
+    clx84RO('Agent Receivable',clx84Pick(base,'Agent Receivable')),
+    clx84RO('Agent Payable',clx84Pick(base,'Agent Payable')),
+    clx84RO('Net Settlement',clx84Pick(base,'Principal Net','Net Settlement')),
+    clx84RO('Commission',clx84Pick(base,'Commission')),
+    clx84RO('Profit Share',clx84Pick(base,'Profit Share'))
+  ])+'<div class="equipNote">Allocation is display-only unless supplied by the existing finance/booking source. CLX-084 creates no allocation engine.</div>');
+  out+=clx84Section('Job P&L — Read-only',clx84Grid([
+    clx84RO('Revenue',revenue),clx84RO('Cost',cost),clx84RO('Gross Profit',gp),clx84RO('Margin',margin.toFixed(2)+'%'),
+    clx84RO('AR',key==='invoice'?outstanding:clx84Pick(base,'AR','Customer AR')),clx84RO('AP',key==='bills'?outstanding:clx84Pick(base,'AP','Vendor AP')),
+    clx84RO('Accrual',clx84Pick(base,'Accrual','Accrued Cost')),clx84RO('Cash Received',cashReceived),
+    clx84RO('Cash Paid',cashPaid),clx84RO('Outstanding',outstanding),clx84RO('Agent / Principal Net',clx84Pick(base,'Principal Net','Net Settlement'))
+  ])+clx84Rows('Posted GL report context',reports));
+  out+=clx84Section('Payment / Receipt & Document Links','<div class="formActions">'+
+    clx84Link('agent-tasks::booking','Booking',jr)+clx84Link('agent-tasks::bl','B/L',jr)+clx84Link('agent-tasks::cro','CRO',jr)+
+    clx84Link('agent-tasks::transshipment-crt','CRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
+    clx84Link('gl-accounts::invoice','Invoice',jr)+clx84Link('gl-accounts::bills','Bill / AP',jr)+
+    clx84Link('gl-accounts::receipt','Receipt',jr)+clx84Link('gl-accounts::payment','Payment',jr)+
+    clx84Link('gl-accounts::voucher','GL Voucher',jr)+clx84Link('agent-tasks::soa','SOA',jr)+
+    clx84Link('integration-security::request-response-audit','Audit',jr)+'</div>'+
+    '<div class="equipNote">Receipts, payments, settlements and GL postings stay on the existing Treasury/GL records; CLX-084 adds no payment logic.</div>');
+  out+=clx84Section('Governance / Maker-Checker',
+    '<div class="equipNote"><b>Manual rate / additional cost rule:</b> approved commercial values are not opened for uncontrolled editing. Any post-approval additional accrued cost must use an existing governed change / CRT / adjustment route with reason and audit, and only an authorized ADMIN or assigned finance role where the backend already permits it.</div>'+
+    '<div class="equipNote"><b>Four-eyes:</b> create / approve / post / credit / write-off / adjustment / payment release continue through the existing role and action-route controls. No self-approval path is introduced by CLX-084.</div>');
+  out+='<div class="card"><div class="formActions">'+
+    (key==='invoice'||key==='bills'?'<button class="btn primary" onclick="openFinanceForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button>':'<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing SOA Record</button>')+
+    '<button class="btn" onclick="clx84TogglePreview()">Print / Preview</button></div></div></div>';
+  clx84PreviewState={title:state.current.name,base};
+  $('gridArea').insertAdjacentHTML('beforeend',out);
+  return true;
+}
+
 function financeDomain(){if(state.current?.screen_id?.startsWith('gl-accounts::'))return 'gl';if(state.current?.domain==='Treasury / AR-AP')return 'treasury';return null}
 async function financeModuleMeta(kind){
   const raw=await api(kind==='gl'?'/api/v1/gl/modules':'/api/v1/treasury/modules',{headers:{'X-Role':state.role}});
