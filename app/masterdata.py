@@ -209,11 +209,11 @@ def usage(domain:str,record_key:str):c=connect();init_schema(c);x=[dict(r) for r
 def delete_check(domain:str,record_key:str):
     c=connect();init_schema(c);n=c.execute('SELECT COUNT(*) n FROM md_usage WHERE domain=? AND record_key=?',(domain,record_key)).fetchone()['n'];c.close();return {'hard_delete_allowed':False,'used_references':n,'protection':'NO_HARD_DELETE; DEACTIVATE OR ALIAS/MERGE'}
 @router.post('/aliases-merge')
-def alias_merge(b:AliasMerge,x_role:Optional[str]=Header(None,alias='X-Role'),x_user:Optional[str]=Header(None,alias='X-User')):
-    role,user=actor(x_role,x_user)
-    if not can_approve(role):raise HTTPException(403,{'code':'CHECKER_PERMISSION_DENIED'})
-    if b.domain not in DOMAINS or b.source_key==b.target_key:raise HTTPException(422,{'code':'INVALID_ALIAS'})
-    c=connect();init_schema(c);src=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.source_key)).fetchone();tgt=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.target_key)).fetchone()
+def alias_merge(b:AliasMerge,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    if not can_approve_roles(roles):c.close();raise HTTPException(403,{'code':'CHECKER_PERMISSION_DENIED'})
+    if b.domain not in DOMAINS or b.source_key==b.target_key:c.close();raise HTTPException(422,{'code':'INVALID_ALIAS'})
+    src=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.source_key)).fetchone();tgt=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.target_key)).fetchone()
     if not src or not tgt:c.close();raise HTTPException(404,'Source/target not found')
     if tgt['status']!='ACTIVE':c.close();raise HTTPException(409,{'code':'TARGET_NOT_ACTIVE'})
     ref='MDA-'+uuid.uuid4().hex[:8].upper()
@@ -223,10 +223,10 @@ def alias_merge(b:AliasMerge,x_role:Optional[str]=Header(None,alias='X-Role'),x_
 @router.get('/aliases')
 def aliases():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_aliases ORDER BY id DESC')];c.close();return x
 @router.post('/sequences/next')
-def sequence_next(b:SequenceNext,x_role:Optional[str]=Header(None,alias='X-Role')):
-    role,_=actor(x_role,None)
-    if role not in {'ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'}:raise HTTPException(403,{'code':'SEQUENCE_PERMISSION_DENIED'})
-    c=connect();init_schema(c);c.execute('BEGIN IMMEDIATE');r=c.execute("SELECT * FROM md_sequences WHERE sequence_code=? AND status='ACTIVE'",(b.sequence_code,)).fetchone()
+def sequence_next(b:SequenceNext,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session)
+    if not can_make_roles(roles):c.close();raise HTTPException(403,{'code':'SEQUENCE_PERMISSION_DENIED'})
+    c.execute('BEGIN');r=c.execute("SELECT * FROM md_sequences WHERE sequence_code=? AND status='ACTIVE'",(b.sequence_code,)).fetchone()
     if not r:c.execute('ROLLBACK');c.close();raise HTTPException(404,'Sequence not found')
     n=r['next_number'];val=f"{r['prefix']}{n:0{r['width']}d}";c.execute('UPDATE md_sequences SET next_number=next_number+1,version=version+1 WHERE id=?',(r['id'],));c.execute('COMMIT');c.close();return {'value':val,'sequence_code':b.sequence_code}
 @router.get('/sequences')
