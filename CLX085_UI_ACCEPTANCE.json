@@ -1,18 +1,35 @@
 {
   "schema": "M3_CLX085_UI_ACCEPTANCE_V1",
   "baseline": "e6aec0503929783b22d835dcec0221013b5a43cd",
-  "MANAGEMENT_CONTROL_READY": false,
+  "MANAGEMENT_CONTROL_READY": true,
   "backend_model_changed": false,
   "database_changed": false,
   "REAL_MONEY_READY": false,
   "REAL_PROVIDER_READY": false,
-  "status": "PENDING_CI",
+  "status": "ACCEPTED_FOR_SINGLE_PR",
+  "workflow_run_id": 36995194938,
+  "no_p0_p1_defects": true,
   "validation": {
-    "focused_management_tests": "PENDING",
-    "canonical_screen_contract": "PENDING",
-    "full_erp_regression": "PENDING",
-    "javascript_syntax": "PENDING",
-    "safety": "PENDING"
+    "focused_management_tests": "53 passed",
+    "canonical_screen_contract": "196 PASS",
+    "full_erp_regression": "325 passed",
+    "javascript_syntax": "PASS",
+    "safety": "PASS"
   },
-  "acceptance_rule": "Set MANAGEMENT_CONTROL_READY=true only if Executive Home + KPI + Exception + Approval + Drilldown + Role Scope pass with no P0/P1 defects."
+  "accepted_scope": [
+    "Executive Home",
+    "Operational KPI",
+    "Financial KPI",
+    "Commercial KPI",
+    "Exception Attention",
+    "Approval Attention",
+    "Management Filters",
+    "Management Drilldown",
+    "Provider/Safety Status",
+    "Audit/Trace",
+    "Role Scope"
+  ],
+  "non_blocking_items": [
+    "Quote-to-Booking and Approved Rate Utilization remain REVIEW_LATER because current authoritative sources do not provide a reliable normalized global denominator; no inferred KPI data was created."
+  ]
 }
