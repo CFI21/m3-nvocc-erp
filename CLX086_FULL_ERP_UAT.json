@@ -1,0 +1,21 @@
+{
+  "schema": "M3_CLX086_FULL_ERP_UAT_V1",
+  "status": "PASS",
+  "workflow_run_id": 36997389164,
+  "checks": {
+    "booking_bl": "PASS",
+    "cro_crt_release_do": "PASS",
+    "container_equipment": "PASS",
+    "finance_soa_gl_treasury": "PASS",
+    "executive_kpi_exception_approval": "PASS",
+    "audit_masterdata": "PASS",
+    "navigation_196": "PASS",
+    "javascript": "PASS",
+    "python_compile": "PASS",
+    "full_regression": "PASS"
+  },
+  "focused_final_uat": "70 passed",
+  "full_erp_regression": "331 passed",
+  "canonical_screen_contract": "196 PASS",
+  "zero_p0_p1": true
+}

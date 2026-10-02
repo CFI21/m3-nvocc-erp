@@ -1,0 +1,56 @@
+{
+  "schema": "M3_CLX086_DATA_RECONCILIATION_V1",
+  "project_ref": "ozupgknqaqgvprliewxe",
+  "status": "PASS",
+  "duplicates": {
+    "booking_ref": 0,
+    "container_no": 0,
+    "gl_external_ref": 0,
+    "job_ref": 0,
+    "master_key": 0
+  },
+  "orphans": {
+    "jobs_booking": 0,
+    "container_job": 0,
+    "transaction_job": 0,
+    "gl_job": 0,
+    "treasury_job": 0,
+    "container_financial": 0
+  },
+  "finance": {
+    "gl_total_debit": "193630.00",
+    "gl_total_credit": "193630.00",
+    "gl_variance": "0.00",
+    "status": "PASS"
+  },
+  "operational_counts": {
+    "booking": 5,
+    "bl": 5,
+    "cro": 5,
+    "crt": 5,
+    "export-crt": 5,
+    "transshipment-crt": 5,
+    "delivery-order": 5,
+    "soa": 5
+  },
+  "finance_counts": {
+    "invoice": 5,
+    "bills": 5,
+    "receipt": 5,
+    "payment": 5,
+    "voucher": 20
+  },
+  "master_record_count": 98,
+  "backup_evidence": {
+    "backup_manifests": 6,
+    "clx075_pass_rehearsals": 2,
+    "latest_backup_manifest": "2026-09-24T14:35:50.486406+00:00",
+    "latest_cutover_rehearsal": "2026-10-01T10:47:38.9311+00:00"
+  },
+  "provider_safety": {
+    "dummy_bank_enabled": true,
+    "real_provider_rows_enabled": 0,
+    "real_money_provider_rows_enabled": 0
+  },
+  "no_duplicate_models": true
+}
