@@ -45,7 +45,7 @@ def test_operational_control_and_existing_links():
     for target in [
       "gl-accounts::profit-loss","integration-security::request-response-audit","agent-tasks::detention-collection",
       "integration-security::fx-rate-feed","agent-tasks::planning","agent-tasks::cro",
-      "agent-tasks::transshipment-crt","agent-tasks::delivery-order"
+      "agent-tasks::transshipment-trt","agent-tasks::delivery-order"
     ]: assert target in HTML
 
 def test_lower_workspace_and_commercial_flow():
