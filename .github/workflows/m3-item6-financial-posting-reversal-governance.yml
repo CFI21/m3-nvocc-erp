@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "app/gl.py"
+      - "app/item6_financial_governance.py"
       - "app/schema.sql"
       - "migrations/M3_ITEM6_FINANCIAL_POSTING_REVERSAL_001.sql"
       - "tests/test_m3_item6_financial_posting_reversal_governance.py"
