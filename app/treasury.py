@@ -8,6 +8,12 @@ from .json_recovery import load_json_or_recover_arrays
 from .gl import assert_period_postable,next_voucher,fx_rate
 from .admin import session as iam_session
 from .clx034_smart_approval_fast_track import enforce_treasury_action
+from .item7_financial_document_governance import (
+    validate_allocation,
+    enforce_treasury_update,
+    enforce_single_reversal,
+    enabled as item7_enabled,
+)
 
 HERE=Path(__file__).resolve().parent
 _TREASURY_META, META_RECOVERED = load_json_or_recover_arrays(
@@ -190,6 +196,7 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
             old=c.execute('SELECT * FROM idempotency_keys WHERE actor_role=? AND idem_key=?',(role,idempotency_key,)).fetchone()
             if old:c.execute('ROLLBACK');return json.loads(old['response_json'])
         j=jid(c,b.job_ref);ext=b.external_ref or b.fields.get(MODULES[module]['fields'][0]) or f'M3-{module[:8].upper()}-{uuid.uuid4().hex[:8].upper()}'
+        allocation_meta=validate_allocation(c,module,b.fields,j)
         amt=amount_from(b.fields);curr=b.fields.get('Currency') or b.fields.get('Settlement Currency') or 'USD';stat=b.fields.get('Status') or 'Draft'
         sensitive={'supplier-carrier-payment-allocation','payment-batches','advance-payments','customer-refunds','bank-transfer','inter-bank-transfer'}
         source_ref=b.fields.get('Payment Ref') or b.fields.get('Bill Ref') or b.fields.get('Batch / Payment Ref') or b.fields.get('Payments') or b.fields.get('Reference')
@@ -197,7 +204,11 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
             duplicate=c.execute("SELECT id,external_ref FROM treasury_records WHERE module=? AND source_ref=? AND ABS(amount-?)<0.005 AND currency=? AND status NOT IN ('Reversed','Cancelled') ORDER BY id LIMIT 1",(module,source_ref,amt,curr)).fetchone()
             if duplicate:raise HTTPException(409,{'code':'DUPLICATE_TREASURY_SOURCE','existing_ref':duplicate['external_ref']})
         cur=c.execute('INSERT INTO treasury_records(module,external_ref,job_id,party_type,party_name,currency,amount,status,version,maker_id,source_type,source_ref,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)',(module,ext,j,None,b.fields.get('Party') or b.fields.get('Customer') or b.fields.get('Supplier / Carrier'),curr,amt,stat,x_actor_id,None,source_ref,json.dumps(b.fields),now(),now()))
-        r=getrec(c,module,cur.lastrowid);out=ser(r);audit(c,role,x_actor_id,'CREATE',module,r['id'],j,None,out)
+        r=getrec(c,module,cur.lastrowid)
+        if allocation_meta:
+            c.execute('''INSERT INTO treasury_allocations(treasury_record_id,source_type,source_ref,allocated_amount,currency,fx_rate,job_id)
+              VALUES(?,?,?,?,?,?,?)''',(r['id'],allocation_meta['source_module'].upper(),allocation_meta['source_ref'],amt,curr,1,j))
+        out=ser(r);audit(c,role,x_actor_id,'CREATE',module,r['id'],j,None,out,{'allocation_governance':allocation_meta})
         if idempotency_key:c.execute('INSERT INTO idempotency_keys(actor_role,idem_key,request_hash,response_json,status_code,created_at) VALUES(?,?,?,?,201,?)',(role,idempotency_key,hashlib.sha256(json.dumps(b.model_dump(),sort_keys=True).encode()).hexdigest(),json.dumps(out),now()))
         c.execute('COMMIT');return out
     except HTTPException:c.execute('ROLLBACK');raise
@@ -213,6 +224,7 @@ def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_i
     c=connect();tx(c)
     try:
         r=getrec(c,module,rid)
+        enforce_treasury_update(r['status'],x_m3_session)
         if r['version']!=b.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         before=ser(r);stat=b.fields.get('Status') or r['status'];amt=amount_from(b.fields) or r['amount']
         cur=c.execute('UPDATE treasury_records SET payload_json=?,status=?,amount=?,version=version+1,updated_at=? WHERE id=? AND version=?',(json.dumps(b.fields),stat,amt,now(),rid,b.version))
@@ -241,6 +253,7 @@ def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'
             gl_post(c,r,module,x_actor_id,False);new='Released'
             if module=='payment-batches':c.execute('UPDATE treasury_payment_batches SET released_by=?,status=?,released_at=?,version=version+1 WHERE record_id=?',(x_actor_id,'Released',now(),rid))
         elif action=='reverse':
+            enforce_single_reversal(c,rid)
             link=c.execute("SELECT * FROM treasury_gl_links WHERE treasury_record_id=? AND link_type='POSTING' ORDER BY id DESC LIMIT 1",(rid,)).fetchone()
             if not link:raise HTTPException(422,{'code':'POSTED_TREASURY_TRANSACTION_REQUIRED'})
             rev_vid,rev_vno=gl_post(c,r,module,x_actor_id,True);new='Reversed'
