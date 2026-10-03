@@ -81,6 +81,48 @@ def require_screen(screen_id):
     if not s: raise HTTPException(404,'Unknown CLX-011 screen')
     return s
 
+DEFAULT_FIELDS={
+    'Agent Tasks':['External Ref','Job Ref','Customer','Agent','Status','Version','Module Fields'],
+    'General / Administration':['External Ref','Job Ref','Source Type','Source Ref','Status','Version','Module Fields'],
+    'Treasury / AR-AP':['External Ref','Job Ref','Party Type','Party Name','Currency','Amount','Status','Version','Source Type','Source Ref','Module Fields'],
+    'Integration & Security':['External Ref','Job Ref','Office Scope','Country Scope','Status','Version','Module Fields'],
+    'Master Data':['Record Key','Name','Status','Effective From','Effective To','Version','Module Fields'],
+}
+
+def _field_contract_for(s):
+    fields=list(s.get('fields') or DEFAULT_FIELDS.get(s['domain'],['Reference','Status','Module Fields']))
+    columns=list(s.get('columns') or fields[:min(6,len(fields))])
+    return {
+        'screen_id':s['screen_id'],'name':s['name'],'domain':s['domain'],'submenu':s['submenu'],
+        'route':s['route'],'fields':fields,'columns':columns,
+        'field_contract_api':s.get('field_contract_api') or f"/api/clx011/field-contract?screen_id={s['screen_id']}",
+        'screen_data_api':f"/api/clx011/screen-data?screen_id={s['screen_id']}",
+        'related_records_api':s.get('related_records_api') or '/api/clx011/related/{job_ref}',
+        'authoritative':True,'parallel_model':False,
+    }
+
+def _decorate_menu(rows):
+    out=[]
+    for domain in rows:
+        d=dict(domain);subs=[]
+        for sub in domain.get('submenus',[]):
+            x=dict(sub)
+            x['links']=[_field_contract_for(require_screen(sid)) for sid in sub.get('screens',[])]
+            if sub.get('items'):
+                items=[]
+                for item in sub['items']:
+                    y=dict(item);target=require_screen(item['target'])
+                    y['route']=target['route']
+                    y['field_contract_api']=target.get('field_contract_api') or f"/api/clx011/field-contract?screen_id={target['screen_id']}"
+                    y['screen_data_api']=f"/api/clx011/screen-data?screen_id={target['screen_id']}"
+                    y['related_records_api']=target.get('related_records_api') or '/api/clx011/related/{job_ref}'
+                    y['fields']=list(target.get('fields') or DEFAULT_FIELDS.get(target['domain'],['Reference','Status','Module Fields']))
+                    items.append(y)
+                x['items']=items
+            subs.append(x)
+        d['submenus']=subs;out.append(d)
+    return out
+
 def screen_role_allowed(s,role):
     r=role.upper()
     if r=='SUPER_ADMIN': r='ADMIN'
@@ -113,7 +155,7 @@ def health():
 
 @router.get('/menu')
 def menu(q:Optional[str]=None):
-    if not q: return {'screen_count':len(SCREENS),'menu':CATALOG['menu']}
+    if not q: return {'screen_count':len(SCREENS),'menu':_decorate_menu(CATALOG['menu'])}
     q=q.lower().strip()
     screen_ids={s['screen_id'] for s in CATALOG['screens'] if q in s['name'].lower() or q in s['domain'].lower() or q in s['submenu'].lower()}
     out=[]
@@ -132,7 +174,11 @@ def menu(q:Optional[str]=None):
         if subs:
             out.append({'domain':d['domain'],'submenus':subs,'screen_count':sum(len(x.get('screens',[])) for x in subs),
                         'navigation_alias_count':sum(len(x.get('items',[])) for x in subs)})
-    return {'screen_count':len(screen_ids),'navigation_alias_count':alias_hits,'menu':out}
+    return {'screen_count':len(screen_ids),'navigation_alias_count':alias_hits,'menu':_decorate_menu(out)}
+
+@router.get('/field-contract')
+def field_contract(screen_id:str=Query(...)):
+    return _field_contract_for(require_screen(screen_id))
 
 @router.get('/screens')
 def screens(domain:Optional[str]=None,submenu:Optional[str]=None):
