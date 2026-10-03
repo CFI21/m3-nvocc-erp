@@ -13,7 +13,12 @@ from .hardening import router as hardening_router
 from .treasury import router as treasury_router
 from .integration import router as integration_router
 from .bulk import router as bulk_router
-from .admin import router as admin_router
+from .admin import router as admin_router, session as iam_session
+from .bulk_permission_governance import (
+    enabled as bulk_permission_enabled,
+    authorize_job as bulk_authorize_job,
+    assert_job_access as bulk_assert_job_access,
+)
 from .admin_seed import run as admin_seed_run
 from .masterdata import router as masterdata_router
 from .masterdata_seed import run as masterdata_seed_run
@@ -151,6 +156,14 @@ def actor(x_role:str,x_agent_scope:Optional[str],x_customer_scope:Optional[str])
     role=x_role.upper()
     if role not in ROLE_PERMS: raise HTTPException(403,'Unknown role')
     return role,x_agent_scope,x_customer_scope
+
+def governed_job_actor(conn,session_token,job_ref,action):
+    if not bulk_permission_enabled(): return None
+    s=iam_session(conn,session_token)
+    out=bulk_assert_job_access(conn,s['user_id'],job_ref,'agent-tasks',action)
+    roles=[m['role'] for m in out.get('matches',[]) if m.get('effect')=='ALLOW']
+    role=roles[0] if roles else 'SUPER_ADMIN'
+    return {'session':s,'role':role,'access':out}
 
 def scope_clause(role,agent_scope,customer_scope):
     if role=='AGENT':
@@ -352,26 +365,49 @@ def reset(x_role:str=Header('VIEWER')):
 def modules(): return list(MODULES.values())
 
 @app.get('/api/v1/{module}')
-def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None,q:Optional[str]=None,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
-    require_module(module); role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); conn=connect()
-    clause,args=scope_clause(role,ascope,cscope); where='t.module=?'; vals=[module]
+def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None,q:Optional[str]=None,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module); conn=connect()
+    if bulk_permission_enabled():
+        if not x_m3_session: conn.close(); raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_JOB_SCOPE'})
+        ss=iam_session(conn,x_m3_session); role='SESSION';ascope=cscope=None;clause='';args=[]
+    else:
+        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); clause,args=scope_clause(role,ascope,cscope)
+    where='t.module=?'; vals=[module]
     if job_ref: where+=' AND j.job_ref=?'; vals.append(job_ref)
     if status: where+=' AND t.status=?'; vals.append(status)
-    rows=conn.execute(tx_query(where)+clause+' ORDER BY t.id',vals+args).fetchall(); conn.close()
+    rows=conn.execute(tx_query(where)+clause+' ORDER BY t.id',vals+args).fetchall()
+    if bulk_permission_enabled():
+        filtered=[]
+        for r in rows:
+            a=bulk_authorize_job(conn,ss['user_id'],r['job_ref'],'agent-tasks','view')
+            if a['allowed']: filtered.append(r)
+        rows=filtered
+    conn.close()
     out=[serialize_tx(r) for r in rows]
     if q:
         qq=q.lower(); out=[r for r in out if qq in json.dumps(r).lower()]
     return {'module':module,'count':len(out),'records':out}
 
 @app.get('/api/v1/{module}/{tid}')
-def get_record(module:str,tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
-    require_module(module); role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); conn=connect(); r=get_tx(conn,module,tid,role,ascope,cscope); out=serialize_tx(r); conn.close(); return out
+def get_record(module:str,tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module); conn=connect()
+    if bulk_permission_enabled():
+        r=conn.execute(tx_query('t.id=? AND t.module=?'),(tid,module)).fetchone()
+        if not r: conn.close(); raise HTTPException(404,'Transaction not found')
+        ga=governed_job_actor(conn,x_m3_session,r['job_ref'],'view'); role=ga['role'];ascope=cscope=None
+    else:
+        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); r=get_tx(conn,module,tid,role,ascope,cscope)
+    out=serialize_tx(r); conn.close(); return out
 
 @app.post('/api/v1/{module}',status_code=201)
-async def create_record(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
-    require_module(module); role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
-    if not role_ok(role,'create'): raise HTTPException(403,'Role cannot create')
-    raw=await request.body(); rh=hashlib.sha256(raw).hexdigest(); conn=connect(); tx(conn)
+async def create_record(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module); conn=connect()
+    if bulk_permission_enabled():
+        ga=governed_job_actor(conn,x_m3_session,body.job_ref,'create'); role=ga['role'];ascope=cscope=None
+    else:
+        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+        if not role_ok(role,'create'): conn.close(); raise HTTPException(403,'Role cannot create')
+    raw=await request.body(); rh=hashlib.sha256(raw).hexdigest(); tx(conn)
     try:
         if idempotency_key:
             prior=conn.execute('SELECT * FROM idempotency_keys WHERE actor_role=? AND idem_key=?',(role,idempotency_key)).fetchone()
@@ -402,12 +438,18 @@ async def create_record(module:str,body:CreateBody,request:Request,x_role:str=He
     finally: conn.close()
 
 @app.put('/api/v1/{module}/{tid}')
-def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
-    require_module(module); role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
-    if not role_ok(role,'edit'): raise HTTPException(403,'Role cannot edit')
-    conn=connect(); tx(conn)
+def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module); conn=connect(); tx(conn)
     try:
-        r=get_tx(conn,module,tid,role,ascope,cscope); before=serialize_tx(r); ctx=job_context(conn,r['job_ref'])
+        if bulk_permission_enabled():
+            r=conn.execute(tx_query('t.id=? AND t.module=?'),(tid,module)).fetchone()
+            if not r: raise HTTPException(404,'Transaction not found')
+            ga=governed_job_actor(conn,x_m3_session,r['job_ref'],'edit'); role=ga['role'];ascope=cscope=None
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            if not role_ok(role,'edit'): raise HTTPException(403,'Role cannot edit')
+            r=get_tx(conn,module,tid,role,ascope,cscope)
+        before=serialize_tx(r); ctx=job_context(conn,r['job_ref'])
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
@@ -424,12 +466,17 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
     finally: conn.close()
 
 @app.delete('/api/v1/{module}/{tid}')
-def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
-    require_module(module); role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
-    if role not in {'ADMIN','SUPER_ADMIN'}: raise HTTPException(403,'ADMIN only delete')
-    conn=connect(); tx(conn)
+def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module); conn=connect(); tx(conn)
     try:
-        r=get_tx(conn,module,tid,role,ascope,cscope)
+        if bulk_permission_enabled():
+            r=conn.execute(tx_query('t.id=? AND t.module=?'),(tid,module)).fetchone()
+            if not r: raise HTTPException(404,'Transaction not found')
+            ga=governed_job_actor(conn,x_m3_session,r['job_ref'],'admin'); role=ga['role'];ascope=cscope=None
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            if role not in {'ADMIN','SUPER_ADMIN'}: raise HTTPException(403,'ADMIN only delete')
+            r=get_tx(conn,module,tid,role,ascope,cscope)
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
@@ -439,13 +486,20 @@ def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Head
     finally: conn.close()
 
 @app.post('/api/v1/{module}/{tid}/actions/{action}')
-def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
-    require_module(module); role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); action=action.lower()
-    if not role_ok(role,action): raise HTTPException(403,f'Role cannot {action}')
+def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    require_module(module); action=action.lower()
     if action=='release' and module not in RELEASE_MODULES: raise HTTPException(422,{'code':'MODULE_NOT_RELEASABLE'})
     conn=connect(); tx(conn)
     try:
-        r=get_tx(conn,module,tid,role,ascope,cscope); before=serialize_tx(r)
+        if bulk_permission_enabled():
+            r=conn.execute(tx_query('t.id=? AND t.module=?'),(tid,module)).fetchone()
+            if not r: raise HTTPException(404,'Transaction not found')
+            ga=governed_job_actor(conn,x_m3_session,r['job_ref'],action); role=ga['role'];ascope=cscope=None
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            if not role_ok(role,action): raise HTTPException(403,f'Role cannot {action}')
+            r=get_tx(conn,module,tid,role,ascope,cscope)
+        before=serialize_tx(r)
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES and action in {'amend','reissue','cancel','reverse'}:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid,'action':action})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
