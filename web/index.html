@@ -198,7 +198,7 @@ function renderFlow(){
   const inCore=core.some(([id])=>id===state.current.screen_id);
   if(inCore){
     const f=CORE_BUSINESS_FLOW[state.current.screen_id]||{previous:[],next:[]};
-    $('flow').innerHTML='<div class="opFollow"><b>Previous</b>'+flowButtons(f.previous)+
+    $('flow').innerHTML='<div class="opFollow"><b>Operational follow-up</b><span class="muted">·</span><b>Previous</b>'+flowButtons(f.previous)+
       '<span class="muted">|</span><b>Current</b><button class="current">'+esc(state.current.name)+'</button>'+
       '<span class="muted">|</span><b>Next</b>'+(flowButtons(f.next)||'<span class="muted">Condition-driven / none</span>')+
       '<span class="muted">|</span><button onclick="openDrawer(\'related\')">Related</button><button onclick="openDrawer(\'audit\')">Audit</button></div>';
