@@ -221,3 +221,39 @@ def test_release_event_captures_governance_context(isolated):
     assert detail["organization_scope"]=="M3-EU"
     assert detail["job_ref"]=="50001"
     assert detail["hbl_no"]==isolated["hbl"]
+
+
+@pytest.mark.parametrize("flow,module",[
+    ("EXPORT","export-trt"),
+    ("IMPORT","import-trt"),
+    ("TS","transshipment-trt"),
+])
+def test_final_release_acceptance_matrix_by_flow(isolated, flow, module):
+    # Item 5 authority is HBL + container release governance and is shared by
+    # Export / Import / TS. Each operational flow must still be explicitly
+    # present in the releasable module set so it cannot bypass the common gate.
+    from app.main import RELEASE_MODULES
+    assert module in RELEASE_MODULES, flow
+
+    out=upsert_release_container(
+        release_ref="REL-TEST-001",
+        container_no=isolated["container"],
+        actor_user_id=f"USR-{flow}-MAKER",
+        action="RELEASE",
+        actor_role="OPS",
+        office_scope=f"{flow}-OFFICE",
+        branch_scope=f"{flow}-BRANCH",
+        country_scope="NL",
+        organization_scope="M3-EU",
+    )
+    assert out["status"]=="RELEASED", flow
+    assert out["prerequisites"]["ready"] is True, flow
+
+    c=db.connect()
+    ev=c.execute("SELECT * FROM nvocc_release_events ORDER BY id DESC LIMIT 1").fetchone()
+    detail=json.loads(ev["detail_json"])
+    c.close()
+    assert detail["actor_role"]=="OPS", flow
+    assert detail["branch_scope"]==f"{flow}-BRANCH", flow
+    assert detail["job_ref"]=="50001", flow
+    assert detail["hbl_no"]==isolated["hbl"], flow
