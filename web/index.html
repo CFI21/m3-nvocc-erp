@@ -819,7 +819,7 @@ function clx49BookingTogglePot(){
   const pot=document.querySelector('[data-clx49-field="POT Agent"]');
   const ts1=document.querySelector('[data-clx49-field="TS Agent (1)"]');
   const ts2=document.querySelector('[data-clx49-field="TS Agent (2)"]');
-  if(pot)pot.disabled=!pot1;
+  if(pot){pot.disabled=!(via||trans);if(pot1)pot.disabled=false;}
   if(ts1)ts1.disabled=!pot1;
   if(ts2)ts2.disabled=!pot2;
 }
@@ -995,7 +995,7 @@ async function clx49RenderBooking(tab){
       clx78Field(r,'Quantity','Quantity')+clx78Field(r,'SOC / COC','SOC / COC')+
       clx78Field(r,'SRR','SRR')+
       '</div></div></div>'+
-      '<div class="clx78Panel"><div class="clx78PanelHead">Operational Control</div><div class="clx78PanelBody"><div class="clx78OpsTabs"><span>Departure</span><span>Arrival</span><span>Docs</span><span>Pre-Allocation</span><span>Achieved Quantities</span><span>Numbers</span><span>Additional Detail</span></div><div class="clx78Fields" style="grid-template-columns:repeat(2,minmax(140px,1fr))">'+
+      '<div class="clx78Panel"><div class="clx78PanelHead">Operational Control</div><div class="clx78PanelBody"><div class="clx78OpsTabs"><span>Organizations</span><span>Departure</span><span>Arrival</span><span>Docs</span><span>Pre-Allocation</span><span>Achieved Quantities</span><span>Numbers</span><span>Additional Detail</span></div><div class="clx78Fields" style="grid-template-columns:repeat(2,minmax(140px,1fr))">'+
       clx78Field(r,'Operations Owner','Operations Owner')+clx78Field(r,'Agent Reference','Agent Reference')+
       clx78Field(r,'Primary Vendor / Carrier','Primary Vendor / Carrier')+clx78Field(r,'SI Cut-off','SI Cut-off',{type:'date'})+
       clx78Field(r,'VGM Cut-off','VGM Cut-off',{type:'date'})+clx78Field(r,'Gate-in Cut-off','Gate-in Cut-off',{type:'date'})+
