@@ -140,7 +140,7 @@ function domainSlug(d){return d.toLowerCase().replace(/\s*\/\s*/g,'-').replace(/
 function saveState(){localStorage.setItem('m3clx011-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('m3clx011-recent',JSON.stringify(state.recent.slice(0,15)))}
 function toggleGroup(id){let x=document.querySelector(`[data-content="${CSS.escape(id)}"]`);if(x)x.classList.toggle('collapse')}
 function screenAllowed(s){let r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;return !Array.isArray(s.roles)||!s.roles.length||s.roles.includes(r)}
-function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];return s&&screenAllowed(s)&&(!q||s.name.toLowerCase().includes(q)||s.submenu.toLowerCase().includes(q)||s.domain.toLowerCase().includes(q))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);return s&&aliasOk&&screenAllowed(s)&&(!q||it.label.toLowerCase().includes(q)||sub.name.toLowerCase().includes(q)||d.domain.toLowerCase().includes(q))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'&&(!q||'setup account container coding account setup global equipment tower equipment control container master network reposition lease depot'.includes(q))){
+function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];let terms=s?[s.name,s.submenu,s.domain,s.key,s.screen_id,...(s.search_terms||[])]:[];return s&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);let terms=[it.label,sub.name,d.domain,...(it.search_terms||[]),...(s?.search_terms||[])];return s&&aliasOk&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'&&(!q||'setup account container coding account setup global equipment tower equipment control container master network reposition lease depot'.includes(q))){
   const setupTarget=state.byId['gl-accounts::account-integration'];
   const setupAllowed=setupTarget&&screenAllowed(setupTarget);
   if(setupAllowed){
@@ -163,17 +163,34 @@ function renderBreadcrumb(){let s=state.current,n=state.navContext;if(n){$('brea
 function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,15);saveState()}
 function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);let i=same.findIndex(s=>s.screen_id===state.current.screen_id);return same[i+dir]?.screen_id||null}
 const CORE_FOLLOWUP=[
-  ['agent-tasks::booking','Booking'],['agent-tasks::bl','B/L'],['agent-tasks::cro','CRO'],
+  ['agent-tasks::booking','Booking'],['agent-tasks::planning','Job Planning'],['agent-tasks::bl','B/L'],['agent-tasks::cro','CRO'],
   ['agent-tasks::crt','CRT'],['agent-tasks::container-activity','Container'],
   ['agent-tasks::delivery-order','Delivery Order'],['agent-tasks::soa','SOA']
 ];
+const CORE_BUSINESS_FLOW={
+  'agent-tasks::booking':{previous:[['master-data::customers','Customer'],['agent-tasks::special-rates-request','Rate']],next:[['agent-tasks::planning','Job Planning']]},
+  'agent-tasks::planning':{previous:[['agent-tasks::booking','Booking']],next:[['agent-tasks::bl','B/L'],['agent-tasks::cro','CRO']]},
+  'agent-tasks::bl':{previous:[['agent-tasks::booking','Booking'],['agent-tasks::planning','Job Planning']],next:[['agent-tasks::cro','CRO'],['agent-tasks::crt','CRT'],['agent-tasks::delivery-order','Release / DO']]},
+  'agent-tasks::cro':{previous:[['agent-tasks::booking','Booking'],['agent-tasks::bl','B/L']],next:[['agent-tasks::crt','CRT'],['agent-tasks::container-activity','Container']]},
+  'agent-tasks::crt':{previous:[['agent-tasks::cro','CRO']],next:[['agent-tasks::container-activity','Container'],['agent-tasks::delivery-order','Release / DO'],['agent-tasks::transshipment-crt','Transshipment']]},
+  'agent-tasks::container-activity':{previous:[['agent-tasks::cro','CRO'],['agent-tasks::crt','CRT']],next:[['agent-tasks::delivery-order','Release / DO'],['agent-tasks::storage-cost','Storage'],['agent-tasks::detention-collection','Detention'],['agent-tasks::soa','Finance / SOA']]},
+  'agent-tasks::delivery-order':{previous:[['agent-tasks::bl','B/L'],['agent-tasks::container-activity','Container']],next:[['agent-tasks::soa','SOA / Finance']]},
+  'agent-tasks::soa':{previous:[['agent-tasks::delivery-order','Delivery Order'],['gl-accounts::invoice','Invoice'],['gl-accounts::bills','Bill / AP']],next:[]}
+};
+function flowButtons(xs){
+  return (xs||[]).filter(([id])=>state.byId[id]&&screenAllowed(state.byId[id])).map(([id,label])=>'<button onclick="openScreen(\''+id+'\')">'+esc(label)+'</button>').join('');
+}
 function renderFlow(){
   if(!state.current){$('flow').innerHTML='';return}
   const key=state.current.key||'';
   const core=CORE_FOLLOWUP.filter(([id])=>state.byId[id]);
   const inCore=core.some(([id])=>id===state.current.screen_id);
   if(inCore){
-    $('flow').innerHTML='<div class="opFollow"><b>Operational follow-up</b>'+core.map(([id,label])=>'<button class="'+(id===state.current.screen_id?'current':'')+'" onclick="openScreen(\''+id+'\')">'+esc(label)+'</button>').join('')+'<button onclick="openDrawer(\'related\')">Related</button><button onclick="openDrawer(\'audit\')">Audit</button></div>';
+    const f=CORE_BUSINESS_FLOW[state.current.screen_id]||{previous:[],next:[]};
+    $('flow').innerHTML='<div class="opFollow"><b>Previous</b>'+flowButtons(f.previous)+
+      '<span class="muted">|</span><b>Current</b><button class="current">'+esc(state.current.name)+'</button>'+
+      '<span class="muted">|</span><b>Next</b>'+(flowButtons(f.next)||'<span class="muted">Condition-driven / none</span>')+
+      '<span class="muted">|</span><button onclick="openDrawer(\'related\')">Related</button><button onclick="openDrawer(\'audit\')">Audit</button></div>';
   }else{
     let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);
     $('flow').innerHTML='<div class="opFollow"><b>Screen flow</b>'+same.slice(0,10).map((s,i)=>'<button class="'+(s.screen_id===state.current.screen_id?'current':'')+'" onclick="openScreen(\''+s.screen_id.replaceAll("'","\\'")+'\')">'+esc(s.name)+'</button>').join('')+'</div>';
@@ -184,6 +201,8 @@ function metaCards(data){
   let s=state.current,n=state.navContext||{};
   const sample=state.rows?.[0]||{};const p=typeof sample.payload_json==='object'?sample.payload_json:{};
   const get=(...ks)=>{for(const k of ks){const v=sample[k]??p[k];if(v!==undefined&&v!==null&&String(v)!=='')return v}return '—'};
+  // Section arrays are presentation metadata only and may be safely extended when a
+  // verified field group belongs to the same business screen. No empty future sections are rendered.
   const sections=(s.domain==='Agent Tasks'
     ?['BASIC','PARTIES','ROUTING','CARGO / EQUIPMENT','DOCUMENTS','COST / REVENUE','FOLLOW-UP','AUDIT']
     :s.domain==='General / Administration'
