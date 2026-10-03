@@ -412,7 +412,7 @@
         "Audit / Exceptions"
       ],
       "previous_step": "vessel-lock",
-      "next_step": "crt",
+      "next_step": "trt",
       "actions": [
         "create",
         "edit",
@@ -477,8 +477,8 @@
       "screen_id": "agent-tasks::crt",
       "domain": "Agent Tasks",
       "submenu": "Transactions",
-      "key": "crt",
-      "name": "CRT",
+      "key": "trt",
+      "name": "TRT",
       "route": "/agent-tasks/transactions/crt",
       "purpose": "Execute and control the NVOCC operational step CRT within the job lifecycle.",
       "business_sequence_position": 6,
@@ -507,7 +507,7 @@
         "Audit / Exceptions"
       ],
       "previous_step": "cro",
-      "next_step": "export-crt",
+      "next_step": "export-trt",
       "actions": [
         "create",
         "edit",
@@ -569,13 +569,13 @@
       ]
     },
     {
-      "screen_id": "agent-tasks::export-crt",
+      "screen_id": "agent-tasks::export-trt",
       "domain": "Agent Tasks",
       "submenu": "Transactions",
-      "key": "export-crt",
-      "name": "Export CRT",
-      "route": "/agent-tasks/transactions/export-crt",
-      "purpose": "Execute and control the NVOCC operational step Export CRT within the job lifecycle.",
+      "key": "export-trt",
+      "name": "Export TRT",
+      "route": "/agent-tasks/transactions/export-trt",
+      "purpose": "Execute and control the NVOCC operational step Export TRT within the job lifecycle.",
       "business_sequence_position": 7,
       "source_records": [
         "current persisted module records"
@@ -601,8 +601,8 @@
         "GL",
         "Audit / Exceptions"
       ],
-      "previous_step": "crt",
-      "next_step": "transshipment-crt",
+      "previous_step": "trt",
+      "next_step": "transshipment-trt",
       "actions": [
         "create",
         "edit",
@@ -664,13 +664,13 @@
       ]
     },
     {
-      "screen_id": "agent-tasks::transshipment-crt",
+      "screen_id": "agent-tasks::transshipment-trt",
       "domain": "Agent Tasks",
       "submenu": "Transactions",
-      "key": "transshipment-crt",
-      "name": "Transshipment CRT",
-      "route": "/agent-tasks/transactions/transshipment-crt",
-      "purpose": "Execute and control the NVOCC operational step Transshipment CRT within the job lifecycle.",
+      "key": "transshipment-trt",
+      "name": "Transshipment TRT",
+      "route": "/agent-tasks/transactions/transshipment-trt",
+      "purpose": "Execute and control the NVOCC operational step Transshipment TRT within the job lifecycle.",
       "business_sequence_position": 8,
       "source_records": [
         "current persisted module records"
@@ -696,7 +696,7 @@
         "GL",
         "Audit / Exceptions"
       ],
-      "previous_step": "export-crt",
+      "previous_step": "export-trt",
       "next_step": "bl",
       "actions": [
         "create",
@@ -791,7 +791,7 @@
         "GL",
         "Audit / Exceptions"
       ],
-      "previous_step": "transshipment-crt",
+      "previous_step": "transshipment-trt",
       "next_step": "switch-bl",
       "actions": [
         "create",

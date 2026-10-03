@@ -131,7 +131,7 @@ def e2e(job_ref:str,x_role:str=Header('VIEWER')):
       'Quote':n("select count(*) n from transaction_records where job_id=? and module='special-rates-request'")>0,'Booking':bool(j['booking_ref']),
       'Job':True,'Routing':bool(j['pol'] and j['pod']),'Vessel/Voyage':bool(j['voyage_no']),'Container':summary['containers']>0,
       'Documentation':n("select count(*) n from transaction_records where job_id=? and module in ('bl','import-bl','switch-bl','split-bl')")>0,
-      'HBL/MBL':len(bills)>=2,'Manifest/VGM':wf['vgm_status'] is not None,'Import/Export':n("select count(*) n from transaction_records where job_id=? and module in ('export-crt','import-crt','transshipment-crt')")>0,
+      'HBL/MBL':len(bills)>=2,'Manifest/VGM':wf['vgm_status'] is not None,'Import/Export':n("select count(*) n from transaction_records where job_id=? and module in ('export-trt','import-trt','transshipment-trt')")>0,
       'Delivery/Release':n("select count(*) n from transaction_records where job_id=? and module='delivery-order'")>0,
       'Charges':n("select count(*) n from transaction_records where job_id=? and module in ('detention-collection','storage-cost')")>0,
       'Invoice/Bill':n("select count(*) n from gl_records where job_id=? and module in ('invoice','bills')")>0,

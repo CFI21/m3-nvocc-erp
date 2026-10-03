@@ -5,7 +5,7 @@ ROOT=Path(__file__).resolve().parents[1]
 HTML=(ROOT/'web/index.html').read_text(encoding='utf-8')
 
 def test_operational_key_scope():
-    assert "const CLX83_OPERATIONAL_KEYS=new Set(['cro','crt','export-crt','transshipment-crt','delivery-order'])" in HTML
+    assert "const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','transshipment-trt','delivery-order'])" in HTML
     assert "renderClx083OperationalMaster" in HTML
 
 def test_cro_master_fields_and_authoritative_container_link():
@@ -35,7 +35,7 @@ def test_delivery_order_and_release_same_authoritative_record():
 def test_governance_exceptions_links_and_preview():
     for x in ['Status Governance / Exception Control','Authoritative Document & Journey Links','Read-only ','Preview uses the currently selected authoritative transaction values']:
         assert x in HTML,x
-    for target in ['agent-tasks::booking','agent-tasks::bl','agent-tasks::cro','agent-tasks::transshipment-crt','agent-tasks::delivery-order','agent-tasks::container-activity','gl-accounts::invoice','agent-tasks::soa','integration-security::request-response-audit']:
+    for target in ['agent-tasks::booking','agent-tasks::bl','agent-tasks::cro','agent-tasks::transshipment-trt','agent-tasks::delivery-order','agent-tasks::container-activity','gl-accounts::invoice','agent-tasks::soa','integration-security::request-response-audit']:
         assert target in HTML,target
     assert "clx83PreviewHtml" in HTML
     preview=HTML[HTML.index("function clx83PreviewHtml"):HTML.index("function clx83TogglePreview")]

@@ -1,11 +1,11 @@
 {
   "modules": [
     {
-      "key": "crt",
-      "name": "CRT",
+      "key": "trt",
+      "name": "TRT",
       "route": "/agent-tasks/transactions/crt",
       "columns": [
-        "CRT No.",
+        "TRT No.",
         "Date",
         "Agent",
         "Booking / Job Ref",
@@ -17,7 +17,7 @@
         "Status"
       ],
       "fields": [
-        "CRT No.",
+        "TRT No.",
         "Date",
         "Agent",
         "Customer",
@@ -43,11 +43,11 @@
       ]
     },
     {
-      "key": "export-crt",
-      "name": "Export CRT",
-      "route": "/agent-tasks/transactions/export-crt",
+      "key": "export-trt",
+      "name": "Export TRT",
+      "route": "/agent-tasks/transactions/export-trt",
       "columns": [
-        "Export CRT No.",
+        "Export TRT No.",
         "Booking",
         "Agent",
         "POL",
@@ -58,7 +58,7 @@
         "Status"
       ],
       "fields": [
-        "Export CRT No.",
+        "Export TRT No.",
         "Booking",
         "Job Ref",
         "Agent",
@@ -83,11 +83,11 @@
       ]
     },
     {
-      "key": "import-crt",
-      "name": "Import CRT",
-      "route": "/agent-tasks/transactions/import-crt",
+      "key": "import-trt",
+      "name": "Import TRT",
+      "route": "/agent-tasks/transactions/import-trt",
       "columns": [
-        "Import CRT No.",
+        "Import TRT No.",
         "BL",
         "Agent",
         "POD",
@@ -98,7 +98,7 @@
         "Status"
       ],
       "fields": [
-        "Import CRT No.",
+        "Import TRT No.",
         "MBL",
         "HBL",
         "Job Ref",
@@ -122,11 +122,11 @@
       ]
     },
     {
-      "key": "transshipment-crt",
-      "name": "Transshipment CRT",
-      "route": "/agent-tasks/transactions/transshipment-crt",
+      "key": "transshipment-trt",
+      "name": "Transshipment TRT",
+      "route": "/agent-tasks/transactions/transshipment-trt",
       "columns": [
-        "TS CRT No.",
+        "TS TRT No.",
         "Job",
         "Container",
         "From Vessel",
@@ -135,7 +135,7 @@
         "Status"
       ],
       "fields": [
-        "TS CRT No.",
+        "TS TRT No.",
         "Job Ref",
         "Container",
         "Incoming Vessel",
@@ -698,9 +698,9 @@
     }
   ],
   "data": {
-    "crt": [
+    "trt": [
       {
-        "CRT No.": "CLX-CRT-00001",
+        "TRT No.": "CLX-TRT-00001",
         "Date": "2026-09-24",
         "Agent": "CLX-AGT-SIN",
         "Customer": "Bluewave Trading BV",
@@ -725,7 +725,7 @@
         "Status": "Draft"
       },
       {
-        "CRT No.": "CLX-CRT-00002",
+        "TRT No.": "CLX-TRT-00002",
         "Date": "2026-09-25",
         "Agent": "CLX-AGT-DXB",
         "Customer": "Atlas Home Europe",
@@ -750,7 +750,7 @@
         "Status": "Approved"
       },
       {
-        "CRT No.": "CLX-CRT-00003",
+        "TRT No.": "CLX-TRT-00003",
         "Date": "2026-09-26",
         "Agent": "CLX-AGT-SHA",
         "Customer": "Northstar Foods",
@@ -775,7 +775,7 @@
         "Status": "Released"
       },
       {
-        "CRT No.": "CLX-CRT-00004",
+        "TRT No.": "CLX-TRT-00004",
         "Date": "2026-09-27",
         "Agent": "CLX-AGT-KHI",
         "Customer": "Orion Textiles",
@@ -800,7 +800,7 @@
         "Status": "Open"
       },
       {
-        "CRT No.": "CLX-CRT-00005",
+        "TRT No.": "CLX-TRT-00005",
         "Date": "2026-09-28",
         "Agent": "CLX-AGT-RTM",
         "Customer": "Vertex Retail",
@@ -825,9 +825,9 @@
         "Status": "Closed"
       }
     ],
-    "export-crt": [
+    "export-trt": [
       {
-        "Export CRT No.": "CLX-ECRT-00001",
+        "Export TRT No.": "CLX-ECRT-00001",
         "Booking": "CLX-BKG-50001",
         "Job Ref": "50001",
         "Agent": "CLX-AGT-SIN",
@@ -851,7 +851,7 @@
         "Status": "Draft"
       },
       {
-        "Export CRT No.": "CLX-ECRT-00002",
+        "Export TRT No.": "CLX-ECRT-00002",
         "Booking": "CLX-BKG-50002",
         "Job Ref": "50002",
         "Agent": "CLX-AGT-DXB",
@@ -875,7 +875,7 @@
         "Status": "Approved"
       },
       {
-        "Export CRT No.": "CLX-ECRT-00003",
+        "Export TRT No.": "CLX-ECRT-00003",
         "Booking": "CLX-BKG-50003",
         "Job Ref": "50003",
         "Agent": "CLX-AGT-SHA",
@@ -899,7 +899,7 @@
         "Status": "Released"
       },
       {
-        "Export CRT No.": "CLX-ECRT-00004",
+        "Export TRT No.": "CLX-ECRT-00004",
         "Booking": "CLX-BKG-50004",
         "Job Ref": "50004",
         "Agent": "CLX-AGT-KHI",
@@ -923,7 +923,7 @@
         "Status": "Open"
       },
       {
-        "Export CRT No.": "CLX-ECRT-00005",
+        "Export TRT No.": "CLX-ECRT-00005",
         "Booking": "CLX-BKG-50005",
         "Job Ref": "50005",
         "Agent": "CLX-AGT-RTM",
@@ -947,9 +947,9 @@
         "Status": "Closed"
       }
     ],
-    "import-crt": [
+    "import-trt": [
       {
-        "Import CRT No.": "CLX-ICRT-00001",
+        "Import TRT No.": "CLX-ICRT-00001",
         "MBL": "CLXMBL50001",
         "HBL": "CLXHBL50001",
         "Job Ref": "50001",
@@ -972,7 +972,7 @@
         "Status": "Draft"
       },
       {
-        "Import CRT No.": "CLX-ICRT-00002",
+        "Import TRT No.": "CLX-ICRT-00002",
         "MBL": "CLXMBL50002",
         "HBL": "CLXHBL50002",
         "Job Ref": "50002",
@@ -995,6 +995,6 @@
         "Status": "Approved"
       },
       {
-        "Import CRT No.": "CLX-ICRT-00003",
+        "Import TRT No.": "CLX-ICRT-00003",
         "MBL": "CLXMBL50003",
         "HBL": "CLXHBL50003",

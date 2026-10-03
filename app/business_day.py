@@ -24,13 +24,13 @@ STAGES=[
  ('planning','Planning','agent-tasks::planning','OPS'),
  ('vessel-lock','Vessel Lock','agent-tasks::vessel-lock','OPS'),
  ('cro','CRO','agent-tasks::cro','OPS'),
- ('crt','CRT','agent-tasks::crt','OPS'),
- ('export-crt','Export CRT','agent-tasks::export-crt','OPS'),
- ('transshipment','Transshipment','agent-tasks::transshipment-crt','OPS'),
+ ('trt','CRT','agent-tasks::crt','OPS'),
+ ('export-trt','Export TRT','agent-tasks::export-trt','OPS'),
+ ('transshipment','Transshipment','agent-tasks::transshipment-trt','OPS'),
  ('bl','B/L','agent-tasks::bl','DOCS'),
  ('switch-split-bl','Switch / Split B/L','agent-tasks::switch-bl','DOCS'),
  ('import-bl','Import B/L','agent-tasks::import-bl','DOCS'),
- ('import-crt','Import CRT','agent-tasks::import-crt','OPS'),
+ ('import-trt','Import TRT','agent-tasks::import-trt','OPS'),
  ('delivery-order','Delivery Order','agent-tasks::delivery-order','OPS'),
  ('container-activity','Container Activity','agent-tasks::container-activity','OPS'),
  ('detention-storage','Detention / Storage','agent-tasks::detention-collection','OPS'),
@@ -50,10 +50,10 @@ STAGES=[
 
 EXCEPTION_SCENARIOS=[
  ('50003','MISSING_DOCUMENTS','HIGH','OPEN','agent-tasks::bl','DOCS','Complete shipping instructions / required documents and revalidate document gate.'),
- ('50002','VGM_MISSING','CRITICAL','OPEN','agent-tasks::export-crt','OPS','Obtain and validate VGM before export release.'),
+ ('50002','VGM_MISSING','CRITICAL','OPEN','agent-tasks::export-trt','OPS','Obtain and validate VGM before export release.'),
  ('50002','CUT_OFF_RISK','HIGH','OPEN','agent-tasks::planning','OPS','Escalate cut-off risk and confirm terminal/vessel cut-off action.'),
  ('50004','VESSEL_DELAY','HIGH','OPEN','agent-tasks::vessel-lock','OPS','Update ETA/ETD and notify linked operational records.'),
- ('50004','TRANSSHIPMENT_HOLD','CRITICAL','OPEN','agent-tasks::transshipment-crt','OPS','Confirm transshipment milestone and clear hold through accepted workflow.'),
+ ('50004','TRANSSHIPMENT_HOLD','CRITICAL','OPEN','agent-tasks::transshipment-trt','OPS','Confirm transshipment milestone and clear hold through accepted workflow.'),
  ('50002','PAYMENT_BLOCK','HIGH','OPEN','integration-and-security::payment-release-safety','TREASURY_MANAGER','Resolve payment safety gate before simulated release.'),
  ('50003','CREDIT_LIMIT','MEDIUM','OPEN','gl-accounts::customer-credit-control','FINANCE','Review customer exposure and obtain authorized credit decision.'),
  ('50001','DUPLICATE_ENTRY','MEDIUM','PREVENTED','agent-tasks::booking','OPS','Idempotency / unique reference control prevents duplicate creation.'),
@@ -132,7 +132,7 @@ def job_context(c,jr):
     return d
 
 def source_ref(c,jid,jr,stage_key):
-    agent_map={'special-rate-request':'special-rates-request','booking':'booking','planning':'planning','vessel-lock':'vessel-lock','cro':'cro','crt':'crt','export-crt':'export-crt','transshipment':'transshipment-crt','bl':'bl','switch-split-bl':'switch-bl','import-bl':'import-bl','import-crt':'import-crt','delivery-order':'delivery-order','container-activity':'container-activity','detention-storage':'detention-collection','agent-receipt-pay':'agent-receipt-pay','soa':'soa'}
+    agent_map={'special-rate-request':'special-rates-request','booking':'booking','planning':'planning','vessel-lock':'vessel-lock','cro':'cro','trt':'trt','export-trt':'export-trt','transshipment':'transshipment-trt','bl':'bl','switch-split-bl':'switch-bl','import-bl':'import-bl','import-trt':'import-trt','delivery-order':'delivery-order','container-activity':'container-activity','detention-storage':'detention-collection','agent-receipt-pay':'agent-receipt-pay','soa':'soa'}
     if stage_key in agent_map:
         r=c.execute('SELECT external_ref FROM transaction_records WHERE job_id=? AND module=?',(jid,agent_map[stage_key])).fetchone()
         return r['external_ref'] if r else None
@@ -167,7 +167,7 @@ def exception_due(severity):
     return (base+datetime.timedelta(minutes=mins)).isoformat()
 
 def stage_status_for(jr,key):
-    if jr=='50002' and key in {'export-crt','delivery-order'}:return 'BLOCKED_BY_CONTROL'
+    if jr=='50002' and key in {'export-trt','delivery-order'}:return 'BLOCKED_BY_CONTROL'
     if jr=='50003' and key in {'bl','import-bl'}:return 'BLOCKED_BY_CONTROL'
     if jr=='50004' and key in {'transshipment','bank-reconciliation'}:return 'BLOCKED_BY_CONTROL'
     if jr=='50005' and key=='job-closeout':return 'CLOSED_PROTECTED'

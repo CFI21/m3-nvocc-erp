@@ -27,7 +27,7 @@ def test_dense_forms_are_grouped_not_four_column_newspaper_layout():
 def test_followup_reuses_existing_authoritative_screens():
     for sid in [
         'agent-tasks::booking','agent-tasks::bl','agent-tasks::cro',
-        'agent-tasks::crt','agent-tasks::container-activity',
+        'agent-tasks::trt','agent-tasks::container-activity',
         'agent-tasks::delivery-order','agent-tasks::soa'
     ]:
         assert sid in HTML

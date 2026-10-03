@@ -175,16 +175,16 @@ function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice
 function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);let i=same.findIndex(s=>s.screen_id===state.current.screen_id);return same[i+dir]?.screen_id||null}
 const CORE_FOLLOWUP=[
   ['agent-tasks::booking','Booking'],['agent-tasks::planning','Job Planning'],['agent-tasks::bl','B/L'],['agent-tasks::cro','CRO'],
-  ['agent-tasks::crt','CRT'],['agent-tasks::container-activity','Container'],
+  ['agent-tasks::trt','TRT'],['agent-tasks::container-activity','Container'],
   ['agent-tasks::delivery-order','Delivery Order'],['agent-tasks::soa','SOA']
 ];
 const CORE_BUSINESS_FLOW={
   'agent-tasks::booking':{previous:[['master-data::customers','Customer'],['agent-tasks::special-rates-request','Rate']],next:[['agent-tasks::planning','Job Planning']]},
   'agent-tasks::planning':{previous:[['agent-tasks::booking','Booking']],next:[['agent-tasks::bl','B/L'],['agent-tasks::cro','CRO']]},
-  'agent-tasks::bl':{previous:[['agent-tasks::booking','Booking'],['agent-tasks::planning','Job Planning']],next:[['agent-tasks::cro','CRO'],['agent-tasks::crt','CRT'],['agent-tasks::delivery-order','Release / DO']]},
-  'agent-tasks::cro':{previous:[['agent-tasks::booking','Booking'],['agent-tasks::bl','B/L']],next:[['agent-tasks::crt','CRT'],['agent-tasks::container-activity','Container']]},
-  'agent-tasks::crt':{previous:[['agent-tasks::cro','CRO']],next:[['agent-tasks::container-activity','Container'],['agent-tasks::delivery-order','Release / DO'],['agent-tasks::transshipment-crt','Transshipment']]},
-  'agent-tasks::container-activity':{previous:[['agent-tasks::cro','CRO'],['agent-tasks::crt','CRT']],next:[['agent-tasks::delivery-order','Release / DO'],['agent-tasks::storage-cost','Storage'],['agent-tasks::detention-collection','Detention'],['agent-tasks::soa','Finance / SOA']]},
+  'agent-tasks::bl':{previous:[['agent-tasks::booking','Booking'],['agent-tasks::planning','Job Planning']],next:[['agent-tasks::cro','CRO'],['agent-tasks::trt','TRT'],['agent-tasks::delivery-order','Release / DO']]},
+  'agent-tasks::cro':{previous:[['agent-tasks::booking','Booking'],['agent-tasks::bl','B/L']],next:[['agent-tasks::trt','TRT'],['agent-tasks::container-activity','Container']]},
+  'agent-tasks::trt':{previous:[['agent-tasks::cro','CRO']],next:[['agent-tasks::container-activity','Container'],['agent-tasks::delivery-order','Release / DO'],['agent-tasks::transshipment-trt','Transshipment']]},
+  'agent-tasks::container-activity':{previous:[['agent-tasks::cro','CRO'],['agent-tasks::trt','TRT']],next:[['agent-tasks::delivery-order','Release / DO'],['agent-tasks::storage-cost','Storage'],['agent-tasks::detention-collection','Detention'],['agent-tasks::soa','Finance / SOA']]},
   'agent-tasks::delivery-order':{previous:[['agent-tasks::bl','B/L'],['agent-tasks::container-activity','Container']],next:[['agent-tasks::soa','SOA / Finance']]},
   'agent-tasks::soa':{previous:[['agent-tasks::delivery-order','Delivery Order'],['gl-accounts::invoice','Invoice'],['gl-accounts::bills','Bill / AP']],next:[]}
 };
@@ -422,7 +422,7 @@ async function openScreen(id,navContext=null,historyMode='push'){
   }catch(e){$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
 }
 
-const CLX83_OPERATIONAL_KEYS=new Set(['cro','crt','export-crt','transshipment-crt','delivery-order']);
+const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','transshipment-trt','delivery-order']);
 let clx83PreviewState=null;
 function clx83Pick(base,...names){for(const n of names){const v=base?.[n];if(v!==undefined&&v!==null&&String(v)!=='')return v}return ''}
 function clx83RO(label,value,opts={}){
@@ -462,7 +462,7 @@ async function renderClx083OperationalMaster(){
   const ident=related?.identity||{};
   const key=state.current.key;
   const isCro=key==='cro';
-  const isCrt=['crt','export-crt','transshipment-crt'].includes(key);
+  const isTrt=['trt','export-trt','transshipment-trt'].includes(key);
   const isDo=key==='delivery-order';
   let out='<div class="clx78Workspace">';
   if(isCro){
@@ -522,10 +522,10 @@ async function renderClx083OperationalMaster(){
       clx83RO('Override Reason',clx83Pick(base,'Override Reason'),{full:true})
     ]));
   }
-  if(isCrt){
+  if(isTrt){
     const pot=clx83Pick(base,'POT','POT (1)','Via Port','Transshipment Port');
     out+=clx83Section('CRT / Transshipment Master',clx83Grid([
-      clx83RO('CRT No.',clx83Pick(base,'CRT No.','TS CRT No.','Export CRT No.')),
+      clx83RO('CRT No.',clx83Pick(base,'CRT No.','TS TRT No.','Export TRT No.')),
       clx83RO('Job',jr),
       clx83RO('Booking',clx83Pick(base,'Booking No.','Booking')),
       clx83RO('B/L',clx83Pick(base,'B/L','BL','HBL','MBL')),
@@ -543,7 +543,7 @@ async function renderClx083OperationalMaster(){
       clx83RO('Remarks',clx83Pick(base,'Remarks'),{full:true,textarea:true})
     ]));
     out+=clx83Section('POT Conditional Logic',pot?
-      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing CRT/booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-crt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
+      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing CRT/booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-trt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
       '<div class="equipNote">Direct shipment / no POT detected. POT, TS Agent and connecting vessel/voyage controls remain inactive; no transshipment data is forced.</div>');
   }
   if(isDo){
@@ -592,7 +592,7 @@ async function renderClx083OperationalMaster(){
     clx83Link('agent-tasks::booking','Booking',jr)+
     clx83Link('agent-tasks::bl','B/L',jr)+
     clx83Link('agent-tasks::cro','CRO',jr)+
-    clx83Link('agent-tasks::transshipment-crt','CRT / Transshipment',jr)+
+    clx83Link('agent-tasks::transshipment-trt','CRT / Transshipment',jr)+
     clx83Link('agent-tasks::delivery-order','Delivery Order',jr)+
     clx83Link('agent-tasks::container-activity','Container Journey',jr)+
     clx83Link('gl-accounts::invoice','Invoice',jr)+
@@ -1014,7 +1014,7 @@ function clx81QuickButtons(){
       '<button onclick="clx81SetBottom(\'Equipment\')">Container Planning</button><br>'+
       '<button onclick="openScreen(\'agent-tasks::cro\')">CRO Planning</button>'+
       '<button onclick="openScreen(\'agent-tasks::planning\')">Slot Planning</button><br>'+
-      '<button onclick="openScreen(\'agent-tasks::transshipment-crt\')">Transshipment</button>'+
+      '<button onclick="openScreen(\'agent-tasks::transshipment-trt\')">Transshipment</button>'+
       '<button onclick="openScreen(\'agent-tasks::delivery-order\')">Delivery Planning</button></div>'+
   '</div>';
 }
@@ -1474,7 +1474,7 @@ async function renderClx084FinanceMaster(){
   ])+clx84Rows('Posted GL report context',reports));
   out+=clx84Section('Payment / Receipt & Document Links','<div class="formActions">'+
     clx84Link('agent-tasks::booking','Booking',jr)+clx84Link('agent-tasks::bl','B/L',jr)+clx84Link('agent-tasks::cro','CRO',jr)+
-    clx84Link('agent-tasks::transshipment-crt','CRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
+    clx84Link('agent-tasks::transshipment-trt','CRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
     clx84Link('gl-accounts::invoice','Invoice',jr)+clx84Link('gl-accounts::bills','Bill / AP',jr)+
     clx84Link('gl-accounts::receipt','Receipt',jr)+clx84Link('gl-accounts::payment','Payment',jr)+
     clx84Link('gl-accounts::voucher','GL Voucher',jr)+clx84Link('agent-tasks::soa','SOA',jr)+
@@ -1767,7 +1767,7 @@ async function showExecutiveHome(){
     api('/api/clx071/journey/kpis',{headers}),
     api('/api/clx071/journey/exceptions',{headers}),
     api('/api/clx077/dummy-bank/safety',{headers}),
-    screen('agent-tasks::booking'),screen('agent-tasks::bl'),screen('agent-tasks::cro'),screen('agent-tasks::transshipment-crt'),screen('agent-tasks::delivery-order'),
+    screen('agent-tasks::booking'),screen('agent-tasks::bl'),screen('agent-tasks::cro'),screen('agent-tasks::transshipment-trt'),screen('agent-tasks::delivery-order'),
     screen('gl-accounts::invoice'),screen('gl-accounts::bills'),screen('gl-accounts::receipt'),screen('gl-accounts::payment'),screen('agent-tasks::soa')
   ]);
   const val=i=>results[i]?.status==='fulfilled'?results[i].value:null;
@@ -1817,7 +1817,7 @@ async function showExecutiveHome(){
       clx85Kpi('Active Jobs',sm.jobs_open??0,'Control Tower jobs',"showControlTower()")+
       clx85Kpi('B/L',bl.length,'Authoritative B/L records',"openScreen('agent-tasks::bl')")+
       clx85Kpi('CRO',cro.length,'Container release orders',"openScreen('agent-tasks::cro')")+
-      clx85Kpi('CRT / TS',crt.length,'Transshipment records',"openScreen('agent-tasks::transshipment-crt')")+
+      clx85Kpi('CRT / TS',crt.length,'Transshipment records',"openScreen('agent-tasks::transshipment-trt')")+
       clx85Kpi('Delivery Orders',delivery.length,'Existing DO records',"openScreen('agent-tasks::delivery-order')")+
       clx85Kpi('Containers',eqCount,'CLX-070 container master',"showEquipmentWorkspace('containers')")+
       clx85Kpi('Available Equipment',available,'CLX-070 availability',"showEquipmentWorkspace('tower')")+
