@@ -17,6 +17,7 @@ permissions:
 jobs:
   item5:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -56,7 +57,9 @@ jobs:
         env: {PYTHONPATH: .}
         run: pytest -q tests/test_m3_stage0_baseline_freeze.py
       - name: Full M3 regression
-        env: {PYTHONPATH: .}
-        run: pytest -q
+        env:
+          PYTHONPATH: .
+          PYTHONFAULTHANDLER: "1"
+        run: timeout --signal=TERM 300s pytest -vv --durations=25
       - name: Compile
         run: python -m compileall -q app
