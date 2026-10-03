@@ -14,6 +14,14 @@ from .item7_financial_document_governance import (
     enforce_single_reversal,
     enabled as item7_enabled,
 )
+from .item8_open_item_governance import (
+    apply_application,
+    reverse_application,
+    apply_write_off,
+    reopen_open_item,
+    enforce_sensitive_action as enforce_item8_sensitive_action,
+    enabled as item8_enabled,
+)
 
 HERE=Path(__file__).resolve().parent
 _TREASURY_META, META_RECOVERED = load_json_or_recover_arrays(
@@ -234,7 +242,7 @@ def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_i
     finally:c.close()
 @router.post('/{module}/{rid}/actions/{action}')
 def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'),x_actor_id:str=Header('actor-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_mutable(module);action=action.lower().replace('-','_');role=actor(x_role,action if action in {'approve','release','reverse','reconcile','write_off'} else 'edit')
+    require_mutable(module);action=action.lower().replace('-','_');enforce_item8_sensitive_action(action,x_m3_session);role=actor(x_role,action if action in {'approve','release','reverse','reconcile','write_off'} else 'edit')
     if action in {'approve','release','reverse','write_off'}: enforce_treasury_action(module,rid,action,x_m3_session,b.version)
     if x_m3_session:
         c0=connect();s0=iam_session(c0,x_m3_session);x_actor_id=s0['user_ref'];c0.close()
@@ -250,6 +258,11 @@ def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'
         elif action=='release':
             if r['status']!='Approved':raise HTTPException(422,{'code':'APPROVAL_REQUIRED_BEFORE_RELEASE'})
             if not r['checker_id']:raise HTTPException(422,{'code':'CHECKER_REQUIRED'})
+            open_item_meta={}
+            if module in {'customer-receipt-allocation','supplier-carrier-payment-allocation'}:
+                src_ref=p.get('Invoice Ref') if module=='customer-receipt-allocation' else p.get('Bill Ref')
+                src_type='INVOICE' if module=='customer-receipt-allocation' else 'BILL'
+                open_item_meta=apply_application(c,src_ref,src_type,r['amount'],r['job_id'],r['currency'])
             gl_post(c,r,module,x_actor_id,False);new='Released'
             if module=='payment-batches':c.execute('UPDATE treasury_payment_batches SET released_by=?,status=?,released_at=?,version=version+1 WHERE record_id=?',(x_actor_id,'Released',now(),rid))
         elif action=='reverse':
@@ -260,9 +273,21 @@ def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'
             rev_ext=r['external_ref']+'-REV';rev_payload=dict(p);rev_payload['Status']='Reversal';rev_payload['Reversal Of']=r['external_ref']
             cur=c.execute('INSERT INTO treasury_records(module,external_ref,job_id,party_type,party_name,currency,amount,status,version,maker_id,checker_id,source_type,source_ref,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?)',(module,rev_ext,r['job_id'],r['party_type'],r['party_name'],r['currency'],-abs(r['amount']),'Reversal',x_actor_id,x_actor_id,'REVERSAL',r['external_ref'],json.dumps(rev_payload),now(),now()))
             c.execute('INSERT INTO treasury_reversals(original_record_id,reversal_record_id,original_voucher_id,reversal_voucher_id,reason,ts) VALUES(?,?,?,?,?,?)',(rid,cur.lastrowid,link['voucher_id'],rev_vid,b.reason or 'Treasury reversal',now()))
+            if module in {'customer-receipt-allocation','supplier-carrier-payment-allocation'}:
+                src_ref=p.get('Invoice Ref') if module=='customer-receipt-allocation' else p.get('Bill Ref')
+                src_type='INVOICE' if module=='customer-receipt-allocation' else 'BILL'
+                reverse_application(c,src_ref,src_type,r['amount'])
         elif action=='write_off':
             if not ('customer' in module or 'supplier' in module or 'carrier' in module):raise HTTPException(422,{'code':'WRITE_OFF_ONLY_AR_AP'})
-            new='Written Off'
+            src_ref=p.get('Invoice Ref') or p.get('Bill Ref') or p.get('Source Ref') or r['source_ref']
+            src_type='INVOICE' if ('customer' in module or p.get('Invoice Ref')) else 'BILL'
+            apply_write_off(c,src_ref,src_type,b.reason);new='Written Off'
+        elif action=='reopen':
+            if not x_m3_session: raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_OPEN_ITEM_REOPEN'})
+            if r['maker_id']==x_actor_id: raise HTTPException(422,{'code':'MAKER_CANNOT_REOPEN_OWN_TRANSACTION'})
+            src_ref=p.get('Invoice Ref') or p.get('Bill Ref') or p.get('Source Ref') or r['source_ref']
+            src_type='INVOICE' if ('customer' in module or p.get('Invoice Ref')) else 'BILL'
+            reopen_open_item(c,src_ref,src_type,number(p,'Outstanding') or r['amount'],b.reason);new='Reopened'
         elif action=='reconcile':
             if module=='cash-denomination' and abs(number(p,'Difference') or 0)>.01:raise HTTPException(422,{'code':'CASH_DIFFERENCE_MUST_BE_ZERO'})
             if module=='bank-reconciliation-exception-queue':raise HTTPException(422,{'code':'EXCEPTION_MUST_BE_RESOLVED_VIA_APPROVED_MATCH_WORKFLOW'})
@@ -270,7 +295,7 @@ def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'
         else:raise HTTPException(422,{'code':'UNSUPPORTED_ACTION'})
         p['Status']=new;cur=c.execute('UPDATE treasury_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?',(new,json.dumps(p),now(),rid,b.version))
         if cur.rowcount!=1:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
-        aft=ser(getrec(c,module,rid));audit(c,role,x_actor_id,action.upper(),module,rid,r['job_id'],before,aft,{'reason':b.reason});c.execute('COMMIT');return {'record':aft}
+        aft=ser(getrec(c,module,rid));audit(c,role,x_actor_id,action.upper(),module,rid,r['job_id'],before,aft,{'reason':b.reason,'open_item_application':locals().get('open_item_meta')});c.execute('COMMIT');return {'record':aft}
     except HTTPException as e:
         c.execute('ROLLBACK')
         if action=='release':
