@@ -35,3 +35,26 @@ CREATE TABLE IF NOT EXISTS nvocc_interbranch_settlements(
 CREATE TABLE IF NOT EXISTS nvocc_extension_audit(
  audit_ref TEXT PRIMARY KEY,ts TEXT NOT NULL,actor_role TEXT NOT NULL,branch_scope TEXT,workspace_key TEXT NOT NULL,record_ref TEXT NOT NULL,action TEXT NOT NULL,
  before_json TEXT,after_json TEXT);
+
+
+-- Supabase public-schema safety: these tables are server-side M3 ERP internals.
+-- They are not exposed to browser/Data API roles.
+ALTER TABLE public.nvocc_branch_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nvocc_legal_entity_profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nvocc_depots ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nvocc_port_agent_depot_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nvocc_transfer_pricing ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nvocc_ts_branch_operations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nvocc_release_controls ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nvocc_interbranch_settlements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.nvocc_extension_audit ENABLE ROW LEVEL SECURITY;
+
+REVOKE ALL ON TABLE public.nvocc_branch_profiles FROM anon, authenticated;
+REVOKE ALL ON TABLE public.nvocc_legal_entity_profiles FROM anon, authenticated;
+REVOKE ALL ON TABLE public.nvocc_depots FROM anon, authenticated;
+REVOKE ALL ON TABLE public.nvocc_port_agent_depot_config FROM anon, authenticated;
+REVOKE ALL ON TABLE public.nvocc_transfer_pricing FROM anon, authenticated;
+REVOKE ALL ON TABLE public.nvocc_ts_branch_operations FROM anon, authenticated;
+REVOKE ALL ON TABLE public.nvocc_release_controls FROM anon, authenticated;
+REVOKE ALL ON TABLE public.nvocc_interbranch_settlements FROM anon, authenticated;
+REVOKE ALL ON TABLE public.nvocc_extension_audit FROM anon, authenticated;

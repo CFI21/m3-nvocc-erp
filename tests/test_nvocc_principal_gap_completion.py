@@ -150,4 +150,10 @@ def test_schema_and_migration_are_additive():
         assert 'CREATE TABLE IF NOT EXISTS '+table in schema
         assert 'CREATE TABLE IF NOT EXISTS '+table in migration
     assert 'DROP TABLE' not in migration.upper()
-    assert 'ALTER TABLE' not in migration.upper()
+    # Security-only ALTERs are additive: RLS hardening must not alter business columns or drop data.
+    alters=[line.strip().upper() for line in migration.splitlines() if line.strip().upper().startswith('ALTER TABLE')]
+    assert alters
+    assert all(' ENABLE ROW LEVEL SECURITY' in line for line in alters)
+    assert 'DROP COLUMN' not in migration.upper()
+    assert 'ALTER COLUMN' not in migration.upper()
+    assert 'REVOKE ALL ON TABLE PUBLIC.NVOCC_' in migration.upper()
