@@ -8,12 +8,11 @@ def test_legacy_reference_flow_is_visible_without_duplicate_screens():
     c=build_catalog()
     assert c['screen_count']==196
     ho=next(x for x in c['menu'] if x['domain']=='HO Tasks')
-    utility=next(x for x in ho['submenus'] if x['name']=='Utilities')
-    labels=[x['label'] for x in utility.get('items',[])]
-    assert 'Account Setup' in labels
-    account=next(x for x in utility['items'] if x['label']=='Account Setup')
-    assert account['target']=='gl-accounts::account-integration'
-    assert 'Container Coding / Master' in HTML
+    assert [x['name'] for x in ho['submenus']]==['Transaction','Utilities']
+    assert '▾ Setup <span class=count>2</span>' in HTML
+    assert 'Account Setup' in HTML
+    assert "openScreen('gl-accounts::account-integration'" in HTML
+    assert 'Container Coding' in HTML
     assert "showEquipmentWorkspace('containers')" in HTML
 
 def test_reference_transaction_names_remain_visible():
