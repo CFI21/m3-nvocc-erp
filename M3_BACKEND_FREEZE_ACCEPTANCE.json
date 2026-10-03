@@ -1,0 +1,55 @@
+{
+  "schema": "M3_BACKEND_DEVELOPMENT_FREEZE_V1",
+  "baseline": "54860d2e815baf2a2dd717798852a4e5494035f4",
+  "scope": "M3_ONLY",
+  "screen_contract": 196,
+  "authoritative_models": {
+    "masterdata": "PASS",
+    "iam": "PASS",
+    "booking_job": "PASS",
+    "bl": "PASS",
+    "cro_crt": "PASS",
+    "container_equipment": "PASS",
+    "release_delivery_order": "PASS",
+    "agent_operations": "PASS",
+    "finance_gl_treasury": "PASS",
+    "audit_security": "PASS",
+    "screen_integration": "PASS"
+  },
+  "backend_gap_audit": {
+    "todo_fixme_notimplemented": 0,
+    "http_501": 0,
+    "verified_runtime_backend_defects": 0,
+    "duplicate_business_models_created": false,
+    "booking_party_link": "PASS"
+  },
+  "production_baseline_guard": {
+    "bookings": 355,
+    "jobs": 355,
+    "linked_transactions": 1881,
+    "equipment_requirements": 360,
+    "source_bl": 355,
+    "source_unclassified": 355,
+    "authoritative_bills": 0,
+    "actual_containers": 0,
+    "container_events": 0,
+    "delivery_orders": 0,
+    "agent_receipt_pay": 0,
+    "gl": 0,
+    "treasury": 0,
+    "p0_p1": 0
+  },
+  "provider_safety": {
+    "dummy_bank": "SIMULATION_ONLY",
+    "truelayer": "OFF",
+    "openexchangerates": "OFF",
+    "avalara": "OFF",
+    "real_money": "OFF"
+  },
+  "backend_development_ready": true,
+  "frontend_development_can_start": true,
+  "full_live_operational": false,
+  "remaining_infrastructure_gate": "INDEPENDENT_PRODUCTION_DR_NOT_CERTIFIED",
+  "ancline_touched": false,
+  "status": "BACKEND_FROZEN_FOR_FRONTEND"
+}
