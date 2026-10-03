@@ -101,6 +101,20 @@ def _active_holds(c,job_id):
     )]
 
 
+def _container_state(c,con:dict) -> str:
+    state=normalize(con.get("journey_state") or con.get("equipment_status"))
+    if state:
+        return state
+    row=c.execute(
+        """SELECT event_type,status FROM container_events
+           WHERE container_id=? ORDER BY event_time DESC,id DESC LIMIT 1""",
+        (con["id"],)
+    ).fetchone()
+    if row:
+        return normalize(row["event_type"] or row["status"])
+    return "AVAILABLE"
+
+
 def evaluate_prerequisites(
     *,
     job_ref:str,
@@ -154,7 +168,7 @@ def evaluate_prerequisites(
             x for x in holds
             if x.startswith(("LEGAL","COMPLIANCE","DOCUMENT","CUSTOMS","RELEASE","FRAUD","SANCTION"))
         ]
-        state=normalize(con.get("journey_state") or con.get("equipment_status") or "AVAILABLE")
+        state=_container_state(c,con)
         container_ok=state not in TERMINAL_INELIGIBLE_STATES and not bool(con.get("damage_hold",0)) and not bool(con.get("inspection_hold",0))
 
         checks={
@@ -247,7 +261,7 @@ def upsert_release_container(
             condition_type=condition or None,condition_valid_until=condition_valid_until,
         )
 
-        state=normalize(con.get("journey_state") or con.get("equipment_status") or "AVAILABLE")
+        state=_container_state(c,con)
         delivered=state in POST_DELIVERY_STATES
         if action=="RELEASE":
             if not pre["ready"]:
