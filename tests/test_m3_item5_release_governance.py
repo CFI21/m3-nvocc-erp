@@ -6,6 +6,7 @@ from fastapi import HTTPException
 
 from app import db
 from app.seed import run as seed_run
+from app.nvocc_principal_extensions import WorkspaceWrite, upsert_workspace
 from app.release_governance import (
     assert_delivery_order_eligible,
     delivery_order_eligible,
@@ -145,3 +146,78 @@ def test_release_events_are_immutable(isolated):
 def test_feature_flag_defaults_off(monkeypatch):
     monkeypatch.delenv("M3_RELEASE_GOVERNANCE_ENABLED",raising=False)
     assert delivery_order_eligible(job_ref="50001",hbl_no="X",container_no="Y")["governance_enabled"] is False
+
+
+def test_any_active_workflow_hold_blocks_release(isolated):
+    c=db.connect()
+    jid=c.execute("SELECT id FROM jobs WHERE job_ref='50001'").fetchone()["id"]
+    c.execute("INSERT INTO workflow_holds(job_id,code,active,created_at) VALUES(?,?,1,?)",
+              (jid,"OPERATIONAL_HOLD",datetime.datetime.now(datetime.timezone.utc).isoformat()))
+    c.close()
+    p=evaluate_prerequisites(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
+    assert p["ready"] is False
+    assert "no_legal_compliance_document_hold" in p["blocking_reasons"]
+    assert "OPERATIONAL_HOLD" in p["active_holds"]
+
+
+def test_generic_release_workspace_cannot_bypass_governed_release(isolated):
+    with pytest.raises(HTTPException) as e:
+        upsert_workspace(
+            "release-control",
+            WorkspaceWrite(data={
+                "release_ref":"REL-BYPASS-001",
+                "job_ref":"50001",
+                "hbl_no":isolated["hbl"],
+                "status":"RELEASED",
+            }),
+            x_role="ADMIN",
+            x_branch_scope=None,
+        )
+    assert e.value.detail["code"]=="GOVERNED_RELEASE_ACTION_REQUIRED"
+
+
+def test_revoked_or_expired_release_requires_governed_reissue(isolated):
+    upsert_release_container(
+        release_ref="REL-TEST-001",container_no=isolated["container"],
+        actor_user_id="USR-A",action="RELEASE",
+    )
+    upsert_release_container(
+        release_ref="REL-TEST-001",container_no=isolated["container"],
+        actor_user_id="USR-B",action="REVOKE",
+    )
+    with pytest.raises(HTTPException) as e:
+        upsert_release_container(
+            release_ref="REL-TEST-001",container_no=isolated["container"],
+            actor_user_id="USR-C",action="RELEASE",
+        )
+    assert e.value.detail["code"]=="RELEASE_REISSUE_REQUIRED"
+
+    reopened=upsert_release_container(
+        release_ref="REL-TEST-001",container_no=isolated["container"],
+        actor_user_id="USR-C",action="REISSUE",
+        reissue_ref="REISSUE-001",condition_reason="Corrected release authority",
+        actor_role="OPS",office_scope="RTM",branch_scope="RTM",
+        country_scope="NL",organization_scope="M3-EU",crt_ref="CRT-TEST-001",
+    )
+    assert reopened["status"] in {"PENDING","BLOCKED"}
+
+
+def test_release_event_captures_governance_context(isolated):
+    upsert_release_container(
+        release_ref="REL-TEST-001",container_no=isolated["container"],
+        actor_user_id="USR-A",action="RELEASE",
+        actor_role="OPS",office_scope="RTM",branch_scope="RTM",
+        country_scope="NL",organization_scope="M3-EU",
+    )
+    c=db.connect()
+    row=c.execute("SELECT * FROM nvocc_release_events ORDER BY id DESC LIMIT 1").fetchone()
+    detail=json.loads(row["detail_json"])
+    c.close()
+    assert row["actor_user_id"]=="USR-A"
+    assert detail["actor_role"]=="OPS"
+    assert detail["office_scope"]=="RTM"
+    assert detail["branch_scope"]=="RTM"
+    assert detail["country_scope"]=="NL"
+    assert detail["organization_scope"]=="M3-EU"
+    assert detail["job_ref"]=="50001"
+    assert detail["hbl_no"]==isolated["hbl"]
