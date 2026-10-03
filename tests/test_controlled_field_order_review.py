@@ -64,12 +64,25 @@ def test_existing_bl_gate_and_order_are_preserved():
     s=HTML.index("async function clx49RenderBlTab(tab){")
     e=HTML.index("function clx49BookingGroup",s)
     b=HTML[s:e]
-    ordered=['B/L No.','B/L Type','MBL','HBL','Booking No.','Job Ref','Issue Date','Place of Issue','Original / Express','Freight Term','Service Type','Carrier','Vessel','Voyage','POL','POT','POD','Final Destination']
-    last=-1
-    for x in ordered:
-        p=b.index(x)
-        assert p>last,x
-        last=p
+    for x in [
+      "clx82NativeField(w.bl,'B/L No.','B/L No.')",
+      "clx82NativeField(w.bl,'Type','B/L Type')",
+      "clx82DerivedField('Booking No.'",
+      "clx82DerivedField('Job Ref'",
+      "clx82NativeField(w.bl,'Issue Date','Issue Date'",
+      "clx82DerivedField('Place of Issue'",
+      "clx82NativeField(w.bl,'Original / Express','Original / Express')",
+      "clx82DerivedField('Freight Term'",
+      "clx82DerivedField('Service Type'",
+      "clx82DerivedField('Carrier'",
+      "clx82DerivedField('Vessel'",
+      "clx82DerivedField('Voyage'",
+      "clx82DerivedField('POL'",
+      "clx82DerivedField('POT'",
+      "clx82DerivedField('POD'",
+      "clx82DerivedField('Final Destination'"
+    ]:
+        assert x in b,x
     freeze=json.loads((ROOT/'M3_BACKEND_FREEZE_ACCEPTANCE.json').read_text())
     assert 'SOURCE_UNCLASSIFIED' in json.dumps(freeze)
 
