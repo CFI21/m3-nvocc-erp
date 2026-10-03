@@ -47,7 +47,10 @@ class ActionBody(BaseModel):
     corrected_document_ref:Optional[str]=None
 
 class PeriodApprovalBody(BaseModel):
-    action:str=Field(pattern='^(POST|REVERSE)
+    action:str
+    approval_role:str
+    reason:str=Field(min_length=3)
+
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def jdump(x):return json.dumps(x,sort_keys=True,separators=(',',':'))
 
