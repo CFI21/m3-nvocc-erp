@@ -9,6 +9,7 @@ from .json_recovery import load_json_or_recover_arrays
 from .admin import session as iam_session, permission_code as iam_permission_code
 from .clx034_smart_approval_fast_track import enforce_gl_action
 from .clx044_gl_exact_flow import apply_gl_exact_flow
+from .item9_credit_collection_governance import enabled as item9_enabled
 from .item8_open_item_governance import ensure_open_item, apply_document_correction
 from .item7_financial_document_governance import validate_correction
 from .item6_financial_governance import (
@@ -292,7 +293,9 @@ def one(module:str,rid:int,x_role:str=Header('VIEWER'),x_m3_session:Optional[str
     require_module(module);actor(x_role,'view',x_m3_session,module);conn=connect();r=get_record(conn,module,rid);out=serialize(r);conn.close();return out
 @router.post('/{module}',status_code=201)
 async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key')):
-    require_module(module);role=actor(x_role,'create',x_m3_session,module);raw=await request.body();rh=hashlib.sha256(raw).hexdigest();conn=connect();tx(conn)
+    require_module(module)
+    if item9_enabled() and module=='customer-credit-control': raise HTTPException(405,{'code':'AUTHORITATIVE_CREDIT_CONTROL_READ_ONLY'})
+    role=actor(x_role,'create',x_m3_session,module);raw=await request.body();rh=hashlib.sha256(raw).hexdigest();conn=connect();tx(conn)
     try:
         if idempotency_key:
             prior=conn.execute('SELECT * FROM idempotency_keys WHERE actor_role=? AND idem_key=?',(role,'GL:'+idempotency_key)).fetchone()
@@ -316,7 +319,9 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
     finally:conn.close()
 @router.put('/{module}/{rid}')
 def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_module(module);role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
+    require_module(module)
+    if item9_enabled() and module=='customer-credit-control': raise HTTPException(405,{'code':'AUTHORITATIVE_CREDIT_CONTROL_READ_ONLY'})
+    role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
         enforce_update_guard(module,module in TRANSACTIONS,r['status'],x_m3_session)
