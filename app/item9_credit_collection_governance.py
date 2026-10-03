@@ -15,13 +15,19 @@ def refresh_credit_exposure(conn,customer_id,currency='USD'):
     if not row: raise HTTPException(422,{'code':'CREDIT_LIMIT_NOT_CONFIGURED'})
     hold=1 if float(exposure)>float(row['credit_limit'])+0.005 else 0
     conn.execute('UPDATE gl_credit_limits SET exposure=?,on_hold=?,version=version+1 WHERE id=?',(float(exposure),hold,row['id']))
+    conn.execute("""UPDATE finance_states SET outstanding=?,credit_hold=? WHERE job_id IN
+      (SELECT id FROM jobs WHERE customer_id=?)""",(float(exposure),hold,customer_id))
     return {'customer_id':customer_id,'currency':currency,'credit_limit':float(row['credit_limit']),'exposure':float(exposure),'available':round(float(row['credit_limit'])-float(exposure),2),'on_hold':hold}
 
 def session_context(conn,token):
     if not token: raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_CREDIT_GOVERNANCE'})
     s=iam_session(conn,token)
     roles=[r['role_code'] for r in iam_roles_for(conn,s['user_id'])]
-    return {'user_ref':s['user_ref'],'user_id':s['user_id'],'office_code':s['office_code'],'roles':roles}
+    scope=conn.execute("""SELECT c.country_code,o2.org_code organization_code FROM iam_offices o
+      LEFT JOIN iam_countries c ON c.id=o.country_id
+      LEFT JOIN iam_organizations o2 ON o2.id=o.organization_id WHERE o.id=?""",(s['home_office_id'],)).fetchone()
+    return {'user_ref':s['user_ref'],'user_id':s['user_id'],'office_code':s['office_code'],'roles':roles,
+      'country_code':scope['country_code'] if scope else None,'organization_code':scope['organization_code'] if scope else None}
 
 def approval_limit(conn,roles,currency,action='CREDIT_OVERRIDE'):
     limits=[float(r['amount_limit']) for r in conn.execute("SELECT * FROM iam_approval_limits WHERE status='ACTIVE' AND currency=? AND action=?",(currency,action)) if r['role_code'] in roles]
@@ -30,6 +36,9 @@ def approval_limit(conn,roles,currency,action='CREDIT_OVERRIDE'):
 def validate_override_request(conn,ctx,customer_id,amount,currency,reason,expires_at):
     if not reason: raise HTTPException(422,{'code':'CREDIT_OVERRIDE_REASON_REQUIRED'})
     if not expires_at: raise HTTPException(422,{'code':'CREDIT_OVERRIDE_EXPIRY_REQUIRED'})
+    duplicate=conn.execute("""SELECT id,override_ref FROM credit_override_events WHERE customer_id=? AND currency=?
+      AND status IN ('PENDING','APPROVED') AND expires_at>=? LIMIT 1""",(customer_id,currency,now())).fetchone()
+    if duplicate: raise HTTPException(409,{'code':'DUPLICATE_ACTIVE_CREDIT_OVERRIDE','existing_ref':duplicate['override_ref']})
     limit=approval_limit(conn,ctx['roles'],currency)
     if amount<=0 or amount>limit+0.005:
         raise HTTPException(403,{'code':'CREDIT_OVERRIDE_ABOVE_AUTHORITY','authority_limit':limit,'requested':amount})
@@ -55,6 +64,7 @@ def approve_override(conn,ctx,override_id):
     if not row: raise HTTPException(404,{'code':'CREDIT_OVERRIDE_NOT_FOUND'})
     if row['requested_by']==ctx['user_ref']: raise HTTPException(409,{'code':'MAKER_CANNOT_APPROVE_OWN_CREDIT_OVERRIDE'})
     if row['status']!='PENDING': raise HTTPException(409,{'code':'CREDIT_OVERRIDE_NOT_PENDING'})
+    if row['expires_at']<now(): raise HTTPException(409,{'code':'CREDIT_OVERRIDE_EXPIRED'})
     lim=approval_limit(conn,ctx['roles'],row['currency'])
     if float(row['amount'])>lim+0.005: raise HTTPException(403,{'code':'CREDIT_OVERRIDE_ABOVE_AUTHORITY'})
     conn.execute("UPDATE credit_override_events SET status='APPROVED',approved_by=?,approved_at=? WHERE id=?",(ctx['user_ref'],now(),override_id))
