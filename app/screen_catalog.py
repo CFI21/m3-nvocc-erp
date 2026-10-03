@@ -68,6 +68,96 @@ HO_UTILITY_ALIASES = [
 ]
 
 
+# Current 196-screen catalog remains authoritative. These are navigation-only
+# business-area aliases to existing screens, so no second model or duplicate page
+# is introduced. The structure can accept additional verified targets later.
+BUSINESS_NAV_ALIASES = {
+    'Setup': [
+        {'label':'Customer','target':'master-data::customers','search_terms':['customer','client']},
+        {'label':'Common Parties','target':'master-data::common-partys','search_terms':['common party','party']},
+        {'label':'Carrier / Shipping Line','target':'master-data::carriers','search_terms':['carrier','shipping line','line']},
+        {'label':'Vessel','target':'master-data::vessels','search_terms':['vessel','ship']},
+        {'label':'Voyage Registration','target':'master-data::voyages','search_terms':['voyage','voyage registration']},
+        {'label':'Port','target':'master-data::ports','search_terms':['port','pol','pod','pot']},
+        {'label':'Location','target':'master-data::locations','search_terms':['location','place']},
+        {'label':'Commodity','target':'master-data::commoditys','search_terms':['commodity','cargo']},
+        {'label':'Units','target':'master-data::units','search_terms':['unit','uom']},
+        {'label':'Sales Person','target':'master-data::sales-persons','search_terms':['sales person','sales']},
+        {'label':'Equipment Type','target':'master-data::equipment-types','search_terms':['equipment type','container type']},
+        {'label':'Container Type','target':'master-data::container-types','search_terms':['container type','equipment']},
+    ],
+    'Transaction / Operations': [
+        {'label':'Booking','target':'agent-tasks::booking','search_terms':['booking','bkg']},
+        {'label':'Job Planning','target':'agent-tasks::planning','search_terms':['job','job planning','planning']},
+        {'label':'CRO','target':'agent-tasks::cro','search_terms':['cro','container release order']},
+        {'label':'CRT','target':'agent-tasks::crt','search_terms':['crt','container release transaction']},
+        {'label':'Export CRT','target':'agent-tasks::export-crt','search_terms':['export','export crt']},
+        {'label':'Import CRT','target':'agent-tasks::import-crt','search_terms':['import','import crt']},
+        {'label':'Transshipment CRT','target':'agent-tasks::transshipment-crt','search_terms':['transshipment','ts','transshipment crt']},
+        {'label':'Container Activity','target':'agent-tasks::container-activity','search_terms':['container','container activity','equipment journey']},
+        {'label':'Delivery Order','target':'agent-tasks::delivery-order','search_terms':['do','delivery order']},
+        {'label':'Agent Receipt / Pay','target':'agent-tasks::agent-receipt-pay','search_terms':['agent receipt','agent pay','agent operations']},
+    ],
+    'Document': [
+        {'label':'B/L','target':'agent-tasks::bl','search_terms':['b/l','bl','bill of lading','hbl','mbl']},
+        {'label':'Switch B/L','target':'agent-tasks::switch-bl','search_terms':['switch bl','switch b/l']},
+        {'label':'Split B/L','target':'agent-tasks::split-bl','search_terms':['split bl','split b/l']},
+        {'label':'Import B/L','target':'agent-tasks::import-bl','search_terms':['import bl','import b/l']},
+        {'label':'Release Instruction','target':'agent-tasks::delivery-order','search_terms':['release instruction','release','telex release']},
+    ],
+    'Equipment': [
+        {'label':'Container Master / Activity','target':'agent-tasks::container-activity','search_terms':['container master','container','equipment']},
+        {'label':'Detention Collection','target':'agent-tasks::detention-collection','search_terms':['detention','free days']},
+        {'label':'Storage Cost','target':'agent-tasks::storage-cost','search_terms':['storage','demurrage']},
+        {'label':'Equipment Type Setup','target':'master-data::equipment-types','search_terms':['equipment type','size type']},
+        {'label':'Container Type Setup','target':'master-data::container-types','search_terms':['container type','iso type']},
+    ],
+    'Finance': [
+        {'label':'Customer Invoice','target':'gl-accounts::invoice','search_terms':['invoice','sales invoice','ar']},
+        {'label':'Vendor Bill / AP','target':'gl-accounts::bills','search_terms':['bill','ap','vendor bill','purchase invoice']},
+        {'label':'Receipt','target':'gl-accounts::receipt','search_terms':['receipt','cash receipt']},
+        {'label':'Payment','target':'gl-accounts::payment','search_terms':['payment','cash payment']},
+        {'label':'SOA','target':'agent-tasks::soa','search_terms':['soa','statement of account']},
+        {'label':'Profit & Loss','target':'gl-accounts::profit-loss','search_terms':['p&l','pnl','profit loss']},
+        {'label':'Trial Balance','target':'gl-accounts::trial-balance-report','search_terms':['trial balance','tb']},
+    ],
+    'Control / Reporting': [
+        {'label':'Approval Queue','target':'master-data::approval-queue','search_terms':['approval','approval queue']},
+        {'label':'Master Audit','target':'master-data::audit','search_terms':['audit','master audit']},
+        {'label':'Integration Audit','target':'integration-security::request-response-audit','search_terms':['integration audit','request response audit']},
+        {'label':'Balance Sheet','target':'gl-accounts::balance-sheet','search_terms':['balance sheet','bs']},
+        {'label':'GL Detail','target':'gl-accounts::gl-detail','search_terms':['gl detail','general ledger detail']},
+        {'label':'Subledger / GL Reconciliation','target':'gl-accounts::subledger-gl-reconciliation','search_terms':['reconciliation','subledger reconciliation']},
+    ],
+}
+
+SEARCH_SYNONYMS = {
+    'booking':['booking','bkg'],
+    'planning':['job','job planning','planning'],
+    'cro':['cro','container release order'],
+    'crt':['crt','container release transaction'],
+    'export-crt':['export crt','export'],
+    'import-crt':['import crt','import'],
+    'transshipment-crt':['transshipment crt','transshipment','ts'],
+    'bl':['b/l','bl','bill of lading','hbl','mbl'],
+    'switch-bl':['switch bl','switch b/l'],
+    'split-bl':['split bl','split b/l'],
+    'import-bl':['import bl','import b/l'],
+    'delivery-order':['do','delivery order','release instruction','release'],
+    'container-activity':['container','container master','container activity','equipment journey'],
+    'soa':['soa','statement of account'],
+    'invoice':['invoice','sales invoice','ar'],
+    'bills':['bill','vendor bill','purchase invoice','ap'],
+    'receipt':['receipt','cash receipt'],
+    'payment':['payment','cash payment'],
+    'trial-balance-report':['trial balance','tb'],
+    'profit-loss':['profit and loss','profit loss','p&l','pnl'],
+    'balance-sheet':['balance sheet','bs'],
+    'gl-detail':['gl detail','general ledger detail'],
+    'subledger-gl-reconciliation':['reconciliation','subledger reconciliation'],
+}
+
+
 def _humanize(key: str) -> str:
     return key.replace('-', ' ').title()
 
@@ -93,6 +183,12 @@ def _base_screen(prefix: str, domain: str, submenu: str, key: str, name: str, ro
         'columns': list(columns or []),
         'field_contract_api': f'/api/clx011/field-contract?screen_id={prefix}::{key}',
         'related_records_api': '/api/clx011/related/{job_ref}',
+        'search_terms': list(SEARCH_SYNONYMS.get(key, [])),
+        'extension_policy': {
+            'field_extension': 'ADD_TO_EXISTING_SCREEN_FIRST',
+            'section_extension': 'ADD_SECTION_OR_TAB_WHEN_SAME_BUSINESS_FUNCTION',
+            'new_screen_extension': 'ONLY_FOR_VERIFIED_DISTINCT_BUSINESS_WORKSPACE',
+        },
     }
 
 
@@ -292,10 +388,24 @@ def build_catalog() -> dict[str, Any]:
     for item in AGENT_SETUP_ALIASES + HO_TRANSACTION_ALIASES + HO_UTILITY_ALIASES:
         if item['target'] not in screen_ids:
             raise RuntimeError(f"M3_HO_ALIAS_TARGET_MISSING:{item['label']}->{item['target']}")
+    for items in BUSINESS_NAV_ALIASES.values():
+        for item in items:
+            if item['target'] not in screen_ids:
+                raise RuntimeError(f"M3_BUSINESS_NAV_TARGET_MISSING:{item['label']}->{item['target']}")
     # CLX-078 final top-level business navigation order:
     # HO control first, then Agent execution, followed by finance/integration/admin/master data.
     agent_screens=[s for s in screens if s['domain']=='Agent Tasks']
     menu=[{
+        'domain':'M3 Business',
+        'submenus':[
+            {'name':name,'screens':[],'items':items}
+            for name,items in BUSINESS_NAV_ALIASES.items()
+        ],
+        'screen_count':0,
+        'navigation_alias_count':sum(len(v) for v in BUSINESS_NAV_ALIASES.values()),
+        'navigation_only':True,
+        'extensible':True,
+    },{
         'domain':'HO Tasks',
         'submenus':[
             {'name':'Transaction','screens':[],'items':HO_TRANSACTION_ALIASES},
@@ -334,6 +444,16 @@ def build_catalog() -> dict[str, Any]:
         'baseline':'M3-CLX011-SCREEN-INTEGRATION-ACCEPTED-20260924-013SI',
         'parent':'M3-CLX010-ACCEPTED-20260924-012F',
         'screen_count':len(screens),
+        'baseline_screen_count':196,
+        'extension_count':max(0,len(screens)-196),
+        'screen_count_policy':'196 is the current authoritative baseline, not a permanent hard limit; verified distinct workspaces may extend the count.',
+        'extension_governance':{
+            'field':'existing screen first; additive storage only when authoritative value cannot be derived',
+            'section_tab':'extend existing screen when the business function is unchanged',
+            'screen':'new screen only for a verified distinct business workspace with menu, role, audit, flow and tests',
+            'placeholder_screens_forbidden':True,
+            'duplicate_models_forbidden':True,
+        },
         'screens':screens,
         'menu':menu,
         'catalog_recovery':'REBUILT_FROM_AUTHORITATIVE_SOURCE_METADATA_AND_ACCEPTED_PERSISTED_MODULES',
@@ -344,6 +464,6 @@ def build_catalog() -> dict[str, Any]:
             'screen_count_unchanged':True,
         },
     }
-    if len(screens) != 196:
-        raise RuntimeError(f'M3_SCREEN_CATALOG_COUNT_MISMATCH:{len(screens)}!=196')
+    if len(screens) < 196:
+        raise RuntimeError(f'M3_SCREEN_CATALOG_BELOW_ACCEPTED_BASELINE:{len(screens)}<196')
     return catalog
