@@ -396,16 +396,6 @@ def build_catalog() -> dict[str, Any]:
     # HO control first, then Agent execution, followed by finance/integration/admin/master data.
     agent_screens=[s for s in screens if s['domain']=='Agent Tasks']
     menu=[{
-        'domain':'M3 Business',
-        'submenus':[
-            {'name':name,'screens':[],'items':items}
-            for name,items in BUSINESS_NAV_ALIASES.items()
-        ],
-        'screen_count':0,
-        'navigation_alias_count':sum(len(v) for v in BUSINESS_NAV_ALIASES.values()),
-        'navigation_only':True,
-        'extensible':True,
-    },{
         'domain':'HO Tasks',
         'submenus':[
             {'name':'Transaction','screens':[],'items':HO_TRANSACTION_ALIASES},
@@ -456,6 +446,14 @@ def build_catalog() -> dict[str, Any]:
         },
         'screens':screens,
         'menu':menu,
+        'business_navigation':{
+            'navigation_only':True,
+            'extensible':True,
+            'groups':[
+                {'name':name,'items':items}
+                for name,items in BUSINESS_NAV_ALIASES.items()
+            ],
+        },
         'catalog_recovery':'REBUILT_FROM_AUTHORITATIVE_SOURCE_METADATA_AND_ACCEPTED_PERSISTED_MODULES',
         'clx031_ho_tasks':{
             'navigation_only':True,
