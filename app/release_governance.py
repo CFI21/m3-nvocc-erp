@@ -164,10 +164,9 @@ def evaluate_prerequisites(
         surrender_raw=telex or original in {"SURRENDERED","RECEIVED","NOT_REQUIRED"}
         surrender_ok=surrender_raw or (condition=="ORIGINAL_WAIVER" and valid_condition)
 
-        blocked_hold_codes=[
-            x for x in holds
-            if x.startswith(("LEGAL","COMPLIANCE","DOCUMENT","CUSTOMS","RELEASE","FRAUD","SANCTION"))
-        ]
+        # Any active workflow hold is release-blocking. Specific finance/credit and
+        # equipment holds are also evaluated below from their authoritative stores.
+        blocked_hold_codes=list(holds)
         state=_container_state(c,con)
         container_ok=state not in TERMINAL_INELIGIBLE_STATES and not bool(con.get("damage_hold",0)) and not bool(con.get("inspection_hold",0))
 
@@ -225,12 +224,19 @@ def upsert_release_container(
     condition_reason:str|None=None,
     condition_valid_until:str|None=None,
     approver_user_id:str|None=None,
+    reissue_ref:str|None=None,
+    actor_role:str|None=None,
+    office_scope:str|None=None,
+    branch_scope:str|None=None,
+    country_scope:str|None=None,
+    organization_scope:str|None=None,
+    crt_ref:str|None=None,
 ) -> dict[str,Any]:
     if not enabled():
         raise HTTPException(503,{"code":"RELEASE_GOVERNANCE_DISABLED"})
     require_human(actor_user_id,actor_type)
     action=normalize(action)
-    if action not in {"EVALUATE","RELEASE","REVOKE","EXPIRE","HOLD"}:
+    if action not in {"EVALUATE","RELEASE","REVOKE","EXPIRE","HOLD","REISSUE"}:
         raise HTTPException(422,{"code":"RELEASE_ACTION_INVALID"})
 
     c=connect();tx(c)
@@ -246,6 +252,20 @@ def upsert_release_container(
         ).fetchone()
         before_state=existing["status"] if existing else "PENDING"
 
+        if action=="RELEASE" and before_state in {"REVOKED","EXPIRED"}:
+            raise HTTPException(409,{
+                "code":"RELEASE_REISSUE_REQUIRED",
+                "from_state":before_state,
+            })
+        if action=="REISSUE":
+            if before_state not in {"REVOKED","EXPIRED"}:
+                raise HTTPException(409,{
+                    "code":"REISSUE_NOT_ALLOWED_FROM_STATE",
+                    "from_state":before_state,
+                })
+            if not reissue_ref or not condition_reason:
+                raise HTTPException(422,{"code":"REISSUE_REFERENCE_REASON_REQUIRED"})
+
         condition=normalize(condition_type)
         if condition:
             if condition not in CONDITION_TYPES:
@@ -255,6 +275,9 @@ def upsert_release_container(
                 raise HTTPException(403,{"code":"MAKER_CHECKER_SAME_USER"})
             if not condition_reason or not condition_valid_until:
                 raise HTTPException(422,{"code":"CONDITIONAL_RELEASE_REASON_VALIDITY_REQUIRED"})
+            expiry=parse_dt(condition_valid_until)
+            if not expiry or expiry<datetime.datetime.now(datetime.timezone.utc):
+                raise HTTPException(422,{"code":"CONDITIONAL_RELEASE_EXPIRED_OR_INVALID"})
 
         pre=evaluate_prerequisites(
             job_ref=header["job_ref"],hbl_no=header["hbl_no"],container_no=container_no,
@@ -276,6 +299,8 @@ def upsert_release_container(
             new_state="RELEASED_WITH_POST_DELIVERY_HOLD" if delivered else "REVOKED"
         elif action=="EXPIRE":
             new_state="EXPIRED"
+        elif action=="REISSUE":
+            new_state="PENDING" if pre["ready"] else "BLOCKED"
         else:
             new_state="PENDING" if pre["ready"] else "BLOCKED"
 
@@ -304,8 +329,19 @@ def upsert_release_container(
             )
 
         _event(c,release_ref,container_no,before_state,new_state,action,actor_user_id,condition_reason,{
-            "prerequisites":pre["checks"],"condition_type":condition or None,
+            "prerequisites":pre["checks"],
+            "condition_type":condition or None,
             "post_delivery_hold":new_state=="RELEASED_WITH_POST_DELIVERY_HOLD",
+            "approver_user_id":approver_user_id,
+            "actor_role":actor_role,
+            "office_scope":office_scope,
+            "branch_scope":branch_scope,
+            "country_scope":country_scope,
+            "organization_scope":organization_scope,
+            "job_ref":header["job_ref"],
+            "hbl_no":header["hbl_no"],
+            "crt_ref":crt_ref,
+            "reissue_ref":reissue_ref,
         })
         summary=_summary_state(c,release_ref)
         c.execute(
