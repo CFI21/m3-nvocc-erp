@@ -1,4 +1,7 @@
 import os
+import threading
+import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi import HTTPException
@@ -101,6 +104,43 @@ def test_same_business_intent_creates_exactly_one_job(isolated):
     assert second["status"] == "JOB_ALREADY_CREATED"
     assert second["replayed"] is True
     assert first["job_ref"] == second["job_ref"] == "59991"
+    assert counter["calls"] == 1
+
+
+def test_concurrent_auto_and_manual_attempts_create_one_job(isolated):
+    counter = {"calls": 0}
+    lock = threading.Lock()
+    payload = {
+        "booking_ref": "CLX-BKG-TEST-IDEMPOTENCY",
+        "job_ref": "59991",
+        "purpose": "BOOKING_CONFIRMED",
+        "split_sequence": 1,
+    }
+
+    def slow_create(conn):
+        with lock:
+            counter["calls"] += 1
+        time.sleep(0.15)
+        return synthetic_create({"calls": 0})(conn)
+
+    def run(actor_id):
+        return execute_once(
+            booking_ref=payload["booking_ref"],
+            purpose=payload["purpose"],
+            split_sequence=1,
+            consolidation_ref=None,
+            request_payload=payload,
+            actor_id=actor_id,
+            create_fn=slow_create,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        a = pool.submit(run, "TEST-AUTO")
+        b = pool.submit(run, "TEST-MANUAL")
+        results = [a.result(), b.result()]
+
+    assert sorted(x["status"] for x in results) == ["CREATED", "JOB_ALREADY_CREATED"]
+    assert {x["job_ref"] for x in results} == {"59991"}
     assert counter["calls"] == 1
 
 
