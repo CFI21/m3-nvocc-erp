@@ -17,6 +17,27 @@ CREATE TABLE IF NOT EXISTS audit_events(id INTEGER PRIMARY KEY, event_id TEXT NO
 CREATE TABLE IF NOT EXISTS exception_events(id INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, code TEXT NOT NULL, severity TEXT NOT NULL, module TEXT, transaction_id INTEGER, job_id INTEGER REFERENCES jobs(id), detail TEXT NOT NULL, resolved INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS idempotency_keys(id INTEGER PRIMARY KEY, actor_role TEXT NOT NULL, idem_key TEXT NOT NULL, request_hash TEXT NOT NULL, response_json TEXT NOT NULL, status_code INTEGER NOT NULL, created_at TEXT NOT NULL, UNIQUE(actor_role,idem_key));
 
+-- M3 Item 1 — permanent Job creation business idempotency.
+CREATE TABLE IF NOT EXISTS job_creation_idempotency(
+ id INTEGER PRIMARY KEY,
+ business_key TEXT NOT NULL UNIQUE,
+ booking_ref TEXT NOT NULL,
+ purpose TEXT NOT NULL,
+ split_sequence INTEGER NOT NULL CHECK(split_sequence>=1),
+ consolidation_ref TEXT NOT NULL DEFAULT '',
+ request_hash TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN ('IN_PROGRESS','CREATED','FAILED')),
+ job_id INTEGER REFERENCES jobs(id),
+ job_ref TEXT,
+ attempts INTEGER NOT NULL DEFAULT 0 CHECK(attempts>=0),
+ last_error TEXT,
+ created_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ created_by TEXT NOT NULL,
+ UNIQUE(booking_ref,purpose,split_sequence,consolidation_ref)
+);
+CREATE INDEX IF NOT EXISTS idx_job_creation_idempotency_job ON job_creation_idempotency(job_id);
+
 CREATE TABLE IF NOT EXISTS special_rate_workflow(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL UNIQUE REFERENCES transaction_records(id) ON DELETE CASCADE, stage TEXT NOT NULL, carrier_response TEXT, approved_rate REAL, quote_ref TEXT, booking_ref TEXT, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS switch_bl_history(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, job_id INTEGER NOT NULL REFERENCES jobs(id), ts TEXT NOT NULL, original_bill_no TEXT NOT NULL, switch_bill_no TEXT NOT NULL, original_parties_json TEXT NOT NULL, new_parties_json TEXT NOT NULL, approved_by TEXT, confidentiality INTEGER NOT NULL DEFAULT 1, immutable_hash TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS split_bl_allocations(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, child_bill_no TEXT NOT NULL, container_no TEXT NOT NULL, packages REAL NOT NULL, weight REAL NOT NULL, measurement REAL NOT NULL, UNIQUE(transaction_id,child_bill_no));
