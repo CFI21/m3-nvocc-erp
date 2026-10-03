@@ -51,6 +51,7 @@ from .clx074_control import router as clx074_control_router
 from .clx075_lease import router as clx075_lease_router
 from .clx075_readiness import router as clx075_readiness_router
 from .clx077_dummy_bank import router as clx077_dummy_bank_router
+from .nvocc_principal_extensions import router as nvocc_principal_extensions_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -91,6 +92,7 @@ app.include_router(clx074_control_router)
 app.include_router(clx075_lease_router)
 app.include_router(clx075_readiness_router)
 app.include_router(clx077_dummy_bank_router)
+app.include_router(nvocc_principal_extensions_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
