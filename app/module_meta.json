@@ -100,7 +100,10 @@
         "Rate / Quote Ref",
         "SI Cut-off",
         "VGM Cut-off",
-        "Gate-in Cut-off"
+        "Gate-in Cut-off",
+        "Origin Branch",
+        "TS Branch",
+        "Destination Branch"
       ]
     },
     {
@@ -135,7 +138,11 @@
         "Exception List",
         "Planning Notes",
         "Lock / Release",
-        "Status"
+        "Status",
+        "Origin Branch",
+        "TS Branch",
+        "Destination Branch",
+        "Branch Assignment Status"
       ]
     },
     {
@@ -203,7 +210,16 @@
         "SI Cut-off",
         "Transporter",
         "Instructions",
-        "Status"
+        "Status",
+        "Release Depot",
+        "Release Depot Type",
+        "Empty Pickup Depot",
+        "Empty Pickup Depot Type",
+        "POL Agent",
+        "POL Agent Type",
+        "POL Depot",
+        "POL Depot Type",
+        "Cost Allocation"
       ]
     },
     {
@@ -357,7 +373,12 @@
         "Original / Express",
         "Draft Approval",
         "Issue Date",
-        "Status"
+        "Status",
+        "Carrier Booking Ref",
+        "Carrier / Shipping Line",
+        "MBL-HBL Link Status",
+        "Carrier AP Ref",
+        "Shipper AR Ref"
       ]
     },
     {
@@ -538,7 +559,17 @@
         "Release Instruction",
         "Valid Until",
         "Release Status",
-        "Status"
+        "Status",
+        "Delivery From",
+        "Delivery From Type",
+        "Empty Return To",
+        "Empty Return Type",
+        "POD Agent",
+        "POD Agent Type",
+        "Delivery Date",
+        "Empty Return Date",
+        "D&D Free Time End",
+        "Cost Allocation"
       ]
     },
     {
