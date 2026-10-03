@@ -148,7 +148,7 @@ for(const group of businessGroups){
   if(!items.length)continue;
   businessCount+=items.length;
   const sid=domainSlug('business-'+group.name);
-  businessSub+='<button class="subBtn" onclick="toggleGroup(\''+sid+'\')">▾ '+esc(group.name)+' <span class=count>'+items.length+'</span></button><div data-content="'+esc(sid)+'">'+items.map(it=>'<div class="screenLink '+(state.navContext?.label===it.label?'active':'')+'" onclick="openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'Business Navigation\',submenu:\''+group.name.replaceAll("'","\\'")+'\',label:\''+it.label.replaceAll("'","\\'")+'\'})">'+esc(it.label)+'</div>').join('')+'</div>';
+  businessSub+='<button class="subBtn" onclick="toggleGroup(\''+sid+'\')">▾ '+esc(group.name)+' <span class=count>'+items.length+'</span></button><div data-content="'+esc(sid)+'">'+items.map(it=>'<div class="screenLink '+(state.navContext?.label===it.label?'active':'')+'" onclick="'+(it.workspace_key?'openPrincipalWorkspace(\''+String(it.workspace_key).replaceAll("'","\\'")+'\',\''+it.label.replaceAll("'","\\'")+'\',\''+it.target.replaceAll("'","\\'")+'\',\''+group.name.replaceAll("'","\\'")+'\')':'openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'Business Navigation\',submenu:\''+group.name.replaceAll("'","\\'")+'\',label:\''+it.label.replaceAll("'","\\'")+'\'})')+'">'+esc(it.label)+'</div>').join('')+'</div>';
 }
 if(businessCount)html+='<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup(\'business-navigation\')">▾ Business Navigation <span class=count>'+businessCount+'</span></button><div data-content="business-navigation">'+businessSub+'</div></div>';
 for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];let terms=s?[s.name,s.submenu,s.domain,s.key,s.screen_id,...(s.search_terms||[])]:[];return s&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);let terms=[it.label,sub.name,d.domain,...(it.search_terms||[]),...(s?.search_terms||[])];return s&&aliasOk&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'&&(!q||'setup account container coding account setup global equipment tower equipment control container master network reposition lease depot'.includes(q))){
@@ -304,6 +304,94 @@ async function drillGlReportRow(i){
     $('tab-details').innerHTML='<pre class=pre>'+esc(JSON.stringify(d,null,2))+'</pre>';drawerTabs('details');$('drawer').classList.add('open');
   }catch(e){alert(e.message)}
 }
+
+const PRINCIPAL_READONLY=new Set(['bl-linkage','branch-pnl']);
+function principalHeaders(){return {'X-Role':state.role==='SUPER_ADMIN'?'ADMIN':state.role}}
+function principalPretty(k){return String(k||'').replaceAll('_',' ').replace(/\b\w/g,x=>x.toUpperCase())}
+function principalTable(rows,workspace){
+  if(!rows?.length)return '<div class="card empty">No records yet. Use New to create the first governed record.</div>';
+  let keys=[];for(const r of rows){for(const k of Object.keys(r)){if(!['version','updated_at'].includes(k)&&!keys.includes(k))keys.push(k)}}keys=keys.slice(0,9);
+  return '<div class="opGridWrap"><table><thead><tr><th>Action</th>'+keys.map(k=>'<th>'+esc(principalPretty(k))+'</th>').join('')+'</tr></thead><tbody>'+
+    rows.map((r,idx)=>'<tr><td><button class="btn" onclick="principalEdit(\''+workspace+'\','+idx+')">Open</button></td>'+keys.map(k=>'<td>'+esc(r[k]??'')+'</td>').join('')+'</tr>').join('')+
+    '</tbody></table></div>';
+}
+function principalFieldHtml(def,val){
+  const [name,type,required]=def,id='pgf-'+name,req=required?' *':'';
+  if(type==='boolean')return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="checkbox" '+(Number(val)||String(val).toLowerCase()==='true'?'checked':'')+'></div>';
+  if(type==='textarea')return '<div class="formField full"><label>'+esc(principalPretty(name))+req+'</label><textarea id="'+esc(id)+'">'+esc(val??'')+'</textarea></div>';
+  const inputType=['number','date','datetime-local'].includes(type)?type:'text';
+  return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="'+inputType+'" value="'+esc(val??'')+'"></div>';
+}
+async function principalEdit(workspace,index=-1){
+  const d=state.principalWorkspace;if(!d||d.workspace!==workspace)return;
+  const row=index>=0?d.rows[index]:{};
+  const fields=d.schema.map(x=>principalFieldHtml(x,row?.[x[0]])).join('');
+  $('gridArea').innerHTML='<div class="clx82Section"><div class="clx82Head">'+(index>=0?'Edit':'New')+' '+esc(d.title)+'</div><div class="clx82Body"><div class="formGrid">'+fields+
+    '<div class="formActions"><button class="btn" onclick="openPrincipalWorkspace(\''+workspace+'\',\''+String(state.navContext?.label||d.title).replaceAll("'","\\'")+'\',\''+state.current.screen_id.replaceAll("'","\\'")+'\',\''+String(state.navContext?.submenu||'').replaceAll("'","\\'")+'\')">Cancel</button>'+
+    '<button class="btn primary" onclick="principalSave(\''+workspace+'\')">Save</button></div></div></div></div>';
+}
+async function principalSave(workspace){
+  const d=state.principalWorkspace,data={};
+  for(const def of d.schema){
+    const [name,type]=def,el=$('pgf-'+name);if(!el)continue;
+    data[name]=type==='boolean'?el.checked:el.value;
+  }
+  try{
+    await api('/api/nvocc-principal/workspaces/'+encodeURIComponent(workspace),{method:'POST',headers:{...principalHeaders(),'Content-Type':'application/json'},body:JSON.stringify({data})});
+    await openPrincipalWorkspace(workspace,state.navContext?.label||d.title,state.current.screen_id,state.navContext?.submenu||'');
+  }catch(e){alert('Save failed: '+e.message)}
+}
+async function principalLoadBl(){
+  const jr=String($('principalJobRef')?.value||'').trim();if(!jr)return;
+  try{
+    const d=await api('/api/nvocc-principal/bl-linkage/'+encodeURIComponent(jr),{headers:principalHeaders()});
+    const bills=(d.bills||[]).map(x=>'<tr><td>'+esc(x.kind)+'</td><td>'+esc(x.bill_no)+'</td><td>'+esc(x.status)+'</td></tr>').join('');
+    const docs=(d.documents||[]).map(x=>'<tr><td>'+esc(x.module)+'</td><td>'+esc(x.external_ref)+'</td><td>'+esc(x.status)+'</td></tr>').join('');
+    const gl=(d.carrier_customer_finance||[]).map(x=>'<tr><td>'+esc(x.module)+'</td><td>'+esc(x.external_ref)+'</td><td>'+esc(x.status)+'</td><td>'+esc(x.source_ref||'')+'</td></tr>').join('');
+    $('principalResult').innerHTML='<div class="clx82Section"><div class="clx82Head">MBL ↔ HBL Authoritative Linkage</div><div class="clx82Body"><div class="equipNote">Carrier-side MBL and customer-side HBL remain separate economic/document tracks on the same Job. No second B/L model is created.</div>'+
+      '<div class="clx82Subgrid"><div><b>B/L records</b><table class="clx82Table"><tr><th>Type</th><th>B/L</th><th>Status</th></tr>'+bills+'</table></div><div><b>Document transactions</b><table class="clx82Table"><tr><th>Module</th><th>Ref</th><th>Status</th></tr>'+docs+'</table></div></div>'+
+      '<div style="margin-top:8px"><b>Carrier AP / Shipper AR context</b><table class="clx82Table"><tr><th>Module</th><th>Ref</th><th>Status</th><th>Source</th></tr>'+gl+'</table></div></div></div>';
+  }catch(e){$('principalResult').innerHTML='<div class="card badtext">'+esc(e.message)+'</div>'}
+}
+async function principalLoadPnl(){
+  const br=String($('principalBranch')?.value||'').trim();let u='/api/nvocc-principal/branch-pnl'+(br?'?branch_code='+encodeURIComponent(br):'');
+  try{
+    const d=await api(u,{headers:principalHeaders()});
+    $('principalResult').innerHTML='<div class="equipNote">'+esc(d.note)+'</div>'+principalTable(d.rows||[],'branch-pnl-readonly');
+  }catch(e){$('principalResult').innerHTML='<div class="card badtext">'+esc(e.message)+'</div>'}
+}
+async function principalReleaseCheck(jobRef){
+  if(!jobRef)return;
+  try{
+    const d=await api('/api/nvocc-principal/release-prerequisites/'+encodeURIComponent(jobRef),{headers:principalHeaders()});
+    const c=d.checks||{};
+    alert('Release '+(d.release_ready?'READY':'BLOCKED')+'\nB/L: '+!!c.hbl_issued+'\nCustoms: '+!!c.customs_cleared+'\nFinance: '+!!c.finance_cleared+'\nSurrender/Telex: '+!!c.surrender_or_telex);
+  }catch(e){alert(e.message)}
+}
+async function openPrincipalWorkspace(workspace,label,target,group){
+  const s=state.byId[target];if(!s)return;
+  state.current=s;state.navContext={domain:'Business Navigation',submenu:group,label};state.selected=null;state.principalWorkspace=null;
+  $('favorite').style.visibility='hidden';renderNav();renderBreadcrumb();$('flow').innerHTML='<div class="opFollow"><b>Extension workspace</b><span>Authoritative '+esc(label)+' linked to existing M3 screens/models</span></div>';
+  history.pushState(null,'','#workspace='+encodeURIComponent(workspace));
+  $('screenMeta').innerHTML='<div class="opHeader"><span class="opHeaderTitle">'+esc(label)+'</span><span class="grow"></span><span class="status ok">M3-only · additive · governed</span></div>';
+  if(workspace==='bl-linkage'){
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>MBL ↔ HBL Link Control</b><input id="principalJobRef" placeholder="5-digit Job Ref"><button class="btn primary" onclick="principalLoadBl()">Load Job</button></div><div id="principalResult"></div></div>';return;
+  }
+  if(workspace==='branch-pnl'){
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Branch P&L / Consolidation</b><input id="principalBranch" placeholder="Branch code (optional)"><button class="btn primary" onclick="principalLoadPnl()">Load</button></div><div id="principalResult"></div></div>';await principalLoadPnl();return;
+  }
+  $('gridArea').innerHTML='<div class="card">Loading '+esc(label)+'…</div>';
+  try{
+    const d=await api('/api/nvocc-principal/workspaces/'+encodeURIComponent(workspace),{headers:principalHeaders()});
+    state.principalWorkspace=d;
+    const extra=workspace==='release-control'?'<span class="muted">Release readiness is derived from B/L + Customs + Finance + Surrender/Telex; use Open to maintain POD/depot release data.</span>':'';
+    $('gridArea').innerHTML='<div class="opGridToolbar"><b>'+esc(d.title)+'</b>'+extra+'<span class="grow"></span><button class="btn primary" onclick="principalEdit(\''+workspace+'\',-1)">New</button></div>'+principalTable(d.rows,workspace);
+    if(workspace==='release-control'&&d.rows?.length){
+      $('gridArea').insertAdjacentHTML('afterbegin','<div class="card"><b>Release Gate</b><div class="muted">Each release remains blocked until authoritative HBL/document, customs, finance and surrender/telex prerequisites pass.</div><div class="toolbar">'+d.rows.slice(0,8).map(x=>'<button class="btn" onclick="principalReleaseCheck(\''+String(x.job_ref||'').replaceAll("'","\\'")+'\')">Check '+esc(x.job_ref||x.release_ref)+'</button>').join('')+'</div></div>');
+    }
+  }catch(e){$('gridArea').innerHTML='<div class="card"><b class="badtext">Error loading extension workspace</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+
 async function openScreen(id,navContext=null,historyMode='push'){
   let s=state.byId[id];if(!s)return;
   $('favorite').style.visibility='visible';state.current=s;state.navContext=navContext;state.selected=null;state.page=1;state.sortKey='';state.status='';state.savedView='';
