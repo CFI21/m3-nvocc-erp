@@ -1,0 +1,92 @@
+name: M3 Item 9 Credit Collection Dunning Governance
+
+on:
+  pull_request:
+    paths:
+      - "app/gl.py"
+      - "app/hardening.py"
+      - "app/item9_credit_collection_governance.py"
+      - "app/schema.sql"
+      - "tests/test_m3_item9_credit_collection_dunning_governance.py"
+      - ".github/workflows/m3-item9-credit-collection-dunning-governance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  item9:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Compile before tests
+        run: python -m compileall -q app
+      - name: Item 9 focused tests
+        env:
+          PYTHONPATH: .
+          M3_ITEM9_CREDIT_COLLECTION_GOVERNANCE_ENABLED: "true"
+          M3_ITEM8_OPEN_ITEM_GOVERNANCE_ENABLED: "true"
+          M3_ITEM7_DOCUMENT_SETTLEMENT_GOVERNANCE_ENABLED: "true"
+          M3_ITEM6_FINANCIAL_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item9_credit_collection_dunning_governance.py
+      - name: Item 8 regression
+        env:
+          PYTHONPATH: .
+          M3_ITEM8_OPEN_ITEM_GOVERNANCE_ENABLED: "true"
+          M3_ITEM7_DOCUMENT_SETTLEMENT_GOVERNANCE_ENABLED: "true"
+          M3_ITEM6_FINANCIAL_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item8_open_item_governance.py
+      - name: Item 7 regression
+        env:
+          PYTHONPATH: .
+          M3_ITEM7_DOCUMENT_SETTLEMENT_GOVERNANCE_ENABLED: "true"
+          M3_ITEM6_FINANCIAL_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item7_financial_document_settlement_governance.py
+      - name: Item 6 regression
+        env:
+          PYTHONPATH: .
+          M3_ITEM6_FINANCIAL_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item6_financial_posting_reversal_governance.py
+      - name: Item 5 regression
+        env:
+          PYTHONPATH: .
+          M3_RELEASE_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item5_release_governance.py
+      - name: Item 4 regression
+        env:
+          PYTHONPATH: .
+          M3_STATE_TRANSITION_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item4_state_transition_governance.py
+      - name: Item 3 regression
+        env:
+          PYTHONPATH: .
+          M3_OPERATIONAL_GROUPING_ENABLED: "true"
+        run: pytest -q tests/test_m3_item3_cardinality_operational_grouping.py
+      - name: CRT/TRT regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_crt_governance_trt_rename.py
+      - name: Item 2 regression
+        env:
+          PYTHONPATH: .
+          M3_JOB_IDEMPOTENCY_ENABLED: "true"
+          M3_JOB_MODES_ENABLED: "true"
+        run: pytest -q tests/test_m3_item2_job_modes.py
+      - name: Item 1 regression
+        env:
+          PYTHONPATH: .
+          M3_JOB_IDEMPOTENCY_ENABLED: "true"
+        run: pytest -q tests/test_m3_item1_job_idempotency.py
+      - name: Stage 0 regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_stage0_baseline_freeze.py
+      - name: Full M3 regression
+        env:
+          PYTHONPATH: .
+          PYTHONFAULTHANDLER: "1"
+        run: timeout --signal=TERM 300s pytest -vv --durations=25
+      - name: Final compile
+        run: python -m compileall -q app
