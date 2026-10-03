@@ -193,5 +193,5 @@ def test_direct_edit_after_approved_trt_is_blocked(isolated):
     c.execute("UPDATE transaction_records SET status='Approved' WHERE id=?",(tid,))
     c.close()
     with pytest.raises(HTTPException) as e:
-        update_record("trt",tid,UpdateBody(version=row["version"],fields={"Remarks":"Direct change"}),x_role="OPS")
+        update_record("trt",tid,UpdateBody(version=row["version"],fields={"Remarks":"Direct change"}),x_role="OPS",x_agent_scope=None,x_customer_scope=None)
     assert e.value.detail["code"]=="CRT_REQUIRED_AFTER_APPROVAL"
