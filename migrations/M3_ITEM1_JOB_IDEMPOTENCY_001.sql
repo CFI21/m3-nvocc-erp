@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS public.job_creation_idempotency (
   job_ref text,
   attempts integer NOT NULL DEFAULT 0 CHECK (attempts >= 0),
   last_error text,
+  claim_ref text NOT NULL,
   created_at timestamptz NOT NULL,
   updated_at timestamptz NOT NULL,
   created_by text NOT NULL,
