@@ -76,7 +76,7 @@ def _load_json(path: str) -> dict[str, Any]:
     return json.loads((HERE / path).read_text())
 
 
-def _base_screen(prefix: str, domain: str, submenu: str, key: str, name: str, route: str, actions: list[str]) -> dict[str, Any]:
+def _base_screen(prefix: str, domain: str, submenu: str, key: str, name: str, route: str, actions: list[str], fields: list[str]|None=None, columns: list[str]|None=None) -> dict[str, Any]:
     return {
         'screen_id': f'{prefix}::{key}',
         'domain': domain,
@@ -89,6 +89,10 @@ def _base_screen(prefix: str, domain: str, submenu: str, key: str, name: str, ro
         'quick_actions': actions,
         'roles': ['ADMIN','OPS','DOCS','FINANCE','AGENT','VIEWER'],
         'audit': 'existing immutable domain audit + CLX-011 navigation/action intent audit',
+        'fields': list(fields or []),
+        'columns': list(columns or []),
+        'field_contract_api': f'/api/clx011/field-contract?screen_id={prefix}::{key}',
+        'related_records_api': '/api/clx011/related/{job_ref}',
     }
 
 
@@ -167,7 +171,8 @@ def build_catalog() -> dict[str, Any]:
     for m in agent:
         screens.append(_base_screen(
             'agent-tasks','Agent Tasks','Transactions',m['key'],m['name'],m['route'],
-            COMMON_MUTATE + COMMON_READ + ['approve','hold','cancel','amend','reissue','release','advance']
+            COMMON_MUTATE + COMMON_READ + ['approve','hold','cancel','amend','reissue','release','advance'],
+            m.get('fields',[]),m.get('columns',[])
         ))
 
     # GL: recover all complete entries from the truncated accepted file, then restore
@@ -194,7 +199,8 @@ def build_catalog() -> dict[str, Any]:
     for group,m in gl_modules:
         s=_base_screen(
             'gl-accounts','General / Administration','Finance & Accounting Setup · '+gl_groups[group],m['key'],m['name'],m['route'],
-            COMMON_MUTATE + COMMON_READ + ['approve','release','reverse']
+            COMMON_MUTATE + COMMON_READ + ['approve','release','reverse'],
+            m.get('fields',[]),m.get('columns',[])
         )
         s['roles']=['ADMIN','GL_MANAGER','GL_ACCOUNTANT','AUDITOR']
         screens.append(s)
@@ -213,7 +219,8 @@ def build_catalog() -> dict[str, Any]:
     for m in treasury_modules:
         s=_base_screen(
             'treasury','Treasury / AR-AP',_group_name(m.get('group','')),m['key'],m['name'],m['route'],
-            COMMON_MUTATE + COMMON_READ + ['approve','release','reverse']
+            COMMON_MUTATE + COMMON_READ + ['approve','release','reverse'],
+            m.get('fields',[]),m.get('columns',[])
         )
         # CLX-050: keep screen visibility aligned with the already-authoritative
         # Treasury API role matrix; do not grant any capability the API does not own.
@@ -225,7 +232,9 @@ def build_catalog() -> dict[str, Any]:
     for m in integration:
         screens.append(_base_screen(
             'integration-security','Integration & Security',_group_name(m.get('group','')),m['key'],m['name'],m['route'],
-            COMMON_READ + ['retry','activate','deactivate']
+            COMMON_READ + ['retry','activate','deactivate'],
+            ['External Ref','Job Ref','Office Scope','Country Scope','Status','Version','Module Fields'],
+            ['External Ref','Job Ref','Office Scope','Country Scope','Status']
         ))
 
     # Administration: source code is authoritative for all 28 screens.
@@ -241,7 +250,9 @@ def build_catalog() -> dict[str, Any]:
         screens.append(_base_screen(
             'administration','General / Administration',_group_name(group),key,
             m.get('name',_humanize(key)),m.get('route',f'/admin/{group}/{key}'),
-            COMMON_READ + ['activate','deactivate','change-request','approve','reject','version-history']
+            COMMON_READ + ['activate','deactivate','change-request','approve','reject','version-history'],
+            ['Record ID','Reference','Name / Value','Status','Scope','Effective / Validity','Audit'],
+            ['Reference','Name / Value','Status','Scope']
         ))
 
     # Master Data: source code is authoritative for 29 domains + 13 governance screens.
@@ -270,7 +281,9 @@ def build_catalog() -> dict[str, Any]:
         screens.append(_base_screen(
             'master-data','Master Data','Governance' if is_governance else 'Master Records',
             key,name,f'/master-data/{"governance" if is_governance else "records"}/{key}',
-            COMMON_READ + ['change-request','approve','reject','activate','deactivate','version-history']
+            COMMON_READ + ['change-request','approve','reject','activate','deactivate','version-history'],
+            (['Record Key','Name','Status','Effective From','Effective To','Version','Module Fields'] if not is_governance else ['Reference','Domain','Status','Maker','Checker','Reason','Created At','Updated At']),
+            (['Record Key','Name','Status','Effective From','Effective To'] if not is_governance else ['Reference','Domain','Status','Created At'])
         ))
 
     # Stable menu derived from the rebuilt catalog.
