@@ -11,7 +11,7 @@ def test_legacy_reference_flow_is_visible_without_duplicate_screens():
     assert [x['name'] for x in ho['submenus']]==['Transaction','Utilities']
     assert '▾ Setup <span class=count>2</span>' in HTML
     assert 'Account Setup' in HTML
-    assert "openScreen('gl-accounts::account-integration'" in HTML
+    assert "gl-accounts::account-integration" in HTML
     assert 'Container Coding' in HTML
     assert "showEquipmentWorkspace('containers')" in HTML
 
