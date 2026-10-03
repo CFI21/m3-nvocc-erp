@@ -27,7 +27,7 @@ def test_soa_master_and_treasury_gl_sources():
         assert x in HTML,x
 
 def test_payment_links_and_governance():
-    for target in ['agent-tasks::booking','agent-tasks::bl','agent-tasks::cro','agent-tasks::transshipment-crt','agent-tasks::delivery-order','gl-accounts::invoice','gl-accounts::bills','gl-accounts::receipt','gl-accounts::payment','gl-accounts::voucher','agent-tasks::soa','integration-security::request-response-audit']:
+    for target in ['agent-tasks::booking','agent-tasks::bl','agent-tasks::cro','agent-tasks::transshipment-trt','agent-tasks::delivery-order','gl-accounts::invoice','gl-accounts::bills','gl-accounts::receipt','gl-accounts::payment','gl-accounts::voucher','agent-tasks::soa','integration-security::request-response-audit']:
         assert target in HTML,target
     assert 'Manual rate / additional cost rule:' in HTML
     assert 'existing governed change / CRT / adjustment route' in HTML
