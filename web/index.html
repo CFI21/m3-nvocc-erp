@@ -478,8 +478,15 @@ async function renderClx083OperationalMaster(){
       clx83RO('POL',clx83Pick(base,'POL')||ident.pol),
       clx83RO('POT',clx83Pick(base,'POT','POT (1)','Via Port')),
       clx83RO('POD',clx83Pick(base,'POD')||ident.pod),
-      clx83RO('Depot',clx83Pick(base,'Depot')),
-      clx83RO('Empty Pickup Location',clx83Pick(base,'Empty Pickup Location','Pickup Location')),
+      clx83RO('Release Depot',clx83Pick(base,'Release Depot','Depot')),
+      clx83RO('Release Depot Type',clx83Pick(base,'Release Depot Type')),
+      clx83RO('Empty Pickup Depot',clx83Pick(base,'Empty Pickup Depot','Empty Depot','Empty Pickup Location','Pickup Location')),
+      clx83RO('Empty Pickup Depot Type',clx83Pick(base,'Empty Pickup Depot Type')),
+      clx83RO('POL Agent',clx83Pick(base,'POL Agent','Agent')),
+      clx83RO('POL Agent Type',clx83Pick(base,'POL Agent Type')),
+      clx83RO('POL Depot',clx83Pick(base,'POL Depot')),
+      clx83RO('POL Depot Type',clx83Pick(base,'POL Depot Type')),
+      clx83RO('Cost Allocation',clx83Pick(base,'Cost Allocation')),
       clx83RO('Release Date',clx83Pick(base,'Release Date')),
       clx83RO('Valid Until',clx83Pick(base,'Valid Until')),
       clx83RO('Container Qty',clx83Pick(base,'Container Qty','Quantity')),
@@ -551,13 +558,21 @@ async function renderClx083OperationalMaster(){
       clx83RO('Container',clx83Pick(base,'Container','Container No.')),
       clx83RO('Size / Type',clx83Pick(base,'Size/Type','Size-Type','Container Type')),
       clx83RO('POD',clx83Pick(base,'POD')||ident.pod),
-      clx83RO('Depot',clx83Pick(base,'Depot')),
+      clx83RO('Delivery From',clx83Pick(base,'Delivery From','Depot')),
+      clx83RO('Delivery From Type',clx83Pick(base,'Delivery From Type')),
+      clx83RO('POD Agent',clx83Pick(base,'POD Agent')),
+      clx83RO('POD Agent Type',clx83Pick(base,'POD Agent Type')),
       clx83RO('Valid Until',clx83Pick(base,'Valid Until','Validity')),
       clx83RO('Payment Status',clx83Pick(base,'Payment Status','Freight Status')),
       clx83RO('Customs Status',clx83Pick(base,'Customs Status')),
       clx83RO('Freight Status',clx83Pick(base,'Freight Status')),
       clx83RO('Release Status',clx83Pick(base,'Release Status')),
-      clx83RO('Empty Return Location',clx83Pick(base,'Empty Return Location','Return Depot')),
+      clx83RO('Empty Return To',clx83Pick(base,'Empty Return To','Empty Return Location','Return Depot')),
+      clx83RO('Empty Return Type',clx83Pick(base,'Empty Return Type')),
+      clx83RO('Delivery Date',clx83Pick(base,'Delivery Date')),
+      clx83RO('Empty Return Date',clx83Pick(base,'Empty Return Date')),
+      clx83RO('D&D Free Time End',clx83Pick(base,'D&D Free Time End')),
+      clx83RO('Cost Allocation',clx83Pick(base,'Cost Allocation')),
       clx83RO('Free Days',clx83Pick(base,'Free Days')),
       clx83RO('Remarks',clx83Pick(base,'Remarks','Release Instruction'),{full:true,textarea:true})
     ]));
@@ -782,7 +797,7 @@ async function clx49RenderBlTab(tab){
   html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>B/L MASTER WORKSPACE</b><span class="muted">Job '+esc(w.context.job_ref)+' · Booking '+esc(w.context.booking_ref||'—')+' · B/L '+esc(w.context.hbl_no||'—')+'</span><span class="grow"></span>'+
     '<button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Booking</button>'+
     '<button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button>'+
-    '<button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button>'+
+    '<button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button>'+\n    '<button class="btn" onclick="openPrincipalWorkspace(\'bl-linkage\',\'MBL ↔ HBL Link Control\',\'agent-tasks::bl\',\'Document\')">MBL ↔ HBL Link</button>'+
     '<button class="btn" onclick="clx82ShowPreview()">Preview / Print</button></div>'+
     '<div class="clx78Hint">CLX-082 B/L Master Field Alignment · same authoritative B/L / Delivery Order / Vessel Lock / Audit records · no duplicate document model.</div>'+
     '<div class="clx78Tabs">'+CLX49_BL_TABS.map(t=>'<button class="'+(t===tab?'active':'')+'" onclick="clx49RenderBlTab(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div>';
@@ -850,7 +865,7 @@ async function clx49RenderBlTab(tab){
   }
 
   if(tab==='Release Instruction'){
-    html+='<div class="clx82Section"><div class="clx82Head">Release Instruction</div><div class="clx82Body"><div class="clx82Grid">'+
+    html+='<div class="clx82Section"><div class="clx82Head">Release Instruction</div><div class="clx82Body"><div class="toolbar"><button class="btn" onclick="openPrincipalWorkspace(\'release-control\',\'Release Control\',\'agent-tasks::delivery-order\',\'Document\')">Open Release Control Gate</button></div><div class="clx82Grid">'+
       clx82NativeField(r,'Release Instruction','Release Type / Instruction',{wide:true})+
       clx82NativeField(r,'Original BL Status','Original B/L Status')+
       clx82NativeField(r,'Telex Release','Telex Release')+
@@ -876,8 +891,7 @@ async function clx49RenderBlTab(tab){
       clx82NativeField(r,'Release Status','Release Status')+
       clx82NativeField(r,'Payment Block','Payment Block')+
       clx82NativeField(r,'Customs Status','Customs Status')+
-      clx82NativeField(r,'Freight Status','Freight Status')+
-    '</div></div></div>';
+      clx82NativeField(r,'Freight Status','Freight Status')+\n      clx82NativeField(r,'Delivery From','Delivery From')+\n      clx82NativeField(r,'Delivery From Type','Delivery From Type')+\n      clx82NativeField(r,'Empty Return To','Empty Return To')+\n      clx82NativeField(r,'Empty Return Type','Empty Return Type')+\n      clx82NativeField(r,'POD Agent','POD Agent')+\n      clx82NativeField(r,'POD Agent Type','POD Agent Type')+\n      clx82NativeField(r,'Delivery Date','Delivery Date',{type:'date'})+\n      clx82NativeField(r,'Empty Return Date','Empty Return Date',{type:'date'})+\n      clx82NativeField(r,'D&D Free Time End','D&D Free Time End',{type:'date'})+\n      clx82NativeField(r,'Cost Allocation','Cost Allocation')+\n    '</div></div></div>';
   }
 
   if(tab==='Lock Info'){
