@@ -3,6 +3,16 @@ from pydantic import BaseModel
 from typing import Optional
 import datetime,json,uuid
 from .db import connect,tx,backend_name
+from .item9_credit_collection_governance import (
+    enabled as item9_enabled,
+    refresh_credit_exposure,
+    effective_credit,
+    session_context as credit_session_context,
+    validate_override_request,
+    approve_override,
+    validate_collection_metadata,
+    dunning_level,
+)
 
 router=APIRouter(prefix='/api/v1/gl/hardening',tags=['CLX-006 GL Hardening'])
 WRITE={'ADMIN','FINANCE','GL_MANAGER','GL_ACCOUNTANT'}
@@ -33,6 +43,19 @@ class RevalueBody(BaseModel):
     new_rate:float
     exposure:float
     job_ref:Optional[str]=None
+
+class CreditOverrideRequest(BaseModel):
+    customer_id:int
+    amount:float
+    currency:str='USD'
+    reason:str
+    expires_at:str
+
+class CreditOverrideDecision(BaseModel):
+    reason:Optional[str]=None
+
+class CollectionMetadata(BaseModel):
+    fields:dict
 
 @router.get('/health')
 def health():
@@ -109,7 +132,60 @@ def ap_aging(x_role:str=Header('AUDITOR')):
 
 @router.get('/credit-control')
 def credit_control(x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect(); rows=[dict(x) for x in c.execute('SELECT cc.*,cu.name customer_name,ROUND(cc.credit_limit-cc.exposure,2) available FROM gl_credit_limits cc JOIN customers cu ON cu.id=cc.customer_id ORDER BY cu.name')]; c.close(); return rows
+    role(x_role); c=connect()
+    rows=[]
+    for cc in c.execute('SELECT cc.*,cu.name customer_name FROM gl_credit_limits cc JOIN customers cu ON cu.id=cc.customer_id ORDER BY cu.name'):
+        if item9_enabled():
+            snap=effective_credit(c,cc['customer_id'],cc['currency'])
+            rows.append({**dict(cc),'exposure':snap['exposure'],'on_hold':snap['effective_hold'],'available':snap['effective_available'],'override_amount':snap['override_amount']})
+        else:
+            rows.append({**dict(cc),'available':round(float(cc['credit_limit'])-float(cc['exposure']),2)})
+    c.close(); return rows
+
+@router.get('/collections/dunning')
+def collection_dunning(x_role:str=Header('AUDITOR')):
+    role(x_role); c=connect(); rows=[]
+    for r in c.execute("""SELECT a.*,cu.name customer_name,j.job_ref FROM gl_ar_open_items a
+      JOIN customers cu ON cu.id=a.customer_id LEFT JOIN jobs j ON j.id=a.job_id
+      WHERE a.status='OPEN' AND a.outstanding>0 ORDER BY a.due_date,a.id"""):
+        days=max(0,int((datetime.date(2026,10,3)-datetime.date.fromisoformat(r['due_date'])).days))
+        rows.append({**dict(r),'days_overdue':days,'dunning_level':dunning_level(days),
+          'priority':'CRITICAL' if days>90 else 'HIGH' if days>60 else 'MEDIUM' if days>30 else 'NORMAL'})
+    c.close(); return rows
+
+@router.post('/credit-overrides',status_code=201)
+def request_credit_override(b:CreditOverrideRequest,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not item9_enabled(): raise HTTPException(404,'Item 9 governance disabled')
+    c=connect();tx(c)
+    try:
+        ctx=credit_session_context(c,x_m3_session)
+        data=validate_override_request(c,ctx,b.customer_id,b.amount,b.currency,b.reason,b.expires_at)
+        ref='COV-'+uuid.uuid4().hex[:10].upper()
+        c.execute("""INSERT INTO credit_override_events
+          (override_ref,customer_id,currency,amount,reason,expires_at,requested_by,status,office_code,created_at)
+          VALUES(?,?,?,?,?,?,?,'PENDING',?,?)""",(ref,b.customer_id,b.currency,b.amount,b.reason,b.expires_at,ctx['user_ref'],ctx['office_code'],now()))
+        audit(c,ctx['user_ref'],'CREDIT_OVERRIDE_REQUEST','credit',{'override_ref':ref,**data})
+        c.execute('COMMIT');return dict(c.execute('SELECT * FROM credit_override_events WHERE override_ref=?',(ref,)).fetchone())
+    except HTTPException:
+        c.execute('ROLLBACK');raise
+    finally:c.close()
+
+@router.post('/credit-overrides/{override_id}/approve')
+def approve_credit_override(override_id:int,b:CreditOverrideDecision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not item9_enabled(): raise HTTPException(404,'Item 9 governance disabled')
+    c=connect();tx(c)
+    try:
+        ctx=credit_session_context(c,x_m3_session)
+        out=approve_override(c,ctx,override_id)
+        audit(c,ctx['user_ref'],'CREDIT_OVERRIDE_APPROVE','credit',{'override_id':override_id,'reason':b.reason})
+        c.execute('COMMIT');return out
+    except HTTPException:
+        c.execute('ROLLBACK');raise
+    finally:c.close()
+
+@router.post('/collections/metadata/validate')
+def validate_collection_update(b:CollectionMetadata,x_role:str=Header('VIEWER')):
+    role(x_role);validate_collection_metadata(b.fields);return {'ok':True,'metadata_only':True}
 
 @router.get('/supplier-payables')
 def supplier_payables(x_role:str=Header('AUDITOR')):
