@@ -103,6 +103,7 @@ class WorkspaceWrite(BaseModel):
 def _now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def _role(workspace:str,role:str):
     r=(role or "VIEWER").upper()
+    if r=="SUPER_ADMIN": r="ADMIN"
     if r not in WORKSPACES[workspace]["roles"]: raise HTTPException(403,{"code":"ROLE_NOT_ALLOWED","workspace":workspace})
     return r
 def _ensure(conn):
@@ -172,7 +173,7 @@ def upsert_workspace(workspace:str,b:WorkspaceWrite,x_role:str=Header("VIEWER"),
 
 @router.get("/release-prerequisites/{job_ref}")
 def release_prerequisites(job_ref:str,x_role:str=Header("VIEWER")):
-    if x_role.upper() not in {"ADMIN","OPS","DOCS","FINANCE","AUDITOR","VIEWER"}: raise HTTPException(403,"Role not allowed")
+    if x_role.upper() not in {"ADMIN","SUPER_ADMIN","OPS","DOCS","FINANCE","AUDITOR","VIEWER"}: raise HTTPException(403,"Role not allowed")
     c=connect();_ensure(c)
     row=c.execute("""SELECT j.id,w.documentation_status,w.customs_status,w.release_status,f.payment_status,f.outstanding,f.credit_hold,
       (SELECT bill_no FROM bills WHERE job_id=j.id AND kind='HBL' ORDER BY id LIMIT 1) hbl_no,
@@ -194,7 +195,7 @@ def release_prerequisites(job_ref:str,x_role:str=Header("VIEWER")):
 
 @router.get("/bl-linkage/{job_ref}")
 def bl_linkage(job_ref:str,x_role:str=Header("VIEWER")):
-    if x_role.upper() not in {"ADMIN","OPS","DOCS","FINANCE","AUDITOR","VIEWER","AGENT"}: raise HTTPException(403,"Role not allowed")
+    if x_role.upper() not in {"ADMIN","SUPER_ADMIN","OPS","DOCS","FINANCE","AUDITOR","VIEWER","AGENT"}: raise HTTPException(403,"Role not allowed")
     c=connect();_ensure(c)
     j=c.execute("SELECT id FROM jobs WHERE job_ref=?",(job_ref,)).fetchone()
     if not j:c.close();raise HTTPException(404,"Job not found")
@@ -205,7 +206,7 @@ def bl_linkage(job_ref:str,x_role:str=Header("VIEWER")):
 
 @router.get("/branch-pnl")
 def branch_pnl(branch_code:Optional[str]=None,x_role:str=Header("VIEWER")):
-    if x_role.upper() not in {"ADMIN","FINANCE","GL_MANAGER","GL_ACCOUNTANT","AUDITOR","VIEWER"}: raise HTTPException(403,"Role not allowed")
+    if x_role.upper() not in {"ADMIN","SUPER_ADMIN","FINANCE","GL_MANAGER","GL_ACCOUNTANT","AUDITOR","VIEWER"}: raise HTTPException(403,"Role not allowed")
     c=connect();_ensure(c)
     where=" WHERE status IN ('APPROVED','SETTLED','POSTED')" + (" AND (from_branch=? OR to_branch=?)" if branch_code else "")
     args=[branch_code,branch_code] if branch_code else []
