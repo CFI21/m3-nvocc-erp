@@ -85,6 +85,28 @@
 .clx82Status{display:inline-block;padding:2px 6px;border:1px solid #b8c2cf;border-radius:10px;background:#f8f9fa}
 @media(max-width:1250px){.clx82Grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.clx82Subgrid{grid-template-columns:1fr}}
 
+
+/* M3 operational organization pass — clean dense ERP, no business-model change */
+.opHeader{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);padding:8px 10px;margin-bottom:6px}
+.opHeaderTitle{font-size:15px;font-weight:700}.opHeader .grow{flex:1}
+.opContext{display:flex;gap:5px;flex-wrap:wrap;background:#f8fafb;border:1px solid var(--line);padding:6px 8px;margin-bottom:6px}
+.opContextItem{display:flex;gap:4px;align-items:center;border-right:1px solid #d7dde5;padding-right:8px}.opContextItem:last-child{border-right:0}
+.opContextItem b{font-size:10px}.opContextItem span{font-size:10px;color:#475467}
+.opSectionNav{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:0 0 7px;background:#eef1f4;padding:4px 5px 0}
+.opSectionNav span{padding:5px 8px;border:1px solid #c7ced8;border-bottom:0;background:#fff;font-size:10px}
+.opFollow{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:6px 8px;border:1px solid #b9d6c6;background:#f4faf6;margin:6px 0}
+.opFollow b{font-size:10px;color:#214f3d}.opFollow button{padding:4px 7px;border:1px solid #aeb7c4;background:#fff;cursor:pointer}
+.opFollow button.current{background:var(--brand);color:#fff;border-color:var(--brand)}
+.opGridToolbar{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding:6px;background:#fff;border:1px solid var(--line);border-bottom:0}
+.opGridToolbar .grow{flex:1}.opGridToolbar input{min-width:220px}.opGridToolbar input,.opGridToolbar select{padding:5px 6px;border:1px solid #b8c2cf;background:#fff}
+.opGridWrap{background:#fff;border:1px solid var(--line);overflow:auto;max-height:58vh}
+.opGridWrap table{border-collapse:collapse;width:100%;min-width:820px}.opGridWrap th,.opGridWrap td{padding:5px 7px;border-bottom:1px solid #e7ebf0;text-align:left;white-space:nowrap;max-width:230px;overflow:hidden;text-overflow:ellipsis}
+.opGridWrap th{background:#edf2f5;position:sticky;top:0;z-index:2}.opGridWrap tr:hover td{background:#f8fbf9}
+.clx78MainGrid{grid-template-columns:1fr!important}
+.clx78Fields,.clx78Commercial .clx78Fields{grid-template-columns:repeat(2,minmax(180px,1fr))!important}
+.clx82Grid{grid-template-columns:repeat(2,minmax(180px,1fr))!important}
+.homeGrid{grid-template-columns:repeat(4,minmax(150px,1fr))}
+@media(max-width:1250px){.clx78Fields,.clx78Commercial .clx78Fields,.clx82Grid{grid-template-columns:1fr!important}.homeGrid{grid-template-columns:repeat(2,minmax(140px,1fr))}}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
@@ -117,7 +139,15 @@ function domainSlug(d){return d.toLowerCase().replace(/\s*\/\s*/g,'-').replace(/
 function saveState(){localStorage.setItem('m3clx011-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('m3clx011-recent',JSON.stringify(state.recent.slice(0,15)))}
 function toggleGroup(id){let x=document.querySelector(`[data-content="${CSS.escape(id)}"]`);if(x)x.classList.toggle('collapse')}
 function screenAllowed(s){let r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;return !Array.isArray(s.roles)||!s.roles.length||s.roles.includes(r)}
-function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];return s&&screenAllowed(s)&&(!q||s.name.toLowerCase().includes(q)||s.submenu.toLowerCase().includes(q)||s.domain.toLowerCase().includes(q))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);return s&&aliasOk&&screenAllowed(s)&&(!q||it.label.toLowerCase().includes(q)||sub.name.toLowerCase().includes(q)||d.domain.toLowerCase().includes(q))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'&&(!q||'global equipment tower equipment control container master network reposition lease depot'.includes(q))){
+function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];return s&&screenAllowed(s)&&(!q||s.name.toLowerCase().includes(q)||s.submenu.toLowerCase().includes(q)||s.domain.toLowerCase().includes(q))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);return s&&aliasOk&&screenAllowed(s)&&(!q||it.label.toLowerCase().includes(q)||sub.name.toLowerCase().includes(q)||d.domain.toLowerCase().includes(q))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'&&(!q||'setup account container coding account setup global equipment tower equipment control container master network reposition lease depot'.includes(q))){
+  const setupTarget=state.byId['gl-accounts::account-integration'];
+  const setupAllowed=setupTarget&&screenAllowed(setupTarget);
+  if(setupAllowed){
+    subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-reference-setup\')">▾ Setup <span class=count>2</span></button><div data-content="ho-reference-setup">'+
+      '<div class="screenLink '+(state.navContext?.label==='Account Setup'?'active':'')+'" onclick="openScreen(\'gl-accounts::account-integration\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Account Setup\'})">Account Setup</div>'+
+      '<div class="screenLink '+(state.equipmentView==='containers'?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Coding</div></div>';
+    dcount+=2;
+  }
   subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-equipment-control\')">▾ Equipment Control <span class=count>6</span></button><div data-content="ho-equipment-control">'+
     '<div class="screenLink '+(state.equipmentView==='tower'?'active':'')+'" onclick="showEquipmentWorkspace(\'tower\')">Global Equipment Tower</div>'+
     '<div class="screenLink '+(state.equipmentView==='containers'?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Master</div>'+
@@ -131,12 +161,68 @@ if(!dcount)continue;let did=domainSlug(d.domain);html+=`<div class="menuBlock"><
 function renderBreadcrumb(){let s=state.current,n=state.navContext;if(n){$('breadcrumb').textContent=`M3 NVOCC ERP / ${n.domain} / ${n.submenu} / ${n.label}`;$('topTitle').textContent=n.label;$('pageTitle').textContent=n.label;document.title=`M3 NVOCC ERP — ${n.label}`}else{$('breadcrumb').textContent=`M3 NVOCC ERP / ${s.domain} / ${s.submenu} / ${s.name}`;$('topTitle').textContent=s.name;$('pageTitle').textContent=s.name;document.title=`M3 NVOCC ERP — ${s.name}`}$('favorite').textContent=state.favorites.has(s.screen_id)?'★':'☆';$('favorite').classList.toggle('on',state.favorites.has(s.screen_id))}
 function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,15);saveState()}
 function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);let i=same.findIndex(s=>s.screen_id===state.current.screen_id);return same[i+dir]?.screen_id||null}
-function renderFlow(){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);$('flow').innerHTML=same.map((s,i)=>`<span class="flowStep ${s.screen_id===state.current.screen_id?'active':''}" onclick="openScreen('${s.screen_id.replaceAll("'","\'")}')">${s.business_sequence_position??(i+1)}. ${esc(s.name)}</span>`).join('');$('prevBtn').disabled=!neighborId(-1);$('nextBtn').disabled=!neighborId(1)}
-function metaCards(data){let s=state.current,src=Array.isArray(s.source_records)?s.source_records:[],val=Array.isArray(s.validations)?s.validations:[];return `<div class=kpis><div class="card kpi"><span>Domain</span><b>${esc(s.domain)}</b></div><div class="card kpi"><span>Submenu</span><b>${esc(s.submenu)}</b></div><div class="card kpi"><span>Records</span><b>${data.count??0}</b></div><div class="card kpi"><span>Previous</span><b>${esc(s.previous_step||'—')}</b></div><div class="card kpi"><span>Next</span><b>${esc(s.next_step||'—')}</b></div></div><div class=card><b>Purpose</b><span class=muted> — ${esc(s.purpose||s.name||'')}</span><br><span class=muted>Source: ${esc(src.length?src.join(', '):'authoritative module API')} · Validations: ${esc(val.length?val.join(' · '):'server-side validation')}</span></div>`}
+const CORE_FOLLOWUP=[
+  ['agent-tasks::booking','Booking'],['agent-tasks::bl','B/L'],['agent-tasks::cro','CRO'],
+  ['agent-tasks::crt','CRT'],['agent-tasks::container-activity','Container'],
+  ['agent-tasks::delivery-order','Delivery Order'],['agent-tasks::soa','SOA']
+];
+function renderFlow(){
+  if(!state.current){$('flow').innerHTML='';return}
+  const key=state.current.key||'';
+  const core=CORE_FOLLOWUP.filter(([id])=>state.byId[id]);
+  const inCore=core.some(([id])=>id===state.current.screen_id);
+  if(inCore){
+    $('flow').innerHTML='<div class="opFollow"><b>Operational follow-up</b>'+core.map(([id,label])=>'<button class="'+(id===state.current.screen_id?'current':'')+'" onclick="openScreen(\''+id+'\')">'+esc(label)+'</button>').join('')+'<button onclick="openDrawer(\'related\')">Related</button><button onclick="openDrawer(\'audit\')">Audit</button></div>';
+  }else{
+    let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);
+    $('flow').innerHTML='<div class="opFollow"><b>Screen flow</b>'+same.slice(0,10).map((s,i)=>'<button class="'+(s.screen_id===state.current.screen_id?'current':'')+'" onclick="openScreen(\''+s.screen_id.replaceAll("'","\\'")+'\')">'+esc(s.name)+'</button>').join('')+'</div>';
+  }
+  $('prevBtn').disabled=!neighborId(-1);$('nextBtn').disabled=!neighborId(1)
+}
+function metaCards(data){
+  let s=state.current,n=state.navContext||{};
+  const sample=state.rows?.[0]||{};const p=typeof sample.payload_json==='object'?sample.payload_json:{};
+  const get=(...ks)=>{for(const k of ks){const v=sample[k]??p[k];if(v!==undefined&&v!==null&&String(v)!=='')return v}return '—'};
+  const sections=(s.domain==='Agent Tasks'
+    ?['BASIC','PARTIES','ROUTING','CARGO / EQUIPMENT','DOCUMENTS','COST / REVENUE','FOLLOW-UP','AUDIT']
+    :s.domain==='General / Administration'
+      ?['BASIC','TRANSACTION / SETUP','CONTROL','FOLLOW-UP','AUDIT']
+      :s.domain==='Treasury / AR-AP'
+        ?['BASIC','PARTY / ACCOUNT','AMOUNT','ALLOCATION','FOLLOW-UP','AUDIT']
+        :['BASIC','DETAIL','FOLLOW-UP','AUDIT']);
+  return '<div class="opHeader"><span class="opHeaderTitle">'+esc(n.label||s.name)+'</span><span class="status">'+esc(get('Status','status'))+'</span><span class="muted">'+esc(s.domain)+' / '+esc(s.submenu)+'</span><span class="grow"></span><span class="muted">'+esc(data.count??0)+' records</span></div>'+
+    '<div class="opContext">'+
+      '<span class="opContextItem"><b>Booking</b><span>'+esc(get('Booking No.','Booking','booking_ref'))+'</span></span>'+
+      '<span class="opContextItem"><b>Job</b><span>'+esc(get('Job Ref','Job','job_ref'))+'</span></span>'+
+      '<span class="opContextItem"><b>B/L</b><span>'+esc(get('B/L','BL','HBL','MBL','external_ref'))+'</span></span>'+
+      '<span class="opContextItem"><b>Customer</b><span>'+esc(get('Customer','customer_name'))+'</span></span>'+
+      '<span class="opContextItem"><b>Agent</b><span>'+esc(get('Agent','agent_name'))+'</span></span>'+
+      '<span class="opContextItem"><b>Route</b><span>'+esc([get('POL','pol'),get('POT','POT (1)'),get('POD','pod')].filter(x=>x!=='—').join(' → ')||'—')+'</span></span>'+
+    '</div>'+
+    '<div class="opSectionNav">'+sections.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>';
+}
 function normalizeRows(rows){return (rows||[]).map(r=>{let o={...r};if(o.payload&&typeof o.payload==='object'){for(const [k,v] of Object.entries(o.payload)){if(!(k in o))o[k]=v}delete o.payload}return o})}
 function calcRows(){let q=($('gridSearch')?.value||'').toLowerCase();let st=$('statusFilter')?.value||'';let rows=state.rows.filter(r=>(!q||JSON.stringify(r).toLowerCase().includes(q))&&(!st||String(r.status??r.Status??'')===st));if(state.savedView==='action')rows=rows.filter(r=>/draft|pending|open|review|hold|failed/i.test(String(r.status??r.Status??'')));if(state.savedView==='closed')rows=rows.filter(r=>/released|closed|approved|posted|reconciled|active/i.test(String(r.status??r.Status??'')));if(state.sortKey)rows.sort((a,b)=>String(a[state.sortKey]??'').localeCompare(String(b[state.sortKey]??''))*(state.sortAsc?1:-1));state.filtered=rows;return rows}
 function statuses(){return [...new Set(state.rows.map(r=>String(r.status??r.Status??'')).filter(Boolean))].sort()}
-function renderGrid(){let rows=calcRows(),total=Math.max(1,Math.ceil(rows.length/state.pageSize));state.page=Math.min(state.page,total);let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=[];for(const r of slice){for(const k of Object.keys(r)){if(!keys.includes(k)&&k!=='payload_json')keys.push(k)}}keys=keys.slice(0,12);let html=`<div class=toolbar><input id=gridSearch placeholder="Search current screen..." value="${esc($('gridSearch')?.value||'')}" oninput="state.page=1;renderGrid()"><select id=statusFilter onchange="state.status=this.value;state.page=1;renderGrid()"><option value="">All statuses</option>${statuses().map(s=>`<option ${state.status===s?'selected':''}>${esc(s)}</option>`).join('')}</select><select onchange="state.savedView=this.value;state.page=1;renderGrid()"><option value="">Saved views</option><option value=action ${state.savedView==='action'?'selected':''}>Action Required</option><option value=closed ${state.savedView==='closed'?'selected':''}>Released / Closed / Approved</option></select><select onchange="state.pageSize=+this.value;state.page=1;renderGrid()"><option>20</option><option>50</option><option>100</option></select><button class=btn onclick="state.page=Math.max(1,state.page-1);renderGrid()">Prev</button><span class=muted>Page ${state.page}/${total}</span><button class=btn onclick="state.page=Math.min(${total},state.page+1);renderGrid()">Next</button><button class=btn onclick="exportCsv()">Export</button><button class=btn onclick="window.print()">Print</button><span class=muted>${rows.length} filtered / ${state.rows.length} total</span></div>`;if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div>';html+=`<div class=tablewrap><table><thead><tr><th>Actions</th>${keys.map(k=>`<th onclick="sortBy('${String(k).replaceAll("'","\'")}')">${esc(k)}${state.sortKey===k?(state.sortAsc?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>${slice.map((r,i)=>`<tr onclick="selectRow(${(state.page-1)*state.pageSize+i})"><td>${isGlReport()?`<button class=rowAction title="Drill Down" onclick="event.stopPropagation();drillGlReportRow(${(state.page-1)*state.pageSize+i})">↳</button>`:`<button class=rowAction title="Quick Actions" onclick="event.stopPropagation();selectRow(${(state.page-1)*state.pageSize+i});$('fabWrap').classList.add('open')">⋮</button>`}</td>${keys.map(k=>`<td>${esc(typeof r[k]==='object'?JSON.stringify(r[k]):r[k])}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;return html}
+function renderGrid(){
+  let rows=calcRows(),total=Math.max(1,Math.ceil(rows.length/state.pageSize));state.page=Math.min(state.page,total);
+  let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=[];
+  const preferred=['external_ref','job_ref','booking_ref','Status','status','Customer','Agent','B/L','BL','POL','POD','Date','Amount','Currency'];
+  for(const k of preferred){if(slice.some(r=>Object.prototype.hasOwnProperty.call(r,k))&&!keys.includes(k))keys.push(k)}
+  for(const r of slice){for(const k of Object.keys(r)){if(!keys.includes(k)&&k!=='payload_json'&&!['id','version'].includes(k))keys.push(k)}}
+  keys=keys.slice(0,8);
+  let html='<div class="opGridToolbar"><input id=gridSearch placeholder="Search reference / party / status..." value="'+esc($('gridSearch')?.value||'')+'" oninput="state.page=1;renderGrid()">'+
+    '<select id=statusFilter onchange="state.status=this.value;state.page=1;renderGrid()"><option value="">All statuses</option>'+statuses().map(s=>'<option '+(state.status===s?'selected':'')+'>'+esc(s)+'</option>').join('')+'</select>'+
+    '<select onchange="state.savedView=this.value;state.page=1;renderGrid()"><option value="">Saved views</option><option value=action '+(state.savedView==='action'?'selected':'')+'>Action Required</option><option value=closed '+(state.savedView==='closed'?'selected':'')+'>Released / Closed / Approved</option></select>'+
+    '<span class="grow"></span><span class=muted>'+rows.length+' / '+state.rows.length+'</span>'+
+    '<button class=btn onclick="state.page=Math.max(1,state.page-1);renderGrid()">‹</button><span class=muted>'+state.page+'/'+total+'</span><button class=btn onclick="state.page=Math.min('+total+',state.page+1);renderGrid()">›</button>'+
+    '<button class=btn onclick="exportCsv()">Export</button></div>';
+  if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div>';
+  html+='<div class=opGridWrap><table><thead><tr><th>Action</th>'+keys.map(k=>'<th onclick="sortBy(\''+String(k).replaceAll("'","\\'")+'\')">'+esc(k)+(state.sortKey===k?(state.sortAsc?' ▲':' ▼'):'')+'</th>').join('')+'</tr></thead><tbody>'+
+    slice.map((r,i)=>'<tr onclick="selectRow('+((state.page-1)*state.pageSize+i)+')"><td>'+(isGlReport()?'<button class=rowAction title="Drill Down" onclick="event.stopPropagation();drillGlReportRow('+((state.page-1)*state.pageSize+i)+')">↳</button>':'<button class=rowAction title="Quick Actions" onclick="event.stopPropagation();selectRow('+((state.page-1)*state.pageSize+i)+');$(\'fabWrap\').classList.add(\'open\')">⋮</button>')+'</td>'+keys.map(k=>'<td>'+esc(typeof r[k]==='object'?JSON.stringify(r[k]):r[k])+'</td>').join('')+'</tr>').join('')+
+    '</tbody></table></div>';
+  return html
+}
 function sortBy(k){if(state.sortKey===k)state.sortAsc=!state.sortAsc;else{state.sortKey=k;state.sortAsc=true}renderGrid()}
 function exportCsv(){let rows=state.filtered.length?state.filtered:calcRows();if(!rows.length)return;let ks=[...new Set(rows.flatMap(r=>Object.keys(r)))];let csv=[ks.join(','),...rows.map(r=>ks.map(k=>'"'+String(typeof r[k]==='object'?JSON.stringify(r[k]):r[k]??'').replaceAll('"','""')+'"').join(','))].join('\n');let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`M3_${state.current.key}.csv`;a.click()}
 const GL_REPORT_KEYS=new Set(['trial-balance-report','profit-loss','balance-sheet','gl-detail','subledger-gl-reconciliation']);
