@@ -102,3 +102,27 @@ Keep:
 - Dummy Bank=ON
 
 TrueLayer, OpenExchangeRates and Avalara may be contract/sandbox tested but must not be activated without explicit authorization.
+
+## Verified resilience status — 2026-10-03
+
+PASS:
+- M3-NVOCC-PROD is ACTIVE_HEALTHY in eu-west-2 on PostgreSQL 17.
+- Core public operational/IAM/provider/audit tables are RLS-enabled and the checked tables grant no SELECT/INSERT access to `anon` or `authenticated`; server-only access remains the intended model.
+- IAM users USR-001 through USR-006 are ACTIVE with MFA required; USR-AGT-DE2D61A3B5 remains INVITED with MFA required and AGENT scope.
+- Provider safety remains enforced: Dummy Bank enabled and simulation-only; TrueLayer Bank, TrueLayer Payments, OpenExchangeRates and Avalara disabled; REAL_MONEY remains OFF.
+- Production identity sequences checked for bookings, jobs, transaction_records, equipment_work_items, audit_events and screen_integration_events are synchronized to current table maxima.
+- Render API image sha256:d0ddb8413b2fbb56134256e9a870c7d18fb97c28916dede9da16ae9ec148ad92 is live; prior API image deploys remain available as rollback points.
+- screen_integration_events has immutable update/delete triggers and no public Data API grants.
+
+VERIFIED GAP:
+- No independent current production backup/restore artifact is certified. Existing clx013_backup_manifests are CLX-013 test SQLite rehearsal artifacts dated 2026-09-24 and do not prove restoration of the current Supabase production database.
+- Supabase organization plan is Free. Managed daily backup retention/PITR is therefore not the operating recovery mechanism; regular independent logical exports are required.
+- Supabase security advisor reports `public.prevent_screen_integration_event_mutation` with mutable function `search_path`. This is not a business-data defect, but should be hardened in a governed migration by setting an explicit safe search_path before the next security freeze.
+
+REQUIRED FIX BEFORE SCALING REAL-BUSINESS VOLUME:
+1. Produce a fresh logical dump of M3-NVOCC-PROD outside the production Supabase project.
+2. Record checksum, timestamp, source project/database identity and retention location.
+3. Restore that dump into an isolated recovery environment and reconcile critical table counts plus Booking/Job/document links, IAM, master data, GL and Treasury controls.
+4. Record measured RPO/RTO; do not reuse the CLX-013 SQLite timings as production RPO/RTO evidence.
+5. Harden the screen-integration immutability trigger function with an explicit safe PostgreSQL search_path through the normal migration/review path.
+
