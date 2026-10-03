@@ -83,6 +83,7 @@
 .clx82Subgrid{display:grid;grid-template-columns:1fr 1fr;gap:6px}.clx82Table{width:100%;border-collapse:collapse;font-size:10px}.clx82Table th,.clx82Table td{border:1px solid #d7dde5;padding:5px 6px;text-align:left}.clx82Table th{background:#f4f6f8}
 .clx82FlowActions{display:flex;gap:5px;flex-wrap:wrap}.clx82FlowActions button{padding:5px 7px;border:1px solid #aeb7c4;background:#fff}
 .clx82Status{display:inline-block;padding:2px 6px;border:1px solid #b8c2cf;border-radius:10px;background:#f8f9fa}
+.clx81GroupTitle{grid-column:1/-1;font-size:10px;font-weight:700;letter-spacing:.04em;color:#344054;background:#f2f4f7;border-bottom:1px solid #d0d5dd;padding:5px 6px;margin-top:2px}
 @media(max-width:1250px){.clx82Grid{grid-template-columns:repeat(2,minmax(150px,1fr))}.clx82Subgrid{grid-template-columns:1fr}}
 
 
@@ -818,7 +819,7 @@ function clx49BookingTogglePot(){
   const pot=document.querySelector('[data-clx49-field="POT Agent"]');
   const ts1=document.querySelector('[data-clx49-field="TS Agent (1)"]');
   const ts2=document.querySelector('[data-clx49-field="TS Agent (2)"]');
-  if(pot)pot.disabled=!(via||trans);
+  if(pot)pot.disabled=!pot1;
   if(ts1)ts1.disabled=!pot1;
   if(ts2)ts2.disabled=!pot2;
 }
@@ -966,23 +967,43 @@ async function clx49RenderBooking(tab){
     ].map(x=>'<button class="'+(displayTab===x[1]?'active':'')+'" onclick="clx49RenderBooking(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>';
   if(tab==='Booking Info'){
     html+='<div class="clx78MainGrid"><div class="clx78Panel"><div class="clx78PanelHead">Basic Info</div><div class="clx78PanelBody"><div class="clx78Fields">'+
-      clx78Field(r,'Booking No.','Booking #')+clx78Field(r,'Approval #','Approval #')+clx78Field(r,'Reference #','Reference #',{review:true})+clx78Field(r,'Booking Date','Booking Date',{type:'date'})+
-      clx78Field(r,'Carrier','Carrier')+'<div class="clx78Field"><label>Thru B/L</label>'+clx81Check(r,'Thru B/L','Enabled')+'</div>'+clx78Field(r,'Container Owner','Cntnr Owner')+clx78Field(r,'Sailing Date','Sailing Date',{type:'date'})+
-      clx78Field(r,'Commodity','Commodity')+clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+clx78Field(r,'POL','POL')+
-      clx78Field(r,'POL Agent','Agent (POL)')+clx78Field(r,'POD','POD')+clx78Field(r,'POD Agent','Agent (POD)')+clx78Field(r,'POT (1)','POT (1)')+
-      clx78Field(r,'TS Agent (1)','TS Agent (1)',{disabled:!hasPot1})+clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','TS Agent (2)',{disabled:!hasPot2})+clx78Field(r,'Shipper','Shipper',{wide:true})+
-      clx78Field(r,'Actual Shipper','Actual Shipper',{wide:true})+clx78Field(r,'Freight Type','Freight Type')+clx78Field(r,'Consignee','Consignee',{wide:true})+
-      clx78Field(r,'Notify Party','Notify Party',{wide:true})+clx78Field(r,'SRR','SRR')+
+      '<div class="clx81GroupTitle">BASIC</div>'+
+      clx78Field(r,'Booking No.','Booking No.')+clx78Field(r,'Booking Date','Booking Date',{type:'date'})+
+      clx78Field(r,'Status','Booking Status')+clx78Field(r,'Approval #','Approval #')+
+      clx78Field(r,'Reference #','Reference #',{review:true})+clx78Field(r,'Sales Person','Sales Person')+
+      clx78Field(r,'Freight Type','Shipment / Freight Type')+clx78Field(r,'Freight Term','Freight Term')+
+      clx78Field(r,'Carrier Booking Ref','Carrier Booking Ref')+'<div class="clx78Field"><label>Thru B/L</label>'+clx81Check(r,'Thru B/L','Enabled')+'</div>'+
+      clx78Field(r,'Sailing Date','Sailing Date',{type:'date'})+
+      '<div class="clx81GroupTitle">PARTIES</div>'+
+      clx78Field(r,'Booking Party','Customer / Booking Party',{wide:true})+
+      clx78Field(r,'Shipper','Shipper',{wide:true})+clx78Field(r,'Actual Shipper','Actual Shipper',{wide:true})+
+      clx78Field(r,'Consignee','Consignee',{wide:true})+clx78Field(r,'Notify Party','Notify Party',{wide:true})+
+      clx78Field(r,'Billing Party','Billing Party')+clx78Field(r,'Agent','Origin / Sending Agent')+
+      clx78Field(r,'POL Agent','POL Agent')+clx78Field(r,'POT Agent','POT Agent',{disabled:!hasPot1})+
+      clx78Field(r,'Receiving Agent','Destination / Receiving Agent')+clx78Field(r,'POD Agent','POD Agent')+
+      clx78Field(r,'Carrier','Carrier / Shipping Line')+clx78Field(r,'Container Owner','Container Owner')+
+      clx78Field(r,'Equipment Provider','Equipment Provider')+
+      '<div class="clx81GroupTitle">ROUTING</div>'+
+      clx78Field(r,'POL','POL')+clx78Field(r,'POT (1)','POT (1)')+
+      clx78Field(r,'TS Agent (1)','TS Agent (1)',{disabled:!hasPot1})+
+      clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','TS Agent (2)',{disabled:!hasPot2})+
+      clx78Field(r,'POD','POD')+clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
+      '<div class="clx81GroupTitle">CARGO / EQUIPMENT</div>'+
+      clx78Field(r,'Commodity','Commodity')+clx78Field(r,'Cargo','Cargo Description',{wide:true})+
+      clx78Field(r,'Packages','Packages')+clx78Field(r,'Weight','Gross Weight')+
+      clx78Field(r,'Measurement','Measurement / Volume')+clx78Field(r,'Equipment','Equipment Type')+
+      clx78Field(r,'Quantity','Quantity')+clx78Field(r,'SOC / COC','SOC / COC')+
+      clx78Field(r,'SRR','SRR')+
       '</div></div></div>'+
-      '<div class="clx78Panel"><div class="clx78PanelHead">Operational Control</div><div class="clx78PanelBody"><div class="clx78OpsTabs"><span>Organizations</span><span>Departure</span><span>Arrival</span><span>Docs</span><span>Pre-Allocation</span><span>Achieved Quantities</span><span>Numbers</span><span>Additional Detail</span></div><div class="clx78Fields" style="grid-template-columns:repeat(2,minmax(140px,1fr))">'+
-      clx78Field(r,'Agent','Sending Agent')+clx78Field(r,'Receiving Agent','Receiving Agent')+
-      clx78Field(r,'Carrier','Carrier')+clx78Field(r,'Agent Reference','Agent Reference')+
-      clx78Field(r,'Primary Vendor / Carrier','Primary Vendor / Cr')+clx78Field(r,'Carrier Booking Ref','Carrier Bkg. Ref')+
+      '<div class="clx78Panel"><div class="clx78PanelHead">Operational Control</div><div class="clx78PanelBody"><div class="clx78OpsTabs"><span>Departure</span><span>Arrival</span><span>Docs</span><span>Pre-Allocation</span><span>Achieved Quantities</span><span>Numbers</span><span>Additional Detail</span></div><div class="clx78Fields" style="grid-template-columns:repeat(2,minmax(140px,1fr))">'+
+      clx78Field(r,'Operations Owner','Operations Owner')+clx78Field(r,'Agent Reference','Agent Reference')+
+      clx78Field(r,'Primary Vendor / Carrier','Primary Vendor / Carrier')+clx78Field(r,'SI Cut-off','SI Cut-off',{type:'date'})+
+      clx78Field(r,'VGM Cut-off','VGM Cut-off',{type:'date'})+clx78Field(r,'Gate-in Cut-off','Gate-in Cut-off',{type:'date'})+
       clx78Field(r,'Free Days POL','Free Days POL')+clx78Field(r,'Free Days POD','Free Days POD')+
       clx78Field(r,'Detention Tariff','Detention Tariff',{wide:true})+
       '</div><div class="clx78MiniActions" style="margin-top:7px">'+clx81QuickButtons()+'</div></div></div></div>'+
       '<div class="clx78Panel clx78Commercial"><div class="clx78PanelHead">Commercial Ownership / Financial Parties</div><div class="clx78PanelBody"><div class="clx78Fields">'+
-      clx78Field(r,'Operation','Operation')+clx78Field(r,'Principal','Principal')+clx78Field(r,'Booking Party','Booking Party / Customer')+clx78Field(r,'Billing Party','Billing Party')+
+      clx78Field(r,'Operation','Operation')+clx78Field(r,'Principal','Principal')+clx78Field(r,'Commercial Owner','Commercial Owner')+clx78Field(r,'Finance / Credit Party','Finance / Credit Party')+
       clx78Field(r,'Settlement Agent','Settlement Agent')+clx78Field(r,'Rate Basis','Rate Basis')+clx78Field(r,'Contract / Tariff Ref','Contract / Tariff Ref')+clx78Field(r,'Financial Flow','Financial Flow')+
       '<div class="clx78Field full"><label>Billing Control</label>'+clx81Check(r,'Same as Booking Party','Same as Booking Party')+'</div>'+
       '</div></div></div>'+
