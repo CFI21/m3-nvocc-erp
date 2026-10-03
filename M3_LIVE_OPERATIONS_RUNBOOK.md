@@ -117,12 +117,12 @@ PASS:
 VERIFIED GAP:
 - No independent current production backup/restore artifact is certified. Existing clx013_backup_manifests are CLX-013 test SQLite rehearsal artifacts dated 2026-09-24 and do not prove restoration of the current Supabase production database.
 - Supabase organization plan is Free. Managed daily backup retention/PITR is therefore not the operating recovery mechanism; regular independent logical exports are required.
-- Supabase security advisor reports `public.prevent_screen_integration_event_mutation` with mutable function `search_path`. This is not a business-data defect, but should be hardened in a governed migration by setting an explicit safe search_path before the next security freeze.
 
 REQUIRED FIX BEFORE SCALING REAL-BUSINESS VOLUME:
 1. Produce a fresh logical dump of M3-NVOCC-PROD outside the production Supabase project.
 2. Record checksum, timestamp, source project/database identity and retention location.
 3. Restore that dump into an isolated recovery environment and reconcile critical table counts plus Booking/Job/document links, IAM, master data, GL and Treasury controls.
 4. Record measured RPO/RTO; do not reuse the CLX-013 SQLite timings as production RPO/RTO evidence.
-5. Harden the screen-integration immutability trigger function with an explicit safe PostgreSQL search_path through the normal migration/review path.
 
+
+Search-path hardening completed on 2026-10-03: `public.prevent_screen_integration_event_mutation` now uses `search_path = pg_catalog, public`; the corresponding Supabase advisor warning is cleared. Independent production backup/restore certification remains the open resilience blocker.
