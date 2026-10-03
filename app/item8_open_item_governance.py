@@ -7,6 +7,10 @@ from .item7_financial_document_governance import find_source_document
 def enabled():
     return os.getenv('M3_ITEM8_OPEN_ITEM_GOVERNANCE_ENABLED','false').lower()=='true'
 
+def enforce_sensitive_action(action,session_token):
+    if enabled() and str(action).lower() in {'write_off','reopen'} and not session_token:
+        raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_GOVERNED_OPEN_ITEM_ACTION'})
+
 
 def _num(v):
     try:return float(v)
