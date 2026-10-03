@@ -1,0 +1,42 @@
+{
+  "baseline": "632d54db5bf80214c3ae4cbae52d7a2c01029c38",
+  "source_spec": "Geplakte tekst(3).txt — M3 Full Structure NVOCC-as-Principal",
+  "scope": "M3-only NVOCC principal gap completion",
+  "screen_baseline": 196,
+  "screen_count_after": 196,
+  "screen_count_changed": false,
+  "extension_strategy": "Persisted governed sub-workspaces linked to existing authoritative screens; no duplicate Booking/Job/B-L/Container/Finance model.",
+  "completed_gaps": [
+    "Expanded Branch/Office operational profile",
+    "Expanded Legal Entity finance/inter-company profile",
+    "Depot Master",
+    "Port Agent / Depot Configuration",
+    "Inter-Branch Transfer Pricing",
+    "Booking/Job branch assignment fields",
+    "MBL-HBL linkage control using existing bills/B-L/GL sources",
+    "CRO depot/agent/cost allocation fields",
+    "TS Branch Operations end-to-end workspace",
+    "Release Control with derived B/L/Customs/Finance/Surrender prerequisites",
+    "Delivery Order delivery/empty-return/depot fields",
+    "Inter-Branch Settlement",
+    "Branch P&L / consolidation internal-component reporting"
+  ],
+  "new_authoritative_screens": [],
+  "new_persisted_extension_workspaces": 8,
+  "read_only_control_views": [
+    "MBL-HBL Link Control",
+    "Branch P&L / Consolidation"
+  ],
+  "database_change": "ADDITIVE_TABLES_ONLY",
+  "destructive_change": false,
+  "existing_models_preserved": true,
+  "real_money": false,
+  "dummy_bank": "SIMULATION_ONLY",
+  "providers": {
+    "TRUE_LAYER": false,
+    "OXR": false,
+    "AVALARA": false
+  },
+  "ancline_touched": false,
+  "exact_next_gate": "Run focused + full regression, merge if green, apply additive production migration, then validate Booking→Job→MBL/HBL/CRO→TS→Release→DO→Settlement with a controlled business case."
+}

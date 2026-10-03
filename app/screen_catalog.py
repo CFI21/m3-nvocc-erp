@@ -85,6 +85,11 @@ BUSINESS_NAV_ALIASES = {
         {'label':'Sales Person','target':'master-data::sales-persons','search_terms':['sales person','sales']},
         {'label':'Equipment Type','target':'master-data::equipment-types','search_terms':['equipment type','container type']},
         {'label':'Container Type','target':'master-data::container-types','search_terms':['container type','equipment']},
+        {'label':'Branch / Office Master (Expanded)','target':'administration::branches','workspace_key':'branch-profile','search_terms':['branch master','office master','branch type','port role']},
+        {'label':'Legal Entity Master (Expanded)','target':'administration::legal-entities','workspace_key':'legal-entity-profile','search_terms':['legal entity','intercompany','consolidation group']},
+        {'label':'Depot Master','target':'master-data::locations','workspace_key':'depot-master','search_terms':['depot master','yard','carrier depot','terminal']},
+        {'label':'Port Agent / Depot Configuration','target':'master-data::ports','workspace_key':'port-config','search_terms':['port agent','depot assignment','pol agent','pod agent','ts agent']},
+        {'label':'Inter-Branch Transfer Pricing','target':'gl-accounts::account-integration','workspace_key':'transfer-pricing','search_terms':['transfer pricing','inter branch pricing','internal allocation']},
     ],
     'Transaction / Operations': [
         {'label':'Booking','target':'agent-tasks::booking','search_terms':['booking','bkg']},
@@ -97,6 +102,7 @@ BUSINESS_NAV_ALIASES = {
         {'label':'Container Activity','target':'agent-tasks::container-activity','search_terms':['container','container activity','equipment journey']},
         {'label':'Delivery Order','target':'agent-tasks::delivery-order','search_terms':['do','delivery order']},
         {'label':'Agent Receipt / Pay','target':'agent-tasks::agent-receipt-pay','search_terms':['agent receipt','agent pay','agent operations']},
+        {'label':'TS Branch Operations','target':'agent-tasks::transshipment-crt','workspace_key':'ts-branch-ops','search_terms':['ts branch operations','transshipment branch','ts task','re-load','reloading']},
     ],
     'Document': [
         {'label':'B/L','target':'agent-tasks::bl','search_terms':['b/l','bl','bill of lading','hbl','mbl']},
@@ -104,6 +110,8 @@ BUSINESS_NAV_ALIASES = {
         {'label':'Split B/L','target':'agent-tasks::split-bl','search_terms':['split bl','split b/l']},
         {'label':'Import B/L','target':'agent-tasks::import-bl','search_terms':['import bl','import b/l']},
         {'label':'Release Instruction','target':'agent-tasks::delivery-order','search_terms':['release instruction','release','telex release']},
+        {'label':'Release Control','target':'agent-tasks::delivery-order','workspace_key':'release-control','search_terms':['release control','release prerequisites','finance clearance','customs clearance','surrender']},
+        {'label':'MBL ↔ HBL Link Control','target':'agent-tasks::bl','workspace_key':'bl-linkage','search_terms':['mbl hbl link','mbl reconciliation','carrier bl','house bl']},
     ],
     'Equipment': [
         {'label':'Container Master / Activity','target':'agent-tasks::container-activity','search_terms':['container master','container','equipment']},
@@ -120,6 +128,7 @@ BUSINESS_NAV_ALIASES = {
         {'label':'SOA','target':'agent-tasks::soa','search_terms':['soa','statement of account']},
         {'label':'Profit & Loss','target':'gl-accounts::profit-loss','search_terms':['p&l','pnl','profit loss']},
         {'label':'Trial Balance','target':'gl-accounts::trial-balance-report','search_terms':['trial balance','tb']},
+        {'label':'Inter-Branch Settlement','target':'treasury::agent-settlement','workspace_key':'interbranch-settlement','search_terms':['inter branch settlement','intercompany settlement','branch settlement']},
     ],
     'Control / Reporting': [
         {'label':'Approval Queue','target':'master-data::approval-queue','search_terms':['approval','approval queue']},
@@ -128,6 +137,7 @@ BUSINESS_NAV_ALIASES = {
         {'label':'Balance Sheet','target':'gl-accounts::balance-sheet','search_terms':['balance sheet','bs']},
         {'label':'GL Detail','target':'gl-accounts::gl-detail','search_terms':['gl detail','general ledger detail']},
         {'label':'Subledger / GL Reconciliation','target':'gl-accounts::subledger-gl-reconciliation','search_terms':['reconciliation','subledger reconciliation']},
+        {'label':'Branch P&L / Consolidation','target':'gl-accounts::profit-loss','workspace_key':'branch-pnl','search_terms':['branch pnl','branch p&l','consolidation','elimination','group margin']},
     ],
 }
 
