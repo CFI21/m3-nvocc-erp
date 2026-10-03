@@ -50,6 +50,7 @@ class PeriodApprovalBody(BaseModel):
     action:str=Field(pattern='^(POST|REVERSE)
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def jdump(x):return json.dumps(x,sort_keys=True,separators=(',',':'))
+
 def item6_enabled():
     return os.getenv('M3_ITEM6_FINANCIAL_GOVERNANCE_ENABLED','false').lower()=='true'
 
@@ -99,7 +100,6 @@ def _ensure_period_governance(conn,period,voucher_id,action,flow=None):
         code='TAX_FILED_PERIOD_APPROVAL_REQUIRED' if period['status']=='LOCKED' else 'CLOSED_PERIOD_APPROVAL_REQUIRED'
         raise HTTPException(422,{'code':code,'period':period['period_no'],'status':period['status'],'missing_roles':missing})
     return {'period_mode':'TAX_FILED_CONTROLLED' if period['status']=='LOCKED' else 'CLOSED_CONTROLLED','approvals':sorted(got)}
-
 def require_module(m):
     if m not in MODULES: raise HTTPException(404,'Unknown GL module')
 def actor(role,action='view',session_token=None,module=None):
@@ -225,7 +225,7 @@ def assert_period_postable(conn,date_text,voucher_id=None,action='POST',flow=Non
     ctl=conn.execute('SELECT earliest_posting_date FROM gl_backdate_controls WHERE period_id=? AND active=1',(p['id'],)).fetchone()
     if ctl and date_text < ctl['earliest_posting_date']:
         raise HTTPException(422,{'code':'BACKDATE_LIMIT_EXCEEDED','date':date_text,'earliest_posting_date':ctl['earliest_posting_date'],'period':p['period_no']})
-    return p,governance
+    return (p,governance) if voucher_id is not None else p
 
 def approval_rule(conn,vtype,amount):
     return conn.execute("SELECT * FROM gl_approval_rules WHERE active=1 AND voucher_type IN (?, '*') AND ?>=min_amount AND (max_amount IS NULL OR ?<=max_amount) ORDER BY CASE WHEN voucher_type=? THEN 0 ELSE 1 END,min_amount DESC LIMIT 1",(vtype,amount,amount,vtype)).fetchone()
@@ -278,6 +278,36 @@ def voucher_for(conn,rid):return conn.execute('SELECT * FROM gl_vouchers WHERE g
 def voucher_balanced(conn,vid):
     r=conn.execute('SELECT COALESCE(SUM(debit),0) d,COALESCE(SUM(credit),0) c FROM gl_voucher_lines WHERE voucher_id=?',(vid,)).fetchone()
     return abs(r['d']-r['c'])<0.0001 and r['d']>0,r['d'],r['c']
+
+@router.post('/period-governance/{period_id}/voucher/{voucher_id}/approve')
+def approve_period_override(period_id:int,voucher_id:int,body:PeriodApprovalBody,
+                            x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not item6_enabled(): raise HTTPException(404,'Item 6 governance disabled')
+    c=connect();tx(c)
+    try:
+        ctx=_session_context(c,x_m3_session)
+        if not (set(ctx['roles']) & ITEM6_APPROVAL_ROLE_MAP[body.approval_role]):
+            raise HTTPException(403,{'code':'PERIOD_APPROVAL_ROLE_REQUIRED','approval_role':body.approval_role})
+        v=c.execute('SELECT * FROM gl_vouchers WHERE id=?',(voucher_id,)).fetchone()
+        p=c.execute('SELECT * FROM gl_periods WHERE id=?',(period_id,)).fetchone()
+        if not v or not p: raise HTTPException(404,{'code':'PERIOD_OR_VOUCHER_NOT_FOUND'})
+        if v['maker_role']==ctx['user_ref']: raise HTTPException(409,{'code':'MAKER_SELF_ACTION_BLOCKED'})
+        ref='PGA-'+uuid.uuid4().hex[:12].upper()
+        try:
+            c.execute("""INSERT INTO gl_period_override_approvals
+              (approval_ref,period_id,voucher_id,action,approval_role,approver_user_ref,approver_office_code,reason,status,created_at)
+              VALUES(?,?,?,?,?,?,?,?, 'APPROVED',?)""",
+              (ref,period_id,voucher_id,body.action,body.approval_role,ctx['user_ref'],ctx['office_code'],body.reason,now()))
+        except IntegrityError:
+            raise HTTPException(409,{'code':'PERIOD_APPROVAL_ALREADY_EXISTS','approval_role':body.approval_role})
+        audit(c,ctx['user_ref'],'PERIOD_OVERRIDE_APPROVE','accounting-periods',period_id,v['job_id'],None,
+              {'approval_ref':ref,'voucher_id':voucher_id,'action':body.action,'approval_role':body.approval_role},
+              {'office_code':ctx['office_code'],'country_code':ctx['country_code'],'organization_code':ctx['organization_code'],'roles':ctx['roles'],'reason':body.reason})
+        c.execute('COMMIT')
+        return {'approval_ref':ref,'period_id':period_id,'voucher_id':voucher_id,'action':body.action,'approval_role':body.approval_role,'status':'APPROVED'}
+    except HTTPException:
+        c.execute('ROLLBACK');raise
+    finally:c.close()
 
 @router.get('/health')
 def health():return {'project':'M3 NVOCC ERP','baseline':'M3-CLX006-REBRAND-20260923-001','module':'GENERAL / ADMINISTRATION · FINANCE & ACCOUNTING SETUP','database':backend_name(),'production_promoted':False,'live_integrations':False}
@@ -424,7 +454,8 @@ def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEW
             rvno=next_voucher(conn,'RV'); cur=conn.execute('''INSERT INTO gl_vouchers(gl_record_id,voucher_no,voucher_type,voucher_date,currency,status,source_type,source_ref,job_id,total_debit,total_credit,version,reversal_of,posted_at,created_at) VALUES(NULL,?,?,?,?,?,?,?,?,?,?,1,?,?,?)''',(rvno,'RV',v['voucher_date'],v['currency'],'Posted','REVERSAL',v['voucher_no'],v['job_id'],v['total_credit'],v['total_debit'],v['id'],now(),now()));rvid=cur.lastrowid
             for line in conn.execute('SELECT * FROM gl_voucher_lines WHERE voucher_id=? ORDER BY line_no',(v['id'],)):
                 conn.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(rvid,line['line_no'],line['account_code'],line['credit'],line['debit'],'Reversal of '+v['voucher_no'],line['job_id']))
-            conn.execute('UPDATE gl_vouchers SET status=\'Reversed\',version=version+1 WHERE id=?',(v['id'],));st='Reversed';p['Status']=st;meta['reversal_voucher']=rvno
+            conn.execute('UPDATE gl_vouchers SET status=\'Reversed\',version=version+1 WHERE id=?',(v['id'],));st='Reversed';p['Status']=st
+            meta.update({'reversal_voucher':rvno,'original_voucher':v['voucher_no'],'period_mode':period_gov['period_mode'],'period_approvals':period_gov['approvals']})
         else:raise HTTPException(422,{'code':'UNKNOWN_GL_ACTION'})
         cur=conn.execute('UPDATE gl_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?',(st,json.dumps(p),now(),rid,body.version))
         if cur.rowcount!=1:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
