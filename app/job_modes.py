@@ -41,7 +41,7 @@ def _profile(conn, job_id:int, job_type:str, consolidation_ref:str|None, split_s
     conn.execute(
         """INSERT INTO job_mode_profiles(job_id,job_type,consolidation_ref,split_sequence,commercial_authority,version)
            VALUES(?,?,?,?,?,1)""",
-        (job_id,job_type,normalize(consolidation_ref),"JOB_BOOKING_LINKS"),
+        (job_id,job_type,normalize(consolidation_ref),split_sequence,"JOB_BOOKING_LINKS"),
     )
 
 
