@@ -543,7 +543,7 @@ async function renderClx083OperationalMaster(){
       clx83RO('Remarks',clx83Pick(base,'Remarks'),{full:true,textarea:true})
     ]));
     out+=clx83Section('POT Conditional Logic',pot?
-      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing CRT/booking record.</div>':
+      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing CRT/booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-crt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
       '<div class="equipNote">Direct shipment / no POT detected. POT, TS Agent and connecting vessel/voyage controls remain inactive; no transshipment data is forced.</div>');
   }
   if(isDo){
@@ -891,7 +891,17 @@ async function clx49RenderBlTab(tab){
       clx82NativeField(r,'Release Status','Release Status')+
       clx82NativeField(r,'Payment Block','Payment Block')+
       clx82NativeField(r,'Customs Status','Customs Status')+
-      clx82NativeField(r,'Freight Status','Freight Status')+\n      clx82NativeField(r,'Delivery From','Delivery From')+\n      clx82NativeField(r,'Delivery From Type','Delivery From Type')+\n      clx82NativeField(r,'Empty Return To','Empty Return To')+\n      clx82NativeField(r,'Empty Return Type','Empty Return Type')+\n      clx82NativeField(r,'POD Agent','POD Agent')+\n      clx82NativeField(r,'POD Agent Type','POD Agent Type')+\n      clx82NativeField(r,'Delivery Date','Delivery Date',{type:'date'})+\n      clx82NativeField(r,'Empty Return Date','Empty Return Date',{type:'date'})+\n      clx82NativeField(r,'D&D Free Time End','D&D Free Time End',{type:'date'})+\n      clx82NativeField(r,'Cost Allocation','Cost Allocation')+\n    '</div></div></div>';
+      clx82NativeField(r,'Freight Status','Freight Status')+
+      clx82NativeField(r,'Delivery From','Delivery From')+
+      clx82NativeField(r,'Delivery From Type','Delivery From Type')+
+      clx82NativeField(r,'Empty Return To','Empty Return To')+
+      clx82NativeField(r,'Empty Return Type','Empty Return Type')+
+      clx82NativeField(r,'POD Agent','POD Agent')+
+      clx82NativeField(r,'POD Agent Type','POD Agent Type')+
+      clx82NativeField(r,'Delivery Date','Delivery Date',{type:'date'})+
+      clx82NativeField(r,'Empty Return Date','Empty Return Date',{type:'date'})+
+      clx82NativeField(r,'D&D Free Time End','D&D Free Time End',{type:'date'})+
+      clx82NativeField(r,'Cost Allocation','Cost Allocation')+\n    '</div></div></div>';
   }
 
   if(tab==='Lock Info'){
@@ -1120,6 +1130,7 @@ async function clx49RenderBooking(tab){
       clx78Field(r,'TS Agent (1)','TS Agent (1)',{disabled:!hasPot1})+
       clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','TS Agent (2)',{disabled:!hasPot2})+
       clx78Field(r,'POD','POD')+clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
+      clx78Field(r,'Origin Branch','Origin Branch')+clx78Field(r,'TS Branch','TS Branch',{disabled:!hasPot1})+clx78Field(r,'Destination Branch','Destination Branch')+
       '<div class="clx81GroupTitle">CARGO / EQUIPMENT</div>'+
       clx78Field(r,'Commodity','Commodity')+clx78Field(r,'Cargo','Cargo Description',{wide:true})+
       clx78Field(r,'Packages','Packages')+clx78Field(r,'Weight','Gross Weight')+
