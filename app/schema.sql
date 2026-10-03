@@ -116,6 +116,67 @@ BEGIN SELECT RAISE(ABORT,'CRT_AUDIT_IMMUTABLE'); END;
 CREATE TRIGGER IF NOT EXISTS crt_audit_immutable_delete BEFORE DELETE ON crt_audit
 BEGIN SELECT RAISE(ABORT,'CRT_AUDIT_IMMUTABLE'); END;
 
+-- M3 Item 3 — cardinality + operational grouping relationship layer.
+CREATE TABLE IF NOT EXISTS operational_groups(
+ id INTEGER PRIMARY KEY,
+ group_ref TEXT NOT NULL UNIQUE,
+ group_type TEXT NOT NULL CHECK(group_type IN ('CONSOLIDATION','TS','VESSEL','TERMINAL','CRO_TRT')),
+ authority_scope TEXT NOT NULL CHECK(authority_scope='OPERATIONAL_COORDINATION_ONLY'),
+ created_by TEXT NOT NULL,
+ created_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS operational_group_jobs(
+ id INTEGER PRIMARY KEY,
+ group_id INTEGER NOT NULL REFERENCES operational_groups(id) ON DELETE CASCADE,
+ job_id INTEGER NOT NULL REFERENCES jobs(id),
+ relationship_status TEXT NOT NULL CHECK(relationship_status IN ('ACTIVE','REMOVED')),
+ created_at TEXT NOT NULL,
+ UNIQUE(group_id,job_id)
+);
+CREATE TABLE IF NOT EXISTS mbl_hbl_links(
+ id INTEGER PRIMARY KEY,
+ mbl_bill_id INTEGER NOT NULL REFERENCES bills(id),
+ hbl_bill_id INTEGER NOT NULL REFERENCES bills(id),
+ job_id INTEGER NOT NULL REFERENCES jobs(id),
+ link_status TEXT NOT NULL CHECK(link_status IN ('ACTIVE','REMOVED')),
+ created_by TEXT NOT NULL,
+ created_at TEXT NOT NULL,
+ UNIQUE(mbl_bill_id,hbl_bill_id),
+ CHECK(mbl_bill_id<>hbl_bill_id)
+);
+CREATE TABLE IF NOT EXISTS cro_container_links(
+ id INTEGER PRIMARY KEY,
+ cro_transaction_id INTEGER NOT NULL REFERENCES transaction_records(id),
+ container_id INTEGER NOT NULL REFERENCES containers(id),
+ relationship_status TEXT NOT NULL CHECK(relationship_status IN ('ACTIVE','REMOVED')),
+ created_by TEXT NOT NULL,
+ created_at TEXT NOT NULL,
+ UNIQUE(cro_transaction_id,container_id)
+);
+CREATE TABLE IF NOT EXISTS cro_trt_links(
+ id INTEGER PRIMARY KEY,
+ cro_transaction_id INTEGER NOT NULL REFERENCES transaction_records(id),
+ trt_transaction_id INTEGER NOT NULL REFERENCES transaction_records(id),
+ relationship_status TEXT NOT NULL CHECK(relationship_status IN ('ACTIVE','REMOVED')),
+ created_by TEXT NOT NULL,
+ created_at TEXT NOT NULL,
+ UNIQUE(cro_transaction_id,trt_transaction_id)
+);
+CREATE TABLE IF NOT EXISTS trt_container_links(
+ id INTEGER PRIMARY KEY,
+ trt_transaction_id INTEGER NOT NULL REFERENCES transaction_records(id),
+ container_id INTEGER NOT NULL REFERENCES containers(id),
+ relationship_status TEXT NOT NULL CHECK(relationship_status IN ('ACTIVE','REMOVED')),
+ created_by TEXT NOT NULL,
+ created_at TEXT NOT NULL,
+ UNIQUE(trt_transaction_id,container_id)
+);
+CREATE INDEX IF NOT EXISTS idx_operational_group_jobs_job ON operational_group_jobs(job_id);
+CREATE INDEX IF NOT EXISTS idx_mbl_hbl_job ON mbl_hbl_links(job_id);
+CREATE INDEX IF NOT EXISTS idx_cro_container_container ON cro_container_links(container_id);
+CREATE INDEX IF NOT EXISTS idx_trt_container_container ON trt_container_links(container_id);
+
 CREATE TABLE IF NOT EXISTS special_rate_workflow(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL UNIQUE REFERENCES transaction_records(id) ON DELETE CASCADE, stage TEXT NOT NULL, carrier_response TEXT, approved_rate REAL, quote_ref TEXT, booking_ref TEXT, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS switch_bl_history(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, job_id INTEGER NOT NULL REFERENCES jobs(id), ts TEXT NOT NULL, original_bill_no TEXT NOT NULL, switch_bill_no TEXT NOT NULL, original_parties_json TEXT NOT NULL, new_parties_json TEXT NOT NULL, approved_by TEXT, confidentiality INTEGER NOT NULL DEFAULT 1, immutable_hash TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS split_bl_allocations(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, child_bill_no TEXT NOT NULL, container_no TEXT NOT NULL, packages REAL NOT NULL, weight REAL NOT NULL, measurement REAL NOT NULL, UNIQUE(transaction_id,child_bill_no));

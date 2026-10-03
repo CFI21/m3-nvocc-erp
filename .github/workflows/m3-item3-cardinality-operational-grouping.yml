@@ -1,0 +1,51 @@
+name: M3 Item 3 Cardinality Operational Grouping
+
+on:
+  pull_request:
+    paths:
+      - "app/operational_grouping.py"
+      - "app/schema.sql"
+      - "migrations/M3_ITEM3_CARDINALITY_OPERATIONAL_GROUPING_001.sql"
+      - "docs/M3_ITEM3_CARDINALITY_OPERATIONAL_GROUPING.md"
+      - "tests/test_m3_item3_cardinality_operational_grouping.py"
+      - ".github/workflows/m3-item3-cardinality-operational-grouping.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  item3:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Item 3 focused tests
+        env:
+          PYTHONPATH: .
+          M3_OPERATIONAL_GROUPING_ENABLED: "true"
+        run: pytest -q tests/test_m3_item3_cardinality_operational_grouping.py
+      - name: CRT/TRT regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_crt_governance_trt_rename.py
+      - name: Item 2 regression
+        env:
+          PYTHONPATH: .
+          M3_JOB_IDEMPOTENCY_ENABLED: "true"
+          M3_JOB_MODES_ENABLED: "true"
+        run: pytest -q tests/test_m3_item2_job_modes.py
+      - name: Item 1 regression
+        env:
+          PYTHONPATH: .
+          M3_JOB_IDEMPOTENCY_ENABLED: "true"
+        run: pytest -q tests/test_m3_item1_job_idempotency.py
+      - name: Stage 0 regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_stage0_baseline_freeze.py
+      - name: Full M3 regression
+        env: {PYTHONPATH: .}
+        run: pytest -q
+      - name: Compile
+        run: python -m compileall -q app
