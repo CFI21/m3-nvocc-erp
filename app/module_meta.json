@@ -223,11 +223,11 @@
       ]
     },
     {
-      "key": "crt",
-      "name": "CRT",
+      "key": "trt",
+      "name": "TRT",
       "route": "/agent-tasks/transactions/crt",
       "columns": [
-        "CRT No.",
+        "TRT No.",
         "Date",
         "Agent",
         "Booking / Job Ref",
@@ -239,7 +239,7 @@
         "Status"
       ],
       "fields": [
-        "CRT No.",
+        "TRT No.",
         "Date",
         "Agent",
         "Customer",
@@ -265,11 +265,11 @@
       ]
     },
     {
-      "key": "export-crt",
-      "name": "Export CRT",
-      "route": "/agent-tasks/transactions/export-crt",
+      "key": "export-trt",
+      "name": "Export TRT",
+      "route": "/agent-tasks/transactions/export-trt",
       "columns": [
-        "Export CRT No.",
+        "Export TRT No.",
         "Booking",
         "Agent",
         "POL",
@@ -280,7 +280,7 @@
         "Status"
       ],
       "fields": [
-        "Export CRT No.",
+        "Export TRT No.",
         "Booking",
         "Job Ref",
         "Agent",
@@ -305,11 +305,11 @@
       ]
     },
     {
-      "key": "transshipment-crt",
-      "name": "Transshipment CRT",
-      "route": "/agent-tasks/transactions/transshipment-crt",
+      "key": "transshipment-trt",
+      "name": "Transshipment TRT",
+      "route": "/agent-tasks/transactions/transshipment-trt",
       "columns": [
-        "TS CRT No.",
+        "TS TRT No.",
         "Job",
         "Container",
         "From Vessel",
@@ -318,7 +318,7 @@
         "Status"
       ],
       "fields": [
-        "TS CRT No.",
+        "TS TRT No.",
         "Job Ref",
         "Container",
         "Incoming Vessel",
@@ -490,11 +490,11 @@
       ]
     },
     {
-      "key": "import-crt",
-      "name": "Import CRT",
-      "route": "/agent-tasks/transactions/import-crt",
+      "key": "import-trt",
+      "name": "Import TRT",
+      "route": "/agent-tasks/transactions/import-trt",
       "columns": [
-        "Import CRT No.",
+        "Import TRT No.",
         "BL",
         "Agent",
         "POD",
@@ -505,7 +505,7 @@
         "Status"
       ],
       "fields": [
-        "Import CRT No.",
+        "Import TRT No.",
         "MBL",
         "HBL",
         "Job Ref",
@@ -751,10 +751,10 @@
     }
   ],
   "primary_keys": {
-    "crt": "CRT No.",
-    "export-crt": "Export CRT No.",
-    "import-crt": "Import CRT No.",
-    "transshipment-crt": "TS CRT No.",
+    "trt": "TRT No.",
+    "export-trt": "Export TRT No.",
+    "import-trt": "Import TRT No.",
+    "transshipment-trt": "TS TRT No.",
     "soa": "SOA No.",
     "agent-receipt-pay": "Transaction No.",
     "detention-collection": "Reference",
