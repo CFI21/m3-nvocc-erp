@@ -289,6 +289,20 @@ CREATE TABLE IF NOT EXISTS gl_vouchers(
  version INTEGER NOT NULL DEFAULT 1, reversal_of INTEGER REFERENCES gl_vouchers(id), approved_by TEXT, approved_at TEXT, posted_at TEXT, created_at TEXT NOT NULL,
  maker_role TEXT, exchange_rate REAL NOT NULL DEFAULT 1, base_currency TEXT NOT NULL DEFAULT 'USD', base_total_debit REAL NOT NULL DEFAULT 0, base_total_credit REAL NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS gl_period_override_approvals(
+ id INTEGER PRIMARY KEY,
+ approval_ref TEXT NOT NULL UNIQUE,
+ period_id INTEGER NOT NULL REFERENCES gl_periods(id),
+ voucher_id INTEGER NOT NULL REFERENCES gl_vouchers(id),
+ action TEXT NOT NULL CHECK(action IN ('POST','REVERSE')),
+ approval_role TEXT NOT NULL CHECK(approval_role IN ('FINANCE_MANAGER','CFO','EXTERNAL_ADVISOR','TS_BRANCH_MANAGER','TS_FINANCE')),
+ approver_user_ref TEXT NOT NULL,
+ approver_office_code TEXT,
+ reason TEXT NOT NULL,
+ status TEXT NOT NULL DEFAULT 'APPROVED' CHECK(status IN ('APPROVED','REVOKED')),
+ created_at TEXT NOT NULL,
+ UNIQUE(period_id,voucher_id,action,approval_role)
+);
 CREATE TABLE IF NOT EXISTS gl_voucher_lines(
  id INTEGER PRIMARY KEY, voucher_id INTEGER NOT NULL REFERENCES gl_vouchers(id) ON DELETE CASCADE, line_no INTEGER NOT NULL,
  account_code TEXT NOT NULL REFERENCES gl_accounts(account_code), debit REAL NOT NULL DEFAULT 0, credit REAL NOT NULL DEFAULT 0,

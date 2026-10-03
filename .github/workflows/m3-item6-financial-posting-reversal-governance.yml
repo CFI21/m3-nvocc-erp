@@ -1,0 +1,71 @@
+name: M3 Item 6 Financial Posting Reversal Governance
+
+on:
+  pull_request:
+    paths:
+      - "app/gl.py"
+      - "app/item6_financial_governance.py"
+      - "app/schema.sql"
+      - "migrations/M3_ITEM6_FINANCIAL_POSTING_REVERSAL_001.sql"
+      - "tests/test_m3_item6_financial_posting_reversal_governance.py"
+      - ".github/workflows/m3-item6-financial-posting-reversal-governance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  item6:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Compile before tests
+        run: python -m compileall -q app
+      - name: Item 6 focused tests
+        env:
+          PYTHONPATH: .
+          M3_ITEM6_FINANCIAL_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item6_financial_posting_reversal_governance.py
+      - name: Item 5 regression
+        env:
+          PYTHONPATH: .
+          M3_RELEASE_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item5_release_governance.py
+      - name: Item 4 regression
+        env:
+          PYTHONPATH: .
+          M3_STATE_TRANSITION_GOVERNANCE_ENABLED: "true"
+        run: pytest -q tests/test_m3_item4_state_transition_governance.py
+      - name: Item 3 regression
+        env:
+          PYTHONPATH: .
+          M3_OPERATIONAL_GROUPING_ENABLED: "true"
+        run: pytest -q tests/test_m3_item3_cardinality_operational_grouping.py
+      - name: CRT/TRT regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_crt_governance_trt_rename.py
+      - name: Item 2 regression
+        env:
+          PYTHONPATH: .
+          M3_JOB_IDEMPOTENCY_ENABLED: "true"
+          M3_JOB_MODES_ENABLED: "true"
+        run: pytest -q tests/test_m3_item2_job_modes.py
+      - name: Item 1 regression
+        env:
+          PYTHONPATH: .
+          M3_JOB_IDEMPOTENCY_ENABLED: "true"
+        run: pytest -q tests/test_m3_item1_job_idempotency.py
+      - name: Stage 0 regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_stage0_baseline_freeze.py
+      - name: Full M3 regression
+        env:
+          PYTHONPATH: .
+          PYTHONFAULTHANDLER: "1"
+        run: timeout --signal=TERM 300s pytest -vv --durations=25
+      - name: Final compile
+        run: python -m compileall -q app

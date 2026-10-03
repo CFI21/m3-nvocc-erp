@@ -9,6 +9,14 @@ from .json_recovery import load_json_or_recover_arrays
 from .admin import session as iam_session, permission_code as iam_permission_code
 from .clx034_smart_approval_fast_track import enforce_gl_action
 from .clx044_gl_exact_flow import apply_gl_exact_flow
+from .item6_financial_governance import (
+    enabled as item6_enabled,
+    enforce_sensitive_session,
+    enforce_update_guard,
+    ensure_period_governance,
+    session_context as item6_session_context,
+    record_period_approval,
+)
 
 HERE=Path(__file__).resolve().parent
 META, META_RECOVERED = load_json_or_recover_arrays(
@@ -43,6 +51,13 @@ class UpdateBody(BaseModel):
 class ActionBody(BaseModel):
     version:int=Field(ge=1)
     reason:Optional[str]=None
+    crt_ref:Optional[str]=None
+    corrected_document_ref:Optional[str]=None
+
+class PeriodApprovalBody(BaseModel):
+    action:str
+    approval_role:str
+    reason:str=Field(min_length=3)
 
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def jdump(x):return json.dumps(x,sort_keys=True,separators=(',',':'))
@@ -161,13 +176,17 @@ def fiscal_period(conn,date_text):
     if not r: raise HTTPException(422,{'code':'NO_ACCOUNTING_PERIOD','date':date_text})
     return r
 
-def assert_period_postable(conn,date_text):
+def assert_period_postable(conn,date_text,voucher_id=None,action='POST',flow=None):
     p=fiscal_period(conn,date_text)
-    if p['status']!='OPEN': raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_NOT_OPEN','period':p['period_no'],'status':p['status']})
+    governance=None
+    if item6_enabled() and voucher_id is not None:
+        governance=ensure_period_governance(conn,p,voucher_id,action,flow)
+    elif p['status']!='OPEN':
+        raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_NOT_OPEN','period':p['period_no'],'status':p['status']})
     ctl=conn.execute('SELECT earliest_posting_date FROM gl_backdate_controls WHERE period_id=? AND active=1',(p['id'],)).fetchone()
     if ctl and date_text < ctl['earliest_posting_date']:
         raise HTTPException(422,{'code':'BACKDATE_LIMIT_EXCEEDED','date':date_text,'earliest_posting_date':ctl['earliest_posting_date'],'period':p['period_no']})
-    return p
+    return (p,governance or {'period_mode':'OPEN','approvals':[]}) if voucher_id is not None else p
 
 def approval_rule(conn,vtype,amount):
     return conn.execute("SELECT * FROM gl_approval_rules WHERE active=1 AND voucher_type IN (?, '*') AND ?>=min_amount AND (max_amount IS NULL OR ?<=max_amount) ORDER BY CASE WHEN voucher_type=? THEN 0 ELSE 1 END,min_amount DESC LIMIT 1",(vtype,amount,amount,vtype)).fetchone()
@@ -220,6 +239,23 @@ def voucher_for(conn,rid):return conn.execute('SELECT * FROM gl_vouchers WHERE g
 def voucher_balanced(conn,vid):
     r=conn.execute('SELECT COALESCE(SUM(debit),0) d,COALESCE(SUM(credit),0) c FROM gl_voucher_lines WHERE voucher_id=?',(vid,)).fetchone()
     return abs(r['d']-r['c'])<0.0001 and r['d']>0,r['d'],r['c']
+
+@router.post('/period-governance/{period_id}/voucher/{voucher_id}/approve')
+def approve_period_override(period_id:int,voucher_id:int,body:PeriodApprovalBody,
+                            x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not item6_enabled(): raise HTTPException(404,'Item 6 governance disabled')
+    conn=connect();tx(conn)
+    try:
+        ctx=item6_session_context(conn,x_m3_session)
+        out=record_period_approval(conn,now,period_id,voucher_id,body.action,body.approval_role,body.reason,ctx)
+        audit(conn,ctx['user_ref'],'PERIOD_OVERRIDE_APPROVE','accounting-periods',period_id,out['job_id'],None,out,
+              {'office_code':ctx['office_code'],'country_code':ctx['country_code'],'organization_code':ctx['organization_code'],'roles':ctx['roles'],'reason':body.reason})
+        conn.execute('COMMIT')
+        out.pop('job_id',None)
+        return out
+    except HTTPException:
+        conn.execute('ROLLBACK');raise
+    finally:conn.close()
 
 @router.get('/health')
 def health():return {'project':'M3 NVOCC ERP','baseline':'M3-CLX006-REBRAND-20260923-001','module':'GENERAL / ADMINISTRATION · FINANCE & ACCOUNTING SETUP','database':backend_name(),'production_promoted':False,'live_integrations':False}
@@ -278,6 +314,7 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
     require_module(module);role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
+        enforce_update_guard(module,module in TRANSACTIONS,r['status'],x_m3_session)
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         p=json.loads(r['payload_json']);p.update(body.fields);errs=validate(module,p)
         if errs:raise HTTPException(422,{'codes':errs})
@@ -289,13 +326,17 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
     finally:conn.close()
 @router.post('/{module}/{rid}/actions/{action}')
 def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_module(module);action=action.lower();role=actor(x_role,action,x_m3_session,module)
+    require_module(module);action=action.lower();enforce_sensitive_session(action,x_m3_session);role=actor(x_role,action,x_m3_session,module)
     if action in {'approve','post','reverse','close'}: enforce_gl_action(module,rid,action,x_m3_session,body.version,body.reason)
     conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
-        p=json.loads(r['payload_json']);st=r['status'];meta={'reason':body.reason}
+        p=json.loads(r['payload_json']);st=r['status'];meta={'reason':body.reason,'crt_ref':body.crt_ref,'corrected_document_ref':body.corrected_document_ref}
+        if item6_enabled():
+            meta.update(item6_session_context(conn,x_m3_session))
+            if action=='cancel' and str(st).upper() in {'APPROVED','POSTED','REVERSED','CANCELLED','CLOSED'}:
+                raise HTTPException(409,{'code':'FINANCIAL_RECORD_IMMUTABLE','status':st})
         if action=='approve':
             st='Approved';p['Status']=st
             if module=='voucher':
@@ -322,11 +363,18 @@ def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEW
             if not v:raise HTTPException(422,{'code':'VOUCHER_ENGINE_RECORD_MISSING'})
             ok,d,c=voucher_balanced(conn,v['id'])
             if not ok:raise HTTPException(422,{'code':'UNBALANCED_VOUCHER','debit':d,'credit':c})
-            assert_period_postable(conn,v['voucher_date'])
+            flow=p.get('Flow') or p.get('Shipment Type') or p.get('Mode')
+            period,period_gov=assert_period_postable(conn,v['voucher_date'],v['id'],'POST',flow)
             rule=approval_rule(conn,v['voucher_type'],float(v['total_debit'])); needed=int(rule['required_levels']) if rule else 1
             done=approval_count(conn,v['id'])
+            if v['status']=='Posted': raise HTTPException(409,{'code':'VOUCHER_ALREADY_POSTED'})
             if v['status']!='Approved' or done<needed: raise HTTPException(422,{'code':'APPROVAL_REQUIRED_BEFORE_POSTING','approvals':done,'required':needed})
-            conn.execute("UPDATE gl_vouchers SET status='Posted',posted_at=?,version=version+1 WHERE id=?",(now(),v['id']));st='Posted';p['Status']=st;meta.update({'balanced':True,'period_open':True,'approvals':done})
+            dup=conn.execute("""SELECT id,voucher_no FROM gl_vouchers WHERE id<>? AND status='Posted'
+                AND COALESCE(source_type,'')=COALESCE(?,'') AND COALESCE(source_ref,'')=COALESCE(?,'')
+                AND COALESCE(source_ref,'')<>'' AND voucher_type<>'RV' LIMIT 1""",(v['id'],v['source_type'],v['source_ref'])).fetchone()
+            if dup: raise HTTPException(409,{'code':'DUPLICATE_SOURCE_POSTING','existing_voucher':dup['voucher_no']})
+            conn.execute("UPDATE gl_vouchers SET status='Posted',posted_at=?,version=version+1 WHERE id=?",(now(),v['id']));st='Posted';p['Status']=st
+            meta.update({'balanced':True,'period_open':period['status']=='OPEN','period_mode':period_gov['period_mode'],'period_approvals':period_gov['approvals'],'approvals':done})
         elif action=='close':
             if module!='accounting-periods':raise HTTPException(422,{'code':'CLOSE_ONLY_ACCOUNTING_PERIOD'})
             period_no=int(p.get('Period') or 0)
@@ -338,11 +386,16 @@ def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEW
             if module!='voucher':raise HTTPException(422,{'code':'REVERSE_ONLY_VOUCHER'})
             v=voucher_for(conn,rid)
             if not v or v['status']!='Posted':raise HTTPException(422,{'code':'ONLY_POSTED_VOUCHER_CAN_REVERSE'})
-            assert_period_postable(conn,v['voucher_date'])
+            flow=p.get('Flow') or p.get('Shipment Type') or p.get('Mode')
+            period,period_gov=assert_period_postable(conn,v['voucher_date'],v['id'],'REVERSE',flow)
+            if not body.reason: raise HTTPException(422,{'code':'REVERSAL_REASON_REQUIRED'})
+            prior=conn.execute('SELECT voucher_no FROM gl_vouchers WHERE reversal_of=? LIMIT 1',(v['id'],)).fetchone()
+            if prior: raise HTTPException(409,{'code':'REVERSAL_ALREADY_EXISTS','reversal_voucher':prior['voucher_no']})
             rvno=next_voucher(conn,'RV'); cur=conn.execute('''INSERT INTO gl_vouchers(gl_record_id,voucher_no,voucher_type,voucher_date,currency,status,source_type,source_ref,job_id,total_debit,total_credit,version,reversal_of,posted_at,created_at) VALUES(NULL,?,?,?,?,?,?,?,?,?,?,1,?,?,?)''',(rvno,'RV',v['voucher_date'],v['currency'],'Posted','REVERSAL',v['voucher_no'],v['job_id'],v['total_credit'],v['total_debit'],v['id'],now(),now()));rvid=cur.lastrowid
             for line in conn.execute('SELECT * FROM gl_voucher_lines WHERE voucher_id=? ORDER BY line_no',(v['id'],)):
                 conn.execute('INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)',(rvid,line['line_no'],line['account_code'],line['credit'],line['debit'],'Reversal of '+v['voucher_no'],line['job_id']))
-            conn.execute('UPDATE gl_vouchers SET status=\'Reversed\',version=version+1 WHERE id=?',(v['id'],));st='Reversed';p['Status']=st;meta['reversal_voucher']=rvno
+            conn.execute('UPDATE gl_vouchers SET status=\'Reversed\',version=version+1 WHERE id=?',(v['id'],));st='Reversed';p['Status']=st
+            meta.update({'reversal_voucher':rvno,'original_voucher':v['voucher_no'],'period_mode':period_gov['period_mode'],'period_approvals':period_gov['approvals']})
         else:raise HTTPException(422,{'code':'UNKNOWN_GL_ACTION'})
         cur=conn.execute('UPDATE gl_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?',(st,json.dumps(p),now(),rid,body.version))
         if cur.rowcount!=1:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
