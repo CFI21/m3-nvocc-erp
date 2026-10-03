@@ -1,0 +1,45 @@
+name: M3 Item 2 Job Modes
+
+on:
+  pull_request:
+    paths:
+      - "app/job_modes.py"
+      - "app/schema.sql"
+      - "migrations/M3_ITEM2_JOB_MODES_001.sql"
+      - "tests/test_m3_item2_job_modes.py"
+      - "docs/M3_ITEM2_STANDARD_CONSOLIDATION_JOB.md"
+      - ".github/workflows/m3-item2-job-modes.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  item2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Item 2 focused tests
+        env:
+          PYTHONPATH: .
+          M3_JOB_IDEMPOTENCY_ENABLED: "true"
+          M3_JOB_MODES_ENABLED: "true"
+        run: pytest -q tests/test_m3_item2_job_modes.py
+      - name: Item 1 regression
+        env:
+          PYTHONPATH: .
+          M3_JOB_IDEMPOTENCY_ENABLED: "true"
+        run: pytest -q tests/test_m3_item1_job_idempotency.py
+      - name: Stage 0 regression
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_m3_stage0_baseline_freeze.py
+      - name: Full M3 regression
+        env:
+          PYTHONPATH: .
+        run: pytest -q
+      - name: Compile
+        run: python -m compileall -q app
