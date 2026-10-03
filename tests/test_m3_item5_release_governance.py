@@ -119,7 +119,7 @@ def test_pre_delivery_revoke_and_post_delivery_hold(isolated):
         """INSERT INTO container_events(
            event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json
            ) VALUES('EVT-ITEM5-DELIVERED',?,?, 'DELIVERED',?,'TSTPOD','DELIVERED','item5-test','{}')""",
-        (con["job_id"],con["id"],datetime.datetime.now(datetime.timezone.utc).isoformat())
+        (con["job_id"],con["id"],(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=30)).isoformat())
     )
     c.close()
     post=upsert_release_container(release_ref="REL-TEST-001",container_no=isolated["container"],actor_user_id="USR-C",action="HOLD")
