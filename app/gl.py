@@ -9,6 +9,14 @@ from .json_recovery import load_json_or_recover_arrays
 from .admin import session as iam_session, permission_code as iam_permission_code
 from .clx034_smart_approval_fast_track import enforce_gl_action
 from .clx044_gl_exact_flow import apply_gl_exact_flow
+from .item6_financial_governance import (
+    enabled as item6_enabled,
+    enforce_sensitive_session,
+    enforce_update_guard,
+    ensure_period_governance,
+    session_context as item6_session_context,
+    record_period_approval,
+)
 
 HERE=Path(__file__).resolve().parent
 META, META_RECOVERED = load_json_or_recover_arrays(
@@ -43,6 +51,13 @@ class UpdateBody(BaseModel):
 class ActionBody(BaseModel):
     version:int=Field(ge=1)
     reason:Optional[str]=None
+    crt_ref:Optional[str]=None
+    corrected_document_ref:Optional[str]=None
+
+class PeriodApprovalBody(BaseModel):
+    action:str
+    approval_role:str
+    reason:str=Field(min_length=3)
 
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def jdump(x):return json.dumps(x,sort_keys=True,separators=(',',':'))
@@ -161,13 +176,17 @@ def fiscal_period(conn,date_text):
     if not r: raise HTTPException(422,{'code':'NO_ACCOUNTING_PERIOD','date':date_text})
     return r
 
-def assert_period_postable(conn,date_text):
+def assert_period_postable(conn,date_text,voucher_id=None,action='POST',flow=None):
     p=fiscal_period(conn,date_text)
-    if p['status']!='OPEN': raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_NOT_OPEN','period':p['period_no'],'status':p['status']})
+    governance=None
+    if item6_enabled() and voucher_id is not None:
+        governance=ensure_period_governance(conn,p,voucher_id,action,flow)
+    elif p['status']!='OPEN':
+        raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_NOT_OPEN','period':p['period_no'],'status':p['status']})
     ctl=conn.execute('SELECT earliest_posting_date FROM gl_backdate_controls WHERE period_id=? AND active=1',(p['id'],)).fetchone()
     if ctl and date_text < ctl['earliest_posting_date']:
         raise HTTPException(422,{'code':'BACKDATE_LIMIT_EXCEEDED','date':date_text,'earliest_posting_date':ctl['earliest_posting_date'],'period':p['period_no']})
-    return p
+    return (p,governance or {'period_mode':'OPEN','approvals':[]}) if voucher_id is not None else p
 
 def approval_rule(conn,vtype,amount):
     return conn.execute("SELECT * FROM gl_approval_rules WHERE active=1 AND voucher_type IN (?, '*') AND ?>=min_amount AND (max_amount IS NULL OR ?<=max_amount) ORDER BY CASE WHEN voucher_type=? THEN 0 ELSE 1 END,min_amount DESC LIMIT 1",(vtype,amount,amount,vtype)).fetchone()
@@ -278,6 +297,7 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
     require_module(module);role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
+        enforce_update_guard(module,module in TRANSACTIONS,r['status'],x_m3_session)
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         p=json.loads(r['payload_json']);p.update(body.fields);errs=validate(module,p)
         if errs:raise HTTPException(422,{'codes':errs})
@@ -289,13 +309,17 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
     finally:conn.close()
 @router.post('/{module}/{rid}/actions/{action}')
 def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_module(module);action=action.lower();role=actor(x_role,action,x_m3_session,module)
+    require_module(module);action=action.lower();enforce_sensitive_session(action,x_m3_session);role=actor(x_role,action,x_m3_session,module)
     if action in {'approve','post','reverse','close'}: enforce_gl_action(module,rid,action,x_m3_session,body.version,body.reason)
     conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
-        p=json.loads(r['payload_json']);st=r['status'];meta={'reason':body.reason}
+        p=json.loads(r['payload_json']);st=r['status'];meta={'reason':body.reason,'crt_ref':body.crt_ref,'corrected_document_ref':body.corrected_document_ref}
+        if item6_enabled():
+            meta.update(item6_session_context(conn,x_m3_session))
+            if action=='cancel' and str(st).upper() in {'APPROVED','POSTED','REVERSED','CANCELLED','CLOSED'}:
+                raise HTTPException(409,{'code':'FINANCIAL_RECORD_IMMUTABLE','status':st})
         if action=='approve':
             st='Approved';p['Status']=st
             if module=='voucher':
