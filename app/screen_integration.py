@@ -125,6 +125,23 @@ def _decorate_menu(rows):
         d['submenus']=subs;out.append(d)
     return out
 
+def _decorate_business_navigation():
+    nav=CATALOG.get('business_navigation') or {}
+    groups=[]
+    for group in nav.get('groups',[]):
+        g={'name':group['name'],'items':[]}
+        for item in group.get('items',[]):
+            y=dict(item)
+            target=require_screen(item['target'])
+            y['route']=target['route']
+            y['field_contract_api']=target.get('field_contract_api') or ('/api/clx011/field-contract?screen_id='+target['screen_id'])
+            y['screen_data_api']='/api/clx011/screen-data?screen_id='+target['screen_id']
+            y['related_records_api']=target.get('related_records_api') or '/api/clx011/related/{job_ref}'
+            y['fields']=list(target.get('fields') or DEFAULT_FIELDS.get(target['domain'],['Reference','Status','Module Fields']))
+            g['items'].append(y)
+        groups.append(g)
+    return {'navigation_only':True,'extensible':bool(nav.get('extensible')),'groups':groups}
+
 def screen_role_allowed(s,role):
     r=role.upper()
     if r=='SUPER_ADMIN': r='ADMIN'
@@ -161,7 +178,7 @@ def health():
 
 @router.get('/menu')
 def menu(q:Optional[str]=None):
-    if not q: return {'screen_count':len(SCREENS),'menu':_decorate_menu(CATALOG['menu'])}
+    if not q: return {'screen_count':len(SCREENS),'menu':_decorate_menu(CATALOG['menu']),'business_navigation':_decorate_business_navigation()}
     q=q.lower().strip()
     def screen_matches(s):
         terms=[s['name'],s['domain'],s['submenu'],s.get('key',''),s.get('screen_id','')]+list(s.get('search_terms') or [])
