@@ -52,6 +52,7 @@ from .clx075_lease import router as clx075_lease_router
 from .clx075_readiness import router as clx075_readiness_router
 from .clx077_dummy_bank import router as clx077_dummy_bank_router
 from .nvocc_principal_extensions import router as nvocc_principal_extensions_router
+from .crt_governance import router as crt_governance_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -93,6 +94,7 @@ app.include_router(clx075_lease_router)
 app.include_router(clx075_readiness_router)
 app.include_router(clx077_dummy_bank_router)
 app.include_router(nvocc_principal_extensions_router)
+app.include_router(crt_governance_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
@@ -124,7 +126,9 @@ ROLE_PERMS={
  'AGENT':set('create edit amend view'.split()),
  'VIEWER':set('view'.split())
 }
-RELEASE_MODULES={'crt','export-crt','import-crt','transshipment-crt','delivery-order','import-bl','cro'}
+RELEASE_MODULES={'trt','export-trt','import-trt','transshipment-trt','delivery-order','import-bl','cro'}
+GOVERNED_POST_APPROVAL_MODULES={'trt','export-trt','import-trt','transshipment-trt'}
+POST_APPROVAL_LOCK_STATUSES={'approved','released','issued','completed','closed'}
 
 class CreateBody(BaseModel):
     job_ref:str=Field(pattern=r'^\d{5}$')
@@ -237,11 +241,11 @@ def add_hold(conn,jid,code):
     conn.execute('INSERT INTO workflow_holds(job_id,code,active,created_at) VALUES(?,?,1,?) ON CONFLICT(job_id,code) DO UPDATE SET active=1,cleared_at=NULL',(jid,code,now()))
 
 def sync_release(conn,jid,exclude_id=None):
-    sql="UPDATE transaction_records SET status='Released',version=version+1,updated_at=? WHERE job_id=? AND module IN ('delivery-order','import-crt','import-bl')"
+    sql="UPDATE transaction_records SET status='Released',version=version+1,updated_at=? WHERE job_id=? AND module IN ('delivery-order','import-trt','import-bl')"
     args=[now(),jid]
     if exclude_id is not None: sql+=' AND id<>?'; args.append(exclude_id)
     conn.execute(sql,args)
-    q="SELECT id,payload_json,module FROM transaction_records WHERE job_id=? AND module IN ('delivery-order','import-crt','import-bl')"
+    q="SELECT id,payload_json,module FROM transaction_records WHERE job_id=? AND module IN ('delivery-order','import-trt','import-bl')"
     vals=[jid]
     if exclude_id is not None: q+=' AND id<>?'; vals.append(exclude_id)
     for r in conn.execute(q,vals):
@@ -404,6 +408,8 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
     conn=connect(); tx(conn)
     try:
         r=get_tx(conn,module,tid,role,ascope,cscope); before=serialize_tx(r); ctx=job_context(conn,r['job_ref'])
+        if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
+            raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         payload=json.loads(r['payload_json']); payload.update(body.fields); errs=validate_fields(module,ctx,payload)
         if errs: raise HTTPException(422,{'codes':errs})
@@ -424,6 +430,8 @@ def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Head
     conn=connect(); tx(conn)
     try:
         r=get_tx(conn,module,tid,role,ascope,cscope)
+        if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
+            raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         before=serialize_tx(r); conn.execute('DELETE FROM transaction_records WHERE id=?',(tid,)); audit(conn,role,None,'DELETE',module,tid,r['job_id'],before,None,{})
         conn.execute('COMMIT'); return {'deleted':True,'id':tid}
@@ -438,6 +446,8 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
     conn=connect(); tx(conn)
     try:
         r=get_tx(conn,module,tid,role,ascope,cscope); before=serialize_tx(r)
+        if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES and action in {'amend','reissue','cancel','reverse'}:
+            raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid,'action':action})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         ctx=job_context(conn,r['job_ref']); payload=json.loads(r['payload_json']); new_status=r['status']
         if ctx['closed'] and action in {'approve','release','hold','cancel','amend','reissue','advance'}:
@@ -475,7 +485,7 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
         elif action=='reissue': new_status='Issued'
         elif action=='reverse': new_status='Reversed'
         # special transshipment completion clears hold and state
-        if module=='transshipment-crt' and action in ('approve','release'):
+        if module=='transshipment-trt' and action in ('approve','release'):
             conn.execute("UPDATE workflow_states SET transshipment_status='CONFIRMED',version=version+1 WHERE job_id=?",(r['job_id'],)); clear_hold(conn,r['job_id'],'TRANSSHIPMENT_CONFIRMATION')
         payload['Status']=new_status
         if module=='special-rates-request': sync_special_rate(conn,tid,payload)
