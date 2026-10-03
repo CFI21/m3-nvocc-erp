@@ -8,7 +8,6 @@ from typing import Any, Iterable, Optional
 
 from fastapi import HTTPException
 
-from .clx071_container_journey import validate_transition as validate_container_transition
 from .db import connect, tx
 
 
@@ -131,6 +130,7 @@ def authorize_container_transition(
             raise HTTPException(409,{"code":"FINANCIAL_POSTED_REVERSAL_REQUIRED"})
 
         if mode=="STANDARD":
+            from .clx071_container_journey import validate_transition as validate_container_transition
             allowed=validate_container_transition(frm,to)
             if not allowed:
                 _append_event(
