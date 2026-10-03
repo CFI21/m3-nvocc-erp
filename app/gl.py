@@ -215,13 +215,17 @@ def fiscal_period(conn,date_text):
     if not r: raise HTTPException(422,{'code':'NO_ACCOUNTING_PERIOD','date':date_text})
     return r
 
-def assert_period_postable(conn,date_text):
+def assert_period_postable(conn,date_text,voucher_id=None,action='POST',flow=None):
     p=fiscal_period(conn,date_text)
-    if p['status']!='OPEN': raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_NOT_OPEN','period':p['period_no'],'status':p['status']})
+    if item6_enabled() and voucher_id is not None:
+        governance=_ensure_period_governance(conn,p,voucher_id,action,flow)
+    else:
+        if p['status']!='OPEN': raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_NOT_OPEN','period':p['period_no'],'status':p['status']})
+        governance={'period_mode':'OPEN','approvals':[]}
     ctl=conn.execute('SELECT earliest_posting_date FROM gl_backdate_controls WHERE period_id=? AND active=1',(p['id'],)).fetchone()
     if ctl and date_text < ctl['earliest_posting_date']:
         raise HTTPException(422,{'code':'BACKDATE_LIMIT_EXCEEDED','date':date_text,'earliest_posting_date':ctl['earliest_posting_date'],'period':p['period_no']})
-    return p
+    return p,governance
 
 def approval_rule(conn,vtype,amount):
     return conn.execute("SELECT * FROM gl_approval_rules WHERE active=1 AND voucher_type IN (?, '*') AND ?>=min_amount AND (max_amount IS NULL OR ?<=max_amount) ORDER BY CASE WHEN voucher_type=? THEN 0 ELSE 1 END,min_amount DESC LIMIT 1",(vtype,amount,amount,vtype)).fetchone()
@@ -329,9 +333,15 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
     finally:conn.close()
 @router.put('/{module}/{rid}')
 def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_module(module);role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
+    require_module(module)
+    if item6_enabled() and module in TRANSACTIONS and not x_m3_session:
+        raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_FINANCIAL_MUTATION'})
+    role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
+        if item6_enabled() and str(r['status']) in IMMUTABLE_FINANCIAL_STATES:
+            code='CRT_REQUIRED_AFTER_APPROVAL' if str(r['status']).upper() in {'APPROVED','POSTED'} else 'FINANCIAL_RECORD_IMMUTABLE'
+            raise HTTPException(409,{'code':code,'status':r['status'],'record_id':rid})
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         p=json.loads(r['payload_json']);p.update(body.fields);errs=validate(module,p)
         if errs:raise HTTPException(422,{'codes':errs})
