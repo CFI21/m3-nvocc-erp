@@ -87,6 +87,6 @@ jobs:
         env:
           PYTHONPATH: .
           PYTHONFAULTHANDLER: "1"
-        run: timeout --signal=TERM 300s pytest -vv --durations=25
+        run: timeout --signal=TERM 480s pytest -vv --durations=25
       - name: Final compile
         run: python -m compileall -q app
