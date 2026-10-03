@@ -64,25 +64,25 @@ def test_ui_uses_real_drawer_forms_and_governed_setup_changes():
 
 def test_agent_role_requires_agent_scope(isolated_db):
     with pytest.raises(HTTPException) as exc:
-        list_records('crt',x_role='AGENT',x_agent_scope=None,x_customer_scope=None)
+        list_records('trt',x_role='AGENT',x_agent_scope=None,x_customer_scope=None)
     assert exc.value.status_code==403
     assert 'X-Agent-Scope' in str(exc.value.detail)
 
 def test_transaction_create_edit_duplicate_and_audit_use_existing_api(isolated_db):
     body=CreateBody(job_ref='50001',external_ref='CLX42-CRT-50001',fields={'Job Ref':'50001','Status':'Draft'})
     request=FakeRequest(body.model_dump())
-    created=asyncio.run(create_record('crt',body,request,x_role='OPS',idempotency_key=None,x_agent_scope=None,x_customer_scope=None))
+    created=asyncio.run(create_record('trt',body,request,x_role='OPS',idempotency_key=None,x_agent_scope=None,x_customer_scope=None))
     data=json.loads(created.body)
     assert data['external_ref']=='CLX42-CRT-50001'
     assert data['status']=='Draft'
     tid=data['id']; version=data['version']
 
-    edited=update_record('crt',tid,UpdateBody(version=version,fields={'Status':'Open','Remarks':'CLX-042 edit'}),x_role='OPS',x_agent_scope=None,x_customer_scope=None)
+    edited=update_record('trt',tid,UpdateBody(version=version,fields={'Status':'Open','Remarks':'CLX-042 edit'}),x_role='OPS',x_agent_scope=None,x_customer_scope=None)
     assert edited['status']=='Open'
     assert edited['fields']['Remarks']=='CLX-042 edit'
 
     with pytest.raises(HTTPException) as exc:
-        asyncio.run(create_record('crt',body,FakeRequest(body.model_dump()),x_role='OPS',idempotency_key=None,x_agent_scope=None,x_customer_scope=None))
+        asyncio.run(create_record('trt',body,FakeRequest(body.model_dump()),x_role='OPS',idempotency_key=None,x_agent_scope=None,x_customer_scope=None))
     assert exc.value.status_code==409
     assert 'DUPLICATE' in str(exc.value.detail)
 
@@ -93,7 +93,7 @@ def test_transaction_create_edit_duplicate_and_audit_use_existing_api(isolated_d
     finally:c.close()
 
 def test_agent_scope_blocks_other_agent_job(isolated_db):
-    rows=list_records('crt',x_role='AGENT',x_agent_scope='DOES-NOT-MATCH',x_customer_scope=None)
+    rows=list_records('trt',x_role='AGENT',x_agent_scope='DOES-NOT-MATCH',x_customer_scope=None)
     assert rows['count']==0
 
 def test_50001_50005_agent_trace_is_complete(isolated_db):
