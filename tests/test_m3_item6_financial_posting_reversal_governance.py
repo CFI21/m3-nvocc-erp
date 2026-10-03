@@ -8,6 +8,7 @@ from app.masterdata_seed import run as masterdata_seed_run
 from app.admin_seed import run as admin_seed_run
 from app.admin import Login, login
 import app.gl as gl
+import app.item6_financial_governance as gov
 
 
 @pytest.fixture()
@@ -70,7 +71,7 @@ def test_client_supplied_role_cannot_bypass_session_requirement(isolated):
     ('TS',{'TS_BRANCH_MANAGER','TS_FINANCE'}),
 ])
 def test_export_import_ts_acceptance_matrix_open_period(flow,expected):
-    assert gl._period_required_roles('OPEN',flow)==expected
+    assert gov.required_period_roles('OPEN',flow)==expected
 
 
 def test_closed_period_requires_finance_manager_and_cfo(isolated):
@@ -80,14 +81,14 @@ def test_closed_period_requires_finance_manager_and_cfo(isolated):
     c.execute("UPDATE gl_periods SET status='CLOSED' WHERE id=?",(p['id'],))
     p=c.execute("SELECT * FROM gl_periods WHERE id=?",(p['id'],)).fetchone()
     with pytest.raises(HTTPException) as exc:
-        gl._ensure_period_governance(c,p,vid,'POST','EXPORT')
+        gov.ensure_period_governance(c,p,vid,'POST','EXPORT')
     assert exc.value.detail['code']=='CLOSED_PERIOD_APPROVAL_REQUIRED'
     assert set(exc.value.detail['missing_roles'])=={'FINANCE_MANAGER','CFO'}
     for role in ('FINANCE_MANAGER','CFO'):
         c.execute("""INSERT INTO gl_period_override_approvals
           (approval_ref,period_id,voucher_id,action,approval_role,approver_user_ref,reason,status,created_at)
           VALUES(?,?,?,?,?,?,?,'APPROVED',?)""",(role+'-REF',p['id'],vid,'POST',role,'USR-'+role,'Item6 approval',gl.now()))
-    out=gl._ensure_period_governance(c,p,vid,'POST','EXPORT')
+    out=gov.ensure_period_governance(c,p,vid,'POST','EXPORT')
     c.close()
     assert out['period_mode']=='CLOSED_CONTROLLED'
     assert set(out['approvals'])=={'FINANCE_MANAGER','CFO'}
@@ -100,7 +101,7 @@ def test_tax_filed_locked_period_requires_cfo_and_external_advisor(isolated):
     c.execute("UPDATE gl_periods SET status='LOCKED' WHERE id=?",(p['id'],))
     p=c.execute("SELECT * FROM gl_periods WHERE id=?",(p['id'],)).fetchone()
     with pytest.raises(HTTPException) as exc:
-        gl._ensure_period_governance(c,p,vid,'POST','IMPORT')
+        gov.ensure_period_governance(c,p,vid,'POST','IMPORT')
     assert exc.value.detail['code']=='TAX_FILED_PERIOD_APPROVAL_REQUIRED'
     assert set(exc.value.detail['missing_roles'])=={'CFO','EXTERNAL_ADVISOR'}
     c.close()
@@ -113,7 +114,7 @@ def test_ts_closed_period_combines_period_and_ts_authority(isolated):
     c.execute("UPDATE gl_periods SET status='CLOSED' WHERE id=?",(p['id'],))
     p=c.execute("SELECT * FROM gl_periods WHERE id=?",(p['id'],)).fetchone()
     with pytest.raises(HTTPException) as exc:
-        gl._ensure_period_governance(c,p,vid,'POST','TS')
+        gov.ensure_period_governance(c,p,vid,'POST','TS')
     assert set(exc.value.detail['missing_roles'])=={'FINANCE_MANAGER','CFO','TS_BRANCH_MANAGER','TS_FINANCE'}
     c.close()
 
@@ -150,7 +151,7 @@ def test_audit_context_includes_user_scope(isolated):
     ctx=None
     c=db.connect()
     try:
-        ctx=gl._session_context(c,admin_token())
+        ctx=gov.session_context(c,admin_token())
     finally:
         c.close()
     assert ctx['user_ref']
