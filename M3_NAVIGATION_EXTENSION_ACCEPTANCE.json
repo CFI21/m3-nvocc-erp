@@ -1,0 +1,65 @@
+{
+  "baseline": "9c1705088e436639d24d528cd2400f0ee85519f1",
+  "scope": "M3 NVOCC ERP navigation completeness + controlled extension capacity",
+  "screen_count": 196,
+  "baseline_screen_count": 196,
+  "extension_count": 0,
+  "current_limit_is_permanent": false,
+  "missing_menu_entries_found": [
+    "Current menu exposed all authoritative screens, but operational findability depended on technical domains and several deep links/legacy aliases.",
+    "Common business abbreviations were not consistently searchable from the catalog."
+  ],
+  "navigation_added": {
+    "domain": "M3 Business",
+    "navigation_only": true,
+    "groups": [
+      "Setup",
+      "Transaction / Operations",
+      "Document",
+      "Equipment",
+      "Finance",
+      "Control / Reporting"
+    ],
+    "duplicate_screens_created": false
+  },
+  "search_synonyms_added": [
+    "DO",
+    "Delivery Order",
+    "B/L",
+    "BL",
+    "HBL",
+    "MBL",
+    "CRO",
+    "CRT",
+    "SOA",
+    "Statement of Account",
+    "Job",
+    "BKG",
+    "P&L",
+    "PNL",
+    "TB"
+  ],
+  "role_visibility": "Aliases continue to inherit target screen authorization; frontend screenAllowed and alias role checks remain authoritative UX filtering.",
+  "extension_capacity": {
+    "field": "Existing screen first; additive storage only if a verified authoritative value cannot be derived.",
+    "section_tab": "Add section/tab when the same business function needs more fields.",
+    "screen": "New screen allowed above 196 only for a verified distinct workspace with menu, role/scope, audit, previous/next flow and tests.",
+    "no_placeholder_pages": true,
+    "no_duplicate_models": true
+  },
+  "previous_current_next": "Explicit core operational previous/current/next flow added using existing authoritative screens only; next actions remain condition-driven.",
+  "new_screens": [],
+  "new_fields": [],
+  "database_changed": false,
+  "api_contract_breaking_change": false,
+  "real_money": false,
+  "dummy_bank": "SIMULATION_ONLY",
+  "providers": {
+    "TRUE_LAYER": false,
+    "OXR": false,
+    "AVALARA": false
+  },
+  "p0_p1": 0,
+  "ancline_touched": false,
+  "exact_next_gate": "Controlled user-by-user frontend validation beginning with Booking, then Job Planning, B/L, CRO, CRT, Container, Release/Delivery Order and Finance follow-up."
+}

@@ -98,6 +98,8 @@ def _field_contract_for(s):
         'field_contract_api':s.get('field_contract_api') or f"/api/clx011/field-contract?screen_id={s['screen_id']}",
         'screen_data_api':f"/api/clx011/screen-data?screen_id={s['screen_id']}",
         'related_records_api':s.get('related_records_api') or '/api/clx011/related/{job_ref}',
+        'search_terms':list(s.get('search_terms') or []),
+        'extension_policy':dict(s.get('extension_policy') or {}),
         'authoritative':True,'parallel_model':False,
     }
 
@@ -122,6 +124,23 @@ def _decorate_menu(rows):
             subs.append(x)
         d['submenus']=subs;out.append(d)
     return out
+
+def _decorate_business_navigation():
+    nav=CATALOG.get('business_navigation') or {}
+    groups=[]
+    for group in nav.get('groups',[]):
+        g={'name':group['name'],'items':[]}
+        for item in group.get('items',[]):
+            y=dict(item)
+            target=require_screen(item['target'])
+            y['route']=target['route']
+            y['field_contract_api']=target.get('field_contract_api') or ('/api/clx011/field-contract?screen_id='+target['screen_id'])
+            y['screen_data_api']='/api/clx011/screen-data?screen_id='+target['screen_id']
+            y['related_records_api']=target.get('related_records_api') or '/api/clx011/related/{job_ref}'
+            y['fields']=list(target.get('fields') or DEFAULT_FIELDS.get(target['domain'],['Reference','Status','Module Fields']))
+            g['items'].append(y)
+        groups.append(g)
+    return {'navigation_only':True,'extensible':bool(nav.get('extensible')),'groups':groups}
 
 def screen_role_allowed(s,role):
     r=role.upper()
@@ -150,21 +169,31 @@ def job_e2e(c,job_ref):
 
 @router.get('/health')
 def health():
-    return {'project':'M3 NVOCC ERP','baseline':BASELINE,'parent':PARENT,'screen_count':len(SCREENS),'menu_domains':len(CATALOG['menu']),
-            'no_business_logic_change':True,'production_promoted':False,'live_credentials':False,'real_money_movement':False}
+    return {'project':'M3 NVOCC ERP','baseline':BASELINE,'parent':PARENT,'screen_count':len(SCREENS),
+            'baseline_screen_count':CATALOG.get('baseline_screen_count',196),
+            'extension_count':CATALOG.get('extension_count',max(0,len(SCREENS)-196)),
+            'screen_count_policy':CATALOG.get('screen_count_policy'),
+            'menu_domains':len(CATALOG['menu']),'no_business_logic_change':True,
+            'production_promoted':False,'live_credentials':False,'real_money_movement':False}
 
 @router.get('/menu')
 def menu(q:Optional[str]=None):
-    if not q: return {'screen_count':len(SCREENS),'menu':_decorate_menu(CATALOG['menu'])}
+    if not q: return {'screen_count':len(SCREENS),'menu':_decorate_menu(CATALOG['menu']),'business_navigation':_decorate_business_navigation()}
     q=q.lower().strip()
-    screen_ids={s['screen_id'] for s in CATALOG['screens'] if q in s['name'].lower() or q in s['domain'].lower() or q in s['submenu'].lower()}
+    def screen_matches(s):
+        terms=[s['name'],s['domain'],s['submenu'],s.get('key',''),s.get('screen_id','')]+list(s.get('search_terms') or [])
+        return any(q in str(x).lower() for x in terms)
+    screen_ids={s['screen_id'] for s in CATALOG['screens'] if screen_matches(s)}
     out=[]
     alias_hits=0
     for d in CATALOG['menu']:
         subs=[]
         for sub in d['submenus']:
             ids=[x for x in sub.get('screens',[]) if x in screen_ids]
-            items=[x for x in sub.get('items',[]) if q in x['label'].lower() or q in d['domain'].lower() or q in sub['name'].lower()]
+            items=[x for x in sub.get('items',[]) if (
+                q in x['label'].lower() or q in d['domain'].lower() or q in sub['name'].lower()
+                or any(q in str(t).lower() for t in x.get('search_terms',[]))
+            )]
             if ids or items:
                 entry={'name':sub['name'],'screens':ids}
                 if items:
