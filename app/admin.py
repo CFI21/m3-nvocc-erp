@@ -4,6 +4,7 @@ from typing import Optional
 import hashlib,uuid,json,datetime,secrets
 from .db import connect
 
+
 router=APIRouter(prefix='/api/admin',tags=['CLX-010 Identity & Administration'])
 
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
@@ -344,6 +345,14 @@ def departments(): c=connect();x=[dict(r) for r in c.execute('''SELECT d.*,b.bra
 def membership(): c=connect();x=[dict(r) for r in c.execute('''SELECT m.*,u.user_ref,o.office_code FROM iam_office_membership m JOIN iam_users u ON u.id=m.user_id JOIN iam_offices o ON o.id=m.office_id ORDER BY m.id''')];c.close();return x
 @router.get('/scope-rules')
 def scopes(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_scope_rules ORDER BY priority,id')];c.close();return x
+@router.get('/bulk-job-access')
+def bulk_job_access(resource:str='agent-tasks',action:str='view',x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    from .bulk_permission_governance import enabled as bulk_enabled, bulk_validate
+    if not bulk_enabled(): raise HTTPException(404,'Bulk permission governance disabled')
+    c=connect(); s=session(c,x_m3_session)
+    if not permission(c,s['user_id'],'identity','view',s['office_code']) and not permission(c,s['user_id'],'identity','admin',s['office_code']):
+        c.close(); raise HTTPException(403,{'code':'PERMISSION_DENIED'})
+    out=bulk_validate(c,resource,action); c.close(); return out
 @router.get('/party-access')
 def party_access(): c=connect();x=[dict(r) for r in c.execute('''SELECT p.*,u.user_ref,u.username FROM iam_party_access p JOIN iam_users u ON u.id=p.user_id ORDER BY p.id''')];c.close();return x
 @router.get('/approval-limits')
