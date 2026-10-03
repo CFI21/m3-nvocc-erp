@@ -1,0 +1,164 @@
+{
+  "baseline": "0b8277e72128ece1bff36e9f4e79c936e6564f65",
+  "scope": "M3 NVOCC ERP controlled field order + missing operational field review",
+  "screen_count": 196,
+  "database_changed": false,
+  "api_contract_changed": false,
+  "duplicate_model_created": false,
+  "new_screen_created": false,
+  "ancline_touched": false,
+  "real_money": false,
+  "dummy_bank": "SIMULATION_ONLY",
+  "providers": {
+    "TRUE_LAYER": false,
+    "OXR": false,
+    "AVALARA": false
+  },
+  "classification": {
+    "booking": {
+      "KEEP": [
+        "Booking No.",
+        "Booking Date",
+        "Status",
+        "Approval #",
+        "Reference #",
+        "Sales Person",
+        "Freight Type",
+        "Freight Term",
+        "Carrier Booking Ref",
+        "Thru B/L",
+        "Sailing Date",
+        "Booking Party",
+        "Shipper",
+        "Actual Shipper",
+        "Consignee",
+        "Notify Party",
+        "Billing Party",
+        "Agent",
+        "POL Agent",
+        "POT Agent",
+        "Receiving Agent",
+        "POD Agent",
+        "Carrier",
+        "Container Owner",
+        "Equipment Provider",
+        "POL",
+        "POT (1)",
+        "TS Agent (1)",
+        "POT (2)",
+        "TS Agent (2)",
+        "POD",
+        "Vessel",
+        "Voyage",
+        "Commodity",
+        "Cargo",
+        "Packages",
+        "Weight",
+        "Measurement",
+        "Equipment",
+        "Quantity",
+        "SOC / COC",
+        "SRR"
+      ],
+      "MOVE": [
+        "Booking Party / customer and all parties into PARTIES",
+        "POL/POT/POD/Vessel/Voyage into ROUTING",
+        "Commodity/Cargo/Equipment into CARGO / EQUIPMENT",
+        "cut-offs/free-days/detention into Operational Control"
+      ],
+      "CONDITIONAL": [
+        "POT Agent",
+        "TS Agent (1)",
+        "TS Agent (2)"
+      ],
+      "READ_ONLY": [
+        "Approval Status"
+      ],
+      "REVIEW_LATER": [
+        "Reference #"
+      ],
+      "DUPLICATE_UI_REMOVED": [
+        "Agent from Operational Control",
+        "Receiving Agent from Operational Control",
+        "Carrier from Operational Control",
+        "Carrier Booking Ref from Operational Control",
+        "Booking Party from Commercial panel",
+        "Billing Party from Commercial panel"
+      ],
+      "NEW_FIELDS_ADDED": []
+    },
+    "job": {
+      "KEEP": [
+        "existing authoritative job reference/context",
+        "booking link",
+        "status",
+        "role/office scope",
+        "related operational and finance links"
+      ],
+      "READ_ONLY": [
+        "booking-sourced context where already linked"
+      ],
+      "NEW_FIELDS_ADDED": []
+    },
+    "bl": {
+      "KEEP": [
+        "existing CLX-082 field order and native/derived split"
+      ],
+      "CONDITIONAL": [
+        "POT",
+        "Switch B/L link",
+        "Split B/L link"
+      ],
+      "READ_ONLY": [
+        "Booking No.",
+        "Job Ref",
+        "derived booking context"
+      ],
+      "GATE": "SOURCE_UNCLASSIFIED preserved",
+      "NEW_FIELDS_ADDED": []
+    },
+    "cro_crt": {
+      "KEEP": [
+        "existing CLX-083 authoritative operational master"
+      ],
+      "CONDITIONAL": [
+        "POT / connection / TS context"
+      ],
+      "NEW_FIELDS_ADDED": []
+    },
+    "container_equipment": {
+      "KEEP": [
+        "one authoritative container master",
+        "journey",
+        "ownership",
+        "location/custody",
+        "free days/detention/storage",
+        "inspection/repair",
+        "lease/reposition/finance links"
+      ],
+      "NEW_FIELDS_ADDED": []
+    },
+    "release_delivery_order": {
+      "KEEP": [
+        "existing authoritative delivery-order record and release instruction projection"
+      ],
+      "READ_ONLY": [
+        "linked finance/customs/freight status until governed source changes"
+      ],
+      "NEW_FIELDS_ADDED": []
+    },
+    "finance": {
+      "KEEP": [
+        "existing GL/Treasury records",
+        "invoice/bill/SOA/job costing projections"
+      ],
+      "READ_ONLY": [
+        "GL/Treasury follow-up and Job P&L"
+      ],
+      "GOVERNANCE": "post-approval additional cost remains existing governed change / CRT / adjustment route with reason, role control and audit",
+      "NEW_FIELDS_ADDED": []
+    }
+  },
+  "missing_field_result": "No verified missing operational field required new storage in this pass; existing authoritative fields cover the reviewed flow.",
+  "exact_next_gate": "User-by-user frontend validation starting with Booking, then Job/B-L/CRO/CRT/Container/Release/DO."
+}
