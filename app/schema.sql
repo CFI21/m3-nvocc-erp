@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS agents(id INTEGER PRIMARY KEY, code TEXT NOT NULL UNI
 CREATE TABLE IF NOT EXISTS vessels(id INTEGER PRIMARY KEY, name TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS voyages(id INTEGER PRIMARY KEY, voyage_no TEXT NOT NULL UNIQUE, vessel_id INTEGER NOT NULL REFERENCES vessels(id));
 CREATE TABLE IF NOT EXISTS bookings(id INTEGER PRIMARY KEY, booking_ref TEXT NOT NULL UNIQUE, customer_id INTEGER NOT NULL REFERENCES customers(id), agent_id INTEGER NOT NULL REFERENCES agents(id), voyage_id INTEGER NOT NULL REFERENCES voyages(id), pol TEXT NOT NULL, pod TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY, job_ref TEXT NOT NULL UNIQUE CHECK(length(job_ref)=5), booking_id INTEGER NOT NULL UNIQUE REFERENCES bookings(id), customer_id INTEGER NOT NULL REFERENCES customers(id), agent_id INTEGER NOT NULL REFERENCES agents(id), voyage_id INTEGER NOT NULL REFERENCES voyages(id), pol TEXT NOT NULL, pod TEXT NOT NULL, operational_status TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
+CREATE TABLE IF NOT EXISTS jobs(id INTEGER PRIMARY KEY, job_ref TEXT NOT NULL UNIQUE CHECK(length(job_ref)=5), booking_id INTEGER NOT NULL REFERENCES bookings(id), customer_id INTEGER NOT NULL REFERENCES customers(id), agent_id INTEGER NOT NULL REFERENCES agents(id), voyage_id INTEGER NOT NULL REFERENCES voyages(id), pol TEXT NOT NULL, pod TEXT NOT NULL, operational_status TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1);
 CREATE TABLE IF NOT EXISTS containers(id INTEGER PRIMARY KEY, container_no TEXT NOT NULL UNIQUE, job_id INTEGER NOT NULL REFERENCES jobs(id), size_type TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS bills(id INTEGER PRIMARY KEY, bill_no TEXT NOT NULL UNIQUE, job_id INTEGER NOT NULL REFERENCES jobs(id), kind TEXT NOT NULL CHECK(kind IN ('HBL','MBL')), status TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS finance_states(id INTEGER PRIMARY KEY, job_id INTEGER NOT NULL UNIQUE REFERENCES jobs(id), payment_status TEXT NOT NULL, currency TEXT NOT NULL, outstanding REAL NOT NULL DEFAULT 0, credit_hold INTEGER NOT NULL DEFAULT 0);
@@ -38,6 +38,30 @@ CREATE TABLE IF NOT EXISTS job_creation_idempotency(
  UNIQUE(booking_ref,purpose,split_sequence,consolidation_ref)
 );
 CREATE INDEX IF NOT EXISTS idx_job_creation_idempotency_job ON job_creation_idempotency(job_id);
+
+-- M3 Item 2 — Standard / Split / Consolidation Job relationships.
+CREATE TABLE IF NOT EXISTS job_mode_profiles(
+ job_id INTEGER PRIMARY KEY REFERENCES jobs(id),
+ job_type TEXT NOT NULL CHECK(job_type IN ('STANDARD','CONSOLIDATION')),
+ consolidation_ref TEXT NOT NULL DEFAULT '',
+ split_sequence INTEGER NOT NULL DEFAULT 1 CHECK(split_sequence>=1),
+ commercial_authority TEXT NOT NULL DEFAULT 'JOB_BOOKING_LINKS',
+ booking_set_hash TEXT,
+ version INTEGER NOT NULL DEFAULT 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_job_mode_consolidation_ref
+ ON job_mode_profiles(consolidation_ref)
+ WHERE job_type='CONSOLIDATION' AND consolidation_ref<>'';
+CREATE TABLE IF NOT EXISTS job_booking_links(
+ id INTEGER PRIMARY KEY,
+ job_id INTEGER NOT NULL REFERENCES jobs(id),
+ booking_id INTEGER NOT NULL REFERENCES bookings(id),
+ source_sequence INTEGER NOT NULL CHECK(source_sequence>=1),
+ relationship_status TEXT NOT NULL CHECK(relationship_status IN ('ACTIVE','REMOVED')),
+ UNIQUE(job_id,booking_id),
+ UNIQUE(job_id,source_sequence)
+);
+CREATE INDEX IF NOT EXISTS idx_job_booking_links_booking ON job_booking_links(booking_id);
 
 CREATE TABLE IF NOT EXISTS special_rate_workflow(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL UNIQUE REFERENCES transaction_records(id) ON DELETE CASCADE, stage TEXT NOT NULL, carrier_response TEXT, approved_rate REAL, quote_ref TEXT, booking_ref TEXT, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS switch_bl_history(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, job_id INTEGER NOT NULL REFERENCES jobs(id), ts TEXT NOT NULL, original_bill_no TEXT NOT NULL, switch_bill_no TEXT NOT NULL, original_parties_json TEXT NOT NULL, new_parties_json TEXT NOT NULL, approved_by TEXT, confidentiality INTEGER NOT NULL DEFAULT 1, immutable_hash TEXT NOT NULL UNIQUE);
