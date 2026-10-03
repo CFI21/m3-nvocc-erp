@@ -63,6 +63,59 @@ CREATE TABLE IF NOT EXISTS job_booking_links(
 );
 CREATE INDEX IF NOT EXISTS idx_job_booking_links_booking ON job_booking_links(booking_id);
 
+-- M3 §29 CRT Governance — CRT=Change Request Ticket; TRT=Terminal Release Ticket.
+CREATE TABLE IF NOT EXISTS change_request_tickets(
+ id INTEGER PRIMARY KEY,
+ ticket_ref TEXT NOT NULL UNIQUE,
+ target_module TEXT NOT NULL CHECK(target_module IN ('trt','export-trt','import-trt','transshipment-trt')),
+ target_record_id INTEGER NOT NULL REFERENCES transaction_records(id),
+ maker_user_id TEXT NOT NULL,
+ state TEXT NOT NULL CHECK(state IN ('DRAFT','SUBMITTED','UNDER_REVIEW','APPROVED','REJECTED','APPLIED','CLOSED')),
+ change_payload_json TEXT NOT NULL,
+ reason TEXT NOT NULL,
+ financial_posted INTEGER NOT NULL DEFAULT 0,
+ closed_period INTEGER NOT NULL DEFAULT 0,
+ tax_filed INTEGER NOT NULL DEFAULT 0,
+ target_version INTEGER NOT NULL,
+ applied_by_user_id TEXT,
+ application_mode TEXT,
+ reversal_ref TEXT,
+ corrected_document_ref TEXT,
+ repost_ref TEXT,
+ created_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ version INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS crt_approvals(
+ id INTEGER PRIMARY KEY,
+ ticket_ref TEXT NOT NULL REFERENCES change_request_tickets(ticket_ref),
+ approval_role TEXT NOT NULL,
+ approver_user_id TEXT,
+ approver_type TEXT NOT NULL CHECK(approver_type IN ('HUMAN_USER','EXTERNAL_ADVISOR')),
+ external_advisor_ref TEXT,
+ decision TEXT NOT NULL CHECK(decision IN ('APPROVED','REJECTED')),
+ mfa_verified INTEGER NOT NULL DEFAULT 0,
+ comment TEXT,
+ evidence_ref TEXT,
+ decided_at TEXT NOT NULL,
+ UNIQUE(ticket_ref,approval_role)
+);
+CREATE TABLE IF NOT EXISTS crt_audit(
+ id INTEGER PRIMARY KEY,
+ event_ref TEXT NOT NULL UNIQUE,
+ ticket_ref TEXT NOT NULL REFERENCES change_request_tickets(ticket_ref),
+ ts TEXT NOT NULL,
+ actor_user_id TEXT NOT NULL,
+ action TEXT NOT NULL,
+ before_json TEXT,
+ after_json TEXT,
+ reason TEXT
+);
+CREATE TRIGGER IF NOT EXISTS crt_audit_immutable_update BEFORE UPDATE ON crt_audit
+BEGIN SELECT RAISE(ABORT,'CRT_AUDIT_IMMUTABLE'); END;
+CREATE TRIGGER IF NOT EXISTS crt_audit_immutable_delete BEFORE DELETE ON crt_audit
+BEGIN SELECT RAISE(ABORT,'CRT_AUDIT_IMMUTABLE'); END;
+
 CREATE TABLE IF NOT EXISTS special_rate_workflow(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL UNIQUE REFERENCES transaction_records(id) ON DELETE CASCADE, stage TEXT NOT NULL, carrier_response TEXT, approved_rate REAL, quote_ref TEXT, booking_ref TEXT, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS switch_bl_history(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, job_id INTEGER NOT NULL REFERENCES jobs(id), ts TEXT NOT NULL, original_bill_no TEXT NOT NULL, switch_bill_no TEXT NOT NULL, original_parties_json TEXT NOT NULL, new_parties_json TEXT NOT NULL, approved_by TEXT, confidentiality INTEGER NOT NULL DEFAULT 1, immutable_hash TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS split_bl_allocations(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, child_bill_no TEXT NOT NULL, container_no TEXT NOT NULL, packages REAL NOT NULL, weight REAL NOT NULL, measurement REAL NOT NULL, UNIQUE(transaction_id,child_bill_no));
