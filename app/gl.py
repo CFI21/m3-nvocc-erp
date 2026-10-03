@@ -9,6 +9,7 @@ from .json_recovery import load_json_or_recover_arrays
 from .admin import session as iam_session, permission_code as iam_permission_code
 from .clx034_smart_approval_fast_track import enforce_gl_action
 from .clx044_gl_exact_flow import apply_gl_exact_flow
+from .item7_financial_document_governance import validate_correction
 from .item6_financial_governance import (
     enabled as item6_enabled,
     enforce_sensitive_session,
@@ -300,10 +301,13 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
         errs=validate(module,body.fields)
         if errs:raise HTTPException(422,{'codes':errs})
         jid=job_id(conn,body.job_ref); ext=body.external_ref or f"CLX-GL-{module.upper()}-{uuid.uuid4().hex[:10].upper()}"; status=str(body.fields.get('Status') or 'Draft')
+        correction_meta=validate_correction(conn,module,body.fields,jid,body.source_type,body.source_ref)
+        if correction_meta:
+            body.source_type=correction_meta['source_module']; body.source_ref=correction_meta['source_ref']
         if conn.execute('SELECT 1 FROM gl_records WHERE module=? AND external_ref=?',(module,ext)).fetchone():raise HTTPException(409,'DUPLICATE_GL_RECORD')
         payload=dict(body.fields); cur=conn.execute('INSERT INTO gl_records(module,external_ref,job_id,source_type,source_ref,status,version,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,1,?,?,?)',(module,ext,jid,body.source_type,body.source_ref,status,json.dumps(payload),now(),now()));rid=cur.lastrowid
         if module=='voucher':build_voucher(conn,rid,payload,jid,body.source_type,body.source_ref,status,maker_role=role)
-        after=serialize(get_record(conn,module,rid));audit(conn,role,'CREATE',module,rid,jid,None,after,{'source_type':body.source_type,'source_ref':body.source_ref})
+        after=serialize(get_record(conn,module,rid));audit(conn,role,'CREATE',module,rid,jid,None,after,{'source_type':body.source_type,'source_ref':body.source_ref,'financial_correction':correction_meta})
         if idempotency_key:conn.execute('INSERT INTO idempotency_keys(actor_role,idem_key,request_hash,response_json,status_code,created_at) VALUES(?,?,?,?,201,?)',(role,'GL:'+idempotency_key,rh,json.dumps(after),now()))
         conn.execute('COMMIT');return JSONResponse(after,status_code=201)
     except HTTPException:conn.execute('ROLLBACK');raise
