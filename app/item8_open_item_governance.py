@@ -147,3 +147,22 @@ def reopen_open_item(conn,source_ref,source_type,amount,reason):
     table='gl_ar_open_items' if typ=='AR' else 'gl_ap_open_items'
     conn.execute(f"UPDATE {table} SET outstanding=?,status='OPEN' WHERE id=?",(target,item['id']))
     return {'type':typ,'open_item_id':item['id'],'outstanding_after':target,'status_after':'OPEN'}
+
+
+def apply_document_correction(conn,module,record):
+    if not enabled() or module not in {'credit-note','debit-note'}:return {}
+    fields=_fields(record)
+    source_ref=record['source_ref'] or fields.get('Invoice Ref') or fields.get('Bill Ref') or fields.get('Source Ref')
+    if not source_ref:return {}
+    amount=_num(fields.get('Amount'))
+    if amount<=0:raise HTTPException(422,{'code':'CORRECTION_AMOUNT_REQUIRED'})
+    source_type='INVOICE' if (fields.get('Invoice Ref') or str(record['source_type'] or '').lower()=='invoice') else 'BILL'
+    if not ((module=='credit-note' and source_type=='INVOICE') or (module=='debit-note' and source_type=='BILL')):
+        return {'applied':False,'reason':'NO_AUTOMATIC_OPEN_ITEM_REDUCTION_FOR_DIRECTION'}
+    meta=validate_application(conn,source_ref,source_type,amount,record['job_id'],fields.get('Currency') or 'USD')
+    table='gl_ar_open_items' if meta['type']=='AR' else 'gl_ap_open_items'
+    new=round(meta['outstanding_before']-amount,2)
+    status='CLOSED' if new<=0.005 else 'OPEN'
+    conn.execute(f'UPDATE {table} SET outstanding=?,status=? WHERE id=?',(max(new,0),status,meta['open_item_id']))
+    meta.update({'applied':True,'correction_module':module,'outstanding_after':max(new,0),'status_after':status})
+    return meta
