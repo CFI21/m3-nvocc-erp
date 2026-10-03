@@ -19,6 +19,7 @@ from .item8_open_item_governance import (
     reverse_application,
     apply_write_off,
     reopen_open_item,
+    enforce_sensitive_action as enforce_item8_sensitive_action,
     enabled as item8_enabled,
 )
 
@@ -241,7 +242,7 @@ def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_i
     finally:c.close()
 @router.post('/{module}/{rid}/actions/{action}')
 def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'),x_actor_id:str=Header('actor-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_mutable(module);action=action.lower().replace('-','_');role=actor(x_role,action if action in {'approve','release','reverse','reconcile','write_off'} else 'edit')
+    require_mutable(module);action=action.lower().replace('-','_');enforce_item8_sensitive_action(action,x_m3_session);role=actor(x_role,action if action in {'approve','release','reverse','reconcile','write_off'} else 'edit')
     if action in {'approve','release','reverse','write_off'}: enforce_treasury_action(module,rid,action,x_m3_session,b.version)
     if x_m3_session:
         c0=connect();s0=iam_session(c0,x_m3_session);x_actor_id=s0['user_ref'];c0.close()
