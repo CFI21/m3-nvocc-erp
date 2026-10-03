@@ -1,0 +1,44 @@
+name: M3 NVOCC Principal Gap Completion
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/nvocc_principal_extensions.py"
+      - "app/module_meta.json"
+      - "app/screen_catalog.py"
+      - "app/schema.sql"
+      - "web/index.html"
+      - "migrations/NVOCC_PRINCIPAL_GAPS_001.sql"
+      - "tests/test_nvocc_principal_gap_completion.py"
+      - ".github/workflows/nvocc-principal-gap-completion.yml"
+  push:
+    branches: [main]
+    paths:
+      - "app/nvocc_principal_extensions.py"
+      - "app/module_meta.json"
+      - "app/screen_catalog.py"
+      - "app/schema.sql"
+      - "web/index.html"
+      - "migrations/NVOCC_PRINCIPAL_GAPS_001.sql"
+      - "tests/test_nvocc_principal_gap_completion.py"
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - name: Focused NVOCC principal gap tests
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_nvocc_principal_gap_completion.py
+      - name: Full M3 regression
+        env: {PYTHONPATH: .}
+        run: pytest -q
+      - name: Python compile
+        run: python -m compileall -q app
+      - name: Safety
+        run: |
+          grep -q '"real_money": false' M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json
+          grep -q '"ancline_touched": false' M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json
