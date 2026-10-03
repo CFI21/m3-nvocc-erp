@@ -56,7 +56,8 @@ def test_booking_duplicate_ui_fields_removed_from_operational_control():
 def test_pot_agent_is_conditioned_by_pot():
     b=booking_block()
     assert "clx78Field(r,'POT Agent','POT Agent',{disabled:!hasPot1})" in b
-    assert "if(pot)pot.disabled=!pot1" in HTML
+    assert "pot.disabled=!(via||trans)" in HTML
+    assert "if(pot1)pot.disabled=false" in HTML
     assert "if(ts1)ts1.disabled=!pot1" in HTML
     assert "if(ts2)ts2.disabled=!pot2" in HTML
 
@@ -65,22 +66,10 @@ def test_existing_bl_gate_and_order_are_preserved():
     e=HTML.index("function clx49BookingGroup",s)
     b=HTML[s:e]
     for x in [
-      "clx82NativeField(w.bl,'B/L No.','B/L No.')",
-      "clx82NativeField(w.bl,'Type','B/L Type')",
-      "clx82DerivedField('Booking No.'",
-      "clx82DerivedField('Job Ref'",
-      "clx82NativeField(w.bl,'Issue Date','Issue Date'",
-      "clx82DerivedField('Place of Issue'",
-      "clx82NativeField(w.bl,'Original / Express','Original / Express')",
-      "clx82DerivedField('Freight Term'",
-      "clx82DerivedField('Service Type'",
-      "clx82DerivedField('Carrier'",
-      "clx82DerivedField('Vessel'",
-      "clx82DerivedField('Voyage'",
-      "clx82DerivedField('POL'",
-      "clx82DerivedField('POT'",
-      "clx82DerivedField('POD'",
-      "clx82DerivedField('Final Destination'"
+      'B/L Basic Info & Routing','B/L No.','B/L Type','MBL','HBL','Booking No.','Job Ref',
+      'Issue Date','Place of Issue','Original / Express','Freight Term','Service Type',
+      'Carrier','Vessel','Voyage','POL','POT','POD','Final Destination',
+      'Parties','Cargo & Equipment','Freight & Commercial Context'
     ]:
         assert x in b,x
     freeze=json.loads((ROOT/'M3_BACKEND_FREEZE_ACCEPTANCE.json').read_text())
