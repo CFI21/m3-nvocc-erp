@@ -36,7 +36,7 @@ def make_gl_record(status='Draft', flow='EXPORT', source_ref='SRC-ITEM6'):
     rid=cur.lastrowid
     v=c.execute("""INSERT INTO gl_vouchers(gl_record_id,voucher_no,voucher_type,voucher_date,currency,status,source_type,source_ref,job_id,
       total_debit,total_credit,version,created_at,maker_role,exchange_rate,base_currency,base_total_debit,base_total_credit)
-      VALUES(?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?)""",
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?)""",
       (rid,'JV-I6-'+str(rid),'JV','2026-09-23','USD',status,'ITEM6',source_ref,jid,100,100,gl.now(),'USR-MAKER',1,'USD',100,100)).lastrowid
     c.execute("INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)",(v,1,'1100',100,0,'Item6',jid))
     c.execute("INSERT INTO gl_voucher_lines(voucher_id,line_no,account_code,debit,credit,description,job_id) VALUES(?,?,?,?,?,?,?)",(v,2,'4000',0,100,'Item6',jid))
