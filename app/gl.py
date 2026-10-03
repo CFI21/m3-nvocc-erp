@@ -9,6 +9,7 @@ from .json_recovery import load_json_or_recover_arrays
 from .admin import session as iam_session, permission_code as iam_permission_code
 from .clx034_smart_approval_fast_track import enforce_gl_action
 from .clx044_gl_exact_flow import apply_gl_exact_flow
+from .item8_open_item_governance import ensure_open_item
 from .item7_financial_document_governance import validate_correction
 from .item6_financial_governance import (
     enabled as item6_enabled,
@@ -403,6 +404,10 @@ def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEW
         else:raise HTTPException(422,{'code':'UNKNOWN_GL_ACTION'})
         cur=conn.execute('UPDATE gl_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?',(st,json.dumps(p),now(),rid,body.version))
         if cur.rowcount!=1:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
+        open_item=None
+        if action=='approve' and module in {'invoice','bills'}:
+            open_item=ensure_open_item(conn,module,get_record(conn,module,rid))
+            if open_item: meta['open_item']={'id':open_item['id'],'source_ref':open_item['source_ref'],'outstanding':open_item['outstanding'],'status':open_item['status']}
         after=serialize(get_record(conn,module,rid));audit(conn,role,action.upper(),module,rid,r['job_id'],before,after,meta);conn.execute('COMMIT');return {'ok':True,'record':after,'meta':meta}
     except HTTPException:conn.execute('ROLLBACK');raise
     finally:conn.close()
