@@ -177,6 +177,34 @@ CREATE INDEX IF NOT EXISTS idx_mbl_hbl_job ON mbl_hbl_links(job_id);
 CREATE INDEX IF NOT EXISTS idx_cro_container_container ON cro_container_links(container_id);
 CREATE INDEX IF NOT EXISTS idx_trt_container_container ON trt_container_links(container_id);
 
+-- M3 Item 4 — append-only state transition governance.
+CREATE TABLE IF NOT EXISTS state_transition_events(
+ id INTEGER PRIMARY KEY,
+ event_ref TEXT NOT NULL UNIQUE,
+ subject_type TEXT NOT NULL,
+ subject_ref TEXT NOT NULL,
+ from_state TEXT NOT NULL,
+ to_state TEXT NOT NULL,
+ mode TEXT NOT NULL CHECK(mode IN ('STANDARD','CORRECTION','OVERRIDE','EXCEPTION_RESOLUTION')),
+ actor_user_id TEXT NOT NULL,
+ actor_role TEXT NOT NULL,
+ reason TEXT,
+ evidence_json TEXT NOT NULL DEFAULT '[]',
+ approver_user_ids_json TEXT NOT NULL DEFAULT '[]',
+ source_event_ref TEXT,
+ financial_posted INTEGER NOT NULL DEFAULT 0,
+ outcome TEXT NOT NULL CHECK(outcome IN ('ALLOWED','BLOCKED')),
+ created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_state_transition_subject
+ ON state_transition_events(subject_type,subject_ref,created_at);
+CREATE TRIGGER IF NOT EXISTS state_transition_immutable_update
+BEFORE UPDATE ON state_transition_events
+BEGIN SELECT RAISE(ABORT,'STATE_TRANSITION_HISTORY_IMMUTABLE'); END;
+CREATE TRIGGER IF NOT EXISTS state_transition_immutable_delete
+BEFORE DELETE ON state_transition_events
+BEGIN SELECT RAISE(ABORT,'STATE_TRANSITION_HISTORY_IMMUTABLE'); END;
+
 CREATE TABLE IF NOT EXISTS special_rate_workflow(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL UNIQUE REFERENCES transaction_records(id) ON DELETE CASCADE, stage TEXT NOT NULL, carrier_response TEXT, approved_rate REAL, quote_ref TEXT, booking_ref TEXT, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS switch_bl_history(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, job_id INTEGER NOT NULL REFERENCES jobs(id), ts TEXT NOT NULL, original_bill_no TEXT NOT NULL, switch_bill_no TEXT NOT NULL, original_parties_json TEXT NOT NULL, new_parties_json TEXT NOT NULL, approved_by TEXT, confidentiality INTEGER NOT NULL DEFAULT 1, immutable_hash TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS split_bl_allocations(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, child_bill_no TEXT NOT NULL, container_no TEXT NOT NULL, packages REAL NOT NULL, weight REAL NOT NULL, measurement REAL NOT NULL, UNIQUE(transaction_id,child_bill_no));
