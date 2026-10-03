@@ -374,6 +374,26 @@ CREATE TABLE IF NOT EXISTS gl_credit_limits(
  id INTEGER PRIMARY KEY, customer_id INTEGER NOT NULL UNIQUE REFERENCES customers(id), currency TEXT NOT NULL, credit_limit REAL NOT NULL,
  exposure REAL NOT NULL DEFAULT 0, on_hold INTEGER NOT NULL DEFAULT 0, version INTEGER NOT NULL DEFAULT 1
 );
+CREATE TABLE IF NOT EXISTS credit_override_events(
+ id INTEGER PRIMARY KEY,
+ override_ref TEXT NOT NULL UNIQUE,
+ customer_id INTEGER NOT NULL REFERENCES customers(id),
+ currency TEXT NOT NULL,
+ amount REAL NOT NULL CHECK(amount>0),
+ reason TEXT NOT NULL,
+ expires_at TEXT NOT NULL,
+ requested_by TEXT NOT NULL,
+ approved_by TEXT,
+ approved_at TEXT,
+ status TEXT NOT NULL CHECK(status IN ('PENDING','APPROVED','REJECTED','EXPIRED','REVOKED')),
+ office_code TEXT,
+ branch_code TEXT,
+ country_code TEXT,
+ organization_code TEXT,
+ created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_credit_override_customer ON credit_override_events(customer_id,currency,status,expires_at);
+
 CREATE TABLE IF NOT EXISTS gl_bank_statement_items(
  id INTEGER PRIMARY KEY, statement_ref TEXT NOT NULL UNIQUE, bank_account_code TEXT NOT NULL REFERENCES gl_accounts(account_code),
  txn_date TEXT NOT NULL, description TEXT NOT NULL, amount REAL NOT NULL, currency TEXT NOT NULL, matched INTEGER NOT NULL DEFAULT 0
