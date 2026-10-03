@@ -82,6 +82,14 @@ class EventBody(BaseModel):
     source_ref:Optional[str]=None
     override:bool=False
     override_reason:Optional[str]=None
+    governance_mode:str="STANDARD"
+    governance_reason:Optional[str]=None
+    governance_evidence_refs:list[str]=Field(default_factory=list)
+    governance_approver_user_ids:list[str]=Field(default_factory=list)
+    correction_source_event_ref:Optional[str]=None
+    correction_original_transition_at:Optional[str]=None
+    financial_posted:bool=False
+    actor_type:str="HUMAN"
     note:Optional[str]=None
 
 class ExceptionDecision(BaseModel):
@@ -217,7 +225,33 @@ def post_event(container_no:str,b:EventBody,x_role:str=Header("OPS"),x_m3_sessio
         a=actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(conn)
         c=get_container(conn,container_no,a);before=dict(c);frm=current_state(c);to=event_state(b.event_type)
         valid=validate_transition(frm,to)
-        if not valid:
+        governance_active=False
+        try:
+            from .state_transition_governance import enabled as state_governance_enabled, authorize_container_transition
+            governance_active=state_governance_enabled()
+        except Exception:
+            governance_active=False
+        if governance_active:
+            mode=(b.governance_mode or ("OVERRIDE" if b.override else "STANDARD")).upper()
+            reason=b.governance_reason or b.override_reason
+            authorize_container_transition(
+                container_no=container_no,
+                from_state=frm,
+                to_state=to,
+                mode=mode,
+                actor_user_id=a["user"],
+                actor_role=a["role"],
+                actor_type=b.actor_type,
+                reason=reason,
+                evidence_refs=b.governance_evidence_refs,
+                approver_user_ids=b.governance_approver_user_ids,
+                source_event_ref=b.correction_source_event_ref,
+                original_transition_at=b.correction_original_transition_at,
+                financial_posted=b.financial_posted,
+                connection=conn,
+            )
+            valid=True
+        elif not valid:
             if not b.override:
                 ref=create_exception(conn,c,"SEQUENCE_EXCEPTION","HIGH",f"Invalid journey transition {frm} -> {to}",expected_event=" / ".join(sorted(NEXT.get(frm,set()))),created_by=a["user"])
                 conn.execute("COMMIT")
@@ -289,10 +323,13 @@ def post_event(container_no:str,b:EventBody,x_role:str=Header("OPS"),x_m3_sessio
                b.charge_code or "MOVE_"+to,b.party_type,b.party_code,float(b.cost_amount),b.currency,to,b.source_ref or event_id,a["user"],now()))
         updated=dict(conn.execute("SELECT * FROM containers WHERE id=?",(c["id"],)).fetchone())
         close_recovered_exceptions(conn,updated,to)
-        if b.override:
+        if b.override and not governance_active:
             create_exception(conn,updated,"AUTHORIZED_OVERRIDE","MEDIUM",f"Authorized override {frm} -> {to}: {b.override_reason}",created_by=a["user"])
+        if governance_active and (b.governance_mode or "").upper()=="OVERRIDE":
+            create_exception(conn,updated,"AUTHORIZED_OVERRIDE","MEDIUM",f"Governed override {frm} -> {to}: {b.governance_reason or b.override_reason}",created_by=a["user"])
         audit(conn,a,"JOURNEY_EVENT",c["id"],job["id"] if job else c["job_id"],before,updated,
-              {"event_id":event_id,"from":frm,"to":to,"override":b.override,"override_reason":b.override_reason,"cost_amount":b.cost_amount})
+              {"event_id":event_id,"from":frm,"to":to,"override":b.override,"override_reason":b.override_reason,
+               "governance_mode":b.governance_mode if governance_active else None,"cost_amount":b.cost_amount})
         conn.execute("COMMIT")
         return {"ok":True,"event_id":event_id,"from":frm,"to":to,"record":updated,"detention":detention_metrics(updated)}
     except HTTPException as e:
