@@ -52,7 +52,6 @@ HO_TRANSACTION_ALIASES = [
 HO_UTILITY_ALIASES = [
     {'label':'Template / Document Setup','target':'master-data::document-types'},
     {'label':'Configuration','target':'master-data::configurations'},
-    {'label':'Account Setup','target':'gl-accounts::account-integration','roles':['ADMIN','GL_MANAGER','GL_ACCOUNTANT','AUDITOR']},
     {'label':'User Management','target':'administration::users','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
     {'label':'Security Policy','target':'integration-security::security-policies','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
     {'label':'Password Policy','target':'administration::password-policy','roles':['ADMIN','SECURITY_ADMIN','AUDITOR']},
