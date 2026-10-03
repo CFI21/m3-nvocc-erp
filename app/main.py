@@ -473,13 +473,26 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
         elif action=='hold':
             code=(body.reason or 'MANUAL_HOLD').strip().upper().replace(' ','_'); add_hold(conn,r['job_id'],code); new_status='Pending'; exception(conn,code,module,tid,r['job_id'],body.reason or 'Manual hold')
         elif action=='release':
-            reasons=release_gate(ctx)
-            if reasons:
-                for code in reasons: exception(conn,code,module,tid,r['job_id'],'Release blocked by server-side workflow gate')
-                audit(conn,role,ascope or cscope,'RELEASE_BLOCKED',module,tid,r['job_id'],before,before,{'reasons':reasons})
-                conn.execute('COMMIT')
-                return JSONResponse({'detail':{'code':'RELEASE_BLOCKED','reasons':reasons}},status_code=422)
-            new_status='Released'; conn.execute("UPDATE workflow_states SET release_status='RELEASED',version=version+1 WHERE job_id=?",(r['job_id'],)); sync_release(conn,r['job_id'],tid)
+            granular_do_release=False
+            if module=='delivery-order':
+                try:
+                    from .release_governance import enabled as release_governance_enabled, assert_delivery_order_eligible
+                    if release_governance_enabled():
+                        assert_delivery_order_eligible(job_ref=r['job_ref'],hbl_no=r['hbl_no'],container_no=r['container_no'])
+                        granular_do_release=True
+                except HTTPException:
+                    raise
+            if not granular_do_release:
+                reasons=release_gate(ctx)
+                if reasons:
+                    for code in reasons: exception(conn,code,module,tid,r['job_id'],'Release blocked by server-side workflow gate')
+                    audit(conn,role,ascope or cscope,'RELEASE_BLOCKED',module,tid,r['job_id'],before,before,{'reasons':reasons})
+                    conn.execute('COMMIT')
+                    return JSONResponse({'detail':{'code':'RELEASE_BLOCKED','reasons':reasons}},status_code=422)
+            new_status='Released'
+            if not granular_do_release:
+                conn.execute("UPDATE workflow_states SET release_status='RELEASED',version=version+1 WHERE job_id=?",(r['job_id'],))
+                sync_release(conn,r['job_id'],tid)
         elif action=='cancel': new_status='Cancelled'
         elif action=='amend': new_status='Draft'
         elif action=='reissue': new_status='Issued'

@@ -205,6 +205,52 @@ CREATE TRIGGER IF NOT EXISTS state_transition_immutable_delete
 BEFORE DELETE ON state_transition_events
 BEGIN SELECT RAISE(ABORT,'STATE_TRANSITION_HISTORY_IMMUTABLE'); END;
 
+-- M3 Item 5 — HBL + container-level release governance beneath nvocc_release_controls.
+CREATE TABLE IF NOT EXISTS nvocc_release_container_control(
+ id INTEGER PRIMARY KEY,
+ release_ref TEXT NOT NULL REFERENCES nvocc_release_controls(release_ref),
+ container_no TEXT NOT NULL,
+ status TEXT NOT NULL CHECK(status IN (
+   'BLOCKED','PENDING','CONDITIONAL','PARTIALLY_RELEASED','RELEASED',
+   'RELEASED_WITH_POST_DELIVERY_HOLD','REVOKED','EXPIRED'
+ )),
+ condition_type TEXT CHECK(condition_type IS NULL OR condition_type IN (
+   'BG','LOI','CREDIT_OVERRIDE','ORIGINAL_WAIVER','MANAGEMENT_APPROVAL','CUSTOMS_CONDITIONAL'
+ )),
+ condition_reason TEXT,
+ condition_valid_until TEXT,
+ condition_approver_user_id TEXT,
+ blocking_reasons_json TEXT NOT NULL DEFAULT '[]',
+ delivered_at_action INTEGER NOT NULL DEFAULT 0,
+ created_at TEXT NOT NULL,
+ updated_at TEXT NOT NULL,
+ version INTEGER NOT NULL DEFAULT 1,
+ UNIQUE(release_ref,container_no)
+);
+CREATE TABLE IF NOT EXISTS nvocc_release_events(
+ id INTEGER PRIMARY KEY,
+ event_ref TEXT NOT NULL UNIQUE,
+ release_ref TEXT NOT NULL REFERENCES nvocc_release_controls(release_ref),
+ container_no TEXT NOT NULL,
+ from_state TEXT NOT NULL,
+ to_state TEXT NOT NULL,
+ action TEXT NOT NULL,
+ actor_user_id TEXT NOT NULL,
+ reason TEXT,
+ detail_json TEXT NOT NULL,
+ created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_release_container_status
+ ON nvocc_release_container_control(release_ref,status,container_no);
+CREATE INDEX IF NOT EXISTS idx_release_events_ref
+ ON nvocc_release_events(release_ref,created_at);
+CREATE TRIGGER IF NOT EXISTS release_event_immutable_update
+BEFORE UPDATE ON nvocc_release_events
+BEGIN SELECT RAISE(ABORT,'RELEASE_EVENT_IMMUTABLE'); END;
+CREATE TRIGGER IF NOT EXISTS release_event_immutable_delete
+BEFORE DELETE ON nvocc_release_events
+BEGIN SELECT RAISE(ABORT,'RELEASE_EVENT_IMMUTABLE'); END;
+
 CREATE TABLE IF NOT EXISTS special_rate_workflow(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL UNIQUE REFERENCES transaction_records(id) ON DELETE CASCADE, stage TEXT NOT NULL, carrier_response TEXT, approved_rate REAL, quote_ref TEXT, booking_ref TEXT, updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS switch_bl_history(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, job_id INTEGER NOT NULL REFERENCES jobs(id), ts TEXT NOT NULL, original_bill_no TEXT NOT NULL, switch_bill_no TEXT NOT NULL, original_parties_json TEXT NOT NULL, new_parties_json TEXT NOT NULL, approved_by TEXT, confidentiality INTEGER NOT NULL DEFAULT 1, immutable_hash TEXT NOT NULL UNIQUE);
 CREATE TABLE IF NOT EXISTS split_bl_allocations(id INTEGER PRIMARY KEY, transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE, child_bill_no TEXT NOT NULL, container_no TEXT NOT NULL, packages REAL NOT NULL, weight REAL NOT NULL, measurement REAL NOT NULL, UNIQUE(transaction_id,child_bill_no));

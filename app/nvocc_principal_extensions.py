@@ -152,6 +152,20 @@ def list_workspace(workspace:str,x_role:str=Header("VIEWER"),x_branch_scope:Opti
 def upsert_workspace(workspace:str,b:WorkspaceWrite,x_role:str=Header("VIEWER"),x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope")):
     if workspace not in WORKSPACES: raise HTTPException(404,"Unknown workspace")
     role=_role(workspace,x_role); data=_clean(workspace,b.data);w=WORKSPACES[workspace];key=w["key"];ref=str(data[key])
+    # Item 5: release state is derived by the governed HBL/container release service.
+    # The generic workspace CRUD may maintain header/master details, but must never
+    # be used as a direct API shortcut to issue/release/revoke/expire cargo.
+    if workspace=="release-control":
+        requested=str(data.get("status") or "PENDING").strip().upper().replace(" ","_")
+        if requested not in {"PENDING","BLOCKED"}:
+            raise HTTPException(409,{
+                "code":"GOVERNED_RELEASE_ACTION_REQUIRED",
+                "workspace":"release-control",
+                "requested_status":requested,
+            })
+        data["status"]=requested
+        data.pop("release_by",None)
+        data.pop("release_date",None)
     if workspace=="ts-branch-ops" and x_branch_scope and role!="ADMIN" and data.get("ts_branch")!=x_branch_scope:
         raise HTTPException(403,{"code":"BRANCH_SCOPE_MISMATCH"})
     if workspace=="interbranch-settlement" and x_branch_scope and role not in {"ADMIN","GL_MANAGER","TREASURY_MANAGER"} and x_branch_scope not in {data.get("from_branch"),data.get("to_branch")}:
