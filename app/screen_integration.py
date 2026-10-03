@@ -363,7 +363,7 @@ def workflow(job_ref:str):
     c=connect()
     try:
         e=job_e2e(c,job_ref)
-        chain=['special-rates-request','booking','planning','vessel-lock','cro','crt','export-crt','transshipment-crt','bl','switch-bl','split-bl','import-bl','import-crt','delivery-order','container-activity','detention-collection','storage-cost','agent-receipt-pay','soa']
+        chain=['special-rates-request','booking','planning','vessel-lock','cro','trt','export-trt','transshipment-trt','bl','switch-bl','split-bl','import-bl','import-trt','delivery-order','container-activity','detention-collection','storage-cost','agent-receipt-pay','soa']
         present={r['module']:dict(r) for r in c.execute('''SELECT t.module,t.external_ref,t.status,t.version FROM transaction_records t JOIN jobs j ON j.id=t.job_id WHERE j.job_ref=?''',(job_ref,))}
         steps=[]
         for i,k in enumerate(chain):
