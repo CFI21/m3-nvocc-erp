@@ -104,12 +104,13 @@ def authorize_container_transition(
     if not enabled():
         raise HTTPException(503,{"code":"STATE_TRANSITION_GOVERNANCE_DISABLED"})
 
-    _require_human(actor_user_id,actor_type)
     frm=normalize(from_state)
     to=normalize(to_state)
     mode=normalize(mode)
     if mode not in MODES:
         raise HTTPException(422,{"code":"TRANSITION_MODE_INVALID"})
+    if mode in {"CORRECTION","OVERRIDE","EXCEPTION_RESOLUTION"}:
+        _require_human(actor_user_id,actor_type)
 
     evidence=_unique_humans(evidence_refs or [])
     approvers=_unique_humans(approver_user_ids or [])
