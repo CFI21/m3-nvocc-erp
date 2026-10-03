@@ -44,6 +44,7 @@ def add_ar(cid,jid,ref,outstanding,status='OPEN',currency='USD'):
 
 def test_exposure_derived_from_authoritative_open_items_and_hold_synced(isolated):
     cst=first_customer(); jid=first_job_for_customer(cst['id']); configure_credit(cst['id'],100)
+    c=db.connect(); c.execute('DELETE FROM gl_ar_open_items WHERE customer_id=?',(cst['id'],)); c.close()
     add_ar(cst['id'],jid,'AR-I9-1',70)
     add_ar(cst['id'],jid,'AR-I9-2',50)
     c=db.connect(); snap=gov.refresh_credit_exposure(c,cst['id'],'USD')
@@ -58,6 +59,7 @@ def test_exposure_derived_from_authoritative_open_items_and_hold_synced(isolated
 
 def test_closed_and_writtenoff_items_not_counted_in_exposure(isolated):
     cst=first_customer(); jid=first_job_for_customer(cst['id']); configure_credit(cst['id'],100)
+    c=db.connect(); c.execute('DELETE FROM gl_ar_open_items WHERE customer_id=?',(cst['id'],)); c.close()
     add_ar(cst['id'],jid,'AR-I9-O',40,'OPEN')
     add_ar(cst['id'],jid,'AR-I9-C',50,'CLOSED')
     add_ar(cst['id'],jid,'AR-I9-W',60,'WRITTEN_OFF')
