@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 from pathlib import Path
 from typing import Optional, Any
 import json, datetime, uuid
-from .db import connect
+from .db import connect, using_postgres
 from .screen_catalog import build_catalog
 from .clx045_gl_reporting import REPORT_KEYS, report_rows
 
@@ -55,6 +55,10 @@ def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def rowdict(r): return dict(r) if r is not None else None
 
 def init_events(c):
+    # PostgreSQL production schema is migration-managed. Runtime bootstrap here
+    # remains only for the SQLite test/dev path.
+    if using_postgres():
+        return
     c.executescript('''
     CREATE TABLE IF NOT EXISTS screen_integration_events(
       id INTEGER PRIMARY KEY AUTOINCREMENT,event_ref TEXT UNIQUE NOT NULL,ts TEXT NOT NULL,
