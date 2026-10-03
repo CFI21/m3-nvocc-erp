@@ -126,12 +126,17 @@ def test_existing_forms_are_extended_in_place_not_duplicated():
 
 def test_web_surfaces_principal_workspaces_and_dense_extension_forms():
     html=open('web/index.html',encoding='utf-8').read()
+    catalog=open('app/screen_catalog.py',encoding='utf-8').read()
     for marker in [
-      'openPrincipalWorkspace','Depot Master','Port Agent / Depot Configuration','Inter-Branch Transfer Pricing',
-      'TS Branch Operations','Release Control','MBL ↔ HBL Link Control','Inter-Branch Settlement','Branch P&L / Consolidation',
+      'openPrincipalWorkspace','TS Branch Operations','Release Control','MBL ↔ HBL Link Control',
       'Origin Branch','Destination Branch','Delivery From','Empty Return To','D&D Free Time End'
     ]:
         assert marker in html,marker
+    for marker in [
+      'Depot Master','Port Agent / Depot Configuration','Inter-Branch Transfer Pricing',
+      'Inter-Branch Settlement','Branch P&L / Consolidation'
+    ]:
+        assert marker in catalog,marker
     assert 'No records yet. Use New to create the first governed record.' in html
     assert '/api/nvocc-principal/release-prerequisites/' in html
 
