@@ -23,7 +23,7 @@ Submit new or changed masters through the governed change-request flow. Resolve 
 Independently approve/reject master-data changes. Review alias/merge decisions, versions, data quality and reference integrity. Never self-approve a change created by the same actor.
 
 ### OPS
-Create and maintain Booking/Job operational records, routing, planning, CRO/CRT and shipment milestones. Use POT/POT Agent only when an actual via-port/transshipment leg exists.
+Create and maintain Booking/Job operational records, routing, planning, CRO/TRT and shipment milestones. Use POT/POT Agent only when an actual via-port/transshipment leg exists.
 
 ### DOCS
 Maintain B/L, HBL/MBL, Switch/Split B/L, release/document controls and document completeness. Keep all document references on the authoritative Job context.
@@ -50,7 +50,7 @@ For each approved real shipment:
 2. Create/confirm Job and one authoritative Job context.
 3. Apply approved rate/special-rate workflow where needed.
 4. Complete vessel/voyage planning and locks.
-5. Create CRO and applicable CRT flow.
+5. Create CRO and applicable TRT flow.
 6. Use POT/Transshipment only if the route actually contains a via port.
 7. Complete HBL/MBL and any governed document variants.
 8. Link container/equipment and record actual movement/custody events.
