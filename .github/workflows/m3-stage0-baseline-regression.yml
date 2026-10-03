@@ -1,0 +1,62 @@
+name: M3 Stage 0 Baseline Regression
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "scripts/m3_stage0_baseline_snapshot.py"
+      - "docs/M3_STAGE0_BASELINE_FREEZE.md"
+      - "M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json"
+      - ".github/workflows/m3-stage0-baseline-regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  baseline-regression:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        run: pip install -r requirements.txt
+
+      - name: Focused Stage 0 baseline tests
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_m3_stage0_baseline_freeze.py
+
+      - name: Full M3 regression
+        env:
+          PYTHONPATH: .
+        run: pytest -q
+
+      - name: Python compile
+        run: python -m compileall -q app scripts/m3_stage0_baseline_snapshot.py
+
+      - name: Generate baseline snapshot for human review
+        env:
+          PYTHONPATH: .
+        run: python scripts/m3_stage0_baseline_snapshot.py
+
+      - name: Verify non-production safety flags
+        run: |
+          grep -q '"real_money": false' M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json
+          grep -q '"dummy_bank": "SIMULATION_ONLY"' M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json
+          grep -q '"TRUE_LAYER": false' M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json
+          grep -q '"OXR": false' M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json
+          grep -q '"AVALARA": false' M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json
+          grep -q '"ancline_touched": false' M3_NVOCC_PRINCIPAL_GAP_ACCEPTANCE.json
+
+      - name: Upload baseline snapshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-stage0-baseline-snapshot
+          path: artifacts/m3_stage0_baseline_snapshot.json
+          if-no-files-found: error
