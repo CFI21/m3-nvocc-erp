@@ -19,14 +19,18 @@ def test_current_baseline_is_196_but_extensible():
 def test_business_navigation_uses_existing_screens_only():
     c=build_catalog()
     ids={s['screen_id'] for s in c['screens']}
-    business=next(d for d in c['menu'] if d['domain']=='M3 Business')
+    assert [x['domain'] for x in c['menu']]==[
+        'HO Tasks','Agent Tasks','Treasury / AR-AP',
+        'Integration & Security','General / Administration','Master Data'
+    ]
+    business=c['business_navigation']
     assert business['navigation_only'] is True
     assert business['extensible'] is True
-    assert [s['name'] for s in business['submenus']]==[
+    assert [g['name'] for g in business['groups']]==[
         'Setup','Transaction / Operations','Document','Equipment','Finance','Control / Reporting'
     ]
-    for sub in business['submenus']:
-        for item in sub['items']:
+    for group in business['groups']:
+        for item in group['items']:
             assert item['target'] in ids
     assert len(ids)==196
 
@@ -88,6 +92,8 @@ def test_previous_current_next_flow_present_for_core_operations():
 def test_frontend_search_uses_catalog_synonyms():
     assert "...(s.search_terms||[])" in HTML
     assert "...(it.search_terms||[])" in HTML
+    assert "state.businessNavigation=m.business_navigation" in HTML
+    assert "Business Navigation" in HTML
     assert "screenAllowed(s)" in HTML
 
 def test_forms_remain_extension_safe_dense_layout():
