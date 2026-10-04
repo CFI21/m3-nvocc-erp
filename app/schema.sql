@@ -338,7 +338,7 @@ CREATE TABLE IF NOT EXISTS gl_fiscal_years(
 CREATE TABLE IF NOT EXISTS gl_periods(
  id INTEGER PRIMARY KEY, fiscal_year_id INTEGER NOT NULL REFERENCES gl_fiscal_years(id), period_no INTEGER NOT NULL,
  start_date TEXT NOT NULL, end_date TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('OPEN','CLOSED','LOCKED','FUTURE')),
- backdate_allowed_until TEXT, closed_at TEXT, locked_at TEXT, tax_filed_at TEXT, tax_filed_by TEXT, version INTEGER NOT NULL DEFAULT 1,
+ backdate_allowed_until TEXT, closed_at TEXT, closed_by TEXT, locked_at TEXT, locked_by TEXT, reopened_at TEXT, reopened_by TEXT, reopen_reason TEXT, tax_filed_at TEXT, tax_filed_by TEXT, version INTEGER NOT NULL DEFAULT 1,
  UNIQUE(fiscal_year_id,period_no)
 );
 CREATE TABLE IF NOT EXISTS gl_backdate_controls(

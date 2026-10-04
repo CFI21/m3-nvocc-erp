@@ -3,6 +3,15 @@ from pydantic import BaseModel
 from typing import Optional
 import datetime,json,uuid
 from .db import connect,tx,backend_name
+from .admin import session as iam_session, permission_code as iam_permission_code
+from .clx033_finance_transaction_governance import enforce_execution
+from .item11_period_reporting_governance import (
+    enabled as item11_enabled,
+    assert_period_close_ready,
+    assert_period_transition,
+    period_close_blockers,
+    statement_snapshot,
+)
 from .item10_tax_fx_governance import (
     enabled as item10_enabled,
     validate_fx_input as item10_validate_fx,
@@ -76,24 +85,53 @@ def periods(x_role:str=Header('AUDITOR')):
     role(x_role); c=connect(); out=[dict(x) for x in c.execute('SELECT p.*,fy.fiscal_year FROM gl_periods p JOIN gl_fiscal_years fy ON fy.id=p.fiscal_year_id ORDER BY fiscal_year,period_no')]; c.close(); return out
 
 @router.post('/periods/{pid}/actions/{action}')
-def period_action(pid:int,action:str,b:PeriodAction,x_role:str=Header('VIEWER')):
-    r=role(x_role,True); c=connect(); tx(c)
+def period_action(pid:int,action:str,b:PeriodAction,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    a=action.lower()
+    actor_ref=None
+    if item11_enabled():
+        c0=connect()
+        try:
+            sess=iam_session(c0,x_m3_session)
+            if not iam_permission_code(c0,sess['user_id'],'PERIOD_CLOSE',sess['office_code']):
+                raise HTTPException(403,{'code':'PERIOD_CLOSE_PERMISSION_REQUIRED'})
+            p0=c0.execute('SELECT * FROM gl_periods WHERE id=?',(pid,)).fetchone()
+            if not p0: raise HTTPException(404,'Period not found')
+            actor_ref=sess['user_ref']
+            assert_period_transition(p0,a,actor_ref,b.reason)
+            country_row=c0.execute("""SELECT co.country_code FROM iam_offices o LEFT JOIN iam_countries co ON co.id=o.country_id WHERE o.id=?""",(sess['home_office_id'],)).fetchone()
+            country=country_row['country_code'] if country_row else None
+            office_code=sess['office_code']
+        finally:c0.close()
+        enforce_execution('GL','accounting-periods',pid,'CLOSE',x_m3_session,b.version,0,'USD','GL',
+                          office_code,country,actor_ref,
+                          f'/api/v1/gl/hardening/periods/{pid}/actions/{a}')
+        r=actor_ref
+    else:
+        r=role(x_role,True)
+    c=connect(); tx(c)
     try:
         p=c.execute('SELECT * FROM gl_periods WHERE id=?',(pid,)).fetchone()
         if not p: raise HTTPException(404,'Period not found')
         if p['version']!=b.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':p['version']})
-        a=action.lower()
+        if item11_enabled(): assert_period_transition(p,a,actor_ref,b.reason)
         if a=='close':
-            bad=c.execute("SELECT COUNT(*) n FROM gl_period_close_checks WHERE period_id=? AND status!='PASS'",(pid,)).fetchone()['n']
-            count=c.execute('SELECT COUNT(*) n FROM gl_period_close_checks WHERE period_id=?',(pid,)).fetchone()['n']
-            if bad or not count: raise HTTPException(422,{'code':'PERIOD_CLOSE_CHECKLIST_INCOMPLETE','failed':bad,'checks':count})
-            st='CLOSED'; extra=('closed_at',now())
-        elif a=='lock': st='LOCKED'; extra=('locked_at',now())
-        elif a=='open': st='OPEN'; extra=(None,None)
+            if item11_enabled(): assert_period_close_ready(c,pid)
+            else:
+                bad=c.execute("SELECT COUNT(*) n FROM gl_period_close_checks WHERE period_id=? AND status!='PASS'",(pid,)).fetchone()['n']
+                count=c.execute('SELECT COUNT(*) n FROM gl_period_close_checks WHERE period_id=?',(pid,)).fetchone()['n']
+                if bad or not count: raise HTTPException(422,{'code':'PERIOD_CLOSE_CHECKLIST_INCOMPLETE','failed':bad,'checks':count})
+            st='CLOSED'; extra={'closed_at':now(),'closed_by':actor_ref}
+        elif a=='lock':
+            st='LOCKED'; extra={'locked_at':now(),'locked_by':actor_ref}
+        elif a=='open':
+            st='OPEN'; extra={'reopened_at':now(),'reopened_by':actor_ref,'reopen_reason':b.reason}
         else: raise HTTPException(422,{'code':'UNKNOWN_PERIOD_ACTION'})
-        sql='UPDATE gl_periods SET status=?,version=version+1'+(f', {extra[0]}=?' if extra[0] else '')+' WHERE id=? AND version=?'
-        args=[st]+([extra[1]] if extra[0] else [])+[pid,b.version]
-        q=c.execute(sql,args)
+        sets=['status=?','version=version+1'];args=[st]
+        for k,v in extra.items():
+            if k in p.keys():
+                sets.append(f'{k}=?');args.append(v)
+        args += [pid,b.version]
+        q=c.execute('UPDATE gl_periods SET '+','.join(sets)+' WHERE id=? AND version=?',args)
         if q.rowcount!=1: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
         pp=c.execute('SELECT p.*,fy.fiscal_year FROM gl_periods p JOIN gl_fiscal_years fy ON fy.id=p.fiscal_year_id WHERE p.id=?',(pid,)).fetchone()
         ext=f"PER-{pp['fiscal_year']}-{int(pp['period_no']):02d}"
@@ -101,7 +139,7 @@ def period_action(pid:int,action:str,b:PeriodAction,x_role:str=Header('VIEWER'))
         if gr:
             payload=json.loads(gr['payload_json']); payload['Status']=st
             c.execute('UPDATE gl_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=?',(st,json.dumps(payload),now(),gr['id']))
-        audit(c,r,a.upper(),'period',{'period_id':pid,'reason':b.reason,'status':st}); c.execute('COMMIT')
+        audit(c,r,a.upper(),'period',{'period_id':pid,'reason':b.reason,'status':st,'actor_user_ref':actor_ref}); c.execute('COMMIT')
         return dict(c.execute('SELECT * FROM gl_periods WHERE id=?',(pid,)).fetchone())
     except HTTPException:
         c.execute('ROLLBACK'); raise
@@ -109,7 +147,12 @@ def period_action(pid:int,action:str,b:PeriodAction,x_role:str=Header('VIEWER'))
 
 @router.get('/period-close/{pid}/checklist')
 def checklist(pid:int,x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect(); rows=[dict(x) for x in c.execute('SELECT * FROM gl_period_close_checks WHERE period_id=? ORDER BY id',(pid,))]; c.close()
+    role(x_role); c=connect()
+    if item11_enabled():
+        out=period_close_blockers(c,pid); c.close()
+        return {'period_id':pid,'all_pass':out['ready'],'checks':out['checks'],'blockers':out['blockers'],
+                'trial_balance':out['trial_balance'],'unmatched_bank_items':out['unmatched_bank_items']}
+    rows=[dict(x) for x in c.execute('SELECT * FROM gl_period_close_checks WHERE period_id=? ORDER BY id',(pid,))]; c.close()
     return {'period_id':pid,'all_pass':bool(rows) and all(x['status']=='PASS' for x in rows),'checks':rows}
 
 @router.get('/ar-aging')
@@ -261,7 +304,10 @@ def profitability(job_ref:str,x_role:str=Header('AUDITOR')):
 
 @router.get('/statements/trial-balance')
 def trial_balance(x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect(); rows=[dict(x) for x in c.execute("SELECT a.account_code,a.account_name,a.account_type,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.debit ELSE 0 END),0),2) debit,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.credit ELSE 0 END),0),2) credit,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.debit-l.credit ELSE 0 END),0),2) balance FROM gl_accounts a LEFT JOIN gl_voucher_lines l ON l.account_code=a.account_code LEFT JOIN gl_vouchers v ON v.id=l.voucher_id GROUP BY a.id ORDER BY a.account_code")]; c.close(); return rows
+    role(x_role); c=connect()
+    if item11_enabled():
+        rows=statement_snapshot(c)['trial_balance']['rows']; c.close(); return rows
+    rows=[dict(x) for x in c.execute("SELECT a.account_code,a.account_name,a.account_type,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.debit ELSE 0 END),0),2) debit,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.credit ELSE 0 END),0),2) credit,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.debit-l.credit ELSE 0 END),0),2) balance FROM gl_accounts a LEFT JOIN gl_voucher_lines l ON l.account_code=a.account_code LEFT JOIN gl_vouchers v ON v.id=l.voucher_id GROUP BY a.id ORDER BY a.account_code")]; c.close(); return rows
 
 @router.get('/statements/profit-loss')
 def profit_loss(x_role:str=Header('AUDITOR')):
@@ -294,5 +340,10 @@ def tax_wht(x_role:str=Header('AUDITOR')):
 
 @router.get('/month-end/status')
 def month_end(x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect(); p=c.execute("SELECT * FROM gl_periods WHERE start_date='2026-09-01'").fetchone(); checks=[dict(x) for x in c.execute('SELECT * FROM gl_period_close_checks WHERE period_id=?',(p['id'],))]; unmatched=c.execute('SELECT COUNT(*) n FROM gl_bank_statement_items WHERE matched=0').fetchone()['n']; c.close()
+    role(x_role); c=connect(); p=c.execute("SELECT * FROM gl_periods WHERE start_date='2026-09-01'").fetchone()
+    if item11_enabled():
+        out=period_close_blockers(c,p['id']); snap=statement_snapshot(c); c.close()
+        return {'period':'2026-09','period_status':p['status'],'checklist_pass':out['ready'],'checks':len(out['checks']),
+                'unmatched_bank_items':out['unmatched_bank_items'],'blockers':out['blockers'],'statements':snap}
+    checks=[dict(x) for x in c.execute('SELECT * FROM gl_period_close_checks WHERE period_id=?',(p['id'],))]; unmatched=c.execute('SELECT COUNT(*) n FROM gl_bank_statement_items WHERE matched=0').fetchone()['n']; c.close()
     return {'period':'2026-09','period_status':p['status'],'checklist_pass':all(x['status']=='PASS' for x in checks),'checks':len(checks),'unmatched_bank_items':unmatched}
