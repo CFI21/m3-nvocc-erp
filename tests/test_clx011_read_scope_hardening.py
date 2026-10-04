@@ -60,10 +60,10 @@ def test_job_specific_direct_screen_access_is_opaque_outside_scope(isolated):
 
 def test_customer_scope_applies_to_direct_screen_data(isolated):
     s=job_scope("50001")
-    ok=screen_data("agent-tasks::booking",job_ref="50001",x_role="AUDITOR",x_customer_scope=s["customer_code"])
+    ok=screen_data("agent-tasks::booking",job_ref="50001",x_role="OPS",x_customer_scope=s["customer_code"])
     assert ok["rows"]
     with pytest.raises(HTTPException) as exc:
-        screen_data("agent-tasks::booking",job_ref="50001",x_role="AUDITOR",x_customer_scope="WRONG-CUSTOMER")
+        screen_data("agent-tasks::booking",job_ref="50001",x_role="OPS",x_customer_scope="WRONG-CUSTOMER")
     assert exc.value.status_code==404
 
 
