@@ -372,8 +372,10 @@ def quick_actions(screen_id:str=Query(...),role:str=Query('VIEWER'),status:Optio
             'server_authority':'Existing accepted domain APIs remain authoritative for mutation and approval rules.'}
 
 @router.get('/action-route')
-def action_route(screen_id:str=Query(...),action:str=Query(...),record_id:Optional[int]=None,version:Optional[int]=None):
-    s=require_screen(screen_id);a=action.lower();domain=s['domain'];key=s['key']
+def action_route(screen_id:str=Query(...),action:str=Query(...),record_id:Optional[int]=None,version:Optional[int]=None,role:str=Query('VIEWER')):
+    s=require_screen(screen_id);r=(role or 'VIEWER').upper();a=action.lower();domain=s['domain'];key=s['key']
+    if not screen_role_allowed(s,r): raise HTTPException(403,'Role cannot access this screen')
+    if a not in ROLE_ACTIONS.get(r,ROLE_ACTIONS['VIEWER']): raise HTTPException(403,'Role cannot use this action')
     if a in {'quick-view','print','export','related-records','audit-history'}:return {'mode':'CLIENT_OR_CLX011','action':a}
     if a=='email':return {'mode':'CLX011_SIMULATED','method':'POST','path':'/api/clx011/simulate-email'}
     if domain=='Agent Tasks':
@@ -453,24 +455,39 @@ class EmailIntent(BaseModel):
     subject:str=Field(default='M3 ERP transaction update',min_length=1,max_length=160)
 
 @router.post('/simulate-email')
-def simulate_email(body:EmailIntent,x_role:str=Header('VIEWER'),x_actor_id:str=Header('ui-user',alias='X-Actor-Id')):
-    s=require_screen(body.screen_id);r=x_role.upper();
-    if 'email' not in ROLE_ACTIONS.get(r,set()):raise HTTPException(403,'Role cannot email')
-    c=connect()
+def simulate_email(body:EmailIntent,x_role:str=Header('VIEWER'),x_actor_id:str=Header('ui-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope')):
+    s=require_screen(body.screen_id);c=connect()
     try:
+        a=_read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope);r=a['role']
+        if not screen_role_allowed(s,r): raise HTTPException(403,'Role cannot access this screen')
+        if 'email' not in ROLE_ACTIONS.get(r,set()):raise HTTPException(403,'Role cannot email')
+        if body.job_ref:_require_job_scope(c,body.job_ref,a,x_customer_scope)
         log(c,r,x_actor_id,'SIMULATED_EMAIL',body.screen_id,body.record_ref,body.job_ref,{'subject':body.subject,'external_delivery':False})
         return {'ok':True,'delivery':'SIMULATED_ONLY','external_delivery':False,'screen':s['name'],'record_ref':body.record_ref}
     finally:c.close()
 
 @router.post('/navigation-event')
-def navigation_event(screen_id:str=Query(...),record_ref:Optional[str]=None,job_ref:Optional[str]=None,x_role:str=Header('VIEWER'),x_actor_id:str=Header('ui-user',alias='X-Actor-Id')):
-    require_screen(screen_id);c=connect()
-    try:log(c,x_role.upper(),x_actor_id,'NAVIGATE',screen_id,record_ref,job_ref,{});return {'ok':True}
+def navigation_event(screen_id:str=Query(...),record_ref:Optional[str]=None,job_ref:Optional[str]=None,x_role:str=Header('VIEWER'),x_actor_id:str=Header('ui-user',alias='X-Actor-Id'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope')):
+    s=require_screen(screen_id);c=connect()
+    try:
+        a=_read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope);r=a['role']
+        if not screen_role_allowed(s,r): raise HTTPException(403,'Role cannot access this screen')
+        if job_ref:_require_job_scope(c,job_ref,a,x_customer_scope)
+        log(c,r,x_actor_id,'NAVIGATE',screen_id,record_ref,job_ref,{})
+        return {'ok':True}
     finally:c.close()
 
 @router.get('/events')
-def events(limit:int=Query(100,ge=1,le=500)):
-    c=connect();init_events(c);rows=[dict(r) for r in c.execute('SELECT * FROM screen_integration_events ORDER BY id DESC LIMIT ?',(limit,))];c.close();return rows
+def events(limit:int=Query(100,ge=1,le=500),x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope')):
+    c=connect();init_events(c)
+    try:
+        a=_read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope)
+        if a['role'] in {'SUPER_ADMIN','ADMIN','AUDITOR','SECURITY_ADMIN'} and not any([x_agent_scope,x_customer_scope,x_branch_scope,x_depot_scope,x_office_scope]):
+            return [dict(r) for r in c.execute('SELECT * FROM screen_integration_events ORDER BY id DESC LIMIT ?',(limit,))]
+        sc,args=_job_scope_clause(a,x_customer_scope,'j')
+        sql='''SELECT e.* FROM screen_integration_events e JOIN jobs j ON j.job_ref=e.job_ref WHERE 1=1'''+sc+' ORDER BY e.id DESC LIMIT ?'
+        return [dict(r) for r in c.execute(sql,args+[limit])]
+    finally:c.close()
 
 @router.get('/feature-gaps')
 def feature_gaps():
