@@ -9,11 +9,15 @@ def test_legacy_reference_flow_is_visible_without_duplicate_screens():
     assert c['screen_count']==196
     ho=next(x for x in c['menu'] if x['domain']=='HO Tasks')
     assert [x['name'] for x in ho['submenus']]==['Transaction','Utilities']
-    assert '▾ Setup <span class=count>2</span>' in HTML
+    assert '▾ Setup <span class=count>4</span>' in HTML
     assert 'Account Setup' in HTML
     assert "gl-accounts::account-integration" in HTML
     assert 'Container Coding' in HTML
     assert "showEquipmentWorkspace('containers')" in HTML
+    assert 'Rates Management' in HTML
+    assert "agent-tasks::special-rates-request" in HTML
+    assert 'Auto SOA' in HTML
+    assert "agent-tasks::soa" in HTML
 
 def test_reference_transaction_names_remain_visible():
     c=build_catalog()
