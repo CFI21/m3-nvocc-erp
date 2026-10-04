@@ -147,7 +147,12 @@ def period_action(pid:int,action:str,b:PeriodAction,x_role:str=Header('VIEWER'),
 
 @router.get('/period-close/{pid}/checklist')
 def checklist(pid:int,x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect(); rows=[dict(x) for x in c.execute('SELECT * FROM gl_period_close_checks WHERE period_id=? ORDER BY id',(pid,))]; c.close()
+    role(x_role); c=connect()
+    if item11_enabled():
+        out=period_close_blockers(c,pid); c.close()
+        return {'period_id':pid,'all_pass':out['ready'],'checks':out['checks'],'blockers':out['blockers'],
+                'trial_balance':out['trial_balance'],'unmatched_bank_items':out['unmatched_bank_items']}
+    rows=[dict(x) for x in c.execute('SELECT * FROM gl_period_close_checks WHERE period_id=? ORDER BY id',(pid,))]; c.close()
     return {'period_id':pid,'all_pass':bool(rows) and all(x['status']=='PASS' for x in rows),'checks':rows}
 
 @router.get('/ar-aging')
@@ -299,7 +304,10 @@ def profitability(job_ref:str,x_role:str=Header('AUDITOR')):
 
 @router.get('/statements/trial-balance')
 def trial_balance(x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect(); rows=[dict(x) for x in c.execute("SELECT a.account_code,a.account_name,a.account_type,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.debit ELSE 0 END),0),2) debit,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.credit ELSE 0 END),0),2) credit,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.debit-l.credit ELSE 0 END),0),2) balance FROM gl_accounts a LEFT JOIN gl_voucher_lines l ON l.account_code=a.account_code LEFT JOIN gl_vouchers v ON v.id=l.voucher_id GROUP BY a.id ORDER BY a.account_code")]; c.close(); return rows
+    role(x_role); c=connect()
+    if item11_enabled():
+        rows=statement_snapshot(c)['trial_balance']['rows']; c.close(); return rows
+    rows=[dict(x) for x in c.execute("SELECT a.account_code,a.account_name,a.account_type,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.debit ELSE 0 END),0),2) debit,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.credit ELSE 0 END),0),2) credit,ROUND(COALESCE(SUM(CASE WHEN v.status='Posted' THEN l.debit-l.credit ELSE 0 END),0),2) balance FROM gl_accounts a LEFT JOIN gl_voucher_lines l ON l.account_code=a.account_code LEFT JOIN gl_vouchers v ON v.id=l.voucher_id GROUP BY a.id ORDER BY a.account_code")]; c.close(); return rows
 
 @router.get('/statements/profit-loss')
 def profit_loss(x_role:str=Header('AUDITOR')):
