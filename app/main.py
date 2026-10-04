@@ -631,6 +631,10 @@ def audit_list(job_ref:Optional[str]=None,limit:int=100,x_role:str=Header('VIEWE
     q+=' ORDER BY a.id DESC LIMIT ?';args.append(min(limit,500));rows=[dict(r) for r in conn.execute(q,args)];conn.close();return rows
 @app.get('/api/v1/system/events/exceptions')
 def exception_list(job_ref:Optional[str]=None,limit:int=100,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope')):
+    x_customer_scope=x_customer_scope if isinstance(x_customer_scope,str) else None
+    x_office_scope=x_office_scope if isinstance(x_office_scope,str) else None
+    x_branch_scope=x_branch_scope if isinstance(x_branch_scope,str) else None
+    x_depot_scope=x_depot_scope if isinstance(x_depot_scope,str) else None
     role,agent_scope,customer_scope=actor(x_role,x_agent_scope,x_customer_scope)
     conn=connect();q='SELECT e.*,j.job_ref FROM exception_events e LEFT JOIN jobs j ON j.id=e.job_id WHERE 1=1';args=[]
     if job_ref:q+=' AND j.job_ref=?';args.append(job_ref)
