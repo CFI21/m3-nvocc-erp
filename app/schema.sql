@@ -584,7 +584,9 @@ CREATE TABLE IF NOT EXISTS nvocc_release_controls(
 CREATE TABLE IF NOT EXISTS nvocc_interbranch_settlements(
  settlement_ref TEXT PRIMARY KEY,from_branch TEXT NOT NULL,to_branch TEXT NOT NULL,legal_entity_from TEXT,legal_entity_to TEXT,job_ref TEXT NOT NULL,container_no TEXT,
  service_period_from TEXT,service_period_to TEXT,charges_json TEXT,total_amount REAL NOT NULL DEFAULT 0,currency TEXT NOT NULL,exchange_rate REAL,status TEXT NOT NULL,
- gl_posting_ref TEXT,elimination_flag INTEGER NOT NULL DEFAULT 0,version INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL);
+ gl_posting_ref TEXT,elimination_flag INTEGER NOT NULL DEFAULT 0,elimination_status TEXT NOT NULL DEFAULT 'NONE',
+ elimination_requested_by TEXT,elimination_requested_at TEXT,elimination_reason TEXT,elimination_approved_by TEXT,elimination_approved_at TEXT,
+ version INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS nvocc_extension_audit(
  audit_ref TEXT PRIMARY KEY,ts TEXT NOT NULL,actor_role TEXT NOT NULL,branch_scope TEXT,workspace_key TEXT NOT NULL,record_ref TEXT NOT NULL,action TEXT NOT NULL,
  before_json TEXT,after_json TEXT);
