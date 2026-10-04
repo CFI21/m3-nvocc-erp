@@ -351,7 +351,7 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
     if item9_enabled() and module=='customer-credit-control': raise HTTPException(405,{'code':'AUTHORITATIVE_CREDIT_CONTROL_READ_ONLY'})
     if item11_enabled() and module=='accounting-periods' and any(k in body.fields for k in ('Status','status','Closed','Locked')):
         raise HTTPException(405,{'code':'PERIOD_STATUS_DIRECT_PATCH_BLOCKED'})
-    if item13_enabled() and module=='fiscal-year' and any(k in body.fields for k in ('Status','status','Closed','Locked')):
+    if item13_enabled() and module=='fiscal-year' and any(k in body.fields for k in ('Status','status','Closed','Locked','Retained Earnings','Retained Earnings Account','Carry Forward','Carry Forward Ref')):
         raise HTTPException(405,{'code':'FISCAL_YEAR_STATUS_DIRECT_PATCH_BLOCKED'})
     role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
