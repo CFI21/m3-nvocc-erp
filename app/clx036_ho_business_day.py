@@ -89,7 +89,7 @@ def _ho_routes():
     rows=[]
     for a in HO_TRANSACTION_ALIASES:
         target=by_id[a['target']]
-        mode=action_route(a['target'],'quick-view')
+        mode=action_route(a['target'],'quick-view',role='ADMIN')
         rows.append({
           'label':a['label'],'target':a['target'],'route':target['route'],
           'quick_view_mode':mode['mode'],'actions':target['actions'],
