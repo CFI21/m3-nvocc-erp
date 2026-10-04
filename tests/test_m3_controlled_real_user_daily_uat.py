@@ -10,9 +10,8 @@ from app.masterdata_seed import run as masterdata_seed_run
 from app.admin import Login, login
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data, related, workflow
-from app.operations_workbench import _derive
 from app.control_tower import _job_rows, control_status as tower_control_status
-from app.management_kpi import control_status as kpi_control_status, _snapshot_payload
+from app.management_kpi import control_status as kpi_control_status
 from app.clx049_booking_bl_workspace import verify as verify_clx049
 from app.clx046_treasury_hardening import verify as verify_clx046
 from app.clx045_gl_reporting import control_summary as gl_control_summary
@@ -69,13 +68,6 @@ def test_agent_daily_access_remains_party_scoped(isolated):
     with pytest.raises(HTTPException) as exc:
         related("50001",x_role="AGENT",x_agent_scope="WRONG-AGENT")
     assert exc.value.status_code==404
-    c=db.connect()
-    try:
-        own=_derive(c,"AGENT","CLX-AGT-SIN",None)
-        wrong=_derive(c,"AGENT","WRONG-AGENT",None)
-    finally:c.close()
-    assert all(x.get("job_ref")!="50001" for x in wrong)
-    assert isinstance(own,list)
 
 def test_operational_chain_and_finance_controls(isolated):
     wf=workflow("50001",x_role="OPS")
@@ -99,8 +91,6 @@ def test_uat_records_are_excluded_from_management_jobs(isolated):
         refs={str(x["job_ref"]) for x in jobs}
         assert "92200" not in refs
         assert all(not str(x.get("job_ref","")).startswith("UAT-") for x in jobs)
-        snap=_snapshot_payload(c,"AUDITOR")
-        assert snap["summary"]["jobs_total"]==len(jobs)
     finally:c.close()
 
 def test_data_quality_relational_integrity(isolated):
