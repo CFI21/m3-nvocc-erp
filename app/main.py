@@ -592,13 +592,32 @@ def split_allocations(tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional
 def special_rate_workflow(tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
     role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); conn=connect(); r=get_tx(conn,'special-rates-request',tid,role,ascope,cscope); w=conn.execute('SELECT * FROM special_rate_workflow WHERE transaction_id=?',(tid,)).fetchone(); conn.close(); return dict(w) if w else {}
 
+def _system_event_scope_sql(role,agent_scope,customer_scope,office_scope,branch_scope,depot_scope,alias='j'):
+    clauses=[];args=[]
+    if role=='AGENT':
+        if not agent_scope: raise HTTPException(403,'AGENT requires X-Agent-Scope')
+        clauses.append(f"{alias}.agent_id=(SELECT id FROM agents WHERE code=?)");args.append(agent_scope)
+    if customer_scope:
+        clauses.append(f"{alias}.customer_id=(SELECT id FROM customers WHERE code=?)");args.append(customer_scope)
+    if office_scope:
+        clauses.append(f"{alias}.office_code=?");args.append(office_scope)
+    if branch_scope:
+        clauses.append(f"{alias}.branch_code=?");args.append(branch_scope)
+    if depot_scope:
+        clauses.append(f"EXISTS (SELECT 1 FROM containers sc WHERE sc.job_id={alias}.id AND sc.depot_code=?)");args.append(depot_scope)
+    return ''.join(' AND '+x for x in clauses),args
+
 @app.get('/api/v1/system/events/audit')
-def audit_list(job_ref:Optional[str]=None,limit:int=100):
-    conn=connect(); q='SELECT a.*,j.job_ref FROM audit_events a LEFT JOIN jobs j ON j.id=a.job_id'; args=[]
-    if job_ref: q+=' WHERE j.job_ref=?'; args.append(job_ref)
-    q+=' ORDER BY a.id DESC LIMIT ?'; args.append(min(limit,500)); rows=[dict(r) for r in conn.execute(q,args)]; conn.close(); return rows
+def audit_list(job_ref:Optional[str]=None,limit:int=100,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope')):
+    role,agent_scope,customer_scope=actor(x_role,x_agent_scope,x_customer_scope)
+    conn=connect();q='SELECT a.*,j.job_ref FROM audit_events a LEFT JOIN jobs j ON j.id=a.job_id WHERE 1=1';args=[]
+    if job_ref:q+=' AND j.job_ref=?';args.append(job_ref)
+    sc,sa=_system_event_scope_sql(role,agent_scope,customer_scope,x_office_scope,x_branch_scope,x_depot_scope,'j');q+=sc;args+=sa
+    q+=' ORDER BY a.id DESC LIMIT ?';args.append(min(limit,500));rows=[dict(r) for r in conn.execute(q,args)];conn.close();return rows
 @app.get('/api/v1/system/events/exceptions')
-def exception_list(job_ref:Optional[str]=None,limit:int=100):
-    conn=connect(); q='SELECT e.*,j.job_ref FROM exception_events e LEFT JOIN jobs j ON j.id=e.job_id'; args=[]
-    if job_ref: q+=' WHERE j.job_ref=?'; args.append(job_ref)
-    q+=' ORDER BY e.id DESC LIMIT ?'; args.append(min(limit,500)); rows=[dict(r) for r in conn.execute(q,args)]; conn.close(); return rows
+def exception_list(job_ref:Optional[str]=None,limit:int=100,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope')):
+    role,agent_scope,customer_scope=actor(x_role,x_agent_scope,x_customer_scope)
+    conn=connect();q='SELECT e.*,j.job_ref FROM exception_events e LEFT JOIN jobs j ON j.id=e.job_id WHERE 1=1';args=[]
+    if job_ref:q+=' AND j.job_ref=?';args.append(job_ref)
+    sc,sa=_system_event_scope_sql(role,agent_scope,customer_scope,x_office_scope,x_branch_scope,x_depot_scope,'j');q+=sc;args+=sa
+    q+=' ORDER BY e.id DESC LIMIT ?';args.append(min(limit,500));rows=[dict(r) for r in conn.execute(q,args)];conn.close();return rows
