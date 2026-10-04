@@ -1,0 +1,49 @@
+name: M3 Final Mutation Governance Regression
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "tests/test_m3_final_mutation_governance_regression.py"
+      - "tests/test_m3_crt_governance_trt_rename.py"
+      - "tests/test_m3_item4_state_transition_governance.py"
+      - "tests/test_m3_item5_release_governance.py"
+      - "tests/test_m3_item6_financial_posting_reversal_governance.py"
+      - "tests/test_clx033_finance_transaction_governance.py"
+      - ".github/workflows/m3-final-mutation-governance-regression.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  mutation-governance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - run: python -m py_compile app/*.py
+      - name: Final 196-screen mutation regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_final_mutation_governance_regression.py
+      - name: CRT governance
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_crt_governance_trt_rename.py
+      - name: State transition governance
+        env: {PYTHONPATH: ., M3_STATE_TRANSITION_GOVERNANCE_ENABLED: "true"}
+        run: pytest -q tests/test_m3_item4_state_transition_governance.py
+      - name: Release governance
+        env: {PYTHONPATH: ., M3_RELEASE_GOVERNANCE_ENABLED: "true"}
+        run: pytest -q tests/test_m3_item5_release_governance.py
+      - name: Financial reversal governance
+        env: {PYTHONPATH: ., M3_ITEM6_FINANCIAL_GOVERNANCE_ENABLED: "true", M3_RELEASE_GOVERNANCE_ENABLED: "true", M3_STATE_TRANSITION_GOVERNANCE_ENABLED: "true"}
+        run: pytest -q tests/test_m3_item6_financial_posting_reversal_governance.py
+      - name: Finance maker-checker direct API governance
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx033_finance_transaction_governance.py
+      - name: Catalog role regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx019_catalog_roles.py tests/test_clx050_operational_uat.py
