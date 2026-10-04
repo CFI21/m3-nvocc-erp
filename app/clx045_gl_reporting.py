@@ -163,6 +163,9 @@ def subledger_reconciliation_rows(company=None,period=None,date_from=None,date_t
         out=[]
         for r in records:
             p=_payload(r.get('payload_json'));module=r['module']
+            if item12_enabled() and _.get('user_id') is not None and r.get('job_id'):
+                jr=c.execute("SELECT job_ref FROM jobs WHERE id=?",(r['job_id'],)).fetchone()
+                if jr and not authorize_job(c,_['user_id'],jr['job_ref'],'gl','view').get('allowed'):continue
             if company and str(p.get('Company') or '').lower()!=company.lower():continue
             if cost_center and str(p.get('Cost Center') or p.get('Cost Centre') or '').lower()!=cost_center.lower():continue
             curr=str(p.get('Currency') or '')
@@ -229,7 +232,12 @@ def report(key:str,company:Optional[str]=None,period:Optional[str]=None,date_fro
 @router.get('/drill/account/{account_code}')
 def drill_account(account_code:str,period:Optional[str]=None,date_from:Optional[str]=None,date_to:Optional[str]=None,currency:Optional[str]=None,x_role:str=Header('AUDITOR'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     _auth(x_role,x_m3_session)
-    rows=gl_detail_rows(account=account_code,period=period,date_from=date_from,date_to=date_to,currency=currency,status='Posted')
+    uid=None
+    if item12_enabled():
+        c=connect()
+        try: uid=iam_session(c,x_m3_session)['user_id']
+        finally:c.close()
+    rows=gl_detail_rows(account=account_code,period=period,date_from=date_from,date_to=date_to,currency=currency,status='Posted',user_id=uid)
     return {'level':'ACCOUNT','account_code':account_code,'count':len(rows),'rows':rows,'next':'voucher'}
 
 @router.get('/drill/voucher/{voucher_no}')
@@ -238,6 +246,11 @@ def drill_voucher(voucher_no:str,x_role:str=Header('AUDITOR'),x_m3_session:Optio
     try:
         v=c.execute('SELECT * FROM gl_vouchers WHERE voucher_no=?',(voucher_no,)).fetchone()
         if not v:raise HTTPException(404,'Voucher not found')
+        if item12_enabled() and v['job_id']:
+            jr=c.execute("SELECT job_ref FROM jobs WHERE id=?",(v['job_id'],)).fetchone()
+            uid=iam_session(c,x_m3_session)['user_id']
+            if jr and not authorize_job(c,uid,jr['job_ref'],'gl','view').get('allowed'):
+                raise HTTPException(403,{'code':'REPORT_SCOPE_DENIED','job_ref':jr['job_ref']})
         rows=[dict(x) for x in c.execute('SELECT l.*,a.account_name,a.account_type FROM gl_voucher_lines l LEFT JOIN gl_accounts a ON a.account_code=l.account_code WHERE l.voucher_id=? ORDER BY l.line_no',(v['id'],))]
         return {'level':'VOUCHER','voucher':dict(v),'lines':rows,'next':'source','source_type':v['source_type'],'source_ref':v['source_ref']}
     finally:c.close()
@@ -248,6 +261,11 @@ def drill_source(module:str,external_ref:str,x_role:str=Header('AUDITOR'),x_m3_s
     try:
         r=c.execute('SELECT * FROM gl_records WHERE module=? AND external_ref=?',(module,external_ref)).fetchone()
         if not r:raise HTTPException(404,'Source GL record not found')
+        if item12_enabled() and r['job_id']:
+            jr=c.execute("SELECT job_ref FROM jobs WHERE id=?",(r['job_id'],)).fetchone()
+            uid=iam_session(c,x_m3_session)['user_id']
+            if jr and not authorize_job(c,uid,jr['job_ref'],'gl','view').get('allowed'):
+                raise HTTPException(403,{'code':'REPORT_SCOPE_DENIED','job_ref':jr['job_ref']})
         d=dict(r);d['fields']=_payload(d.pop('payload_json',None))
         links=[dict(x) for x in c.execute('SELECT * FROM gl_source_links WHERE gl_record_id=? ORDER BY id',(r['id'],))]
         return {'level':'SOURCE','module':module,'record':d,'links':links}
