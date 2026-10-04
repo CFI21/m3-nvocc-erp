@@ -169,7 +169,16 @@ def _read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope
         raise HTTPException(403,'DEPOT requires X-Depot-Scope')
     return a
 
-def _job_scope_clause(a,customer_scope=None,alias='j'):
+def _has_column(c,table,column):
+    if c is None:return False
+    try:
+        if using_postgres():
+            return bool(c.execute("SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name=? AND column_name=?",(table,column)).fetchone())
+        return any(str(r['name'])==column for r in c.execute(f"PRAGMA table_info({table})").fetchall())
+    except Exception:
+        return False
+
+def _job_scope_clause(a,customer_scope=None,alias='j',c=None):
     customer_scope=customer_scope if isinstance(customer_scope,str) and customer_scope else None
     role=str(a.get('role') or 'VIEWER').upper()
     # Global/read-audit roles retain their accepted visibility. Scoped operational
@@ -186,11 +195,14 @@ def _job_scope_clause(a,customer_scope=None,alias='j'):
         if a.get('branch'):
             clauses.append(f"{alias}.branch_code=?");args.append(a['branch'])
         if a.get('depot'):
-            clauses.append(f"EXISTS (SELECT 1 FROM containers scope_c WHERE scope_c.job_id={alias}.id AND scope_c.depot_code=?)");args.append(a['depot'])
+            if _has_column(c,'containers','depot_code'):
+                clauses.append(f"EXISTS (SELECT 1 FROM containers scope_c WHERE scope_c.job_id={alias}.id AND scope_c.depot_code=?)");args.append(a['depot'])
+            else:
+                clauses.append("1=0")
     return ''.join(' AND '+x for x in clauses),args
 
 def _require_job_scope(c,job_ref,a,customer_scope=None):
-    sc,args=_job_scope_clause(a,customer_scope,'j')
+    sc,args=_job_scope_clause(a,customer_scope,'j',c)
     row=c.execute("SELECT j.id FROM jobs j WHERE j.job_ref=?"+sc,[job_ref]+args).fetchone()
     if not row:
         # Keep scoped existence opaque to prevent cross-agent/customer enumeration.
@@ -276,7 +288,7 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
         s=require_screen(screen_id)
         if not screen_role_allowed(s,role): raise HTTPException(403,'Role cannot access this screen')
         if job_ref: _require_job_scope(c,job_ref,a,x_customer_scope)
-        scope_sql,scope_args=_job_scope_clause(a,x_customer_scope,'j')
+        scope_sql,scope_args=_job_scope_clause(a,x_customer_scope,'j',c)
         if s['domain']=='Agent Tasks':
             sql='''SELECT t.id,t.external_ref,j.job_ref,c.name customer,a.code agent,t.status,t.version,t.payload_json
                    FROM transaction_records t JOIN jobs j ON j.id=t.job_id JOIN customers c ON c.id=t.customer_id JOIN agents a ON a.id=t.agent_id WHERE t.module=?''';args=[s['key']]
@@ -462,7 +474,8 @@ def simulate_email(body:EmailIntent,x_role:str=Header('VIEWER'),x_actor_id:str=H
         if not screen_role_allowed(s,r): raise HTTPException(403,'Role cannot access this screen')
         if 'email' not in ROLE_ACTIONS.get(r,set()):raise HTTPException(403,'Role cannot email')
         if body.job_ref:_require_job_scope(c,body.job_ref,a,x_customer_scope)
-        log(c,r,x_actor_id,'SIMULATED_EMAIL',body.screen_id,body.record_ref,body.job_ref,{'subject':body.subject,'external_delivery':False})
+        actor_id=x_actor_id if isinstance(x_actor_id,str) else 'ui-user'
+        log(c,r,actor_id,'SIMULATED_EMAIL',body.screen_id,body.record_ref,body.job_ref,{'subject':body.subject,'external_delivery':False})
         return {'ok':True,'delivery':'SIMULATED_ONLY','external_delivery':False,'screen':s['name'],'record_ref':body.record_ref}
     finally:c.close()
 
@@ -473,7 +486,8 @@ def navigation_event(screen_id:str=Query(...),record_ref:Optional[str]=None,job_
         a=_read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope);r=a['role']
         if not screen_role_allowed(s,r): raise HTTPException(403,'Role cannot access this screen')
         if job_ref:_require_job_scope(c,job_ref,a,x_customer_scope)
-        log(c,r,x_actor_id,'NAVIGATE',screen_id,record_ref,job_ref,{})
+        actor_id=x_actor_id if isinstance(x_actor_id,str) else 'ui-user'
+        log(c,r,actor_id,'NAVIGATE',screen_id,record_ref,job_ref,{})
         return {'ok':True}
     finally:c.close()
 
