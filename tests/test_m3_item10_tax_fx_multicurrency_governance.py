@@ -129,7 +129,7 @@ def test_duplicate_unrealized_fx_event_blocked(isolated):
     p=c.execute("SELECT id FROM gl_periods WHERE start_date='2026-09-01'").fetchone()['id']
     jid=c.execute("SELECT id FROM jobs WHERE job_ref='50001'").fetchone()['id']
     c.execute("""INSERT INTO gl_fx_events(event_ref,event_type,period_id,job_id,currency,foreign_amount,old_rate,new_rate,gain_loss,status)
-      VALUES('ITEM10-FXU','UNREALIZED',?,?,?,?,1000,1.0,1.1,100,'Calculated')""",(p,jid,'EUR'))
+      VALUES('ITEM10-FXU','UNREALIZED',?,?,?,1000,1.0,1.1,100,'Calculated')""",(p,jid,'EUR'))
     with pytest.raises(HTTPException) as exc:
         validate_fx_event_duplicate(c,'UNREALIZED',p,jid,'EUR')
     assert exc.value.detail['code']=='DUPLICATE_FX_EVENT'
