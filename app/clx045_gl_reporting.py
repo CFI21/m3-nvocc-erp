@@ -3,10 +3,18 @@ from typing import Optional
 import json
 from .db import connect
 from .gl import actor
+from .admin import session as iam_session
+from .bulk_permission_governance import authorize_job
+from .item12_reporting_consolidation_governance import (
+    enabled as item12_enabled,
+    cash_flow as item12_cash_flow,
+    job_profitability as item12_job_profitability,
+    scoped_pnl as item12_scoped_pnl,
+)
 
 router=APIRouter(prefix='/api/clx045',tags=['CLX-045 GL Reporting + Financial Control'])
 
-REPORT_KEYS={'trial-balance-report','profit-loss','balance-sheet','gl-detail','subledger-gl-reconciliation'}
+REPORT_KEYS={'trial-balance-report','profit-loss','balance-sheet','gl-detail','subledger-gl-reconciliation','cash-flow'}
 
 def _payload(raw):
     if not raw:return {}
@@ -29,23 +37,27 @@ def _match_filters(v,payload,company,period,date_from,date_to,currency,status,co
     if cost_center and str(payload.get('Cost Center') or payload.get('Cost Centre') or '').lower()!=cost_center.lower():return False
     return True
 
-def _posted_lines(company=None,period=None,date_from=None,date_to=None,account=None,currency=None,status='Posted',cost_center=None):
+def _posted_lines(company=None,period=None,date_from=None,date_to=None,account=None,currency=None,status='Posted',cost_center=None,user_id=None):
     c=connect()
     try:
         rows=[]
         sql='''SELECT v.id voucher_id,v.gl_record_id,v.voucher_no,v.voucher_type,v.voucher_date,v.currency,v.status,
           v.source_type,v.source_ref,v.job_id,v.exchange_rate,v.base_currency,
           l.id line_id,l.line_no,l.account_code,l.debit,l.credit,l.description,
-          a.account_name,a.account_type,g.external_ref,g.payload_json
+          a.account_name,a.account_type,g.external_ref,g.payload_json,j.job_ref
           FROM gl_vouchers v
           JOIN gl_voucher_lines l ON l.voucher_id=v.id
           LEFT JOIN gl_accounts a ON a.account_code=l.account_code
           LEFT JOIN gl_records g ON g.id=v.gl_record_id
+          LEFT JOIN jobs j ON j.id=v.job_id
           ORDER BY v.voucher_date,v.voucher_no,l.line_no'''
         for r in c.execute(sql):
             d=dict(r);p=_payload(d.pop('payload_json',None))
             if account and d['account_code']!=account:continue
-            if not _match_filters(d,p,company,period,date_from,date_to,currency,status,cost_center):continue
+            effective_status='Posted' if item12_enabled() else status
+            if not _match_filters(d,p,company,period,date_from,date_to,currency,effective_status,cost_center):continue
+            if item12_enabled() and user_id is not None and d.get('job_ref'):
+                if not authorize_job(c,user_id,d['job_ref'],'agent-tasks','view').get('allowed'):continue
             rate=_f(d.get('exchange_rate')) or 1.0
             d['company']=p.get('Company') or p.get('company')
             d['cost_center']=p.get('Cost Center') or p.get('Cost Centre')
@@ -57,9 +69,10 @@ def _posted_lines(company=None,period=None,date_from=None,date_to=None,account=N
         return rows
     finally:c.close()
 
-def _opening_balances(company=None,period=None,account=None,currency=None,cost_center=None):
+def _opening_balances(company=None,period=None,account=None,currency=None,cost_center=None,user_id=None):
     c=connect()
     try:
+        if item12_enabled(): return []
         out=[]
         for r in c.execute("SELECT id,external_ref,status,payload_json FROM gl_records WHERE module='opening-balance' ORDER BY id"):
             d=dict(r);p=_payload(d['payload_json'])
@@ -87,7 +100,7 @@ def trial_balance_rows(**flt):
     sums={}
     for code,a in accounts.items():
         sums[code]={'Account Code':code,'Account Name':a['account_name'],'Account Type':a['account_type'],'Opening Debit':0.0,'Opening Credit':0.0,'Movement Debit VC':0.0,'Movement Credit VC':0.0,'Debit LC':0.0,'Credit LC':0.0}
-    for x in _opening_balances(company=flt.get('company'),period=flt.get('period'),account=flt.get('account'),currency=flt.get('currency'),cost_center=flt.get('cost_center')):
+    for x in _opening_balances(company=flt.get('company'),period=flt.get('period'),account=flt.get('account'),currency=flt.get('currency'),cost_center=flt.get('cost_center'),user_id=flt.get('user_id')):
         r=sums.setdefault(x['account_code'],{'Account Code':x['account_code'],'Account Name':x.get('account_name'),'Account Type':'','Opening Debit':0.0,'Opening Credit':0.0,'Movement Debit VC':0.0,'Movement Credit VC':0.0,'Debit LC':0.0,'Credit LC':0.0})
         r['Opening Debit']+=x['debit_vc'];r['Opening Credit']+=x['credit_vc'];r['Debit LC']+=x['debit_lc'];r['Credit LC']+=x['credit_lc']
     for x in _posted_lines(**flt):
@@ -181,19 +194,28 @@ def report_rows(key,**flt):
     if key=='balance-sheet':return balance_sheet_rows(**flt)
     if key=='gl-detail':return gl_detail_rows(**flt)
     if key=='subledger-gl-reconciliation':return subledger_reconciliation_rows(**flt)
+    if key=='cash-flow':
+        c=connect()
+        try:return item12_cash_flow(c,period=flt.get('period'),user_id=flt.get('user_id'))['lines']
+        finally:c.close()
     raise HTTPException(404,'Unknown GL report')
 
 def _auth(role,session):
     return actor(role,'view',session)
 
 def _filters(company,period,date_from,date_to,account,cost_center,currency,status):
-    return dict(company=company,period=period,date_from=date_from,date_to=date_to,account=account,cost_center=cost_center,currency=currency,status='Posted' if status is None else status)
+    effective='Posted' if item12_enabled() else ('Posted' if status is None else status)
+    return dict(company=company,period=period,date_from=date_from,date_to=date_to,account=account,cost_center=cost_center,currency=currency,status=effective)
 
 @router.get('/reports/{key}')
 def report(key:str,company:Optional[str]=None,period:Optional[str]=None,date_from:Optional[str]=None,date_to:Optional[str]=None,account:Optional[str]=None,cost_center:Optional[str]=None,currency:Optional[str]=None,status:Optional[str]=None,x_role:str=Header('AUDITOR'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     _auth(x_role,x_m3_session)
     if key not in REPORT_KEYS:raise HTTPException(404,'Unknown GL report')
     flt=_filters(company,period,date_from,date_to,account,cost_center,currency,status)
+    if item12_enabled():
+        c=connect()
+        try: flt['user_id']=iam_session(c,x_m3_session)['user_id']
+        finally:c.close()
     rows=report_rows(key,**flt)
     out={'phase':'CLX-045','report':key,'filters':flt,'count':len(rows),'rows':rows,'read_only':True}
     if key=='trial-balance-report':
@@ -237,3 +259,19 @@ def control_summary(x_role:str=Header('AUDITOR'),x_m3_session:Optional[str]=Head
     tb=trial_balance_rows(status='Posted');tot=_totals(tb)
     recon=subledger_reconciliation_rows()
     return {'phase':'CLX-045','trial_balance_balanced_vc':abs(tot['debit_vc']-tot['credit_vc'])<0.01,'trial_balance_balanced_lc':abs(tot['debit_lc']-tot['credit_lc'])<0.01,'trial_balance_totals':tot,'subledger_exceptions':sum(1 for r in recon if r['Reconciliation Status']!='MATCHED'),'live_providers':False,'real_money':False}
+
+@router.get('/management/{view}')
+def management_report(view:str,period:Optional[str]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not item12_enabled(): raise HTTPException(404,'Item 12 governance disabled')
+    c=connect()
+    try:
+        sess=iam_session(c,x_m3_session)
+        if view=='job-profitability':
+            return {'view':view,'period':period,'rows':item12_job_profitability(c,period=period,user_id=sess['user_id']),'read_only':True,'source':'POSTED_GL'}
+        dims={'branch-pnl':'branch_code','office-pnl':'office_code','country-pnl':'country_code','organization-pnl':'organization_code'}
+        if view in dims:
+            return {'view':view,'period':period,'rows':item12_scoped_pnl(c,dims[view],period=period,user_id=sess['user_id']),'read_only':True,'source':'POSTED_GL'}
+        if view=='cash-flow':
+            return {'view':view,'period':period,**item12_cash_flow(c,period=period,user_id=sess['user_id']),'read_only':True,'source':'POSTED_GL'}
+        raise HTTPException(404,'Unknown management report')
+    finally:c.close()
