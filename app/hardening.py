@@ -14,6 +14,7 @@ from .item11_period_reporting_governance import (
 )
 from .item13_year_end_governance import (
     enabled as item13_enabled,
+    assert_global_year_access,
     year_end_readiness,
     assert_year_end_ready,
     assert_year_transition,
@@ -89,15 +90,29 @@ def fiscal_years(x_role:str=Header('AUDITOR')):
     role(x_role); c=connect(); out=[dict(x) for x in c.execute('SELECT * FROM gl_fiscal_years ORDER BY fiscal_year')]; c.close(); return out
 
 @router.get('/fiscal-years/{fiscal_year}/year-end-readiness')
-def fiscal_year_readiness(fiscal_year:int,x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect()
-    try:return year_end_readiness(c,fiscal_year)
+def fiscal_year_readiness(fiscal_year:int,x_role:str=Header('AUDITOR'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        if item13_enabled():
+            sess=iam_session(c,x_m3_session)
+            if not iam_permission_code(c,sess['user_id'],'gl:view',sess['office_code']):
+                raise HTTPException(403,{'code':'GL_VIEW_REQUIRED'})
+            assert_global_year_access(c,sess['user_id'])
+        else: role(x_role)
+        return year_end_readiness(c,fiscal_year)
     finally:c.close()
 
 @router.get('/fiscal-years/{fiscal_year}/statutory-audit')
-def fiscal_year_audit(fiscal_year:int,x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect()
-    try:return statutory_audit_snapshot(c,fiscal_year)
+def fiscal_year_audit(fiscal_year:int,x_role:str=Header('AUDITOR'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        if item13_enabled():
+            sess=iam_session(c,x_m3_session)
+            if not iam_permission_code(c,sess['user_id'],'gl:view',sess['office_code']):
+                raise HTTPException(403,{'code':'GL_VIEW_REQUIRED'})
+            assert_global_year_access(c,sess['user_id'])
+        else: role(x_role)
+        return statutory_audit_snapshot(c,fiscal_year)
     finally:c.close()
 
 @router.post('/fiscal-years/{fyid}/actions/{action}')
@@ -109,6 +124,7 @@ def fiscal_year_action(fyid:int,action:str,b:PeriodAction,x_role:str=Header('VIE
         sess=iam_session(c0,x_m3_session)
         if not iam_permission_code(c0,sess['user_id'],'PERIOD_CLOSE',sess['office_code']):
             raise HTTPException(403,{'code':'PERIOD_CLOSE_PERMISSION_REQUIRED'})
+        assert_global_year_access(c0,sess['user_id'])
         fy=c0.execute('SELECT * FROM gl_fiscal_years WHERE id=?',(fyid,)).fetchone()
         if not fy: raise HTTPException(404,{'code':'FISCAL_YEAR_NOT_FOUND'})
         assert_year_transition(fy,a,sess['user_ref'],b.reason)
