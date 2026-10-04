@@ -12,6 +12,14 @@ from .item11_period_reporting_governance import (
     period_close_blockers,
     statement_snapshot,
 )
+from .item13_year_end_governance import (
+    enabled as item13_enabled,
+    year_end_readiness,
+    assert_year_end_ready,
+    assert_year_transition,
+    generate_opening_balances,
+    statutory_audit_snapshot,
+)
 from .item10_tax_fx_governance import (
     enabled as item10_enabled,
     validate_fx_input as item10_validate_fx,
@@ -79,6 +87,70 @@ def health():
 @router.get('/fiscal-years')
 def fiscal_years(x_role:str=Header('AUDITOR')):
     role(x_role); c=connect(); out=[dict(x) for x in c.execute('SELECT * FROM gl_fiscal_years ORDER BY fiscal_year')]; c.close(); return out
+
+@router.get('/fiscal-years/{fiscal_year}/year-end-readiness')
+def fiscal_year_readiness(fiscal_year:int,x_role:str=Header('AUDITOR')):
+    role(x_role); c=connect()
+    try:return year_end_readiness(c,fiscal_year)
+    finally:c.close()
+
+@router.get('/fiscal-years/{fiscal_year}/statutory-audit')
+def fiscal_year_audit(fiscal_year:int,x_role:str=Header('AUDITOR')):
+    role(x_role); c=connect()
+    try:return statutory_audit_snapshot(c,fiscal_year)
+    finally:c.close()
+
+@router.post('/fiscal-years/{fyid}/actions/{action}')
+def fiscal_year_action(fyid:int,action:str,b:PeriodAction,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not item13_enabled(): raise HTTPException(404,{'code':'ITEM13_GOVERNANCE_DISABLED'})
+    a=action.lower()
+    c0=connect()
+    try:
+        sess=iam_session(c0,x_m3_session)
+        if not iam_permission_code(c0,sess['user_id'],'PERIOD_CLOSE',sess['office_code']):
+            raise HTTPException(403,{'code':'PERIOD_CLOSE_PERMISSION_REQUIRED'})
+        fy=c0.execute('SELECT * FROM gl_fiscal_years WHERE id=?',(fyid,)).fetchone()
+        if not fy: raise HTTPException(404,{'code':'FISCAL_YEAR_NOT_FOUND'})
+        assert_year_transition(fy,a,sess['user_ref'],b.reason)
+        country_row=c0.execute("""SELECT co.country_code FROM iam_offices o LEFT JOIN iam_countries co ON co.id=o.country_id WHERE o.id=?""",(sess['home_office_id'],)).fetchone()
+        country=country_row['country_code'] if country_row else None
+        office=sess['office_code']; actor_ref=sess['user_ref']; version=fy['version']; fiscal_year=fy['fiscal_year']
+    finally:c0.close()
+    if b.version!=version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':version})
+    if a in {'close','lock'}:
+        enforce_execution('GL','fiscal-year',fyid,'CLOSE',x_m3_session,b.version,0,'USD','GL',office,country,actor_ref,
+                          f'/api/v1/gl/hardening/fiscal-years/{fyid}/actions/{a}')
+    c=connect();tx(c)
+    try:
+        fy=c.execute('SELECT * FROM gl_fiscal_years WHERE id=?',(fyid,)).fetchone()
+        if not fy: raise HTTPException(404,{'code':'FISCAL_YEAR_NOT_FOUND'})
+        assert_year_transition(fy,a,actor_ref,b.reason)
+        meta={}
+        if a=='close':
+            assert_year_end_ready(c,fiscal_year)
+            cf=generate_opening_balances(c,fiscal_year,actor_ref)
+            st='CLOSED';extra={'closed_at':now(),'closed_by':actor_ref};meta.update(cf)
+        elif a=='lock':
+            st='LOCKED';extra={'locked_at':now(),'locked_by':actor_ref}
+        elif a=='open':
+            st='OPEN';extra={'reopened_at':now(),'reopened_by':actor_ref,'reopen_reason':b.reason}
+        else: raise HTTPException(422,{'code':'UNKNOWN_FISCAL_YEAR_ACTION'})
+        sets=['status=?','version=version+1'];args=[st]
+        for k,v in extra.items():
+            if k in fy.keys():sets.append(f'{k}=?');args.append(v)
+        args += [fyid,b.version]
+        q=c.execute('UPDATE gl_fiscal_years SET '+','.join(sets)+' WHERE id=? AND version=?',args)
+        if q.rowcount!=1:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
+        gr=c.execute("SELECT * FROM gl_records WHERE module='fiscal-year' AND external_ref=?",(f'FY-{fiscal_year}',)).fetchone()
+        if gr:
+            p=json.loads(gr['payload_json']);p['Status']=st
+            c.execute("UPDATE gl_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=?",(st,json.dumps(p),now(),gr['id']))
+        audit(c,actor_ref,'YEAR_'+a.upper(),'fiscal-year',{'fiscal_year':fiscal_year,'reason':b.reason,'meta':meta})
+        c.execute('COMMIT')
+        return {'fiscal_year':fiscal_year,'status':st,'meta':meta}
+    except HTTPException:
+        c.execute('ROLLBACK');raise
+    finally:c.close()
 
 @router.get('/periods')
 def periods(x_role:str=Header('AUDITOR')):
