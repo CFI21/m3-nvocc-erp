@@ -6,6 +6,14 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .db import connect, using_postgres
+from .admin import session as iam_session, permission_code as iam_permission_code
+from .item12_reporting_consolidation_governance import (
+    enabled as item12_enabled,
+    scoped_pnl,
+    consolidated_reporting,
+    request_elimination,
+    approve_elimination,
+)
 
 router=APIRouter(prefix="/api/nvocc-principal",tags=["M3 NVOCC Principal Extensions"])
 
@@ -91,7 +99,9 @@ CREATE TABLE IF NOT EXISTS nvocc_release_controls(
 CREATE TABLE IF NOT EXISTS nvocc_interbranch_settlements(
  settlement_ref TEXT PRIMARY KEY,from_branch TEXT NOT NULL,to_branch TEXT NOT NULL,legal_entity_from TEXT,legal_entity_to TEXT,job_ref TEXT NOT NULL,container_no TEXT,
  service_period_from TEXT,service_period_to TEXT,charges_json TEXT,total_amount REAL NOT NULL DEFAULT 0,currency TEXT NOT NULL,exchange_rate REAL,status TEXT NOT NULL,
- gl_posting_ref TEXT,elimination_flag INTEGER NOT NULL DEFAULT 0,version INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL);
+ gl_posting_ref TEXT,elimination_flag INTEGER NOT NULL DEFAULT 0,elimination_status TEXT NOT NULL DEFAULT 'NONE',
+ elimination_requested_by TEXT,elimination_requested_at TEXT,elimination_reason TEXT,elimination_approved_by TEXT,elimination_approved_at TEXT,
+ version INTEGER NOT NULL DEFAULT 1,updated_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS nvocc_extension_audit(
  audit_ref TEXT PRIMARY KEY,ts TEXT NOT NULL,actor_role TEXT NOT NULL,branch_scope TEXT,workspace_key TEXT NOT NULL,record_ref TEXT NOT NULL,action TEXT NOT NULL,
  before_json TEXT,after_json TEXT);
@@ -149,7 +159,7 @@ def list_workspace(workspace:str,x_role:str=Header("VIEWER"),x_branch_scope:Opti
     return {"workspace":workspace,"title":w["title"],"schema":SCHEMAS[workspace],"rows":rows,"editable":True}
 
 @router.post("/workspaces/{workspace}")
-def upsert_workspace(workspace:str,b:WorkspaceWrite,x_role:str=Header("VIEWER"),x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope")):
+def upsert_workspace(workspace:str,b:WorkspaceWrite,x_role:str=Header("VIEWER"),x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),x_m3_session:Optional[str]=Header(None,alias="X-M3-Session")):
     if workspace not in WORKSPACES: raise HTTPException(404,"Unknown workspace")
     role=_role(workspace,x_role); data=_clean(workspace,b.data);w=WORKSPACES[workspace];key=w["key"];ref=str(data[key])
     # Item 5: release state is derived by the governed HBL/container release service.
@@ -170,6 +180,8 @@ def upsert_workspace(workspace:str,b:WorkspaceWrite,x_role:str=Header("VIEWER"),
         raise HTTPException(403,{"code":"BRANCH_SCOPE_MISMATCH"})
     if workspace=="interbranch-settlement" and x_branch_scope and role not in {"ADMIN","GL_MANAGER","TREASURY_MANAGER"} and x_branch_scope not in {data.get("from_branch"),data.get("to_branch")}:
         raise HTTPException(403,{"code":"BRANCH_SCOPE_MISMATCH"})
+    if item12_enabled() and workspace=="interbranch-settlement" and "elimination_flag" in b.data:
+        raise HTTPException(405,{"code":"GOVERNED_ELIMINATION_ACTION_REQUIRED"})
     c=connect();_ensure(c);old=_row(c.execute(f"SELECT * FROM {w['table']} WHERE {key}=?",(ref,)).fetchone())
     data["updated_at"]=_now()
     cols=list(data)
