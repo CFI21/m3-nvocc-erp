@@ -59,7 +59,7 @@ def test_all_eight_operational_personas_have_governed_screen_surface(isolated):
         accessible=0
         for s in catalog["screens"]:
             try:
-                data=screen_data(s["screen_id"],x_role=role)
+                data=screen_data(s["screen_id"],x_role=role,x_agent_scope="CLX-AGT-SIN" if role=="AGENT" else None)
                 assert isinstance(data["rows"],list)
                 accessible+=1
                 visited.add(s["screen_id"])
