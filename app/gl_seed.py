@@ -33,7 +33,7 @@ def run(conn):
         conn.execute('INSERT INTO gl_cheque_books(book_no,bank_account_code,start_no,end_no,next_no,status) VALUES(?,?,?,?,?,?)',(f'CHQBOOK-{i:02d}','1100',100000+i*100,100099+i*100,100000+i*100,'Active'))
     for i,d in enumerate([1,5,10,20,50],1):rec('cash-denomination-record',f'CDR-{i:03d}',None,{'Currency':'USD','Denomination':str(d),'Type':'Note' if d>1 else 'Coin','Active':'Yes'})
     for i,code in enumerate(['4000','5000','4010','5010','6000'],1):
-        amt=50000*i;rec('budget',f'BUD-2026-{i:03d}',None,{'Fiscal Year':'2026','Period':str(i),'Account Code':code,'Budget Amount':str(amt),'Actual Amount':str(int(amt*.72)),'Variance':str(int(amt*.28)),'Status':'Approved'},'Approved');conn.execute('INSERT INTO gl_budget_lines(fiscal_year,period,account_code,amount) VALUES(2026,?,?,?)',(i,code,amt))
+        amt=50000*i; bref=f'BUD-2026-{i:03d}';rec('budget',bref,None,{'Fiscal Year':'2026','Period':str(i),'Account Code':code,'Budget Amount':str(amt),'Scenario':'BUDGET','Status':'Approved'},'Approved');conn.execute('''INSERT INTO gl_budget_lines(budget_ref,fiscal_year,period,account_code,amount,scenario,status,requested_by,requested_at,approved_by,approved_at,revision_no,version) VALUES(?,2026,?,?,?,'BUDGET','APPROVED','SEED','2026-01-01T00:00:00+00:00','SEED','2026-01-01T00:00:00+00:00',1,1)''',(bref,i,code,amt))
     amounts={'50001':(4650,3910),'50002':(7200,6120),'50003':(5850,4980),'50004':(3120,2670),'50005':(12400,10850)}
     # transaction records and four accounting vouchers per job
     for idx,jr in enumerate(amounts,1):
