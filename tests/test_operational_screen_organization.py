@@ -38,3 +38,7 @@ def test_visible_reference_setup_flow_is_navigation_only():
     assert "gl-accounts::account-integration" in HTML
     assert 'Container Coding' in HTML
     assert "showEquipmentWorkspace('containers')" in HTML
+    assert 'Rates Management' in HTML
+    assert "agent-tasks::special-rates-request" in HTML
+    assert 'Auto SOA' in HTML
+    assert "agent-tasks::soa" in HTML
