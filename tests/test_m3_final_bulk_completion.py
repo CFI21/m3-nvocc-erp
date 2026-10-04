@@ -22,9 +22,9 @@ def isolated(tmp_path,monkeypatch):
     # Independent checker reuses accepted delegation governance.
     admin_id=c.execute("SELECT id FROM iam_users WHERE username='admin'").fetchone()['id']
     auditor_id=c.execute("SELECT id FROM iam_users WHERE username='auditor'").fetchone()['id']
-    c.execute("""INSERT INTO iam_delegations(delegation_ref,from_user_id,to_user_id,permission_code,valid_from,valid_to,status,approved_by)
-      VALUES('DLG-FINAL-BUDGET',?,?,?,'2026-01-01T00:00:00+00:00','2027-12-31T23:59:59+00:00','ACTIVE','USR-001')""",
-      (admin_id,auditor_id,'FINANCE_CONFIG_ADMIN;TX=GL;OFFICE=RTM;COUNTRY=NL'))
+    c.execute("""INSERT INTO iam_temporary_access(temp_ref,user_id,permission_code,valid_from,valid_to,reason,status,approved_by)
+      VALUES('TMP-FINAL-BUDGET',?,'FINANCE_CONFIG_ADMIN','2026-01-01T00:00:00+00:00','2027-12-31T23:59:59+00:00',
+      'Independent final budget checker','ACTIVE','USR-001')""",(auditor_id,))
     # DXB-local GL manager for negative scope tests.
     office=c.execute("SELECT id FROM iam_offices WHERE office_code='DXB'").fetchone()['id']
     role=c.execute("SELECT id FROM iam_roles WHERE role_code='GL_MANAGER'").fetchone()['id']
