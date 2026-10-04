@@ -149,6 +149,17 @@ def revise_line(conn,ref,data,user_id,user_ref):
       (newdata['budget_ref'],core['fiscal_year'],core['period'],core['account_code'],core['amount'],core['scenario'],newdata['job_ref'],newdata['branch_code'],newdata['office_code'],newdata['country_code'],newdata['organization_code'],newdata['cost_center'],newdata['profit_center'],user_ref,now(),int(r['revision_no'])+1,ref,reason))
     return serialize_line(conn,conn.execute("SELECT * FROM gl_budget_lines WHERE budget_ref=?",(newdata['budget_ref'],)).fetchone(),user_id)
 
+def _plan_scope_rollup(lines,key):
+    agg={}
+    for x in lines:
+        scope=x.get(key) or 'UNASSIGNED'
+        a=agg.setdefault(scope,{'scope':scope,'plan':0.0,'actual':0.0})
+        a['plan']+=float(x['amount']);a['actual']+=float(x['actual_amount'])
+    for a in agg.values():
+        a['plan']=round(a['plan'],2);a['actual']=round(a['actual'],2);a['variance']=round(a['actual']-a['plan'],2)
+        a['variance_pct']=round(a['variance']/a['plan']*100,2) if a['plan'] else None
+    return sorted(agg.values(),key=lambda x:x['scope'])
+
 def management_rollup(conn,user_id,fiscal_year=None,period=None):
     sql="SELECT * FROM gl_budget_lines WHERE status='APPROVED'"
     args=[]
@@ -162,14 +173,38 @@ def management_rollup(conn,user_id,fiscal_year=None,period=None):
     totals={'budget':round(sum(float(x['amount']) for x in lines),2),'actual':round(sum(float(x['actual_amount']) for x in lines),2)}
     totals['variance']=round(totals['actual']-totals['budget'],2)
     totals['variance_pct']=round(totals['variance']/totals['budget']*100,2) if totals['budget'] else None
+    pkey=_period_key(fiscal_year,period) if fiscal_year and period else None
+    allowed_refs=_scope_values(conn,user_id)['job_ref']
+    job_ids=[r['id'] for r in conn.execute("SELECT id,job_ref FROM jobs") if r['job_ref'] in allowed_refs]
+    placeholders=','.join('?' for _ in job_ids)
+    if job_ids:
+        ar=conn.execute(f"SELECT COALESCE(SUM(outstanding),0) n FROM gl_ar_open_items WHERE status='OPEN' AND job_id IN ({placeholders})",job_ids).fetchone()['n']
+        ap=conn.execute(f"SELECT COALESCE(SUM(outstanding),0) n FROM gl_ap_open_items WHERE status='OPEN' AND job_id IN ({placeholders})",job_ids).fetchone()['n']
+        overdue=conn.execute(f"SELECT COUNT(*) n FROM gl_ar_open_items WHERE status='OPEN' AND outstanding>0 AND date(due_date)<date('2026-10-04') AND job_id IN ({placeholders})",job_ids).fetchone()['n']
+    else: ar=ap=0;overdue=0
+    customer_ids=[r['customer_id'] for r in conn.execute("SELECT DISTINCT customer_id,job_ref FROM jobs") if r['job_ref'] in allowed_refs]
+    if customer_ids:
+        ph=','.join('?' for _ in customer_ids)
+        credits=[dict(r) for r in conn.execute(f"SELECT customer_id,currency,credit_limit,on_hold FROM gl_credit_limits WHERE customer_id IN ({ph})",customer_ids)]
+    else: credits=[]
+    exposure=round(float(ar or 0),2)
+    credit={'limits':credits,'authoritative_ar_exposure':exposure,'holds':sum(1 for x in credits if x['on_hold'])}
+    unmatched=conn.execute("SELECT COUNT(*) n FROM gl_bank_statement_items WHERE matched=0").fetchone()['n']
+    exceptions={'overdue_ar_items':int(overdue or 0),'credit_holds':credit['holds'],'unmatched_bank_items':int(unmatched or 0)}
     return {
       'lines':lines,'totals':totals,
-      'job_profitability':job_profitability(conn,period=_period_key(fiscal_year,period) if fiscal_year and period else None,user_id=user_id),
-      'branch_pnl':scoped_pnl(conn,'branch_code',period=_period_key(fiscal_year,period) if fiscal_year and period else None,user_id=user_id),
-      'office_pnl':scoped_pnl(conn,'office_code',period=_period_key(fiscal_year,period) if fiscal_year and period else None,user_id=user_id),
-      'country_pnl':scoped_pnl(conn,'country_code',period=_period_key(fiscal_year,period) if fiscal_year and period else None,user_id=user_id),
-      'organization_pnl':scoped_pnl(conn,'organization_code',period=_period_key(fiscal_year,period) if fiscal_year and period else None,user_id=user_id),
-      'cash':cash_flow(conn,period=_period_key(fiscal_year,period) if fiscal_year and period else None,user_id=user_id),
+      'job_plan_vs_actual':_plan_scope_rollup(lines,'job_ref'),
+      'branch_plan_vs_actual':_plan_scope_rollup(lines,'branch_code'),
+      'office_plan_vs_actual':_plan_scope_rollup(lines,'office_code'),
+      'country_plan_vs_actual':_plan_scope_rollup(lines,'country_code'),
+      'organization_plan_vs_actual':_plan_scope_rollup(lines,'organization_code'),
+      'job_profitability':job_profitability(conn,period=pkey,user_id=user_id),
+      'branch_pnl':scoped_pnl(conn,'branch_code',period=pkey,user_id=user_id),
+      'office_pnl':scoped_pnl(conn,'office_code',period=pkey,user_id=user_id),
+      'country_pnl':scoped_pnl(conn,'country_code',period=pkey,user_id=user_id),
+      'organization_pnl':scoped_pnl(conn,'organization_code',period=pkey,user_id=user_id),
+      'cash':cash_flow(conn,period=pkey,user_id=user_id),
+      'ar':round(float(ar or 0),2),'ap':round(float(ap or 0),2),'credit':credit,'exceptions':exceptions,
       'actual_source':'POSTED_GL','read_only_actuals':True
     }
 
