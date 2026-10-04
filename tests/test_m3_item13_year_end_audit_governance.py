@@ -24,14 +24,12 @@ def isolated(tmp_path,monkeypatch):
     monkeypatch.setenv('M3_ITEM11_PERIOD_REPORTING_GOVERNANCE_ENABLED','true')
     seed_run(True); masterdata_seed_run(); admin_seed_run()
     c=db.connect()
-    # independent global checker for governed year-end approval
-    office=c.execute("SELECT id FROM iam_offices WHERE office_code='RTM'").fetchone()['id']
-    role=c.execute("SELECT id FROM iam_roles WHERE role_code='SUPER_ADMIN'").fetchone()['id']
-    uid=c.execute("""INSERT INTO iam_users(user_ref,username,display_name,email,password_hash,home_office_id,mfa_required,status)
-      VALUES('USR-I13-CHECKER','i13.checker','I13 Global Checker','i13.checker@m3.test',?,?,1,'ACTIVE')""",(phash('CheckerI13!'),office)).lastrowid
-    c.execute("""INSERT INTO iam_user_roles(user_id,role_id,office_id,valid_from,status,assigned_by)
-      VALUES(?,?,?,'2026-10-04T00:00:00+00:00','ACTIVE','item13-test')""",(uid,role,office))
-    c.execute("INSERT INTO iam_office_membership(user_id,office_id,membership_type) VALUES(?,?,'PRIMARY')",(uid,office))
+    # Independent checker reuses the accepted delegation model without SoD-conflicting maker/poster capabilities.
+    admin_id=c.execute("SELECT id FROM iam_users WHERE username='admin'").fetchone()['id']
+    auditor_id=c.execute("SELECT id FROM iam_users WHERE username='auditor'").fetchone()['id']
+    c.execute("""INSERT INTO iam_delegations(delegation_ref,from_user_id,to_user_id,permission_code,valid_from,valid_to,status,approved_by)
+      VALUES('DLG-I13-YEAR-END',?,?,?,'2026-01-01T00:00:00+00:00','2027-12-31T23:59:59+00:00','ACTIVE','USR-001')""",
+      (admin_id,auditor_id,'FINANCE_CONFIG_ADMIN;TX=GL;OFFICE=RTM;COUNTRY=NL'))
     c.close()
     return db.DB_PATH
 
@@ -193,7 +191,7 @@ def test_statutory_audit_is_read_only_and_preserves_source_job_voucher_trace(iso
 def test_governed_close_uses_clx033_four_eyes_and_generates_carry_forward(isolated):
     prepare_year_ready()
     admin=token('admin','Admin123!')
-    checker=token('i13.checker','CheckerI13!')
+    checker=token('auditor','Audit123!')
     c=db.connect();fy=c.execute("SELECT * FROM gl_fiscal_years WHERE fiscal_year=2026").fetchone();c.close()
     body=hardening.PeriodAction(version=fy['version'],reason='statutory year end')
     with pytest.raises(HTTPException) as exc:
