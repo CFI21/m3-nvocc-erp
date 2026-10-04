@@ -1,0 +1,39 @@
+name: M3 Final Production Operations Acceptance
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "web/**"
+      - "tests/test_m3_final_production_operations_acceptance.py"
+      - ".github/workflows/m3-final-production-operations-acceptance.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  production-operations-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - run: python -m py_compile app/*.py
+      - name: Final end-to-end production operations acceptance
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_final_production_operations_acceptance.py
+      - name: Operational role regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx050_operational_uat.py
+      - name: Booking B-L workspace regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx049_booking_bl_workspace.py
+      - name: Treasury and GL regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx046_treasury_hardening.py tests/test_clx045_gl_reporting.py
+      - name: Mutation governance regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_final_mutation_governance_regression.py
