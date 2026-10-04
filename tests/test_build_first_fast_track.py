@@ -32,7 +32,7 @@ def test_all_196_existing_screens_load_in_one_completion_sweep(isolated):
             assert 'visible_actions' in qa
             for a in qa['visible_actions']:
                 if a in {'quick-view','print','export','related-records','audit-history','email'}: continue
-                route=action_route(s['screen_id'],a,1,1)
+                route=action_route(s['screen_id'],a,1,1,role='ADMIN')
                 assert route.get('mode') in {'EXISTING_API','EXISTING_GOVERNANCE','MASTER_DATA_GOVERNANCE','CLIENT_OR_CLX011','CLX011_SIMULATED'}
         except Exception as e:
             failures.append((s['screen_id'],repr(e)))
