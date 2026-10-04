@@ -340,5 +340,10 @@ def tax_wht(x_role:str=Header('AUDITOR')):
 
 @router.get('/month-end/status')
 def month_end(x_role:str=Header('AUDITOR')):
-    role(x_role); c=connect(); p=c.execute("SELECT * FROM gl_periods WHERE start_date='2026-09-01'").fetchone(); checks=[dict(x) for x in c.execute('SELECT * FROM gl_period_close_checks WHERE period_id=?',(p['id'],))]; unmatched=c.execute('SELECT COUNT(*) n FROM gl_bank_statement_items WHERE matched=0').fetchone()['n']; c.close()
+    role(x_role); c=connect(); p=c.execute("SELECT * FROM gl_periods WHERE start_date='2026-09-01'").fetchone()
+    if item11_enabled():
+        out=period_close_blockers(c,p['id']); snap=statement_snapshot(c); c.close()
+        return {'period':'2026-09','period_status':p['status'],'checklist_pass':out['ready'],'checks':len(out['checks']),
+                'unmatched_bank_items':out['unmatched_bank_items'],'blockers':out['blockers'],'statements':snap}
+    checks=[dict(x) for x in c.execute('SELECT * FROM gl_period_close_checks WHERE period_id=?',(p['id'],))]; unmatched=c.execute('SELECT COUNT(*) n FROM gl_bank_statement_items WHERE matched=0').fetchone()['n']; c.close()
     return {'period':'2026-09','period_status':p['status'],'checklist_pass':all(x['status']=='PASS' for x in checks),'checks':len(checks),'unmatched_bank_items':unmatched}
