@@ -241,7 +241,7 @@ def branch_pnl(branch_code:Optional[str]=None,x_role:str=Header("VIEWER"),x_m3_s
                 raise HTTPException(403,{"code":"GL_VIEW_REQUIRED"})
             rows=scoped_pnl(c,'branch_code',user_id=sess['user_id'])
             if branch_code:
-                exists=c.execute("SELECT 1 FROM jobs WHERE branch_code=? LIMIT 1",(branch_code,)).fetchone()
+                exists=c.execute("SELECT 1 FROM iam_branches WHERE branch_code=? AND status='ACTIVE' LIMIT 1",(branch_code,)).fetchone()
                 scoped=[r for r in rows if r['scope']==branch_code]
                 if exists and not scoped: raise HTTPException(403,{"code":"REPORT_SCOPE_DENIED","branch_code":branch_code})
                 rows=scoped
