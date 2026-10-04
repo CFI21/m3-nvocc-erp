@@ -373,7 +373,7 @@ def quick_actions(screen_id:str=Query(...),role:str=Query('VIEWER'),status:Optio
 
 @router.get('/action-route')
 def action_route(screen_id:str=Query(...),action:str=Query(...),record_id:Optional[int]=None,version:Optional[int]=None,role:str=Query('VIEWER')):
-    s=require_screen(screen_id);r=(role or 'VIEWER').upper();a=action.lower();domain=s['domain'];key=s['key']
+    s=require_screen(screen_id);r=(role if isinstance(role,str) else 'VIEWER').upper();a=action.lower();domain=s['domain'];key=s['key']
     if not screen_role_allowed(s,r): raise HTTPException(403,'Role cannot access this screen')
     if a not in ROLE_ACTIONS.get(r,ROLE_ACTIONS['VIEWER']): raise HTTPException(403,'Role cannot use this action')
     if a in {'quick-view','print','export','related-records','audit-history'}:return {'mode':'CLIENT_OR_CLX011','action':a}
