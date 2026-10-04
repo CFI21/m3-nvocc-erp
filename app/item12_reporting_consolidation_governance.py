@@ -1,6 +1,6 @@
 import os, json, datetime
 from fastapi import HTTPException
-from .bulk_permission_governance import authorize_job
+from .bulk_permission_governance import authorize_job, resolve_job_scope
 
 CASH_ACCOUNTS={'1000','1100'}
 
@@ -34,6 +34,10 @@ def posted_lines(conn,period=None,user_id=None,branch=None,office=None,country=N
     for r in rows:
         if period and not str(r['voucher_date'] or '').startswith(period):continue
         if allowed is not None and r['job_id'] is not None and r['job_id'] not in allowed:continue
+        if r.get('job_ref'):
+            scope=resolve_job_scope(conn,r['job_ref'],persist=False)
+            r['branch_code']=scope.get('branch_code');r['office_code']=scope.get('office_code')
+            r['country_code']=scope.get('country_code');r['organization_code']=scope.get('organization_code')
         if branch and r['branch_code']!=branch:continue
         if office and r['office_code']!=office:continue
         if country and r['country_code']!=country:continue
