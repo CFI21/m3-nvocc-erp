@@ -115,6 +115,13 @@ def budget_planning_create(b:BudgetPlanBody,x_m3_session:Optional[str]=Header(No
         sess=iam_session(c,x_m3_session)
         if not iam_permission_code(c,sess['user_id'],'GL_EDIT',sess['office_code']): raise HTTPException(403,{'code':'GL_EDIT_REQUIRED'})
         out=budget_create_line(c,b.fields,sess['user_id'],sess['user_ref'])
+        payload={'Fiscal Year':str(out['fiscal_year']),'Period':str(out['period']),'Account Code':out['account_code'],
+                 'Budget Amount':str(out['amount']),'Scenario':out['scenario'],'Status':'Draft'}
+        jid=None
+        if out.get('job_ref'):
+            jr=c.execute("SELECT id FROM jobs WHERE job_ref=?",(out['job_ref'],)).fetchone(); jid=jr['id'] if jr else None
+        c.execute("""INSERT INTO gl_records(module,external_ref,job_id,status,version,payload_json,created_at,updated_at)
+          VALUES('budget',?,?, 'Draft',1,?,?,?)""",(out['budget_ref'],jid,json.dumps(payload),now(),now()))
         audit(c,sess['user_ref'],'BUDGET_CREATE','budget-planning',{'budget_ref':out['budget_ref'],'scope':{k:out.get(k) for k in ('job_ref','branch_code','office_code','country_code','organization_code')}})
         c.execute('COMMIT');return out
     except HTTPException:
@@ -129,6 +136,10 @@ def budget_planning_submit(budget_ref:str,b:BudgetActionBody,x_m3_session:Option
         sess=iam_session(c,x_m3_session)
         if not iam_permission_code(c,sess['user_id'],'GL_EDIT',sess['office_code']): raise HTTPException(403,{'code':'GL_EDIT_REQUIRED'})
         out=budget_submit_line(c,budget_ref,sess['user_id'],sess['user_ref'],b.version)
+        gr=c.execute("SELECT * FROM gl_records WHERE module='budget' AND external_ref=?",(budget_ref,)).fetchone()
+        if gr:
+            p=json.loads(gr['payload_json']);p['Status']='Submitted'
+            c.execute("UPDATE gl_records SET status='Submitted',payload_json=?,version=?,updated_at=? WHERE id=?",(json.dumps(p),out['version'],now(),gr['id']))
         audit(c,sess['user_ref'],'BUDGET_SUBMIT','budget-planning',{'budget_ref':budget_ref})
         c.execute('COMMIT');return out
     except HTTPException:
@@ -143,6 +154,15 @@ def budget_planning_approve(budget_ref:str,b:BudgetActionBody,x_m3_session:Optio
         sess=iam_session(c,x_m3_session)
         if not iam_permission_code(c,sess['user_id'],'FINANCE_CONFIG_ADMIN',sess['office_code']): raise HTTPException(403,{'code':'FINANCE_CONFIG_ADMIN_REQUIRED'})
         out=budget_approve_line(c,budget_ref,sess['user_id'],sess['user_ref'],b.version)
+        gr=c.execute("SELECT * FROM gl_records WHERE module='budget' AND external_ref=?",(budget_ref,)).fetchone()
+        if gr:
+            p=json.loads(gr['payload_json']);p['Status']='Approved'
+            c.execute("UPDATE gl_records SET status='Approved',payload_json=?,version=?,updated_at=? WHERE id=?",(json.dumps(p),out['version'],now(),gr['id']))
+        if out.get('parent_budget_ref'):
+            parent=c.execute("SELECT * FROM gl_records WHERE module='budget' AND external_ref=?",(out['parent_budget_ref'],)).fetchone()
+            if parent:
+                pp=json.loads(parent['payload_json']);pp['Status']='Revised'
+                c.execute("UPDATE gl_records SET status='Revised',payload_json=?,version=version+1,updated_at=? WHERE id=?",(json.dumps(pp),now(),parent['id']))
         audit(c,sess['user_ref'],'BUDGET_APPROVE','budget-planning',{'budget_ref':budget_ref})
         c.execute('COMMIT');return out
     except HTTPException:
@@ -157,6 +177,13 @@ def budget_planning_revise(budget_ref:str,b:BudgetActionBody,x_m3_session:Option
         sess=iam_session(c,x_m3_session)
         if not iam_permission_code(c,sess['user_id'],'GL_EDIT',sess['office_code']): raise HTTPException(403,{'code':'GL_EDIT_REQUIRED'})
         out=budget_revise_line(c,budget_ref,{'amount':b.amount,'reason':b.reason},sess['user_id'],sess['user_ref'])
+        payload={'Fiscal Year':str(out['fiscal_year']),'Period':str(out['period']),'Account Code':out['account_code'],
+                 'Budget Amount':str(out['amount']),'Scenario':out['scenario'],'Status':'Draft','Revision Of':budget_ref,'Revision Reason':b.reason}
+        jid=None
+        if out.get('job_ref'):
+            jr=c.execute("SELECT id FROM jobs WHERE job_ref=?",(out['job_ref'],)).fetchone();jid=jr['id'] if jr else None
+        c.execute("""INSERT INTO gl_records(module,external_ref,job_id,source_type,source_ref,status,version,payload_json,created_at,updated_at)
+          VALUES('budget',?,?,'BUDGET_REVISION',?,'Draft',1,?,?,?)""",(out['budget_ref'],jid,budget_ref,json.dumps(payload),now(),now()))
         audit(c,sess['user_ref'],'BUDGET_REVISE_REQUEST','budget-planning',{'budget_ref':budget_ref,'revision_ref':out['budget_ref'],'reason':b.reason})
         c.execute('COMMIT');return out
     except HTTPException:
