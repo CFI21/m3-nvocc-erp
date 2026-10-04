@@ -6,6 +6,7 @@ on:
       - "app/screen_integration.py"
       - "tests/test_clx011_read_scope_hardening.py"
       - "tests/test_clx050_operational_uat.py"
+      - "tests/test_m3_full_authorization_scope_regression.py"
       - ".github/workflows/clx011-read-scope-security.yml"
   workflow_dispatch:
 
@@ -26,7 +27,7 @@ jobs:
         run: python -m py_compile app/*.py
       - name: CLX011 negative role and scope regression
         env: {PYTHONPATH: .}
-        run: pytest -q tests/test_clx011_read_scope_hardening.py
+        run: pytest -q tests/test_clx011_read_scope_hardening.py tests/test_m3_full_authorization_scope_regression.py
       - name: Existing operational compatibility
         env: {PYTHONPATH: .}
         run: pytest -q tests/test_clx043_full_functional.py tests/test_clx050_operational_uat.py
