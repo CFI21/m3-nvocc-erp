@@ -135,8 +135,7 @@ def test_period_status_direct_patch_blocked(isolated):
     c=db.connect()
     r=c.execute("SELECT * FROM gl_records WHERE module='accounting-periods' ORDER BY id LIMIT 1").fetchone()
     c.close()
-    if not r:
-        pytest.skip('No accounting-period GL projection in seed')
+    assert r is not None, 'ACCOUNTING_PERIOD_GL_PROJECTION_REQUIRED'
     with pytest.raises(HTTPException) as exc:
         gl.update('accounting-periods',r['id'],gl.UpdateBody(version=r['version'],fields={'Status':'CLOSED'}),x_role='GL_MANAGER',x_m3_session=None)
     assert exc.value.detail['code']=='PERIOD_STATUS_DIRECT_PATCH_BLOCKED'
