@@ -16,6 +16,12 @@ from .item11_period_reporting_governance import (
     posted_trial_balance,
 )
 from .item13_year_end_governance import enabled as item13_enabled
+from .final_bulk_governance import (
+    enabled as final_bulk_enabled,
+    create_line as final_budget_create,
+    serialize_line as final_budget_serialize,
+    assert_no_management_override,
+)
 from .item10_tax_fx_governance import (
     enabled as item10_enabled,
     validate_tax as item10_validate_tax,
@@ -104,6 +110,22 @@ def actor(role,action='view',session_token=None,module=None):
     return role
 def serialize(r):
     d=dict(r); d['fields']=json.loads(d.pop('payload_json')); return d
+
+def serialize_budget_record(conn,r,user_id=None):
+    d=serialize(r)
+    if final_bulk_enabled() and d['module']=='budget':
+        line=conn.execute("SELECT * FROM gl_budget_lines WHERE budget_ref=?",(d['external_ref'],)).fetchone()
+        if line:
+            x=final_budget_serialize(conn,line,user_id)
+            d['status']=x['status'].title()
+            d['version']=x['version']
+            d['fields'].update({
+                'Fiscal Year':str(x['fiscal_year']),'Period':str(x['period']),'Account Code':x['account_code'],
+                'Budget Amount':str(x['amount']),'Scenario':x['scenario'],
+                'Actual Amount':str(x['actual_amount']),'Variance':str(x['variance_amount']),
+                'Variance %':x['variance_pct'],'Status':x['status'].title(),'Actual Source':'POSTED_GL'
+            })
+    return d
 def get_record(conn,module,rid):
     r=conn.execute('''SELECT g.*,j.job_ref FROM gl_records g LEFT JOIN jobs j ON j.id=g.job_id WHERE g.module=? AND g.id=?''',(module,rid)).fetchone()
     if not r: raise HTTPException(404,'GL record not found')
@@ -305,16 +327,27 @@ def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None
     require_module(module);actor(x_role,'view',x_m3_session,module);conn=connect();sql='''SELECT g.*,j.job_ref FROM gl_records g LEFT JOIN jobs j ON j.id=g.job_id WHERE g.module=?''';args=[module]
     if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
     if status:sql+=' AND g.status=?';args.append(status)
-    sql+=' ORDER BY g.id';out=[serialize(r) for r in conn.execute(sql,args)];conn.close()
+    sql+=' ORDER BY g.id'
+    uid=None
+    if final_bulk_enabled() and module=='budget':
+        if not x_m3_session: conn.close(); raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_BUDGET'})
+        uid=iam_session(conn,x_m3_session)['user_id']
+    out=[serialize_budget_record(conn,r,uid) if module=='budget' else serialize(r) for r in conn.execute(sql,args)];conn.close()
     if q:out=[r for r in out if q.lower() in json.dumps(r).lower()]
     return {'module':module,'count':len(out),'records':out}
 @router.get('/{module}/{rid}')
 def one(module:str,rid:int,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_module(module);actor(x_role,'view',x_m3_session,module);conn=connect();r=get_record(conn,module,rid);out=serialize(r);conn.close();return out
+    require_module(module);actor(x_role,'view',x_m3_session,module);conn=connect();r=get_record(conn,module,rid)
+    uid=iam_session(conn,x_m3_session)['user_id'] if final_bulk_enabled() and module=='budget' and x_m3_session else None
+    if final_bulk_enabled() and module=='budget' and not x_m3_session: conn.close(); raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_BUDGET'})
+    out=serialize_budget_record(conn,r,uid) if module=='budget' else serialize(r);conn.close();return out
 @router.post('/{module}',status_code=201)
 async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key')):
     require_module(module)
     if item9_enabled() and module=='customer-credit-control': raise HTTPException(405,{'code':'AUTHORITATIVE_CREDIT_CONTROL_READ_ONLY'})
+    if final_bulk_enabled() and module=='budget':
+        assert_no_management_override(body.fields)
+        if not x_m3_session: raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_BUDGET'})
     role=actor(x_role,'create',x_m3_session,module);raw=await request.body();rh=hashlib.sha256(raw).hexdigest();conn=connect();tx(conn)
     try:
         if idempotency_key:
@@ -332,14 +365,36 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
                 item10_validate_fx(conn,curr,vdate,body.fields.get('Exchange Rate'),'USD')
             if any(k in body.fields for k in ('Tax Code','WHT Code','Tax Amount','Taxable Base','Base Amount')):
                 ensure_period_not_tax_filed(conn,vdate)
-        jid=job_id(conn,body.job_ref); ext=body.external_ref or f"CLX-GL-{module.upper()}-{uuid.uuid4().hex[:10].upper()}"; status=str(body.fields.get('Status') or 'Draft')
+        jid=job_id(conn,body.job_ref)
+        budget_line=None
+        if final_bulk_enabled() and module=='budget':
+            sess=iam_session(conn,x_m3_session)
+            bdata={
+              'budget_ref':body.external_ref,
+              'fiscal_year':body.fields.get('Fiscal Year'),'period':body.fields.get('Period'),
+              'account_code':body.fields.get('Account Code'),'amount':body.fields.get('Budget Amount'),
+              'scenario':body.fields.get('Scenario') or 'BUDGET','job_ref':body.job_ref or body.fields.get('Job Ref'),
+              'branch_code':body.fields.get('Branch'),'office_code':body.fields.get('Office'),
+              'country_code':body.fields.get('Country'),'organization_code':body.fields.get('Organization'),
+              'cost_center':body.fields.get('Cost Center'),'profit_center':body.fields.get('Profit Center')
+            }
+            budget_line=final_budget_create(conn,bdata,sess['user_id'],sess['user_ref'])
+            ext=budget_line['budget_ref']; status='Draft'
+            body.fields={k:v for k,v in body.fields.items() if k not in {'Actual Amount','Variance','Variance %'}}
+            body.fields.update({'Fiscal Year':str(budget_line['fiscal_year']),'Period':str(budget_line['period']),'Account Code':budget_line['account_code'],'Budget Amount':str(budget_line['amount']),'Scenario':budget_line['scenario'],'Status':'Draft'})
+        else:
+            ext=body.external_ref or f"CLX-GL-{module.upper()}-{uuid.uuid4().hex[:10].upper()}"; status=str(body.fields.get('Status') or 'Draft')
         correction_meta=validate_correction(conn,module,body.fields,jid,body.source_type,body.source_ref)
         if correction_meta:
             body.source_type=correction_meta['source_module']; body.source_ref=correction_meta['source_ref']
         if conn.execute('SELECT 1 FROM gl_records WHERE module=? AND external_ref=?',(module,ext)).fetchone():raise HTTPException(409,'DUPLICATE_GL_RECORD')
         payload=dict(body.fields); cur=conn.execute('INSERT INTO gl_records(module,external_ref,job_id,source_type,source_ref,status,version,payload_json,created_at,updated_at) VALUES(?,?,?,?,?,?,1,?,?,?)',(module,ext,jid,body.source_type,body.source_ref,status,json.dumps(payload),now(),now()));rid=cur.lastrowid
         if module=='voucher':build_voucher(conn,rid,payload,jid,body.source_type,body.source_ref,status,maker_role=role)
-        after=serialize(get_record(conn,module,rid));audit(conn,role,'CREATE',module,rid,jid,None,after,{'source_type':body.source_type,'source_ref':body.source_ref,'financial_correction':correction_meta})
+        gr=get_record(conn,module,rid)
+        if final_bulk_enabled() and module=='budget':
+            sess=iam_session(conn,x_m3_session);after=serialize_budget_record(conn,gr,sess['user_id'])
+        else: after=serialize(gr)
+        audit(conn,role,'CREATE',module,rid,jid,None,after,{'source_type':body.source_type,'source_ref':body.source_ref,'financial_correction':correction_meta})
         if idempotency_key:conn.execute('INSERT INTO idempotency_keys(actor_role,idem_key,request_hash,response_json,status_code,created_at) VALUES(?,?,?,?,201,?)',(role,'GL:'+idempotency_key,rh,json.dumps(after),now()))
         conn.execute('COMMIT');return JSONResponse(after,status_code=201)
     except HTTPException:conn.execute('ROLLBACK');raise
@@ -353,6 +408,9 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
         raise HTTPException(405,{'code':'PERIOD_STATUS_DIRECT_PATCH_BLOCKED'})
     if item13_enabled() and module=='fiscal-year' and any(k in body.fields for k in ('Status','status','Closed','Locked','Retained Earnings','Retained Earnings Account','Carry Forward','Carry Forward Ref')):
         raise HTTPException(405,{'code':'FISCAL_YEAR_STATUS_DIRECT_PATCH_BLOCKED'})
+    if final_bulk_enabled() and module=='budget':
+        assert_no_management_override(body.fields)
+        raise HTTPException(405,{'code':'GOVERNED_BUDGET_REVISION_REQUIRED'})
     role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
@@ -375,7 +433,10 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
     finally:conn.close()
 @router.post('/{module}/{rid}/actions/{action}')
 def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    require_module(module);action=action.lower();enforce_sensitive_session(action,x_m3_session);role=actor(x_role,action,x_m3_session,module)
+    require_module(module);action=action.lower()
+    if final_bulk_enabled() and module=='budget':
+        raise HTTPException(405,{'code':'GOVERNED_BUDGET_ACTION_REQUIRED'})
+    enforce_sensitive_session(action,x_m3_session);role=actor(x_role,action,x_m3_session,module)
     if action in {'approve','post','reverse','close'}: enforce_gl_action(module,rid,action,x_m3_session,body.version,body.reason)
     conn=connect();tx(conn)
     try:

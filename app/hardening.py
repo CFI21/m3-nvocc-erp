@@ -37,6 +37,14 @@ from .item9_credit_collection_governance import (
     validate_collection_metadata,
     dunning_level,
 )
+from .final_bulk_governance import (
+    enabled as final_bulk_enabled,
+    create_line as budget_create_line,
+    submit_line as budget_submit_line,
+    approve_line as budget_approve_line,
+    revise_line as budget_revise_line,
+    management_rollup,
+)
 
 router=APIRouter(prefix='/api/v1/gl/hardening',tags=['CLX-006 GL Hardening'])
 WRITE={'ADMIN','FINANCE','GL_MANAGER','GL_ACCOUNTANT'}
@@ -80,6 +88,119 @@ class CreditOverrideDecision(BaseModel):
 
 class CollectionMetadata(BaseModel):
     fields:dict
+
+class BudgetPlanBody(BaseModel):
+    fields:dict
+
+class BudgetActionBody(BaseModel):
+    version:int
+    reason:Optional[str]=None
+    amount:Optional[float]=None
+
+@router.get('/planning/budgets')
+def budget_planning_list(fiscal_year:Optional[int]=None,period:Optional[int]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not final_bulk_enabled(): raise HTTPException(404,{'code':'FINAL_BULK_GOVERNANCE_DISABLED'})
+    c=connect()
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'GL_VIEW',sess['office_code']): raise HTTPException(403,{'code':'GL_VIEW_REQUIRED'})
+        return management_rollup(c,sess['user_id'],fiscal_year,period)
+    finally:c.close()
+
+@router.post('/planning/budgets')
+def budget_planning_create(b:BudgetPlanBody,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not final_bulk_enabled(): raise HTTPException(404,{'code':'FINAL_BULK_GOVERNANCE_DISABLED'})
+    c=connect();tx(c)
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'GL_EDIT',sess['office_code']): raise HTTPException(403,{'code':'GL_EDIT_REQUIRED'})
+        out=budget_create_line(c,b.fields,sess['user_id'],sess['user_ref'])
+        payload={'Fiscal Year':str(out['fiscal_year']),'Period':str(out['period']),'Account Code':out['account_code'],
+                 'Budget Amount':str(out['amount']),'Scenario':out['scenario'],'Status':'Draft'}
+        jid=None
+        if out.get('job_ref'):
+            jr=c.execute("SELECT id FROM jobs WHERE job_ref=?",(out['job_ref'],)).fetchone(); jid=jr['id'] if jr else None
+        c.execute("""INSERT INTO gl_records(module,external_ref,job_id,status,version,payload_json,created_at,updated_at)
+          VALUES('budget',?,?, 'Draft',1,?,?,?)""",(out['budget_ref'],jid,json.dumps(payload),now(),now()))
+        audit(c,sess['user_ref'],'BUDGET_CREATE','budget-planning',{'budget_ref':out['budget_ref'],'scope':{k:out.get(k) for k in ('job_ref','branch_code','office_code','country_code','organization_code')}})
+        c.execute('COMMIT');return out
+    except HTTPException:
+        c.execute('ROLLBACK');raise
+    finally:c.close()
+
+@router.post('/planning/budgets/{budget_ref}/submit')
+def budget_planning_submit(budget_ref:str,b:BudgetActionBody,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not final_bulk_enabled(): raise HTTPException(404,{'code':'FINAL_BULK_GOVERNANCE_DISABLED'})
+    c=connect();tx(c)
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'GL_EDIT',sess['office_code']): raise HTTPException(403,{'code':'GL_EDIT_REQUIRED'})
+        out=budget_submit_line(c,budget_ref,sess['user_id'],sess['user_ref'],b.version)
+        gr=c.execute("SELECT * FROM gl_records WHERE module='budget' AND external_ref=?",(budget_ref,)).fetchone()
+        if gr:
+            p=json.loads(gr['payload_json']);p['Status']='Submitted'
+            c.execute("UPDATE gl_records SET status='Submitted',payload_json=?,version=?,updated_at=? WHERE id=?",(json.dumps(p),out['version'],now(),gr['id']))
+        audit(c,sess['user_ref'],'BUDGET_SUBMIT','budget-planning',{'budget_ref':budget_ref})
+        c.execute('COMMIT');return out
+    except HTTPException:
+        c.execute('ROLLBACK');raise
+    finally:c.close()
+
+@router.post('/planning/budgets/{budget_ref}/approve')
+def budget_planning_approve(budget_ref:str,b:BudgetActionBody,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not final_bulk_enabled(): raise HTTPException(404,{'code':'FINAL_BULK_GOVERNANCE_DISABLED'})
+    c=connect();tx(c)
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'FINANCE_CONFIG_ADMIN',sess['office_code']): raise HTTPException(403,{'code':'FINANCE_CONFIG_ADMIN_REQUIRED'})
+        out=budget_approve_line(c,budget_ref,sess['user_id'],sess['user_ref'],b.version)
+        gr=c.execute("SELECT * FROM gl_records WHERE module='budget' AND external_ref=?",(budget_ref,)).fetchone()
+        if gr:
+            p=json.loads(gr['payload_json']);p['Status']='Approved'
+            c.execute("UPDATE gl_records SET status='Approved',payload_json=?,version=?,updated_at=? WHERE id=?",(json.dumps(p),out['version'],now(),gr['id']))
+        if out.get('parent_budget_ref'):
+            parent=c.execute("SELECT * FROM gl_records WHERE module='budget' AND external_ref=?",(out['parent_budget_ref'],)).fetchone()
+            if parent:
+                pp=json.loads(parent['payload_json']);pp['Status']='Revised'
+                c.execute("UPDATE gl_records SET status='Revised',payload_json=?,version=version+1,updated_at=? WHERE id=?",(json.dumps(pp),now(),parent['id']))
+        audit(c,sess['user_ref'],'BUDGET_APPROVE','budget-planning',{'budget_ref':budget_ref})
+        c.execute('COMMIT');return out
+    except HTTPException:
+        c.execute('ROLLBACK');raise
+    finally:c.close()
+
+@router.post('/planning/budgets/{budget_ref}/revise')
+def budget_planning_revise(budget_ref:str,b:BudgetActionBody,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not final_bulk_enabled(): raise HTTPException(404,{'code':'FINAL_BULK_GOVERNANCE_DISABLED'})
+    c=connect();tx(c)
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'GL_EDIT',sess['office_code']): raise HTTPException(403,{'code':'GL_EDIT_REQUIRED'})
+        out=budget_revise_line(c,budget_ref,{'amount':b.amount,'reason':b.reason},sess['user_id'],sess['user_ref'])
+        payload={'Fiscal Year':str(out['fiscal_year']),'Period':str(out['period']),'Account Code':out['account_code'],
+                 'Budget Amount':str(out['amount']),'Scenario':out['scenario'],'Status':'Draft','Revision Of':budget_ref,'Revision Reason':b.reason}
+        jid=None
+        if out.get('job_ref'):
+            jr=c.execute("SELECT id FROM jobs WHERE job_ref=?",(out['job_ref'],)).fetchone();jid=jr['id'] if jr else None
+        c.execute("""INSERT INTO gl_records(module,external_ref,job_id,source_type,source_ref,status,version,payload_json,created_at,updated_at)
+          VALUES('budget',?,?,'BUDGET_REVISION',?,'Draft',1,?,?,?)""",(out['budget_ref'],jid,budget_ref,json.dumps(payload),now(),now()))
+        audit(c,sess['user_ref'],'BUDGET_REVISE_REQUEST','budget-planning',{'budget_ref':budget_ref,'revision_ref':out['budget_ref'],'reason':b.reason})
+        c.execute('COMMIT');return out
+    except HTTPException:
+        c.execute('ROLLBACK');raise
+    finally:c.close()
+
+@router.get('/management-control')
+def final_management_control(fiscal_year:Optional[int]=None,period:Optional[int]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not final_bulk_enabled(): raise HTTPException(404,{'code':'FINAL_BULK_GOVERNANCE_DISABLED'})
+    c=connect()
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'GL_VIEW',sess['office_code']): raise HTTPException(403,{'code':'GL_VIEW_REQUIRED'})
+        out=management_rollup(c,sess['user_id'],fiscal_year,period)
+        out['governance']={'actuals':'POSTED_GL_ONLY','actual_override':'BLOCKED','role_scope':'AUTOMATIC','job_by_job_permissions':False}
+        return out
+    finally:c.close()
 
 @router.get('/health')
 def health():

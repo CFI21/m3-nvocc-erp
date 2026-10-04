@@ -186,19 +186,30 @@
       "columns": [
         "Fiscal Year",
         "Period",
+        "Scenario",
         "Account Code",
         "Budget Amount",
         "Actual Amount",
         "Variance",
+        "Variance %",
         "Status"
       ],
       "fields": [
         "Fiscal Year",
         "Period",
+        "Scenario",
         "Account Code",
         "Budget Amount",
+        "Job Ref",
+        "Branch",
+        "Office",
+        "Country",
+        "Organization",
+        "Cost Center",
+        "Profit Center",
         "Actual Amount",
         "Variance",
+        "Variance %",
         "Status"
       ]
     }
