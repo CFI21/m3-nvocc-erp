@@ -1,0 +1,35 @@
+name: M3 CLX011 Read Scope Security
+
+on:
+  pull_request:
+    paths:
+      - "app/screen_integration.py"
+      - "tests/test_clx011_read_scope_hardening.py"
+      - "tests/test_clx050_operational_uat.py"
+      - ".github/workflows/clx011-read-scope-security.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clx011-read-scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - name: Compile
+        run: python -m py_compile app/*.py
+      - name: CLX011 negative role and scope regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx011_read_scope_hardening.py
+      - name: Existing operational compatibility
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx043_full_functional.py tests/test_clx050_operational_uat.py
+      - name: Frozen screen and navigation contracts
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx019_catalog_roles.py tests/test_menu_field_linkage.py tests/test_navigation_extension_capacity.py

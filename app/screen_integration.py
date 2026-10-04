@@ -6,6 +6,7 @@ import json, datetime, uuid
 from .db import connect, using_postgres
 from .screen_catalog import build_catalog
 from .clx045_gl_reporting import REPORT_KEYS, report_rows
+from .clx070_container_master_control import actor as scope_actor
 
 HERE=Path(__file__).resolve().parent
 CATALOG=build_catalog()
@@ -149,6 +150,53 @@ def screen_role_allowed(s,role):
     allowed={str(x).upper() for x in s.get('roles',[])}
     return not allowed or r in allowed
 
+def _read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope=None):
+    # FastAPI Header defaults are parameter descriptors when these functions are
+    # invoked directly by the regression suite; normalize them to runtime defaults.
+    if not isinstance(x_role,str): x_role='VIEWER'
+    x_m3_session=x_m3_session if isinstance(x_m3_session,str) else None
+    x_agent_scope=x_agent_scope if isinstance(x_agent_scope,str) else None
+    x_branch_scope=x_branch_scope if isinstance(x_branch_scope,str) else None
+    x_depot_scope=x_depot_scope if isinstance(x_depot_scope,str) else None
+    x_office_scope=x_office_scope if isinstance(x_office_scope,str) else None
+    a=scope_actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope)
+    if x_office_scope and not a.get('office'): a['office']=x_office_scope
+    role=str(a.get('role') or x_role or 'VIEWER').upper()
+    a['role']=role
+    if role=='AGENT' and not a.get('agent'):
+        raise HTTPException(403,'AGENT requires X-Agent-Scope')
+    if role=='DEPOT' and not a.get('depot'):
+        raise HTTPException(403,'DEPOT requires X-Depot-Scope')
+    return a
+
+def _job_scope_clause(a,customer_scope=None,alias='j'):
+    customer_scope=customer_scope if isinstance(customer_scope,str) and customer_scope else None
+    role=str(a.get('role') or 'VIEWER').upper()
+    # Global/read-audit roles retain their accepted visibility. Scoped operational
+    # roles inherit only the scope dimensions already carried by IAM/runtime headers.
+    global_roles={'ADMIN','SUPER_ADMIN','AUDITOR','SECURITY_ADMIN','MASTER_DATA_MANAGER'}
+    clauses=[];args=[]
+    if role=='AGENT':
+        clauses.append(f"{alias}.agent_id=(SELECT id FROM agents WHERE code=?)");args.append(a.get('agent'))
+    if customer_scope:
+        clauses.append(f"{alias}.customer_id=(SELECT id FROM customers WHERE code=?)");args.append(customer_scope)
+    if role not in global_roles:
+        if a.get('office'):
+            clauses.append(f"{alias}.office_code=?");args.append(a['office'])
+        if a.get('branch'):
+            clauses.append(f"{alias}.branch_code=?");args.append(a['branch'])
+        if a.get('depot'):
+            clauses.append(f"EXISTS (SELECT 1 FROM containers scope_c WHERE scope_c.job_id={alias}.id AND scope_c.depot_code=?)");args.append(a['depot'])
+    return ''.join(' AND '+x for x in clauses),args
+
+def _require_job_scope(c,job_ref,a,customer_scope=None):
+    sc,args=_job_scope_clause(a,customer_scope,'j')
+    row=c.execute("SELECT j.id FROM jobs j WHERE j.job_ref=?"+sc,[job_ref]+args).fetchone()
+    if not row:
+        # Keep scoped existence opaque to prevent cross-agent/customer enumeration.
+        raise HTTPException(404,'Unknown job or outside data scope')
+    return row['id']
+
 def safe_rows(c,sql,args=(),limit=100):
     return [dict(r) for r in c.execute(sql,args).fetchmany(limit)]
 
@@ -221,15 +269,19 @@ def screen(screen_id:str=Query(...)):
     return require_screen(screen_id)
 
 @router.get('/screen-data')
-def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=Header('VIEWER')):
-    s=require_screen(screen_id);role=x_role.upper()
-    if not screen_role_allowed(s,role): raise HTTPException(403,'Role cannot access this screen')
+def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope')):
     c=connect();rows=[]
     try:
+        a=_read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope);role=a['role']
+        s=require_screen(screen_id)
+        if not screen_role_allowed(s,role): raise HTTPException(403,'Role cannot access this screen')
+        if job_ref: _require_job_scope(c,job_ref,a,x_customer_scope)
+        scope_sql,scope_args=_job_scope_clause(a,x_customer_scope,'j')
         if s['domain']=='Agent Tasks':
             sql='''SELECT t.id,t.external_ref,j.job_ref,c.name customer,a.code agent,t.status,t.version,t.payload_json
                    FROM transaction_records t JOIN jobs j ON j.id=t.job_id JOIN customers c ON c.id=t.customer_id JOIN agents a ON a.id=t.agent_id WHERE t.module=?''';args=[s['key']]
             if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
+            sql+=scope_sql;args.extend(scope_args)
             rows=safe_rows(c,sql,args)
         elif s['screen_id'].startswith('gl-accounts::'):
             if s['key'] in REPORT_KEYS:
@@ -238,16 +290,19 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
                 sql='''SELECT g.id,g.external_ref,j.job_ref,g.source_type,g.source_ref,g.status,g.version,g.payload_json
                        FROM gl_records g LEFT JOIN jobs j ON j.id=g.job_id WHERE g.module=?''';args=[s['key']]
                 if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
+                sql+=scope_sql;args.extend(scope_args)
                 rows=safe_rows(c,sql,args)
         elif s['domain']=='Treasury / AR-AP':
             sql='''SELECT t.id,t.external_ref,j.job_ref,t.party_type,t.party_name,t.currency,t.amount,t.status,t.version,t.source_type,t.source_ref,t.payload_json
                    FROM treasury_records t LEFT JOIN jobs j ON j.id=t.job_id WHERE t.module=?''';args=[s['key']]
             if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
+            sql+=scope_sql;args.extend(scope_args)
             rows=safe_rows(c,sql,args)
         elif s['domain']=='Integration & Security':
             sql='''SELECT i.id,i.external_ref,j.job_ref,i.office_scope,i.country_scope,i.status,i.version,i.payload_json
                    FROM integration_records i LEFT JOIN jobs j ON j.id=i.job_id WHERE i.module=?''';args=[s['key']]
             if job_ref:sql+=' AND j.job_ref=?';args.append(job_ref)
+            sql+=scope_sql;args.extend(scope_args)
             rows=safe_rows(c,sql,args)
         elif s['screen_id'].startswith('administration::'):
             if s['screen_id']=='administration::dashboard':
@@ -337,10 +392,12 @@ def action_route(screen_id:str=Query(...),action:str=Query(...),record_id:Option
     return {'mode':'EXISTING_SCREEN_WORKFLOW','note':'Open the current screen/right-side panel; no new business mutation is introduced by CLX-011.'}
 
 @router.get('/related/{job_ref}')
-def related(job_ref:str):
+def related(job_ref:str,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope')):
     if not (len(job_ref)==5 and job_ref.isdigit()):raise HTTPException(422,'Job reference must be five digits')
     c=connect()
     try:
+        a=_read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope)
+        _require_job_scope(c,job_ref,a,x_customer_scope)
         e=job_e2e(c,job_ref)
         jid=e['identity']['id']
         e['linked_records']={
@@ -358,10 +415,12 @@ def related(job_ref:str):
     finally:c.close()
 
 @router.get('/workflow/{job_ref}')
-def workflow(job_ref:str):
+def workflow(job_ref:str,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope')):
     if not (len(job_ref)==5 and job_ref.isdigit()):raise HTTPException(422,'Job reference must be five digits')
     c=connect()
     try:
+        a=_read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope)
+        _require_job_scope(c,job_ref,a,x_customer_scope)
         e=job_e2e(c,job_ref)
         chain=['special-rates-request','booking','planning','vessel-lock','cro','trt','export-trt','transshipment-trt','bl','switch-bl','split-bl','import-bl','import-trt','delivery-order','container-activity','detention-collection','storage-cost','agent-receipt-pay','soa']
         present={r['module']:dict(r) for r in c.execute('''SELECT t.module,t.external_ref,t.status,t.version FROM transaction_records t JOIN jobs j ON j.id=t.job_id WHERE j.job_ref=?''',(job_ref,))}
@@ -372,13 +431,16 @@ def workflow(job_ref:str):
     finally:c.close()
 
 @router.get('/search')
-def search(q:str=Query(...,min_length=2,max_length=80),role:str=Query('VIEWER')):
-    needle=q.lower();r=role.upper();screen_hits=[{'type':'screen','screen_id':s['screen_id'],'name':s['name'],'domain':s['domain'],'submenu':s['submenu']} for s in CATALOG['screens'] if screen_role_allowed(s,r) and needle in json.dumps(s).lower()][:50]
-    c=connect();record_hits=[];like='%'+needle+'%'
+def search(q:str=Query(...,min_length=2,max_length=80),role:str=Query('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope')):
+    needle=q.lower();c=connect();record_hits=[];like='%'+needle+'%'
     try:
+        a=_read_actor(c,role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope);r=a['role']
+        screen_hits=[{'type':'screen','screen_id':s['screen_id'],'name':s['name'],'domain':s['domain'],'submenu':s['submenu']} for s in CATALOG['screens'] if screen_role_allowed(s,r) and needle in json.dumps(s).lower()][:50]
+        scope_sql,scope_args=_job_scope_clause(a,x_customer_scope,'j')
         for table,typ in [('transaction_records','agent'),('gl_records','gl'),('treasury_records','treasury'),('integration_records','integration')]:
-            for r in c.execute(f'''SELECT x.id,x.module,x.external_ref,j.job_ref,x.status FROM {table} x LEFT JOIN jobs j ON j.id=x.job_id WHERE lower(x.external_ref) LIKE ? OR lower(COALESCE(j.job_ref,'')) LIKE ? OR lower(x.payload_json) LIKE ? LIMIT 25''',(like,like,like)):
-                d=dict(r);d['type']=typ;record_hits.append(d)
+            sql=f'''SELECT x.id,x.module,x.external_ref,j.job_ref,x.status FROM {table} x LEFT JOIN jobs j ON j.id=x.job_id WHERE (lower(x.external_ref) LIKE ? OR lower(COALESCE(j.job_ref,'')) LIKE ? OR lower(x.payload_json) LIKE ?)'''+scope_sql+' LIMIT 25'
+            for rr in c.execute(sql,[like,like,like]+scope_args):
+                d=dict(rr);d['type']=typ;record_hits.append(d)
         for r in c.execute("SELECT domain,record_key,display_name,status,version FROM md_records WHERE lower(record_key) LIKE ? OR lower(display_name) LIKE ? LIMIT 25",(like,like)):
             d=dict(r);d['type']='master';record_hits.append(d)
     finally:c.close()
