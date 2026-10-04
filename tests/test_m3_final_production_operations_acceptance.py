@@ -19,7 +19,7 @@ FLOW_SCREENS = [
     ("agent-tasks::cro","OPS"),
     ("agent-tasks::container-activity","OPS"),
     ("agent-tasks::delivery-order","OPS"),
-    ("gl-accounts::invoice","FINANCE"),
+    ("gl-accounts::invoice","GL_ACCOUNTANT"),
     ("gl-accounts::voucher","GL_ACCOUNTANT"),
 ]
 
