@@ -2,9 +2,20 @@ import os, json, datetime
 from fastapi import HTTPException
 from .item11_period_reporting_governance import close_check_status
 from .item12_reporting_consolidation_governance import validate_interbranch_eliminations, trial_balance as item12_trial_balance
+from .bulk_permission_governance import authorize_job
 
 def enabled():
     return os.getenv('M3_ITEM13_YEAR_END_GOVERNANCE_ENABLED','false').lower()=='true'
+
+def assert_global_year_access(conn,user_id):
+    jobs=[r['job_ref'] for r in conn.execute("SELECT job_ref FROM jobs ORDER BY id")]
+    denied=[]
+    for jr in jobs:
+        if not authorize_job(conn,user_id,jr,'gl','view').get('allowed'):
+            denied.append(jr)
+    if denied:
+        raise HTTPException(403,{'code':'GLOBAL_YEAR_SCOPE_REQUIRED','denied_job_count':len(denied),'sample':denied[:5]})
+    return True
 
 def year(conn,fiscal_year):
     r=conn.execute("SELECT * FROM gl_fiscal_years WHERE fiscal_year=?",(fiscal_year,)).fetchone()
