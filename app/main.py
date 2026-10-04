@@ -592,7 +592,7 @@ def split_allocations(tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional
 def special_rate_workflow(tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None)):
     role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); conn=connect(); r=get_tx(conn,'special-rates-request',tid,role,ascope,cscope); w=conn.execute('SELECT * FROM special_rate_workflow WHERE transaction_id=?',(tid,)).fetchone(); conn.close(); return dict(w) if w else {}
 
-def _system_event_scope_sql(role,agent_scope,customer_scope,office_scope,branch_scope,depot_scope,alias='j'):
+def _system_event_scope_sql(role,agent_scope,customer_scope,office_scope,branch_scope,depot_scope,alias='j',conn=None):
     clauses=[];args=[]
     if role=='AGENT':
         if not agent_scope: raise HTTPException(403,'AGENT requires X-Agent-Scope')
@@ -604,15 +604,30 @@ def _system_event_scope_sql(role,agent_scope,customer_scope,office_scope,branch_
     if branch_scope:
         clauses.append(f"{alias}.branch_code=?");args.append(branch_scope)
     if depot_scope:
-        clauses.append(f"EXISTS (SELECT 1 FROM containers sc WHERE sc.job_id={alias}.id AND sc.depot_code=?)");args.append(depot_scope)
+        has_depot=False
+        try:
+            if backend_name()=='postgres':
+                has_depot=bool(conn and conn.execute("SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='containers' AND column_name='depot_code'").fetchone())
+            else:
+                has_depot=bool(conn and any(str(r['name'])=='depot_code' for r in conn.execute("PRAGMA table_info(containers)").fetchall()))
+        except Exception:
+            has_depot=False
+        if has_depot:
+            clauses.append(f"EXISTS (SELECT 1 FROM containers sc WHERE sc.job_id={alias}.id AND sc.depot_code=?)");args.append(depot_scope)
+        else:
+            clauses.append("1=0")
     return ''.join(' AND '+x for x in clauses),args
 
 @app.get('/api/v1/system/events/audit')
 def audit_list(job_ref:Optional[str]=None,limit:int=100,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope')):
+    x_customer_scope=x_customer_scope if isinstance(x_customer_scope,str) else None
+    x_office_scope=x_office_scope if isinstance(x_office_scope,str) else None
+    x_branch_scope=x_branch_scope if isinstance(x_branch_scope,str) else None
+    x_depot_scope=x_depot_scope if isinstance(x_depot_scope,str) else None
     role,agent_scope,customer_scope=actor(x_role,x_agent_scope,x_customer_scope)
     conn=connect();q='SELECT a.*,j.job_ref FROM audit_events a LEFT JOIN jobs j ON j.id=a.job_id WHERE 1=1';args=[]
     if job_ref:q+=' AND j.job_ref=?';args.append(job_ref)
-    sc,sa=_system_event_scope_sql(role,agent_scope,customer_scope,x_office_scope,x_branch_scope,x_depot_scope,'j');q+=sc;args+=sa
+    sc,sa=_system_event_scope_sql(role,agent_scope,customer_scope,x_office_scope,x_branch_scope,x_depot_scope,'j',conn);q+=sc;args+=sa
     q+=' ORDER BY a.id DESC LIMIT ?';args.append(min(limit,500));rows=[dict(r) for r in conn.execute(q,args)];conn.close();return rows
 @app.get('/api/v1/system/events/exceptions')
 def exception_list(job_ref:Optional[str]=None,limit:int=100,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None,alias='X-Agent-Scope'),x_customer_scope:Optional[str]=Header(None,alias='X-Customer-Scope'),x_office_scope:Optional[str]=Header(None,alias='X-Office-Scope'),x_branch_scope:Optional[str]=Header(None,alias='X-Branch-Scope'),x_depot_scope:Optional[str]=Header(None,alias='X-Depot-Scope')):
