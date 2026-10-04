@@ -38,6 +38,12 @@ def posted_lines(conn,period=None,user_id=None,branch=None,office=None,country=N
             scope=resolve_job_scope(conn,r['job_ref'],persist=False)
             r['branch_code']=scope.get('branch_code');r['office_code']=scope.get('office_code')
             r['country_code']=scope.get('country_code');r['organization_code']=scope.get('organization_code')
+            if r['branch_code'] and r['office_code']:
+                br=conn.execute("""SELECT o.office_code FROM iam_branches b JOIN iam_offices o ON o.id=b.office_id
+                  WHERE b.branch_code=? AND b.status='ACTIVE'""",(r['branch_code'],)).fetchone()
+                if not br or br['office_code']!=r['office_code']:
+                    raise HTTPException(409,{'code':'REPORT_SCOPE_ATTRIBUTION_MISMATCH','job_ref':r['job_ref'],
+                      'branch_code':r['branch_code'],'office_code':r['office_code']})
         if branch and r['branch_code']!=branch:continue
         if office and r['office_code']!=office:continue
         if country and r['country_code']!=country:continue
@@ -124,9 +130,12 @@ def consolidated_reporting(conn,period=None,user_id=None):
     if elim['invalid']:
         raise HTTPException(422,{'code':'CONSOLIDATION_ELIMINATION_INVALID','exceptions':elim['invalid']})
     elimination_total=round(sum(_f(r.get('total_amount'))*(_f(r.get('exchange_rate')) or 1.0) for r in elim['valid']),2)
+    intercompany=[{'settlement_ref':r['settlement_ref'],'from_entity':r.get('legal_entity_from'),'to_entity':r.get('legal_entity_to'),
+      'from_branch':r.get('from_branch'),'to_branch':r.get('to_branch'),'amount_base':round(_f(r.get('total_amount'))*(_f(r.get('exchange_rate')) or 1.0),2),
+      'gl_posting_ref':r.get('gl_posting_ref'),'elimination_status':r.get('elimination_status')} for r in elim['valid']]
     revenue=round(sum(x['revenue'] for x in org),2)
     cost=round(sum(x['cost'] for x in org),2)
-    return {'organizations':org,'gross_margin':round(revenue-cost,2),'elimination_total':elimination_total,'consolidated_margin':round(revenue-cost-elimination_total,2),'source':'POSTED_GL_PLUS_GOVERNED_INTERBRANCH_ELIMINATION'}
+    return {'organizations':org,'intercompany':intercompany,'gross_margin':round(revenue-cost,2),'elimination_total':elimination_total,'consolidated_margin':round(revenue-cost-elimination_total,2),'source':'POSTED_GL_PLUS_GOVERNED_INTERBRANCH_ELIMINATION'}
 
 def assert_no_report_override(fields):
     blocked={'Total','Revenue','Cost','Margin','Net Profit','Assets','Liabilities','Equity','Cash Flow','Consolidated Margin','Elimination Total'}
