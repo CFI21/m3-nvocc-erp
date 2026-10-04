@@ -151,6 +151,14 @@ def screen_role_allowed(s,role):
     return not allowed or r in allowed
 
 def _read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope,x_office_scope=None):
+    # FastAPI Header defaults are parameter descriptors when these functions are
+    # invoked directly by the regression suite; normalize them to runtime defaults.
+    if not isinstance(x_role,str): x_role='VIEWER'
+    x_m3_session=x_m3_session if isinstance(x_m3_session,str) else None
+    x_agent_scope=x_agent_scope if isinstance(x_agent_scope,str) else None
+    x_branch_scope=x_branch_scope if isinstance(x_branch_scope,str) else None
+    x_depot_scope=x_depot_scope if isinstance(x_depot_scope,str) else None
+    x_office_scope=x_office_scope if isinstance(x_office_scope,str) else None
     a=scope_actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope)
     if x_office_scope and not a.get('office'): a['office']=x_office_scope
     role=str(a.get('role') or x_role or 'VIEWER').upper()
