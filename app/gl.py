@@ -15,6 +15,7 @@ from .item11_period_reporting_governance import (
     assert_period_close_ready,
     posted_trial_balance,
 )
+from .item13_year_end_governance import enabled as item13_enabled
 from .item10_tax_fx_governance import (
     enabled as item10_enabled,
     validate_tax as item10_validate_tax,
@@ -350,6 +351,8 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
     if item9_enabled() and module=='customer-credit-control': raise HTTPException(405,{'code':'AUTHORITATIVE_CREDIT_CONTROL_READ_ONLY'})
     if item11_enabled() and module=='accounting-periods' and any(k in body.fields for k in ('Status','status','Closed','Locked')):
         raise HTTPException(405,{'code':'PERIOD_STATUS_DIRECT_PATCH_BLOCKED'})
+    if item13_enabled() and module=='fiscal-year' and any(k in body.fields for k in ('Status','status','Closed','Locked')):
+        raise HTTPException(405,{'code':'FISCAL_YEAR_STATUS_DIRECT_PATCH_BLOCKED'})
     role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
