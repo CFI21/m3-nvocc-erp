@@ -322,8 +322,36 @@ CREATE TABLE IF NOT EXISTS gl_cheque_books(
  start_no INTEGER NOT NULL, end_no INTEGER NOT NULL, next_no INTEGER NOT NULL, status TEXT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS gl_budget_lines(
- id INTEGER PRIMARY KEY, fiscal_year INTEGER NOT NULL, period INTEGER NOT NULL, account_code TEXT NOT NULL REFERENCES gl_accounts(account_code),
- amount REAL NOT NULL, UNIQUE(fiscal_year,period,account_code)
+ id INTEGER PRIMARY KEY,
+ budget_ref TEXT UNIQUE,
+ fiscal_year INTEGER NOT NULL,
+ period INTEGER NOT NULL CHECK(period BETWEEN 1 AND 12),
+ account_code TEXT NOT NULL REFERENCES gl_accounts(account_code),
+ amount REAL NOT NULL,
+ scenario TEXT NOT NULL DEFAULT 'BUDGET' CHECK(scenario IN ('BUDGET','FORECAST')),
+ job_ref TEXT,
+ branch_code TEXT,
+ office_code TEXT,
+ country_code TEXT,
+ organization_code TEXT,
+ cost_center TEXT,
+ profit_center TEXT,
+ status TEXT NOT NULL DEFAULT 'DRAFT' CHECK(status IN ('DRAFT','SUBMITTED','APPROVED','REVISED','REJECTED')),
+ requested_by TEXT,
+ requested_at TEXT,
+ approved_by TEXT,
+ approved_at TEXT,
+ revision_no INTEGER NOT NULL DEFAULT 1,
+ parent_budget_ref TEXT,
+ revision_reason TEXT,
+ version INTEGER NOT NULL DEFAULT 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_gl_budget_scope
+ON gl_budget_lines(
+ fiscal_year,period,account_code,scenario,
+ COALESCE(job_ref,''),COALESCE(branch_code,''),COALESCE(office_code,''),
+ COALESCE(country_code,''),COALESCE(organization_code,''),
+ COALESCE(cost_center,''),COALESCE(profit_center,''),revision_no
 );
 CREATE TRIGGER IF NOT EXISTS gl_audit_immutable_update BEFORE UPDATE ON audit_events WHEN OLD.module LIKE 'gl:%'
 BEGIN SELECT RAISE(ABORT,'GL_AUDIT_IMMUTABLE'); END;
