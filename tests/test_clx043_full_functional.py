@@ -37,17 +37,17 @@ def test_verified_dashboards_and_master_audit_are_bound(isolated):
     assert screen_data('master-data::audit',x_role='ADMIN')['count']>0
 
 def test_gl_treasury_mutations_route_to_real_v1_apis():
-    assert action_route('gl-accounts::voucher','approve',1,1)['path'].startswith('/api/v1/gl/')
-    assert action_route('gl-accounts::voucher','edit',1,1)['path'].startswith('/api/v1/gl/')
-    assert action_route('treasury::cashbook','approve',1,1)['path'].startswith('/api/v1/treasury/')
-    assert action_route('treasury::cashbook','edit',1,1)['path'].startswith('/api/v1/treasury/')
+    assert action_route('gl-accounts::voucher','approve',1,1,role='ADMIN')['path'].startswith('/api/v1/gl/')
+    assert action_route('gl-accounts::voucher','edit',1,1,role='ADMIN')['path'].startswith('/api/v1/gl/')
+    assert action_route('treasury::cashbook','approve',1,1,role='ADMIN')['path'].startswith('/api/v1/treasury/')
+    assert action_route('treasury::cashbook','edit',1,1,role='ADMIN')['path'].startswith('/api/v1/treasury/')
 
 def test_no_visible_action_falls_back_to_dead_placeholder():
     mutation={'create','edit','approve','release','hold','cancel','amend','reissue','reverse','retry','activate','deactivate','change-request','reject','advance'}
     for s in build_catalog()['screens']:
         for a in quick_actions(s['screen_id'],'ADMIN')['visible_actions']:
             if a not in mutation: continue
-            route=action_route(s['screen_id'],a,1,1)
+            route=action_route(s['screen_id'],a,1,1,role='ADMIN')
             if s['domain']=='Master Data':
                 assert route['mode']=='EXISTING_GOVERNANCE'
             else:

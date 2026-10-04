@@ -64,7 +64,7 @@ def test_all_eight_operational_personas_have_governed_screen_surface(isolated):
                 accessible+=1
                 visited.add(s["screen_id"])
                 for action in quick_actions(s["screen_id"],role)["visible_actions"]:
-                    route=action_route(s["screen_id"],action,1,1)
+                    route=action_route(s["screen_id"],action,1,1,role=role)
                     if action in {"quick-view","print","export","related-records","audit-history","email"}:
                         assert route["mode"] in {"CLIENT_OR_CLX011","CLX011_SIMULATED"}
                     else:
