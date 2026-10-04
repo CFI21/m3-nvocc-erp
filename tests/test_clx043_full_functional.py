@@ -47,7 +47,7 @@ def test_no_visible_action_falls_back_to_dead_placeholder():
     for s in build_catalog()['screens']:
         for a in quick_actions(s['screen_id'],'ADMIN')['visible_actions']:
             if a not in mutation: continue
-            route=action_route(s['screen_id'],a,1,1)
+            route=action_route(s['screen_id'],a,1,1,role='ADMIN')
             if s['domain']=='Master Data':
                 assert route['mode']=='EXISTING_GOVERNANCE'
             else:
