@@ -14,7 +14,7 @@ def _f(v):
 def _authorized_job_ids(conn,user_id):
     ids=set()
     for r in conn.execute("SELECT id,job_ref FROM jobs ORDER BY id"):
-        if authorize_job(conn,user_id,r['job_ref'],'agent-tasks','view').get('allowed'):
+        if authorize_job(conn,user_id,r['job_ref'],'gl','view').get('allowed'):
             ids.add(r['id'])
     return ids
 
