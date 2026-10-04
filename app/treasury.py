@@ -14,6 +14,11 @@ from .item7_financial_document_governance import (
     enforce_single_reversal,
     enabled as item7_enabled,
 )
+from .item10_tax_fx_governance import (
+    enabled as item10_enabled,
+    validate_multicurrency_settlement,
+    ensure_period_not_tax_filed,
+)
 from .item8_open_item_governance import (
     apply_application,
     reverse_application,
@@ -204,6 +209,9 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
             old=c.execute('SELECT * FROM idempotency_keys WHERE actor_role=? AND idem_key=?',(role,idempotency_key,)).fetchone()
             if old:c.execute('ROLLBACK');return json.loads(old['response_json'])
         j=jid(c,b.job_ref);ext=b.external_ref or b.fields.get(MODULES[module]['fields'][0]) or f'M3-{module[:8].upper()}-{uuid.uuid4().hex[:8].upper()}'
+        if item10_enabled() and module=='multi-currency-settlement':
+            validate_multicurrency_settlement(c,b.fields)
+            ensure_period_not_tax_filed(c,b.fields.get('Date') or '2026-09-23')
         allocation_meta=validate_allocation(c,module,b.fields,j)
         amt=amount_from(b.fields);curr=b.fields.get('Currency') or b.fields.get('Settlement Currency') or 'USD';stat=b.fields.get('Status') or 'Draft'
         sensitive={'supplier-carrier-payment-allocation','payment-batches','advance-payments','customer-refunds','bank-transfer','inter-bank-transfer'}
@@ -233,6 +241,9 @@ def update(module:str,rid:int,b:UpdateBody,x_role:str=Header('VIEWER'),x_actor_i
     try:
         r=getrec(c,module,rid)
         enforce_treasury_update(r['status'],x_m3_session)
+        if item10_enabled() and module=='multi-currency-settlement':
+            validate_multicurrency_settlement(c,b.fields)
+            ensure_period_not_tax_filed(c,b.fields.get('Date') or '2026-09-23')
         if r['version']!=b.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         before=ser(r);stat=b.fields.get('Status') or r['status'];amt=amount_from(b.fields) or r['amount']
         cur=c.execute('UPDATE treasury_records SET payload_json=?,status=?,amount=?,version=version+1,updated_at=? WHERE id=? AND version=?',(json.dumps(b.fields),stat,amt,now(),rid,b.version))
@@ -257,6 +268,9 @@ def action(module:str,rid:int,action:str,b:ActionBody,x_role:str=Header('VIEWER'
             if module=='payment-batches':c.execute('UPDATE treasury_payment_batches SET checker_id=?,status=?,approved_at=?,version=version+1 WHERE record_id=?',(x_actor_id,'Approved',now(),rid))
         elif action=='release':
             if r['status']!='Approved':raise HTTPException(422,{'code':'APPROVAL_REQUIRED_BEFORE_RELEASE'})
+            if item10_enabled() and module=='multi-currency-settlement':
+                validate_multicurrency_settlement(c,p)
+                ensure_period_not_tax_filed(c,p.get('Date') or '2026-09-23')
             if not r['checker_id']:raise HTTPException(422,{'code':'CHECKER_REQUIRED'})
             open_item_meta={}
             if module in {'customer-receipt-allocation','supplier-carrier-payment-allocation'}:

@@ -10,6 +10,12 @@ from .admin import session as iam_session, permission_code as iam_permission_cod
 from .clx034_smart_approval_fast_track import enforce_gl_action
 from .clx044_gl_exact_flow import apply_gl_exact_flow
 from .item9_credit_collection_governance import enabled as item9_enabled
+from .item10_tax_fx_governance import (
+    enabled as item10_enabled,
+    validate_tax as item10_validate_tax,
+    validate_fx_input as item10_validate_fx,
+    ensure_period_not_tax_filed,
+)
 from .item8_open_item_governance import ensure_open_item, apply_document_correction
 from .item7_financial_document_governance import validate_correction
 from .item6_financial_governance import (
@@ -214,7 +220,12 @@ def build_voucher(conn,record_id,fields,jid,source_type,source_ref,status='Draft
     vtype=str(fields.get('Voucher Type') or 'JV').upper(); vno=fields.get('Voucher No.') or next_voucher(conn,vtype)
     lines=fields.get('Account Lines') or []
     curr=fields.get('Currency') or 'USD'; vdate=fields.get('Date') or '2026-09-23'
-    rate=_num(fields.get('Exchange Rate')) or fx_rate(conn,curr,vdate)
+    if item10_enabled():
+        fxmeta=item10_validate_fx(conn,curr,vdate,fields.get('Exchange Rate'),'USD')
+        rate=fxmeta['rate']
+        item10_validate_tax(conn,fields)
+    else:
+        rate=_num(fields.get('Exchange Rate')) or fx_rate(conn,curr,vdate)
     if lines:
         debit_total=sum(_line_amount(x,'Debit (VC)','Debit','Debit(VC)') for x in lines)
         credit_total=sum(_line_amount(x,'Credit (VC)','Credit','Credit(VC)') for x in lines)
@@ -304,6 +315,14 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
                 conn.execute('COMMIT');return JSONResponse(json.loads(prior['response_json']),status_code=prior['status_code'])
         errs=validate(module,body.fields)
         if errs:raise HTTPException(422,{'codes':errs})
+        if item10_enabled():
+            item10_validate_tax(conn,body.fields)
+            curr=body.fields.get('Currency') or 'USD'
+            vdate=body.fields.get('Date') or body.fields.get('Invoice Date') or '2026-09-23'
+            if body.fields.get('Exchange Rate') not in (None,'') or curr!='USD':
+                item10_validate_fx(conn,curr,vdate,body.fields.get('Exchange Rate'),'USD')
+            if any(k in body.fields for k in ('Tax Code','WHT Code','Tax Amount','Taxable Base','Base Amount')):
+                ensure_period_not_tax_filed(conn,vdate)
         jid=job_id(conn,body.job_ref); ext=body.external_ref or f"CLX-GL-{module.upper()}-{uuid.uuid4().hex[:10].upper()}"; status=str(body.fields.get('Status') or 'Draft')
         correction_meta=validate_correction(conn,module,body.fields,jid,body.source_type,body.source_ref)
         if correction_meta:
@@ -328,6 +347,13 @@ def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_s
         if r['version']!=body.version:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         p=json.loads(r['payload_json']);p.update(body.fields);errs=validate(module,p)
         if errs:raise HTTPException(422,{'codes':errs})
+        if item10_enabled():
+            item10_validate_tax(conn,p)
+            curr=p.get('Currency') or 'USD'; vdate=p.get('Date') or p.get('Invoice Date') or '2026-09-23'
+            if p.get('Exchange Rate') not in (None,'') or curr!='USD':
+                item10_validate_fx(conn,curr,vdate,p.get('Exchange Rate'),'USD')
+            if any(k in p for k in ('Tax Code','WHT Code','Tax Amount','Taxable Base','Base Amount')):
+                ensure_period_not_tax_filed(conn,vdate)
         st=str(p.get('Status') or r['status']);cur=conn.execute('UPDATE gl_records SET payload_json=?,status=?,version=version+1,updated_at=? WHERE id=? AND version=?',(json.dumps(p),st,now(),rid,body.version))
         if cur.rowcount!=1:raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
         after=serialize(get_record(conn,module,rid));audit(conn,role,'UPDATE',module,rid,r['job_id'],before,after,{})
@@ -374,6 +400,7 @@ def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEW
             ok,d,c=voucher_balanced(conn,v['id'])
             if not ok:raise HTTPException(422,{'code':'UNBALANCED_VOUCHER','debit':d,'credit':c})
             flow=p.get('Flow') or p.get('Shipment Type') or p.get('Mode')
+            if item10_enabled(): ensure_period_not_tax_filed(conn,v['voucher_date'])
             period,period_gov=assert_period_postable(conn,v['voucher_date'],v['id'],'POST',flow)
             rule=approval_rule(conn,v['voucher_type'],float(v['total_debit'])); needed=int(rule['required_levels']) if rule else 1
             done=approval_count(conn,v['id'])

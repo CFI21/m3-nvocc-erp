@@ -3,6 +3,12 @@ from pydantic import BaseModel
 from typing import Optional
 import datetime,json,uuid
 from .db import connect,tx,backend_name
+from .item10_tax_fx_governance import (
+    enabled as item10_enabled,
+    validate_fx_input as item10_validate_fx,
+    ensure_period_not_tax_filed,
+    validate_fx_event_duplicate,
+)
 from .item9_credit_collection_governance import (
     enabled as item9_enabled,
     refresh_credit_exposure,
@@ -204,6 +210,10 @@ def revalue(b:RevalueBody,x_role:str=Header('VIEWER')):
         p=period_for(c,b.period+'-23'); jid=None
         if b.job_ref:
             j=c.execute('SELECT id FROM jobs WHERE job_ref=?',(b.job_ref,)).fetchone(); jid=j['id'] if j else None
+        if item10_enabled():
+            ensure_period_not_tax_filed(c,b.period+'-23')
+            item10_validate_fx(c,b.currency,b.period+'-23',b.new_rate,'USD')
+            validate_fx_event_duplicate(c,'UNREALIZED',p['id'],jid,b.currency)
         gl=round(b.exposure*(b.new_rate-float(old['rate'])),2); ref='FXR-'+uuid.uuid4().hex[:8].upper()
         c.execute('INSERT INTO gl_fx_events(event_ref,event_type,period_id,job_id,currency,foreign_amount,old_rate,new_rate,gain_loss,status) VALUES(?,?,?,?,?,?,?,?,?,?)',(ref,'UNREALIZED',p['id'],jid,b.currency,b.exposure,float(old['rate']),b.new_rate,gl,'Calculated'))
         audit(c,r,'REVALUE','fx',{'ref':ref,'gain_loss':gl}); c.execute('COMMIT'); return {'event_ref':ref,'gain_loss':gl,'old_rate':old['rate'],'new_rate':b.new_rate}

@@ -338,7 +338,7 @@ CREATE TABLE IF NOT EXISTS gl_fiscal_years(
 CREATE TABLE IF NOT EXISTS gl_periods(
  id INTEGER PRIMARY KEY, fiscal_year_id INTEGER NOT NULL REFERENCES gl_fiscal_years(id), period_no INTEGER NOT NULL,
  start_date TEXT NOT NULL, end_date TEXT NOT NULL, status TEXT NOT NULL CHECK(status IN ('OPEN','CLOSED','LOCKED','FUTURE')),
- backdate_allowed_until TEXT, closed_at TEXT, locked_at TEXT, version INTEGER NOT NULL DEFAULT 1,
+ backdate_allowed_until TEXT, closed_at TEXT, locked_at TEXT, tax_filed_at TEXT, tax_filed_by TEXT, version INTEGER NOT NULL DEFAULT 1,
  UNIQUE(fiscal_year_id,period_no)
 );
 CREATE TABLE IF NOT EXISTS gl_backdate_controls(
@@ -406,7 +406,8 @@ CREATE TABLE IF NOT EXISTS gl_bank_matches(
 CREATE TABLE IF NOT EXISTS gl_tax_postings(
  id INTEGER PRIMARY KEY, posting_ref TEXT NOT NULL UNIQUE, tax_type TEXT NOT NULL, source_ref TEXT NOT NULL, job_id INTEGER REFERENCES jobs(id),
  taxable_amount REAL NOT NULL, tax_amount REAL NOT NULL, debit_account TEXT NOT NULL REFERENCES gl_accounts(account_code),
- credit_account TEXT NOT NULL REFERENCES gl_accounts(account_code), voucher_no TEXT, status TEXT NOT NULL
+ credit_account TEXT NOT NULL REFERENCES gl_accounts(account_code), voucher_no TEXT, status TEXT NOT NULL,
+ tax_code TEXT, jurisdiction TEXT, treatment TEXT, rate REAL, rate_source TEXT, source_currency TEXT, base_currency TEXT DEFAULT 'USD', exchange_rate REAL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS gl_period_close_checks(
  id INTEGER PRIMARY KEY, period_id INTEGER NOT NULL REFERENCES gl_periods(id), check_code TEXT NOT NULL, check_name TEXT NOT NULL,
