@@ -1,0 +1,37 @@
+name: M3 Controlled Real-User Daily UAT
+
+on:
+  pull_request:
+    paths:
+      - "app/**"
+      - "web/**"
+      - "M3_LIVE_OPERATIONS_RUNBOOK.md"
+      - "tests/test_m3_controlled_real_user_daily_uat.py"
+      - ".github/workflows/m3-controlled-real-user-daily-uat.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  real-user-daily-uat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt pytest
+      - run: python -m py_compile app/*.py
+      - name: Controlled real-user daily operations UAT
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_controlled_real_user_daily_uat.py
+      - name: Final production operations regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_final_production_operations_acceptance.py
+      - name: Operational role regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_clx050_operational_uat.py
+      - name: Mutation governance regression
+        env: {PYTHONPATH: .}
+        run: pytest -q tests/test_m3_final_mutation_governance_regression.py
