@@ -33,7 +33,7 @@ def test_followup_reuses_existing_authoritative_screens():
         assert sid in HTML
 
 def test_visible_reference_setup_flow_is_navigation_only():
-    assert '▾ Setup <span class=count>2</span>' in HTML
+    assert '▾ Setup <span class=count>4</span>' in HTML
     assert 'Account Setup' in HTML
     assert "gl-accounts::account-integration" in HTML
     assert 'Container Coding' in HTML

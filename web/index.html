@@ -155,10 +155,12 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
   const setupTarget=state.byId['gl-accounts::account-integration'];
   const setupAllowed=setupTarget&&screenAllowed(setupTarget);
   if(setupAllowed){
-    subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-reference-setup\')">▾ Setup <span class=count>2</span></button><div data-content="ho-reference-setup">'+
+    subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-reference-setup\')">▾ Setup <span class=count>4</span></button><div data-content="ho-reference-setup">'+
       '<div class="screenLink '+(state.navContext?.label==='Account Setup'?'active':'')+'" onclick="openScreen(\'gl-accounts::account-integration\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Account Setup\'})">Account Setup</div>'+
-      '<div class="screenLink '+(state.equipmentView==='containers'?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Coding</div></div>';
-    dcount+=2;
+      '<div class="screenLink '+(state.equipmentView==='containers'?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Coding</div>'+
+      '<div class="screenLink '+(state.navContext?.label==='Rates Management'?'active':'')+'" onclick="openScreen(\'agent-tasks::special-rates-request\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Rates Management\'})">Rates Management</div>'+
+      '<div class="screenLink '+(state.navContext?.label==='Auto SOA'?'active':'')+'" onclick="openScreen(\'agent-tasks::soa\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Auto SOA\'})">Auto SOA</div></div>';
+    dcount+=4;
   }
   subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-equipment-control\')">▾ Equipment Control <span class=count>6</span></button><div data-content="ho-equipment-control">'+
     '<div class="screenLink '+(state.equipmentView==='tower'?'active':'')+'" onclick="showEquipmentWorkspace(\'tower\')">Global Equipment Tower</div>'+
