@@ -170,6 +170,7 @@ def _read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope
     return a
 
 def _job_scope_clause(a,customer_scope=None,alias='j'):
+    customer_scope=customer_scope if isinstance(customer_scope,str) and customer_scope else None
     role=str(a.get('role') or 'VIEWER').upper()
     # Global/read-audit roles retain their accepted visibility. Scoped operational
     # roles inherit only the scope dimensions already carried by IAM/runtime headers.
