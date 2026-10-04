@@ -1,7 +1,7 @@
 import os, json, datetime
 from fastapi import HTTPException
-from .item11_period_reporting_governance import posted_trial_balance, close_check_status
-from .item12_reporting_consolidation_governance import validate_interbranch_eliminations
+from .item11_period_reporting_governance import close_check_status
+from .item12_reporting_consolidation_governance import validate_interbranch_eliminations, trial_balance as item12_trial_balance
 
 def enabled():
     return os.getenv('M3_ITEM13_YEAR_END_GOVERNANCE_ENABLED','false').lower()=='true'
@@ -28,7 +28,7 @@ def year_end_readiness(conn,fiscal_year):
         if failed:blockers.append({'code':'YEAR_END_CLOSE_CHECKS_FAILED','checks':failed})
         if not p12.get('tax_filed_at'):
             blockers.append({'code':'YEAR_END_TAX_FILED_EVIDENCE_REQUIRED','period_id':p12['id']})
-    tb=posted_trial_balance(conn)
+    tb=item12_trial_balance(conn,period=str(fiscal_year))
     if not tb['balanced']:blockers.append({'code':'YEAR_END_TRIAL_BALANCE_UNBALANCED','debit':tb['total_debit'],'credit':tb['total_credit']})
     unmatched=conn.execute("SELECT COUNT(*) n FROM gl_bank_statement_items WHERE matched=0 AND txn_date BETWEEN ? AND ?",(fy['start_date'],fy['end_date'])).fetchone()['n']
     if unmatched:blockers.append({'code':'YEAR_END_BANK_UNMATCHED','count':unmatched})
@@ -83,6 +83,11 @@ def generate_opening_balances(conn,fiscal_year,actor_user_ref):
     fy=year(conn,fiscal_year); next_year=fiscal_year+1
     existing=conn.execute("SELECT COUNT(*) n FROM gl_records WHERE module='opening-balance' AND external_ref LIKE ?",(f'YECF-{next_year}-%',)).fetchone()['n']
     if existing:raise HTTPException(409,{'code':'DUPLICATE_YEAR_END_CARRY_FORWARD','existing':existing})
+    for r in conn.execute("SELECT external_ref,payload_json FROM gl_records WHERE module='opening-balance'"):
+        try:p=json.loads(r['payload_json'] or '{}')
+        except Exception:p={}
+        if str(p.get('Period') or '').startswith(str(next_year)):
+            raise HTTPException(409,{'code':'DUPLICATE_OPENING_BALANCE','existing_ref':r['external_ref'],'period':p.get('Period')})
     rows=carry_forward_rows(conn,fiscal_year)
     re=retained_earnings_amount(conn,fiscal_year)
     retained=fy['retained_earnings_account'] or '3000'
