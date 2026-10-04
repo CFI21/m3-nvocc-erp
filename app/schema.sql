@@ -333,7 +333,9 @@ BEGIN SELECT RAISE(ABORT,'GL_AUDIT_IMMUTABLE'); END;
 -- CLX-006 GL HARDENING + MONTH-END CONTROL
 CREATE TABLE IF NOT EXISTS gl_fiscal_years(
  id INTEGER PRIMARY KEY, fiscal_year INTEGER NOT NULL UNIQUE, start_date TEXT NOT NULL, end_date TEXT NOT NULL,
- status TEXT NOT NULL CHECK(status IN ('OPEN','CLOSED','LOCKED')), version INTEGER NOT NULL DEFAULT 1
+ status TEXT NOT NULL CHECK(status IN ('OPEN','CLOSED','LOCKED')),
+ closed_at TEXT, closed_by TEXT, locked_at TEXT, locked_by TEXT, reopened_at TEXT, reopened_by TEXT, reopen_reason TEXT,
+ retained_earnings_account TEXT DEFAULT '3000', carry_forward_ref TEXT, version INTEGER NOT NULL DEFAULT 1
 );
 CREATE TABLE IF NOT EXISTS gl_periods(
  id INTEGER PRIMARY KEY, fiscal_year_id INTEGER NOT NULL REFERENCES gl_fiscal_years(id), period_no INTEGER NOT NULL,
