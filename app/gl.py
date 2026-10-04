@@ -10,6 +10,11 @@ from .admin import session as iam_session, permission_code as iam_permission_cod
 from .clx034_smart_approval_fast_track import enforce_gl_action
 from .clx044_gl_exact_flow import apply_gl_exact_flow
 from .item9_credit_collection_governance import enabled as item9_enabled
+from .item11_period_reporting_governance import (
+    enabled as item11_enabled,
+    assert_period_close_ready,
+    posted_trial_balance,
+)
 from .item10_tax_fx_governance import (
     enabled as item10_enabled,
     validate_tax as item10_validate_tax,
@@ -277,7 +282,10 @@ def health():return {'project':'M3 NVOCC ERP','baseline':'M3-CLX006-REBRAND-2026
 def modules():return ALL
 @router.get('/trial-balance')
 def trial_balance(x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    actor(x_role,'view',x_m3_session); conn=connect(); rows=[dict(r) for r in conn.execute('''SELECT a.account_code,a.account_name,a.account_type,ROUND(COALESCE(SUM(l.debit),0),2) debit,ROUND(COALESCE(SUM(l.credit),0),2) credit,ROUND(COALESCE(SUM(l.debit-l.credit),0),2) balance FROM gl_accounts a LEFT JOIN gl_voucher_lines l ON l.account_code=a.account_code LEFT JOIN gl_vouchers v ON v.id=l.voucher_id AND v.status IN ('Posted','Approved') GROUP BY a.id ORDER BY a.account_code''')]; conn.close(); return rows
+    actor(x_role,'view',x_m3_session); conn=connect()
+    if item11_enabled():
+        rows=posted_trial_balance(conn)['rows'];conn.close();return rows
+    rows=[dict(r) for r in conn.execute('''SELECT a.account_code,a.account_name,a.account_type,ROUND(COALESCE(SUM(l.debit),0),2) debit,ROUND(COALESCE(SUM(l.credit),0),2) credit,ROUND(COALESCE(SUM(l.debit-l.credit),0),2) balance FROM gl_accounts a LEFT JOIN gl_voucher_lines l ON l.account_code=a.account_code LEFT JOIN gl_vouchers v ON v.id=l.voucher_id AND v.status IN ('Posted','Approved') GROUP BY a.id ORDER BY a.account_code''')]; conn.close(); return rows
 @router.get('/job/{job_ref}/links')
 def job_links(job_ref:str,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     actor(x_role,'view',x_m3_session); conn=connect(); j=conn.execute('SELECT id,booking_id FROM jobs WHERE job_ref=?',(job_ref,)).fetchone()
@@ -340,6 +348,8 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
 def update(module:str,rid:int,body:UpdateBody,x_role:str=Header('VIEWER'),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module)
     if item9_enabled() and module=='customer-credit-control': raise HTTPException(405,{'code':'AUTHORITATIVE_CREDIT_CONTROL_READ_ONLY'})
+    if item11_enabled() and module=='accounting-periods' and any(k in body.fields for k in ('Status','status','Closed','Locked')):
+        raise HTTPException(405,{'code':'PERIOD_STATUS_DIRECT_PATCH_BLOCKED'})
     role=actor(x_role,'edit',x_m3_session,module);conn=connect();tx(conn)
     try:
         r=get_record(conn,module,rid);before=serialize(r)
@@ -418,6 +428,9 @@ def action(module:str,rid:int,action:str,body:ActionBody,x_role:str=Header('VIEW
             if period_no<1 or period_no>12:raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_NUMBER_REQUIRED'})
             period=conn.execute('SELECT * FROM gl_periods WHERE period_no=? ORDER BY id DESC LIMIT 1',(period_no,)).fetchone()
             if not period:raise HTTPException(422,{'code':'ACCOUNTING_PERIOD_ENGINE_RECORD_MISSING'})
+            if item11_enabled():
+                if str(period['status']).upper()=='CLOSED':raise HTTPException(409,{'code':'PERIOD_ALREADY_CLOSED'})
+                assert_period_close_ready(conn,period['id'])
             conn.execute("UPDATE gl_periods SET status='CLOSED' WHERE id=?",(period['id'],));st='CLOSED';p['Status']=st;meta.update({'period_no':period_no,'period_closed':True})
         elif action=='reverse':
             if module!='voucher':raise HTTPException(422,{'code':'REVERSE_ONLY_VOUCHER'})
