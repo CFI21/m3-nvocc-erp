@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from .db import connect, using_postgres
 from .admin import session as iam_session, permission_code as iam_permission_code
+from .bulk_permission_governance import authorize_job
 from .item12_reporting_consolidation_governance import (
     enabled as item12_enabled,
     scoped_pnl,
@@ -231,7 +232,21 @@ def bl_linkage(job_ref:str,x_role:str=Header("VIEWER")):
     c.close();return {"job_ref":job_ref,"bills":bills,"documents":tx,"carrier_customer_finance":gl,"parallel_tracks":True}
 
 @router.get("/branch-pnl")
-def branch_pnl(branch_code:Optional[str]=None,x_role:str=Header("VIEWER")):
+def branch_pnl(branch_code:Optional[str]=None,x_role:str=Header("VIEWER"),x_m3_session:Optional[str]=Header(None,alias="X-M3-Session")):
+    if item12_enabled():
+        c=connect();_ensure(c)
+        try:
+            sess=iam_session(c,x_m3_session)
+            if not iam_permission_code(c,sess['user_id'],'GL_VIEW',sess['office_code']):
+                raise HTTPException(403,{"code":"GL_VIEW_REQUIRED"})
+            rows=scoped_pnl(c,'branch_code',user_id=sess['user_id'])
+            if branch_code:
+                exists=c.execute("SELECT 1 FROM jobs WHERE branch_code=? LIMIT 1",(branch_code,)).fetchone()
+                scoped=[r for r in rows if r['scope']==branch_code]
+                if exists and not scoped: raise HTTPException(403,{"code":"REPORT_SCOPE_DENIED","branch_code":branch_code})
+                rows=scoped
+            return {"scope":"BRANCH_PNL","branch":branch_code,"rows":rows,"source":"POSTED_GL","read_only":True}
+        finally:c.close()
     if x_role.upper() not in {"ADMIN","SUPER_ADMIN","FINANCE","GL_MANAGER","GL_ACCOUNTANT","AUDITOR","VIEWER"}: raise HTTPException(403,"Role not allowed")
     c=connect();_ensure(c)
     where=" WHERE status IN ('APPROVED','SETTLED','POSTED')" + (" AND (from_branch=? OR to_branch=?)" if branch_code else "")
@@ -249,3 +264,52 @@ def branch_pnl(branch_code:Optional[str]=None,x_role:str=Header("VIEWER")):
         a["group_effect_after_elimination"]=round(a["branch_margin"]-(a["elimination"] if a["branch_margin"]>0 else -a["elimination"]),2)
     c.close()
     return {"scope":"INTER_BRANCH_COMPONENT","branch":branch_code,"rows":list(agg.values()),"note":"External job revenue/cost continues to come from authoritative GL/job profitability; this view adds the missing internal/inter-company component and elimination control."}
+
+@router.post("/interbranch-settlements/{settlement_ref}/elimination/request")
+def request_interbranch_elimination(settlement_ref:str,b:WorkspaceWrite,x_m3_session:Optional[str]=Header(None,alias="X-M3-Session")):
+    if not item12_enabled(): raise HTTPException(404,"Item 12 governance disabled")
+    c=connect();_ensure(c)
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'GL_EDIT',sess['office_code']):
+            raise HTTPException(403,{"code":"GL_EDIT_REQUIRED"})
+        row=c.execute("SELECT * FROM nvocc_interbranch_settlements WHERE settlement_ref=?",(settlement_ref,)).fetchone()
+        if not row: raise HTTPException(404,{"code":"INTERBRANCH_SETTLEMENT_NOT_FOUND"})
+        access=authorize_job(c,sess['user_id'],row['job_ref'],'agent-tasks','view')
+        if not access.get('allowed'): raise HTTPException(403,{"code":"REPORT_SCOPE_DENIED","job_ref":row['job_ref']})
+        before=dict(row)
+        out=request_elimination(c,settlement_ref,sess['user_ref'],b.data.get('reason'))
+        _audit(c,sess['user_ref'],access['job'].get('branch_code'),'interbranch-settlement',settlement_ref,'ELIMINATION_REQUEST',before,out)
+        return {"ok":True,"record":out}
+    finally:c.close()
+
+@router.post("/interbranch-settlements/{settlement_ref}/elimination/approve")
+def approve_interbranch_elimination(settlement_ref:str,x_m3_session:Optional[str]=Header(None,alias="X-M3-Session")):
+    if not item12_enabled(): raise HTTPException(404,"Item 12 governance disabled")
+    c=connect();_ensure(c)
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'FINANCE_CONFIG_ADMIN',sess['office_code']):
+            raise HTTPException(403,{"code":"FINANCE_CONFIG_ADMIN_REQUIRED"})
+        row=c.execute("SELECT * FROM nvocc_interbranch_settlements WHERE settlement_ref=?",(settlement_ref,)).fetchone()
+        if not row: raise HTTPException(404,{"code":"INTERBRANCH_SETTLEMENT_NOT_FOUND"})
+        access=authorize_job(c,sess['user_id'],row['job_ref'],'agent-tasks','view')
+        if not access.get('allowed'): raise HTTPException(403,{"code":"REPORT_SCOPE_DENIED","job_ref":row['job_ref']})
+        before=dict(row)
+        out=approve_elimination(c,settlement_ref,sess['user_ref'])
+        _audit(c,sess['user_ref'],access['job'].get('branch_code'),'interbranch-settlement',settlement_ref,'ELIMINATION_APPROVE',before,out)
+        return {"ok":True,"record":out}
+    finally:c.close()
+
+@router.get("/consolidated-reporting")
+def consolidated_report(period:Optional[str]=None,x_m3_session:Optional[str]=Header(None,alias="X-M3-Session")):
+    if not item12_enabled(): raise HTTPException(404,"Item 12 governance disabled")
+    c=connect();_ensure(c)
+    try:
+        sess=iam_session(c,x_m3_session)
+        if not iam_permission_code(c,sess['user_id'],'GL_VIEW',sess['office_code']):
+            raise HTTPException(403,{"code":"GL_VIEW_REQUIRED"})
+        out=consolidated_reporting(c,period=period,user_id=sess['user_id'])
+        return {**out,"period":period,"read_only":True}
+    finally:c.close()
+
