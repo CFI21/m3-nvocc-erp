@@ -56,7 +56,7 @@ def test_complete_daily_role_surface(isolated):
       ("DOCS",["agent-tasks::bl","agent-tasks::switch-bl","agent-tasks::split-bl","agent-tasks::import-bl"]),
       ("FINANCE",["agent-tasks::special-rates-request","agent-tasks::agent-receipt-pay","agent-tasks::soa"]),
       ("GL_ACCOUNTANT",["gl-accounts::invoice","gl-accounts::bills","gl-accounts::voucher"]),
-      ("TREASURY",["treasury::treasury-dashboard","treasury::bank-reconciliation"]),
+      ("TREASURY",["treasury::treasury-dashboard","treasury::bank-reconciliation-exception-queue"]),
     ]
     for role,screens in daily:
         for sid in screens:
