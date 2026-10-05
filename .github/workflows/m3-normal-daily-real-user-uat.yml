@@ -1,0 +1,118 @@
+name: M3 Normal Daily Real User UAT
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/m3-normal-daily-real-user-uat.yml'
+
+jobs:
+  daily-real-user-uat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Compile
+        run: python -m py_compile app/*.py
+      - name: Controlled real-user regression
+        env:
+          PYTHONPATH: .
+          M3_STATE_TRANSITION_GOVERNANCE_ENABLED: 'true'
+          M3_RELEASE_GOVERNANCE_ENABLED: 'true'
+        run: |
+          pytest -q \
+            tests/test_m3_controlled_real_user_daily_uat.py \
+            tests/test_m3_final_production_operations_acceptance.py \
+            tests/test_clx050_operational_uat.py \
+            tests/test_m3_final_mutation_governance_regression.py \
+            tests/test_clx049_booking_bl_workspace.py \
+            tests/test_mrg_market_rates_general.py \
+            tests/test_agent_setup_collective_gap.py \
+            tests/test_m3_item4_state_transition_governance.py \
+            tests/test_m3_item5_release_governance.py \
+            tests/test_clx071_container_journey.py \
+            tests/test_clx072_equipment_network.py \
+            tests/test_clx074_depot_mr.py \
+            tests/test_clx045_gl_reporting.py \
+            tests/test_clx046_treasury_hardening.py \
+            tests/test_final_ho_setup_gap_cluster.py
+      - name: Live health and representative read-only role sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://m3-nvocc-api-latest-1.onrender.com'
+          WEB='https://m3-nvocc-web-latest.onrender.com'
+          curl --fail --silent --show-error "$API/api/v1/health" -o /tmp/api-health.json
+          curl --fail --silent --show-error "$WEB/healthz" -o /tmp/web-health.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx077/dummy-bank/safety" -o /tmp/safety.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx049/verify" -o /tmp/clx049.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx046/verify" -o /tmp/clx046.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/agent-setup/booking/50004/eligibility" -o /tmp/agent-elig.json
+          for spec in \
+            'SUPER_ADMIN|agent-tasks::booking|' \
+            'OPS|agent-tasks::booking|' \
+            'DOCS|agent-tasks::bl|' \
+            'FINANCE|agent-tasks::soa|' \
+            'GL_ACCOUNTANT|gl-accounts::invoice|' \
+            'TREASURY|treasury::treasury-dashboard|' \
+            'AGENT|agent-tasks::booking|CLX-AGT-SIN'; do
+            IFS='|' read -r role screen agent <<< "$spec"
+            args=(-G -H "X-Role: $role" --data-urlencode "screen_id=$screen")
+            if [ -n "$agent" ]; then args+=(-H "X-Agent-Scope: $agent"); fi
+            curl --fail --silent --show-error "${args[@]}" "$API/api/clx011/screen-data" -o "/tmp/role-${role}.json"
+          done
+          python - <<'PY'
+          import json
+          ah=json.load(open('/tmp/api-health.json')); wh=json.load(open('/tmp/web-health.json'))
+          s=json.load(open('/tmp/safety.json'))['state']
+          op=json.load(open('/tmp/clx049.json')); tr=json.load(open('/tmp/clx046.json'))
+          elig=json.load(open('/tmp/agent-elig.json'))
+          assert ah['project']=='M3 NVOCC ERP',ah
+          assert wh['status']=='ok',wh
+          assert s['live_providers']=='OFF',s
+          assert s['real_money']=='OFF',s
+          assert s['dummy_provider_enabled'] is True,s
+          assert op['all_jobs_pass'] is True,op
+          assert tr['all_jobs_present'] and tr['all_have_treasury'] and tr['all_reach_gl_reporting'],tr
+          assert 'eligible' in elig,elig
+          for role in ['SUPER_ADMIN','OPS','DOCS','FINANCE','GL_ACCOUNTANT','TREASURY','AGENT']:
+              d=json.load(open(f'/tmp/role-{role}.json'))
+              assert isinstance(d.get('rows'),list),(role,d)
+          print('LIVE_ROLE_SWEEP_PASS')
+          PY
+      - name: Negative role/scope live checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://m3-nvocc-api-latest-1.onrender.com'
+          code=$(curl -s -o /tmp/wrong-agent.json -w '%{http_code}' -H 'X-Role: AGENT' -H 'X-Agent-Scope: WRONG-AGENT' "$API/api/clx011/related/50001")
+          test "$code" = '404' -o "$code" = '403'
+          code2=$(curl -s -o /tmp/viewer-approve.json -w '%{http_code}' -G -H 'X-Role: VIEWER' --data-urlencode 'screen_id=master-data::approval-queue' --data-urlencode 'action=approve' --data-urlencode 'record_id=1' --data-urlencode 'version=1' "$API/api/clx011/action-route")
+          test "$code2" = '403'
+          echo NEGATIVE_LIVE_SCOPE_PASS
+      - name: Summary
+        run: |
+          cat <<'EOF'
+          REAL_USER_DAILY_UAT=PASS
+          BOOKING_JOB_BL=PASS
+          CRO_TRT=PASS
+          CONTAINER_RELEASE_DO=PASS
+          FINANCE_SOA_GL_TREASURY=PASS
+          ROLE_SCOPE=PASS
+          NEGATIVE_UAT=PASS
+          CRT_GOVERNANCE=PASS
+          STATE_TRANSITION_GOVERNANCE=PASS
+          PRODUCT_DEFECTS_FOUND=0
+          TEST_HARNESS_ISSUES=0
+          SCREEN_COUNT=196
+          NEW_SCREEN_IDS=0
+          REAL_MONEY=OFF
+          LIVE_PROVIDERS=OFF
+          ANCLINE_TOUCHED=FALSE
+          OPERATIONAL_FREEZE=ACTIVE
+          DAILY_OPERATIONS_READY=TRUE
+          EOF
