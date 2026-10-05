@@ -260,7 +260,7 @@ async function renderMrgWorkspace(){
   try{
     const u=slotRateMode?'/api/mrg/rules?rate_side=COST':(mrgWorkspaceType==='REPORT'?('/api/mrg/report'+mrgReportQuery()):('/api/mrg/rules?mrg_type='+encodeURIComponent(mrgWorkspaceType)));
     const d=await mrgApi(u);mrgRows=d.records||[];
-    if(slotRateMode)mrgRows=mrgRows.filter(r=>r.rate_side==='COST'&&['GENERAL','EXPORT','TRANSSHIPMENT'].includes(r.mrg_type)&&r.charge_type==='SLOT'&&['CARRIER','PRINCIPAL','OTHER'].includes(r.party_type));
+    if(slotRateMode)mrgRows=mrgRows.filter(r=>r.rate_side==='COST'&&['GENERAL','EXPORT','TRANSSHIPMENT'].includes(r.mrg_type)&&(r.charge_type==='SLOT'||r.charge_code==='OFR')&&['CARRIER','PRINCIPAL','OTHER'].includes(r.party_type));
     const toolbar='<div class="toolbar"><b>'+esc(mrgWorkspaceLabel)+'</b><span class="muted">One shared MRG model · '+mrgRows.length+' rule(s)</span><span class="grow"></span>'+
       (slotRateMode?'<button class="btn primary" onclick="mrgNewRule()">New Slot Rate</button>':(mrgWorkspaceType==='REPORT'?'<button class="btn" onclick="mrgResetReport()">Reset Filters</button>':'<button class="btn primary" onclick="mrgNewRule()">New Rate</button>'))+
       (slotRateMode?'':'<button class="btn" onclick="mrgWorkspaceType=\'REPORT\';mrgWorkspaceLabel=\'MRG List / Report\';renderMrgWorkspace()">List / Report</button>')+'</div>';
