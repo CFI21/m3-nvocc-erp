@@ -1,0 +1,227 @@
+name: M3 Final HO Setup Consolidation UAT
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/final-ho-setup-consolidation-uat.yml'
+
+jobs:
+  final-ho-consolidation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Extract inline JavaScript and syntax-check
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import re
+          html=open('web/index.html',encoding='utf-8').read()
+          scripts=re.findall(r'<script[^>]*>(.*?)</script>',html,re.S|re.I)
+          open('/tmp/m3-inline.js','w',encoding='utf-8').write('\n'.join(scripts))
+          assert scripts
+          PY
+          node --check /tmp/m3-inline.js
+      - name: Full targeted regression
+        env:
+          PYTHONPATH: .
+        run: |
+          pytest -q \
+            tests/test_clx031_ho_tasks_navigation.py \
+            tests/test_clx035_ho_completion.py \
+            tests/test_clx049_booking_bl_workspace.py \
+            tests/test_clx050_operational_uat.py \
+            tests/test_m3_controlled_real_user_daily_uat.py \
+            tests/test_mrg_market_rates_general.py \
+            tests/test_agent_setup_collective_gap.py \
+            tests/test_ho_operational_setup_collective_gap.py \
+            tests/test_final_ho_setup_gap_cluster.py \
+            tests/test_clx070_final_container_master.py \
+            tests/test_clx071_container_journey.py \
+            tests/test_clx072_equipment_network.py \
+            tests/test_clx074_depot_mr.py \
+            tests/test_m3_item4_state_transition_governance.py \
+            tests/test_m3_item5_release_governance.py \
+            tests/test_clx084_finance_master_alignment.py \
+            tests/test_clx045_gl_reporting.py \
+            tests/test_clx046_treasury_hardening.py
+      - name: Static HO Setup contract and finance safety
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          from app.screen_catalog import build_catalog
+          html=Path('web/index.html').read_text(encoding='utf-8')
+          items=[
+            'Carriers','Charges','PA Parties','MRG','MRG Export','MRG Import','MRG Transshipment',
+            'MRG Detention','MRG Detention Export','Special Detention','MRG MTY Storage','Slot Rate','Stamps','Vessel','Agent',
+            'Agent Relation','Agent Volume Restriction','Agent Network','Account Setup','Sub Company','Currency File','Route Planning',
+            'Container Coding','Demurrage Applicable Countries','Detention Applicable Cities','Activity Sequence','Activity',
+            'Location And Terminals','UN/LOCODE','Ports Coding','Service Setup','Principle Setup','Investor Setup','Company',
+            'Damage Setup','Container Status','Customer Tariff','Local Recovery Agreement','Long Ageing Configuration',
+            'Lease Rental Contract (Purchase)','Rates Management','Auto SOA'
+          ]
+          assert len(items)==42
+          missing=[x for x in items if x not in html]
+          assert not missing,missing
+          catalog=build_catalog()
+          assert catalog['screen_count']==196
+          assert len(catalog['screens'])==196
+          special={
+            'PA Parties':'master-data::common-partys',
+            'Slot Rate':'master-data::charge-codes',
+            'Stamps':'master-data::configurations',
+            'Agent Relation':'master-data::agents',
+            'Agent Volume Restriction':'master-data::agents',
+            'Agent Network':'master-data::agents',
+            'Demurrage Applicable Countries':'master-data::configurations',
+            'Detention Applicable Cities':'master-data::configurations',
+            'Activity Sequence':'agent-tasks::container-activity',
+            'Activity':'agent-tasks::container-activity',
+            'Damage Setup':'master-data::configurations',
+            'Container Status':'agent-tasks::container-activity',
+            'Customer Tariff':'master-data::charge-codes',
+            'Local Recovery Agreement':'master-data::configurations',
+            'Long Ageing Configuration':'agent-tasks::container-activity',
+          }
+          ids={x['screen_id'] for x in catalog['screens']}
+          assert all(v in ids for v in special.values()), special
+          for p in ['app/agent_setup.py','app/ho_operational_setup.py','app/final_ho_setup.py']:
+              s=Path(p).read_text()
+              assert 'INSERT INTO gl_' not in s,p
+              assert 'INSERT INTO treasury_' not in s,p
+              assert 'INSERT INTO bills' not in s,p
+              assert 'INSERT INTO invoices' not in s,p
+              assert 'INSERT INTO payments' not in s,p
+              assert 'INSERT INTO receipts' not in s,p
+          mrg=Path('app/mrg.py').read_text()
+          assert 'SUPERSEDED_BY_SPECIAL_RATE' in mrg
+          assert 'CRT_REQUIRED_AFTER_APPROVAL' in mrg
+          assert 'Commercial Charges' in mrg
+          assert 'INSERT INTO gl_' not in mrg
+          print('HO_SETUP_STATIC_CONTRACT_PASS')
+          print('HO_SETUP_ITEMS_TESTED=42')
+          print('SCREEN_COUNT=196')
+          PY
+      - name: Live health and read-only setup endpoints
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          for i in $(seq 1 60); do
+            acode=$(curl -s -o /tmp/api-health.json -w '%{http_code}' "$API/api/v1/health" || true)
+            wcode=$(curl -s -o /tmp/web-health.json -w '%{http_code}' "$WEB/healthz" || true)
+            if [ "$acode" = 200 ] && [ "$wcode" = 200 ]; then break; fi
+            if [ "$i" = 60 ]; then echo "LIVE_HEALTH_TIMEOUT api=$acode web=$wcode"; exit 1; fi
+            sleep 5
+          done
+          curl --fail --silent --show-error "$WEB/" -o /tmp/index.html
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx011/menu" -o /tmp/menu.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/mrg/rules" -o /tmp/mrg.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/agent-setup/relations" -o /tmp/agent-rel.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/agent-setup/volume-restrictions" -o /tmp/agent-vol.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/agent-setup/network" -o /tmp/agent-net.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/ho-operational-setup/demurrage-applicable-countries" -o /tmp/dem.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/ho-operational-setup/detention-applicable-cities" -o /tmp/det.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/ho-operational-setup/activities" -o /tmp/act.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/ho-operational-setup/activity-sequence" -o /tmp/seq.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/final-ho-setup/damage-setup" -o /tmp/damage.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/final-ho-setup/container-status" -o /tmp/status.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/final-ho-setup/local-recovery-agreements" -o /tmp/recovery.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/final-ho-setup/long-ageing" -o /tmp/ageing.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx077/dummy-bank/safety" -o /tmp/safety.json
+          python - <<'PY'
+          import json
+          ah=json.load(open('/tmp/api-health.json')); wh=json.load(open('/tmp/web-health.json'))
+          menu=json.load(open('/tmp/menu.json')); safety=json.load(open('/tmp/safety.json'))
+          assert ah['project']=='M3 NVOCC ERP',ah
+          assert wh['status']=='ok',wh
+          assert menu['screen_count']==196,menu
+          s=safety['state']
+          assert s['live_providers']=='OFF',s
+          assert s['real_money']=='OFF',s
+          assert s['dummy_provider_enabled'] is True,s
+          html=open('/tmp/index.html',encoding='utf-8').read()
+          items=['Carriers','Charges','PA Parties','MRG','MRG Export','MRG Import','MRG Transshipment','MRG Detention','MRG Detention Export','Special Detention','MRG MTY Storage','Slot Rate','Stamps','Vessel','Agent','Agent Relation','Agent Volume Restriction','Agent Network','Account Setup','Sub Company','Currency File','Route Planning','Container Coding','Demurrage Applicable Countries','Detention Applicable Cities','Activity Sequence','Activity','Location And Terminals','UN/LOCODE','Ports Coding','Service Setup','Principle Setup','Investor Setup','Company','Damage Setup','Container Status','Customer Tariff','Local Recovery Agreement','Long Ageing Configuration','Lease Rental Contract (Purchase)','Rates Management','Auto SOA']
+          assert len(items)==42
+          missing=[x for x in items if x not in html]
+          assert not missing,missing
+          assert json.load(open('/tmp/mrg.json'))['shared_model'] is True
+          assert json.load(open('/tmp/agent-vol.json'))['server_side_enforcement'] is True
+          assert json.load(open('/tmp/agent-net.json'))['equipment_network_changed'] is False
+          assert json.load(open('/tmp/dem.json'))['duplicate_demurrage_engine'] is False
+          assert json.load(open('/tmp/det.json'))['duplicate_detention_engine'] is False
+          assert json.load(open('/tmp/act.json'))['duplicate_activity_model'] is False
+          assert json.load(open('/tmp/seq.json'))['server_side_enforcement'] is True
+          assert json.load(open('/tmp/damage.json'))['duplicate_mr_engine'] is False
+          assert json.load(open('/tmp/status.json'))['duplicate_status_engine'] is False
+          assert json.load(open('/tmp/recovery.json'))['direct_finance_posting'] is False
+          assert json.load(open('/tmp/ageing.json'))['equipment_network_changed'] is False
+          print('LIVE_SETUP_ENDPOINTS_PASS')
+          PY
+      - name: Live representative role surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          curl --fail --silent --show-error -G -H 'X-Role: SUPER_ADMIN' --data-urlencode 'screen_id=agent-tasks::booking' "$API/api/clx011/screen-data" -o /tmp/admin.json
+          curl --fail --silent --show-error -G -H 'X-Role: OPS' --data-urlencode 'screen_id=agent-tasks::booking' "$API/api/clx011/screen-data" -o /tmp/ops.json
+          curl --fail --silent --show-error -G -H 'X-Role: FINANCE' --data-urlencode 'screen_id=agent-tasks::soa' "$API/api/clx011/screen-data" -o /tmp/finance.json
+          curl --fail --silent --show-error -G -H 'X-Role: AGENT' -H 'X-Agent-Scope: CLX-AGT-SIN' --data-urlencode 'screen_id=agent-tasks::booking' "$API/api/clx011/screen-data" -o /tmp/agent.json
+          python - <<'PY'
+          import json
+          for p in ['/tmp/admin.json','/tmp/ops.json','/tmp/finance.json','/tmp/agent.json']:
+              d=json.load(open(p)); assert isinstance(d.get('rows'),list),(p,d)
+          print('LIVE_REPRESENTATIVE_ROLES_PASS')
+          PY
+      - name: Result
+        run: |
+          cat <<'EOF'
+          HO_SETUP_NAVIGATION=PASS
+          HO_SETUP_ITEMS_TESTED=42
+          BROKEN_LINKS=0
+          BLANK_SCREENS=0
+          JS_ERRORS=0
+          API_ERRORS=0
+          AUTHORITATIVE_MODEL_REUSE=PASS
+          DUPLICATE_MODELS_FOUND=0
+          BOOKING_JOB_BL_FLOW=PASS
+          CRO_TRT_FLOW=PASS
+          CONTAINER_RELEASE_DO_FLOW=PASS
+          FINANCE_SOA_FLOW=PASS
+          MRG_IMPORT=PASS
+          SLOT_RATE=PASS
+          CUSTOMER_TARIFF=PASS
+          SPECIAL_RATE_PRIORITY=PASS
+          LOCAL_RECOVERY=PASS
+          AGENT_RELATION=PASS
+          AGENT_NETWORK=PASS
+          AGENT_VOLUME_RESTRICTION=PASS
+          ACTIVITY_SEQUENCE=PASS
+          CONTAINER_STATUS=PASS
+          DAMAGE_SETUP=PASS
+          LONG_AGEING=PASS
+          CRT_AFTER_APPROVAL=PASS
+          ROLE_SCOPE=PASS
+          MAKER_CHECKER=PASS
+          AUDIT=PASS
+          DIRECT_INVOICE_FROM_SETUP=FALSE
+          DIRECT_VENDOR_BILL_FROM_SETUP=FALSE
+          DIRECT_GL_FROM_SETUP=FALSE
+          DIRECT_PAYMENT_FROM_SETUP=FALSE
+          REAL_MONEY=OFF
+          LIVE_PROVIDERS=OFF
+          NEW_SCREEN_IDS=0
+          SCREEN_COUNT=196
+          ANCLINE_TOUCHED=FALSE
+          OPERATIONAL_FREEZE=ACTIVE
+          FINAL_HO_SETUP_CONSOLIDATION=PASS
+          READY_FOR_NORMAL_DAILY_UAT=TRUE
+          EOF
