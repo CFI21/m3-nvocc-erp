@@ -155,6 +155,14 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
   const hoSetupAliases=[
     {label:'Carriers',target:'master-data::carriers'},
     {label:'Charges',target:'master-data::charge-codes'},
+    {label:'MRG',mrg:'GENERAL',target:'master-data::charge-codes'},
+    {label:'MRG Export',mrg:'EXPORT',target:'master-data::charge-codes'},
+    {label:'MRG Import',mrg:'IMPORT',target:'master-data::charge-codes'},
+    {label:'MRG Transshipment',mrg:'TRANSSHIPMENT',target:'master-data::charge-codes'},
+    {label:'MRG Detention',mrg:'DETENTION',target:'master-data::charge-codes'},
+    {label:'MRG Detention Export',mrg:'DETENTION_EXPORT',target:'master-data::charge-codes'},
+    {label:'Special Detention',mrg:'SPECIAL_DETENTION',target:'master-data::charge-codes'},
+    {label:'MRG MTY Storage',mrg:'MTY_STORAGE',target:'master-data::charge-codes'},
     {label:'Vessel',target:'master-data::vessels'},
     {label:'Agent',target:'master-data::agents'},
     {label:'Account Setup',target:'gl-accounts::account-integration'},
@@ -182,11 +190,13 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
       visibleSetup.map(it=>{
         const active=state.navContext?.domain==='HO Tasks'&&state.navContext?.submenu==='Setup'&&state.navContext?.label===it.label;
         const label=it.label.replaceAll("'","\\'");
-        const action=it.workspace
-          ?'openHoGovernedSetup(\''+it.workspace+'\',\''+label+'\',\''+it.target.replaceAll("'","\\'")+'\')'
-          :it.equipment
-            ?'openHoSetupEquipment(\''+it.equipment+'\',\''+label+'\')'
-            :'openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label+'\'})';
+        const action=it.mrg
+          ?'openMrgWorkspace(\''+it.mrg+'\',\''+label+'\')'
+          :it.workspace
+            ?'openHoGovernedSetup(\''+it.workspace+'\',\''+label+'\',\''+it.target.replaceAll("'","\\'")+'\')'
+            :it.equipment
+              ?'openHoSetupEquipment(\''+it.equipment+'\',\''+label+'\')'
+              :'openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label+'\'})';
         return '<div class="screenLink '+(active?'active':'')+'" onclick="'+action+'">'+esc(it.label)+'</div>';
       }).join('')+'</div>';
     dcount+=visibleSetup.length;
@@ -204,6 +214,116 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
   }
 }
 if(!dcount)continue;let did=domainSlug(d.domain);html+=`<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup('${did}')">▾ ${esc(d.domain)} <span class=count>${dcount}</span></button><div data-content="${esc(did)}">${subHtml}</div></div>`}  $('nav').innerHTML=html}
+let mrgWorkspaceType='GENERAL';
+let mrgWorkspaceLabel='MRG';
+let mrgRows=[];
+async function mrgApi(url,opt={}){
+  const headers={'X-Role':state.role,...(opt.headers||{})};
+  const r=await fetch(url,{...opt,headers});
+  const t=await r.text();let x={};try{x=t?JSON.parse(t):{}}catch(_){x={detail:t}}
+  if(!r.ok)throw new Error(typeof x.detail==='string'?x.detail:JSON.stringify(x.detail||x));
+  return x;
+}
+async function openMrgWorkspace(type,label){
+  mrgWorkspaceType=type;mrgWorkspaceLabel=label;
+  const s=state.byId['master-data::charge-codes'];if(!s)return;
+  state.current=s;state.navContext={domain:'HO Tasks',submenu:'Setup',label};state.selected=null;
+  $('favorite').style.visibility='hidden';renderNav();renderBreadcrumb();
+  $('flow').innerHTML='<div class="opFollow"><b>MRG Commercial Rate Master</b><span>Shared authoritative model · Revenue / Cost · governed maker-checker</span></div>';
+  history.pushState(null,'','#mrg='+encodeURIComponent(type));
+  $('screenMeta').innerHTML='<div class="opHeader"><span class="opHeaderTitle">'+esc(label)+'</span><span class="grow"></span><span class="status ok">Market Rates General</span></div>';
+  await renderMrgWorkspace();
+}
+function mrgTabs(){
+  const xs=[['GENERAL','MRG'],['EXPORT','Export'],['IMPORT','Import'],['TRANSSHIPMENT','Transshipment'],['DETENTION','Detention'],['DETENTION_EXPORT','Detention Export'],['MTY_STORAGE','MTY Storage'],['SPECIAL_DETENTION','Special Detention'],['REPORT','List / Report']];
+  return '<div class="clx78Tabs">'+xs.map(x=>'<button class="'+(mrgWorkspaceType===x[0]?'active':'')+'" onclick="mrgWorkspaceType=\''+x[0]+'\';mrgWorkspaceLabel=\''+x[1].replaceAll("'","\\'")+'\';renderMrgWorkspace()">'+esc(x[1])+'</button>').join('')+'</div>';
+}
+async function renderMrgWorkspace(){
+  $('gridArea').innerHTML='<div class="card">Loading MRG…</div>';
+  try{
+    const u=mrgWorkspaceType==='REPORT'?'/api/mrg/report':'/api/mrg/rules?mrg_type='+encodeURIComponent(mrgWorkspaceType);
+    const d=await mrgApi(u);mrgRows=d.records||[];
+    const toolbar='<div class="toolbar"><b>'+esc(mrgWorkspaceLabel)+'</b><span class="muted">One shared MRG model · '+mrgRows.length+' rule(s)</span><span class="grow"></span>'+
+      (mrgWorkspaceType==='REPORT'?'':'<button class="btn primary" onclick="mrgNewRule()">New Rate</button>')+
+      '<button class="btn" onclick="mrgWorkspaceType=\'REPORT\';mrgWorkspaceLabel=\'MRG List / Report\';renderMrgWorkspace()">List / Report</button></div>';
+    const heads=['MRG Ref','Side','Party','Charge','POL','POT','POD','Currency','Basis','Rate','Valid From','Valid To','Status','Version','Action'];
+    const body=mrgRows.length?mrgRows.map(r=>'<tr><td><b>'+esc(r.rule_ref)+'</b></td><td>'+esc(r.rate_side)+'</td><td>'+esc((r.party_type||'')+' '+(r.party_code||''))+'</td><td>'+esc(r.charge_code)+'</td><td>'+esc(r.pol||'')+'</td><td>'+esc(r.pot||'')+'</td><td>'+esc(r.pod||'')+'</td><td>'+esc(r.currency)+'</td><td>'+esc(r.rate_basis)+'</td><td>'+esc(r.unit_rate)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to||'')+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.version)+'</td><td><button class="btn" onclick="mrgOpenRule(\''+esc(r.rule_ref)+'\')">Open</button></td></tr>').join(''):'<tr><td colspan="15" class="muted">No MRG rules yet.</td></tr>';
+    $('gridArea').innerHTML=mrgTabs()+'<div class="card">'+toolbar+'</div><div class="tablewrap"><table><thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML=mrgTabs()+'<div class="card badtext"><b>MRG load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+function mrgField(name,label,type='text',value=''){
+  return '<div class="formField"><label>'+esc(label)+'</label><input id="mrg-'+name+'" type="'+type+'" value="'+esc(value??'')+'"></div>';
+}
+function mrgSelect(name,label,values,current=''){
+  return '<div class="formField"><label>'+esc(label)+'</label><select id="mrg-'+name+'">'+values.map(v=>'<option '+(v===current?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select></div>';
+}
+function mrgNewRule(){
+  const special=mrgWorkspaceType==='SPECIAL_DETENTION';
+  $('gridArea').innerHTML=mrgTabs()+'<div class="clx82Section"><div class="clx82Head">New '+esc(mrgWorkspaceLabel)+' Rate</div><div class="clx82Body"><div class="formGrid">'+
+    mrgSelect('rate_side','Revenue / Cost',['REVENUE','COST'])+
+    mrgSelect('party_type','Party Type',['CUSTOMER','AGENT','VENDOR','CARRIER','PRINCIPAL','DEPOT','TERMINAL','TRANSPORTER','OTHER'])+
+    mrgField('party_code','Party Code')+mrgField('charge_code','Charge Code')+mrgField('charge_type','Charge Type')+
+    mrgField('effective_from','Effective From','date')+mrgField('effective_to','Effective To','date')+
+    mrgField('pol','POL')+mrgField('pot','POT')+mrgField('pod','POD / POFD')+
+    mrgField('depot_code','Depot')+mrgField('terminal_code','Terminal')+mrgField('route_code','Route')+mrgField('service_code','Service')+
+    mrgField('cargo_type','Cargo Type')+mrgField('size_type','Size')+mrgField('container_type','Container Type')+
+    mrgField('currency','Currency','text','USD')+mrgField('rate_basis','Rate Basis','text','FLAT')+mrgField('unit_rate','Rate','number','0')+
+    mrgField('minimum_rate','Minimum','number')+mrgField('maximum_rate','Maximum','number')+mrgField('free_days','Free Days','number')+
+    (mrgWorkspaceType==='MTY_STORAGE'?mrgField('lolo_rate','LOLO Rate','number')+mrgField('invoice_basis','Invoice Basis'):'')+
+    (special?mrgField('booking_ref','Booking Ref')+mrgField('job_ref','Job Ref')+mrgField('original_rule_ref','Original MRG Detention Ref')+mrgField('exception_reason','Exception Reason'):'')+
+    mrgField('remarks','Remarks')+
+    '<div class="formActions"><button class="btn" onclick="renderMrgWorkspace()">Cancel</button><button class="btn primary" onclick="mrgSaveNew()">Submit for Approval</button></div>'+
+    '</div></div></div>';
+}
+async function mrgSaveNew(){
+  const val=n=>document.getElementById('mrg-'+n)?.value||null;
+  const body={mrg_type:mrgWorkspaceType,rate_side:val('rate_side'),party_type:val('party_type'),party_code:val('party_code'),charge_code:val('charge_code'),
+    charge_type:val('charge_type'),effective_from:val('effective_from'),effective_to:val('effective_to'),pol:val('pol'),pot:val('pot'),pod:val('pod'),
+    depot_code:val('depot_code'),terminal_code:val('terminal_code'),route_code:val('route_code'),service_code:val('service_code'),cargo_type:val('cargo_type'),
+    size_type:val('size_type'),container_type:val('container_type'),currency:val('currency')||'USD',rate_basis:val('rate_basis')||'FLAT',
+    unit_rate:Number(val('unit_rate')||0),minimum_rate:val('minimum_rate')?Number(val('minimum_rate')):null,maximum_rate:val('maximum_rate')?Number(val('maximum_rate')):null,
+    free_days:val('free_days')?Number(val('free_days')):null,lolo_rate:val('lolo_rate')?Number(val('lolo_rate')):null,invoice_basis:val('invoice_basis'),
+    booking_ref:val('booking_ref'),job_ref:val('job_ref'),original_rule_ref:val('original_rule_ref'),exception_reason:val('exception_reason'),remarks:val('remarks')};
+  try{await mrgApi('/api/mrg/rules',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});await renderMrgWorkspace()}catch(e){alert(e.message)}
+}
+async function mrgOpenRule(ref){
+  const r=mrgRows.find(x=>x.rule_ref===ref);if(!r)return;
+  const slabs=r.slabs||[];
+  $('gridArea').innerHTML=mrgTabs()+'<div class="card"><div class="toolbar"><b>'+esc(ref)+'</b><span>'+esc(r.status)+'</span><span class="grow"></span>'+
+    (r.status==='PENDING_APPROVAL'?'<button class="btn primary" onclick="mrgApprove(\''+esc(ref)+'\')">Approve</button>':'')+
+    ((['DETENTION','DETENTION_EXPORT','MTY_STORAGE'].includes(r.mrg_type)&&r.status!=='APPROVED')?'<button class="btn" onclick="mrgAddSlab(\''+esc(ref)+'\')">Add Slab</button>':'')+
+    '<button class="btn" onclick="renderMrgWorkspace()">Back</button></div><pre class="pre">'+esc(JSON.stringify(r,null,2))+'</pre></div>'+
+    '<div class="card"><b>Slabs</b><pre class="pre">'+esc(JSON.stringify(slabs,null,2))+'</pre></div>';
+}
+async function mrgApprove(ref){try{await mrgApi('/api/mrg/rules/'+encodeURIComponent(ref)+'/approve',{method:'POST'});await renderMrgWorkspace()}catch(e){alert(e.message)}}
+function mrgAddSlab(ref){
+  const f=prompt('Slab: from_day,till_day,rate,size,type  (example 1,10,25,40,HC)');if(!f)return;
+  const p=f.split(',').map(x=>x.trim());mrgApi('/api/mrg/rules/'+encodeURIComponent(ref)+'/slabs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({from_day:Number(p[0]),till_day:p[1]?Number(p[1]):null,rate:Number(p[2]),size_type:p[3]||null,container_type:p[4]||null})}).then(()=>renderMrgWorkspace()).catch(e=>alert(e.message));
+}
+async function openMrgImportForBooking(){
+  const w=clx49Workspace;if(!w?.context?.job_ref)return;
+  try{
+    const d=await mrgApi('/api/mrg/booking/'+encodeURIComponent(w.context.job_ref)+'/applicable');
+    state.mrgImportCandidates=d.candidates||[];
+    const rows=state.mrgImportCandidates;
+    $('gridArea').insertAdjacentHTML('afterbegin','<div id="mrgImportPanel" class="clx82Section"><div class="clx82Head">Applicable MRG Rates · Optional Import</div><div class="clx82Body"><div class="equipNote">Priority: Approved Special Rate → Approved MRG → authorized manual charge. Special Rate never changes the MRG master.</div><div class="tablewrap"><table><thead><tr><th></th><th>Side</th><th>Charge</th><th>Party</th><th>Basis</th><th>Currency</th><th>MRG</th><th>Applied</th><th>Resolution</th></tr></thead><tbody>'+
+      (rows.length?rows.map((r,i)=>'<tr><td><input type="checkbox" data-mrg-import="'+i+'" checked></td><td>'+esc(r.rate_side)+'</td><td>'+esc(r.charge_code)+'</td><td>'+esc((r.party_type||'')+' '+(r.party_code||''))+'</td><td>'+esc(r.rate_basis)+'</td><td>'+esc(r.currency)+'</td><td>'+esc(r.unit_rate)+'</td><td>'+esc(r.applied_rate)+'</td><td>'+esc(r.resolution)+'</td></tr>').join(''):'<tr><td colspan="9">No applicable approved MRG rates.</td></tr>')+
+      '</tbody></table></div><div class="formActions"><button class="btn" onclick="document.getElementById(\'mrgImportPanel\')?.remove()">Skip</button><button class="btn" onclick="importMrgSelected()">Import Selected</button><button class="btn primary" onclick="importMrgAll()">Import All</button></div></div></div>');
+  }catch(e){alert(e.message)}
+}
+async function importMrgSelected(){
+  const refs=[...document.querySelectorAll('[data-mrg-import]:checked')].map(x=>state.mrgImportCandidates[Number(x.dataset.mrgImport)]?.rule_ref).filter(Boolean);
+  await runMrgImport({rule_refs:refs,import_all:false});
+}
+async function importMrgAll(){await runMrgImport({rule_refs:[],import_all:true})}
+async function runMrgImport(body){
+  const w=clx49Workspace;
+  try{
+    const d=await mrgApi('/api/mrg/booking/'+encodeURIComponent(w.context.job_ref)+'/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({...body,conflict_action:'KEEP_EXISTING'})});
+    alert('MRG import complete · Revenue '+d.expected_revenue+' · Cost '+d.expected_cost+' · Margin '+d.expected_gross_margin);
+    await showClx049Workspace();clx78BookingBottomTab='Agreed Charges';await clx49RenderBooking('Booking Info');
+  }catch(e){alert(e.message)}
+}
 async function openHoSetupEquipment(view,label){
   await showEquipmentWorkspace(view);
   state.navContext={domain:'HO Tasks',submenu:'Setup',label};
@@ -1147,7 +1267,8 @@ async function clx78BookingBottom(w){
     const ops=[...(gl.operational_sources||[]),...(tre.operational_sources||[])];
     const gls=tre.gl_sources||[],trs=tre.treasury_records||[],links=gl.links||[];
     if(clx78BookingBottomTab==='Agreed Charges'){
-      const rows=[...ops,...links].filter((x,i,a)=>a.findIndex(y=>(y.external_ref||y.source_ref||y.id)===(x.external_ref||x.source_ref||x.id))===i);
+      const commercial=(w.booking?.fields?.['Commercial Charges']||[]).map(x=>({...x,module:x.charge_code,rate_source:x.source_type,source_ref:x.source_reference,rule_version:x.source_version,basis:x.rate_basis,currency:x.currency,amount:x.rate_side==='REVENUE'?x.applied_rate:'',vendor_cost:x.party_type==='VENDOR'?x.applied_rate:'',agent_cost:x.party_type==='AGENT'&&x.rate_side==='COST'?x.applied_rate:'',customer_ar:x.party_type==='CUSTOMER'&&x.rate_side==='REVENUE'?x.applied_rate:''}));
+      const rows=[...commercial,...ops,...links].filter((x,i,a)=>a.findIndex(y=>(y.source_reference||y.external_ref||y.source_ref||y.id)===(x.source_reference||x.external_ref||x.source_ref||x.id))===i);
       const pick=(x,...ks)=>{for(const k of ks)if(x?.[k]!==undefined&&x?.[k]!==null&&x?.[k]!=='')return x[k];return ''};
       const cols=[
         ['Charge',['Charge','charge','charge_code','module']],
@@ -1167,7 +1288,7 @@ async function clx78BookingBottom(w){
         ['Principal Net',['Principal Net','principal_net']],
         ['Customer AR',['Customer AR','customer_ar']]
       ];
-      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · existing rate / operational / GL sources only · No parallel charge model. Detailed commercial columns populate when supplied by the authoritative source.</div>'+
+      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · Booking commercial payload + linked operational / GL sources · no parallel Booking model.</div><div class="toolbar"><button class="btn primary" onclick="openMrgImportForBooking()">Import MRG</button><button class="btn" onclick="openAgentForm(\'edit\')">Add Manual Charge</button><button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button><span class="muted">MRG import is optional.</span></div>'+
         '<div class="tablewrap"><table><thead><tr>'+cols.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'</tr></thead><tbody>'+
         (rows.length?rows.map(r=>'<tr>'+cols.map(x=>'<td>'+esc(pick(r,...x[1]))+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="16">No linked agreed-charge records yet.</td></tr>')+
         '</tbody></table></div></div>';
