@@ -421,10 +421,16 @@ def test_legacy_seeded_released_closed_state_cannot_bypass_current_authority(iso
     con=c.execute("SELECT container_no FROM containers WHERE job_id=? ORDER BY id LIMIT 1",(jid,)).fetchone()["container_no"]
     do=c.execute("SELECT id,payload_json FROM transaction_records WHERE job_id=? AND module='delivery-order' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
     p=json.loads(do["payload_json"])
-    assert p["Release Status"]=="Released"
-    assert p["Status"]=="Closed"
-    assert p["Release Instruction"]=="—"
-    assert p["Valid Until"]=="2026-09-28"
+    # Reproduce the live pre-governance presentation state in the isolated test DB.
+    # This is test-only data and must never become release authority.
+    p.update({
+        "Release Status":"Released",
+        "Status":"Closed",
+        "Release Instruction":"—",
+        "Valid Until":"2026-09-28",
+    })
+    c.execute("UPDATE transaction_records SET status='Closed',payload_json=? WHERE id=?",(json.dumps(p),do["id"]))
+    c.execute("UPDATE workflow_states SET release_status='RELEASED',closed=1 WHERE job_id=?",(jid,))
     c.close()
 
     gate=delivery_order_eligible(job_ref="50005",hbl_no=hbl,container_no=con)
