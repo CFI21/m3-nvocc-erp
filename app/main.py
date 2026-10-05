@@ -196,9 +196,18 @@ def tx_query(where='1=1'):
 def serialize_tx(r):
     d=dict(r); payload=json.loads(d.pop('payload_json')); d['fields']=payload; return d
 
+def module_db_names(module):
+    return ('transshipment-trt','transshipment-crt') if module=='transshipment-trt' else (module,)
+
+def module_where(module):
+    names=module_db_names(module)
+    if len(names)==1:return 't.module=?',list(names)
+    return 't.module IN (?,?)',list(names)
+
 def get_tx(conn,module,tid,role,agent_scope,customer_scope):
     clause,args=scope_clause(role,agent_scope,customer_scope)
-    r=conn.execute(tx_query('t.module=? AND t.id=?')+clause,[module,tid]+args).fetchone()
+    mw,margs=module_where(module)
+    r=conn.execute(tx_query(mw+' AND t.id=?')+clause,margs+[tid]+args).fetchone()
     if not r: raise HTTPException(404,'Transaction not found in actor scope')
     return r
 
@@ -380,7 +389,7 @@ def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None
         ss=iam_session(conn,x_m3_session); role='SESSION';ascope=cscope=None;clause='';args=[]
     else:
         role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); clause,args=scope_clause(role,ascope,cscope)
-    where='t.module=?'; vals=[module]
+    where,vals=module_where(module)
     if job_ref: where+=' AND j.job_ref=?'; vals.append(job_ref)
     if status: where+=' AND t.status=?'; vals.append(status)
     rows=conn.execute(tx_query(where)+clause+' ORDER BY t.id',vals+args).fetchall()
@@ -400,7 +409,8 @@ def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None
 def get_record(module:str,tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); conn=connect()
     if bulk_permission_enabled():
-        r=conn.execute(tx_query('t.id=? AND t.module=?'),(tid,module)).fetchone()
+        mw,margs=module_where(module)
+        r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
         if not r: conn.close(); raise HTTPException(404,'Transaction not found')
         ga=governed_job_actor(conn,x_m3_session,r['job_ref'],'view'); role=ga['role'];ascope=cscope=None
     else:
@@ -502,7 +512,8 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
     conn=connect(); tx(conn)
     try:
         if bulk_permission_enabled():
-            r=conn.execute(tx_query('t.id=? AND t.module=?'),(tid,module)).fetchone()
+            mw,margs=module_where(module)
+        r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
             if not r: raise HTTPException(404,'Transaction not found')
             ga=governed_job_actor(conn,x_m3_session,r['job_ref'],action); role=ga['role'];ascope=cscope=None
         else:
@@ -557,7 +568,18 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             if not granular_do_release:
                 conn.execute("UPDATE workflow_states SET release_status='RELEASED',version=version+1 WHERE job_id=?",(r['job_id'],))
                 sync_release(conn,r['job_id'],tid)
-        elif action=='cancel': new_status='Cancelled'
+        elif action=='cancel':
+            new_status='Cancelled'
+            if module=='transshipment-trt':
+                reason=(body.reason or '').strip()
+                marker=reason.upper().replace(' ','_')
+                if 'NOT_APPLICABLE' in marker or 'STALE_BASELINE' in marker:
+                    if not reason: raise HTTPException(422,{'code':'REASON_REQUIRED'})
+                    conn.execute("UPDATE workflow_states SET transshipment_status='N/A',version=version+1 WHERE job_id=?",(r['job_id'],))
+                    clear_hold(conn,r['job_id'],'TRANSSHIPMENT_CONFIRMATION')
+                    payload['Connection Status']='Not Applicable'
+                    payload['Hold / Release']='N/A'
+                    payload['Resolution Reason']=reason
         elif action=='amend': new_status='Draft'
         elif action=='reissue': new_status='Issued'
         elif action=='reverse': new_status='Reversed'
@@ -567,7 +589,8 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
         payload['Status']=new_status
         if module=='special-rates-request': sync_special_rate(conn,tid,payload)
         if module=='delivery-order' and action=='release': payload['Release Status']='Released'
-        cur=conn.execute('UPDATE transaction_records SET status=?,payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?',(new_status,json.dumps(payload),now(),tid,body.version))
+        canonical_module='transshipment-trt' if module=='transshipment-trt' and r['module']=='transshipment-crt' else r['module']
+        cur=conn.execute('UPDATE transaction_records SET module=?,status=?,payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?',(canonical_module,new_status,json.dumps(payload),now(),tid,body.version))
         if cur.rowcount!=1: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
         after=serialize_tx(conn.execute(tx_query('t.id=?'),(tid,)).fetchone()); audit(conn,role,ascope or cscope,action.upper(),module,tid,r['job_id'],before,after,{'reason':body.reason})
         conn.execute('COMMIT'); return {'ok':True,'record':after,'job':job_context(connect(),r['job_ref'])}
