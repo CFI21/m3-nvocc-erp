@@ -809,7 +809,7 @@ async function drillGlReportRow(i){
 }
 
 const PRINCIPAL_READONLY=new Set(['bl-linkage','branch-pnl']);
-function principalHeaders(){return {'X-Role':state.role==='SUPER_ADMIN'?'ADMIN':state.role}}
+function principalHeaders(){const h={'X-Role':state.role==='SUPER_ADMIN'?'ADMIN':state.role};const s=sessionStorage.getItem('M3_SESSION')||sessionStorage.getItem('M3_SESSION_TOKEN')||'';if(s)h['X-M3-Session']=s;return h}
 function principalPretty(k){return String(k||'').replaceAll('_',' ').replace(/\b\w/g,x=>x.toUpperCase())}
 function principalTable(rows,workspace){
   if(!rows?.length)return '<div class="card empty">No records yet. Use New to create the first governed record.</div>';
@@ -871,6 +871,23 @@ async function principalReleaseCheck(jobRef){
     alert('Release '+(d.release_ready?'READY':'BLOCKED')+'\nB/L: '+!!c.hbl_issued+'\nCustoms: '+!!c.customs_cleared+'\nFinance: '+!!c.finance_cleared+'\nSurrender/Telex: '+!!c.surrender_or_telex);
   }catch(e){alert(e.message)}
 }
+async function principalGovernedRelease(releaseRef,jobRef){
+  const containerNo=prompt('Container number for governed cargo release','');
+  if(!containerNo)return;
+  try{
+    const p=await api('/api/nvocc-principal/release-prerequisites/'+encodeURIComponent(jobRef),{headers:principalHeaders()});
+    if(!p.release_ready){alert('Release blocked: prerequisites are not satisfied.');return}
+    const d=await api('/api/nvocc-principal/release-control/'+encodeURIComponent(releaseRef)+'/action',{
+      method:'POST',headers:{...principalHeaders(),'Content-Type':'application/json'},
+      body:JSON.stringify({container_no:containerNo.trim(),action:'RELEASE'})
+    });
+    const g=d.delivery_order_gate||{};
+    alert('Cargo release authorization: '+String(d.release?.status||'UNKNOWN')+
+      '\nPhysical container release event created: NO'+
+      '\nDelivery Order: '+(g.eligible?'ELIGIBLE':'BLOCKED — waiting for real physical RELEASED event'));
+    await openPrincipalWorkspace('release-control',state.navContext?.label||'Release Control',state.current.screen_id,state.navContext?.submenu||'Transaction / Operations');
+  }catch(e){alert('Governed release failed: '+e.message)}
+}
 async function openPrincipalWorkspace(workspace,label,target,group){
   const s=state.byId[target];if(!s)return;
   state.current=s;state.navContext={domain:'Business Navigation',submenu:group,label};state.selected=null;state.principalWorkspace=null;
@@ -890,7 +907,7 @@ async function openPrincipalWorkspace(workspace,label,target,group){
     const extra=workspace==='release-control'?'<span class="muted">Release readiness is derived from B/L + Customs + Finance + Surrender/Telex; use Open to maintain POD/depot release data.</span>':'';
     $('gridArea').innerHTML='<div class="opGridToolbar"><b>'+esc(d.title)+'</b>'+extra+'<span class="grow"></span><button class="btn primary" onclick="principalEdit(\''+workspace+'\',-1)">New</button></div>'+principalTable(d.rows,workspace);
     if(workspace==='release-control'&&d.rows?.length){
-      $('gridArea').insertAdjacentHTML('afterbegin','<div class="card"><b>Release Gate</b><div class="muted">Each release remains blocked until authoritative HBL/document, customs, finance and surrender/telex prerequisites pass.</div><div class="toolbar">'+d.rows.slice(0,8).map(x=>'<button class="btn" onclick="principalReleaseCheck(\''+String(x.job_ref||'').replaceAll("'","\\'")+'\')">Check '+esc(x.job_ref||x.release_ref)+'</button>').join('')+'</div></div>');
+      $('gridArea').insertAdjacentHTML('afterbegin','<div class="card"><b>Release Gate</b><div class="muted">Cargo release authorization is governed here. A Release action does not fabricate the physical container RELEASED event; Delivery Order remains blocked until that real event exists.</div><div class="toolbar">'+d.rows.slice(0,8).map(x=>'<button class="btn" onclick="principalReleaseCheck(\''+String(x.job_ref||'').replaceAll("'","\\'")+'\')">Check '+esc(x.job_ref||x.release_ref)+'</button><button class="btn primary" onclick="principalGovernedRelease(\''+String(x.release_ref||'').replaceAll("'","\\'")+'\',\''+String(x.job_ref||'').replaceAll("'","\\'")+'\')">Authorize Cargo Release</button>').join('')+'</div></div>');
     }
   }catch(e){$('gridArea').innerHTML='<div class="card"><b class="badtext">Error loading extension workspace</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
