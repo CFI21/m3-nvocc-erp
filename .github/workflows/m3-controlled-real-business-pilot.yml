@@ -57,7 +57,7 @@ jobs:
           assert w['delivery_order'],w
           assert m.get('candidates') is not None,m
           # Current authoritative container context determines what has actually been reached.
-          containers=c.get('containers') or c.get('records') or []
+          containers=c.get('allocated_containers') or []
           print('PILOT_JOB_REF=50004')
           print('PILOT_BOOKING_REF='+str(w['context'].get('booking_ref') or ''))
           print('PILOT_BL_REF='+str(w['context'].get('hbl_no') or ''))
@@ -81,11 +81,11 @@ jobs:
           python - <<'PY'
           import json
           w=json.load(open('/tmp/workspace.json')); c=json.load(open('/tmp/context.json'))
-          containers=c.get('containers') or c.get('records') or []
+          containers=c.get('allocated_containers') or []
           state=''
           if containers: state=str(containers[0].get('journey_state') or containers[0].get('equipment_status') or '').upper()
           release_status=str((w.get('release_instruction') or {}).get('status') or (w.get('delivery_order') or {}).get('status') or '').upper()
-          terminal=state in {'AVAILABLE','SOLD','SCRAPPED','OFF_HIRED','PARTNER_RETURNED','AGENT_RETURNED','SOC_RELEASED'}
+          terminal=state in {'SOLD','SCRAPPED','OFF_HIRED','PARTNER_RETURNED','AGENT_RETURNED','SOC_RELEASED'} or (state=='AVAILABLE' and bool(containers))
           print('CONTROLLED_REAL_BUSINESS_PILOT='+('PASS' if terminal else 'IN_PROGRESS'))
           print('BOOKING=PASS')
           print('JOB=PASS')
