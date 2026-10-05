@@ -59,6 +59,7 @@ from .clx077_dummy_bank import router as clx077_dummy_bank_router
 from .nvocc_principal_extensions import router as nvocc_principal_extensions_router
 from .crt_governance import router as crt_governance_router
 from .mrg import router as mrg_router
+from .agent_setup import router as agent_setup_router, assert_booking_rules
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -102,6 +103,7 @@ app.include_router(clx077_dummy_bank_router)
 app.include_router(nvocc_principal_extensions_router)
 app.include_router(crt_governance_router)
 app.include_router(mrg_router)
+app.include_router(agent_setup_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
@@ -134,7 +136,7 @@ ROLE_PERMS={
  'VIEWER':set('view'.split())
 }
 RELEASE_MODULES={'trt','export-trt','import-trt','transshipment-trt','delivery-order','import-bl','cro'}
-GOVERNED_POST_APPROVAL_MODULES={'trt','export-trt','import-trt','transshipment-trt'}
+GOVERNED_POST_APPROVAL_MODULES={'booking','trt','export-trt','import-trt','transshipment-trt'}
 POST_APPROVAL_LOCK_STATUSES={'approved','released','issued','completed','closed'}
 
 class CreateBody(BaseModel):
@@ -420,6 +422,7 @@ async def create_record(module:str,body:CreateBody,request:Request,x_role:str=He
         if role=='AGENT' and ctx['agent_code']!=ascope: raise HTTPException(403,'Job outside agent scope')
         errs=validate_fields(module,ctx,body.fields)
         if errs: raise HTTPException(422,{'codes':errs})
+        if module=='booking': assert_booking_rules(conn,ctx,body.fields,None)
         ext=body.external_ref or f"CLX-{module.upper()}-{body.job_ref}-{uuid.uuid4().hex[:8].upper()}"
         if conn.execute('SELECT 1 FROM transaction_records WHERE module=? AND external_ref=?',(module,ext)).fetchone(): raise HTTPException(409,'DUPLICATE_TRANSACTION')
         payload=dict(body.fields); payload.setdefault('Job Ref',body.job_ref); payload.setdefault('Agent',ctx['agent_code']); payload.setdefault('Customer',ctx['customer_name']); payload.setdefault('Status','Draft')
@@ -457,6 +460,7 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         payload=json.loads(r['payload_json']); payload.update(body.fields); errs=validate_fields(module,ctx,payload)
         if errs: raise HTTPException(422,{'codes':errs})
+        if module=='booking': assert_booking_rules(conn,ctx,payload,tid)
         status=payload.get('Status') or payload.get('Release Status') or r['status']
         cur=conn.execute('UPDATE transaction_records SET payload_json=?,status=?,version=version+1,updated_at=? WHERE id=? AND version=?',(json.dumps(payload),status,now(),tid,body.version))
         if cur.rowcount!=1: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT'})
