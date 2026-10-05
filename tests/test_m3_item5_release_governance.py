@@ -228,6 +228,19 @@ def test_release_control_operator_action_is_iam_scoped_and_does_not_create_physi
     assert out["delivery_order_gate"]["eligible"] is False
 
 
+def test_release_instruction_missing_blocks_release(isolated):
+    c=db.connect()
+    jid=c.execute("SELECT id FROM jobs WHERE job_ref='50001'").fetchone()["id"]
+    row=c.execute("SELECT id,payload_json FROM transaction_records WHERE job_id=? AND module='delivery-order' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
+    p=json.loads(row["payload_json"])
+    p["Release Instruction"]=""
+    c.execute("UPDATE transaction_records SET payload_json=? WHERE id=?",(json.dumps(p),row["id"]))
+    c.close()
+    out=evaluate_prerequisites(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
+    assert out["checks"]["release_instruction_valid"] is False
+    assert "release_instruction_valid" in out["blocking_reasons"]
+
+
 def test_delivery_order_blocks_unreleased_container(isolated):
     with pytest.raises(HTTPException) as e:
         assert_delivery_order_eligible(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
