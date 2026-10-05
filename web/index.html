@@ -168,6 +168,9 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
     {label:'Stamps',workspace:'stamps',target:'master-data::configurations'},
     {label:'Vessel',target:'master-data::vessels'},
     {label:'Agent',target:'master-data::agents'},
+    {label:'Agent Relation',workspace:'agent-relation',target:'master-data::agents'},
+    {label:'Agent Volume Restriction',workspace:'agent-volume-restriction',target:'master-data::agents'},
+    {label:'Agent Network',workspace:'agent-network',target:'master-data::agents'},
     {label:'Account Setup',target:'gl-accounts::account-integration'},
     {label:'Sub Company',target:'administration::legal-entities'},
     {label:'Currency File',target:'master-data::currencies'},
@@ -398,7 +401,7 @@ async function openHoSetupEquipment(view,label){
 }
 function hoSetupRoleAllowed(workspace){
   const r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;
-  if(['principal-setup','pa-parties','stamps'].includes(workspace))
+  if(['principal-setup','pa-parties','stamps','agent-relation','agent-volume-restriction','agent-network'].includes(workspace))
     return ['ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','OPS','FINANCE','AUDITOR','VIEWER'].includes(r);
   return ['ADMIN','FINANCE','GL_MANAGER','GL_ACCOUNTANT','EQUIPMENT_MANAGER','AUDITOR','VIEWER'].includes(r);
 }
@@ -417,6 +420,9 @@ async function openHoGovernedSetup(workspace,label,target){
   else if(workspace==='investor-setup')await renderHoInvestorSetup();
   else if(workspace==='pa-parties')await renderHoPaParties();
   else if(workspace==='stamps')await renderHoStamps();
+  else if(workspace==='agent-relation')await renderHoAgentRelation();
+  else if(workspace==='agent-volume-restriction')await renderHoAgentVolumeRestriction();
+  else if(workspace==='agent-network')await renderHoAgentNetwork();
 }
 async function renderHoPaParties(){
   try{
@@ -439,6 +445,49 @@ async function renderHoStamps(){
       (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(r.record_key)+'</b></td><td>'+esc(r.display_name||p.name||'')+'</td><td>'+esc(p.document_type||'')+'</td><td>'+esc(p.branch_code||p.office_code||'')+'</td><td>'+esc(r.effective_from||p.effective_from||'')+'</td><td>'+esc(r.effective_to||p.effective_to||'')+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.version)+'</td></tr>'}).join(''):'<tr><td colspan="8" class="muted">No approved stamp configuration records yet. Use existing Configuration master through maker-checker governance.</td></tr>')+
       '</tbody></table></div><div class="card"><b>Available authoritative document types</b><span class="muted"> '+esc((docs||[]).map(x=>x.record_key).join(', ')||'None')+'</span></div>';
   }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Stamps load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function agentSetupApi(path){
+  const r=await fetch('/api/agent-setup/'+path,{headers:{'X-Role':state.role}});
+  const t=await r.text();let x={};try{x=t?JSON.parse(t):{}}catch(_){x={detail:t}}
+  if(!r.ok)throw new Error(typeof x.detail==='string'?x.detail:JSON.stringify(x.detail||x));
+  return x;
+}
+function agentConfigManage(label){
+  return '<button class="btn primary" onclick="openScreen(\'master-data::configurations\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Configuration\'})">Manage Governed Configuration</button>'+
+    '<button class="btn" onclick="openScreen(\'master-data::agents\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Agents\'})">Agent Master</button>';
+}
+async function renderHoAgentRelation(){
+  try{
+    const d=await agentSetupApi('relations');
+    const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Relation</b><span class="muted">Shared relationship rules over existing Agent/Common Party masters. No permanent duplicate Agent model.</span><span class="grow"></span>'+agentConfigManage('Agent Relation')+'</div></div>'+
+      '<div class="equipNote">Supported relation types: '+esc((d.allowed_relation_types||[]).join(', '))+' · Authoritative source: '+esc(d.source)+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Rule</th><th>Agent</th><th>Related Party</th><th>Relation Type</th><th>Country</th><th>Port / Location</th><th>Service / Trade Lane</th><th>Effective From</th><th>Effective To</th><th>Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(r.record_key)+'</b></td><td>'+esc(p.agent_code||'')+'</td><td>'+esc(p.related_party_code||'')+'</td><td>'+esc(p.relation_type||'')+'</td><td>'+esc(p.country||'')+'</td><td>'+esc(p.port||p.location||'')+'</td><td>'+esc(p.service_code||p.trade_lane||'')+'</td><td>'+esc(r.effective_from||p.effective_from||'')+'</td><td>'+esc(r.effective_to||p.effective_to||'')+'</td><td>'+esc(r.status)+'</td></tr>'}).join(''):'<tr><td colspan="10" class="muted">No approved Agent Relation configuration. Existing Booking/Job agent remains authoritative.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Agent Relation load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoAgentVolumeRestriction(){
+  try{
+    const d=await agentSetupApi('volume-restrictions');
+    const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Volume Restriction</b><span class="muted">Server-side booking guard over the existing Booking model.</span><span class="grow"></span>'+agentConfigManage('Agent Volume Restriction')+'</div></div>'+
+      '<div class="equipNote">Verified limit types: '+esc((d.limit_types||[]).join(', '))+' · Server-side enforcement: '+esc(d.server_side_enforcement?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Rule</th><th>Agent</th><th>Limit Type</th><th>Allowed Volume</th><th>Period</th><th>Route / Service</th><th>Equipment</th><th>Principal / Carrier</th><th>Enforcement</th><th>Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(r.record_key)+'</b></td><td>'+esc(p.agent_code||'')+'</td><td>'+esc(p.limit_type||'')+'</td><td>'+esc(p.allowed_volume||'')+'</td><td>'+esc((p.period_start||p.effective_from||'')+' → '+(p.period_end||p.effective_to||''))+'</td><td>'+esc((p.route_code||'')+' '+(p.service_code||''))+'</td><td>'+esc(p.equipment||'')+'</td><td>'+esc(p.principal_code||p.carrier_code||'')+'</td><td>'+esc(p.enforcement||'WARN')+'</td><td>'+esc(r.status)+'</td></tr>'}).join(''):'<tr><td colspan="10" class="muted">No active volume restriction rules. Booking remains unrestricted by this optional configuration.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Agent Volume Restriction load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoAgentNetwork(){
+  try{
+    const d=await agentSetupApi('network');
+    const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Network</b><span class="muted">Commercial/operational Agent coverage network. Equipment Network remains separate and unchanged.</span><span class="grow"></span>'+agentConfigManage('Agent Network')+'</div></div>'+
+      '<div class="equipNote">Network types: '+esc((d.network_types||[]).join(', '))+' · Equipment Network changed: '+esc(d.equipment_network_changed?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Rule</th><th>Agent</th><th>Network Type</th><th>Country</th><th>Branch / Office</th><th>Port Coverage</th><th>Principal / Partner</th><th>Service / Trade Lane</th><th>Effective From</th><th>Effective To</th><th>Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(r.record_key)+'</b></td><td>'+esc(p.agent_code||'')+'</td><td>'+esc(p.network_type||'')+'</td><td>'+esc(p.country||'')+'</td><td>'+esc(p.branch_code||p.office_code||'')+'</td><td>'+esc(p.port||p.port_coverage||'')+'</td><td>'+esc(p.principal_code||p.related_party_code||'')+'</td><td>'+esc(p.service_code||p.trade_lane||'')+'</td><td>'+esc(r.effective_from||p.effective_from||'')+'</td><td>'+esc(r.effective_to||p.effective_to||'')+'</td><td>'+esc(r.status)+'</td></tr>'}).join(''):'<tr><td colspan="11" class="muted">No approved Agent Network configuration. Existing Agent master and Booking routing remain authoritative.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Agent Network load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
 async function renderHoPrincipalSetup(){
   try{
