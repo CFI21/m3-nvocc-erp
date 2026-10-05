@@ -799,7 +799,8 @@ async function clx49RenderBlTab(tab){
   html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>B/L MASTER WORKSPACE</b><span class="muted">Job '+esc(w.context.job_ref)+' · Booking '+esc(w.context.booking_ref||'—')+' · B/L '+esc(w.context.hbl_no||'—')+'</span><span class="grow"></span>'+
     '<button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Booking</button>'+
     '<button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button>'+
-    '<button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button>'+\n    '<button class="btn" onclick="openPrincipalWorkspace(\'bl-linkage\',\'MBL ↔ HBL Link Control\',\'agent-tasks::bl\',\'Document\')">MBL ↔ HBL Link</button>'+
+    '<button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button>'+
+    '<button class="btn" onclick="openPrincipalWorkspace(\'bl-linkage\',\'MBL ↔ HBL Link Control\',\'agent-tasks::bl\',\'Document\')">MBL ↔ HBL Link</button>'+
     '<button class="btn" onclick="clx82ShowPreview()">Preview / Print</button></div>'+
     '<div class="clx78Hint">CLX-082 B/L Master Field Alignment · same authoritative B/L / Delivery Order / Vessel Lock / Audit records · no duplicate document model.</div>'+
     '<div class="clx78Tabs">'+CLX49_BL_TABS.map(t=>'<button class="'+(t===tab?'active':'')+'" onclick="clx49RenderBlTab(\''+t+'\')">'+esc(t)+'</button>').join('')+'</div>';
