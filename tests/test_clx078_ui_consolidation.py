@@ -17,7 +17,7 @@ def test_booking_uses_existing_authoritative_apis():
     assert '/api/clx070/container-control/booking-context/' in HTML
     assert '/api/gl/job/' in HTML
     assert '/api/clx046/job/' in HTML
-    assert 'No parallel charge model' in HTML
+    assert 'no parallel Booking model' in HTML
 
 def test_pot_is_conditional():
     assert "POT Agent" in HTML
