@@ -29,7 +29,6 @@ def test_mrg_ui_preserves_existing_rate_management():
     assert "Special Rate Request" in html
     assert "agent-tasks::special-rates-request" in html
     assert "Commercial Charges" in html
-    assert "SUPERSEDED_BY_SPECIAL_RATE" in html
     assert "MRG import is optional." in html
 
 def test_mrg_backend_is_shared_and_does_not_post_finance():
@@ -40,6 +39,7 @@ def test_mrg_backend_is_shared_and_does_not_post_finance():
     assert 'CRT_REQUIRED_AFTER_APPROVAL' in src
     assert 'direct_finance_posting":False' in src
     assert 'special_rate_workflow' in src
+    assert 'SUPERSEDED_BY_SPECIAL_RATE' in src
     assert 'Commercial Charges' in src
     assert 'INSERT INTO gl_' not in src
     assert 'INSERT INTO treasury_' not in src
