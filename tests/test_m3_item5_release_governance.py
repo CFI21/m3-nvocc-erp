@@ -257,3 +257,44 @@ def test_final_release_acceptance_matrix_by_flow(isolated, flow, module):
     assert detail["branch_scope"]==f"{flow}-BRANCH", flow
     assert detail["job_ref"]=="50001", flow
     assert detail["hbl_no"]==isolated["hbl"], flow
+
+
+def test_express_bl_does_not_require_stale_original_surrender_field(isolated):
+    c=db.connect()
+    jid=c.execute("SELECT id FROM jobs WHERE job_ref='50001'").fetchone()["id"]
+    bl=c.execute("SELECT id,payload_json FROM transaction_records WHERE job_id=? AND module='bl' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
+    p=json.loads(bl["payload_json"])
+    p["Original / Express"]="Express"
+    c.execute("UPDATE transaction_records SET payload_json=? WHERE id=?",(json.dumps(p),bl["id"]))
+    do=c.execute("SELECT id,payload_json FROM transaction_records WHERE job_id=? AND module='delivery-order' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
+    dp=json.loads(do["payload_json"])
+    dp["Original BL Status"]="Open"
+    dp["Telex Release"]="No"
+    c.execute("UPDATE transaction_records SET payload_json=? WHERE id=?",(json.dumps(dp),do["id"]))
+    c.close()
+    out=evaluate_prerequisites(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
+    assert out["checks"]["surrender_or_telex"] is True
+    assert out["bl_release_authority"]["bl_type"]=="EXPRESS"
+    assert out["bl_release_authority"]["original_bl_required"] is False
+    assert out["bl_release_authority"]["express_release_authorized"] is True
+    assert out["bl_release_authority"]["stale_do_document_fields"] is True
+    assert out["document_source_of_truth"].startswith("transaction_records:bl")
+
+
+def test_original_bl_without_surrender_or_telex_stays_blocked(isolated):
+    c=db.connect()
+    jid=c.execute("SELECT id FROM jobs WHERE job_ref='50001'").fetchone()["id"]
+    bl=c.execute("SELECT id,payload_json FROM transaction_records WHERE job_id=? AND module='bl' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
+    p=json.loads(bl["payload_json"])
+    p["Original / Express"]="Original"
+    c.execute("UPDATE transaction_records SET payload_json=? WHERE id=?",(json.dumps(p),bl["id"]))
+    do=c.execute("SELECT id,payload_json FROM transaction_records WHERE job_id=? AND module='delivery-order' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
+    dp=json.loads(do["payload_json"])
+    dp["Original BL Status"]="Open"
+    dp["Telex Release"]="No"
+    c.execute("UPDATE transaction_records SET payload_json=? WHERE id=?",(json.dumps(dp),do["id"]))
+    c.close()
+    out=evaluate_prerequisites(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
+    assert out["checks"]["surrender_or_telex"] is False
+    assert "surrender_or_telex" in out["blocking_reasons"]
+    assert out["bl_release_authority"]["original_bl_required"] is True
