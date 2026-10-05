@@ -412,3 +412,50 @@ def test_original_bl_without_surrender_or_telex_stays_blocked(isolated):
     assert out["checks"]["surrender_or_telex"] is False
     assert "surrender_or_telex" in out["blocking_reasons"]
     assert out["bl_release_authority"]["original_bl_required"] is True
+
+
+def test_legacy_seeded_released_closed_state_cannot_bypass_current_authority(isolated):
+    c=db.connect()
+    jid=c.execute("SELECT id FROM jobs WHERE job_ref='50005'").fetchone()["id"]
+    hbl=c.execute("SELECT bill_no FROM bills WHERE job_id=? AND kind='HBL' ORDER BY id LIMIT 1",(jid,)).fetchone()["bill_no"]
+    con=c.execute("SELECT container_no FROM containers WHERE job_id=? ORDER BY id LIMIT 1",(jid,)).fetchone()["container_no"]
+    do=c.execute("SELECT id,payload_json FROM transaction_records WHERE job_id=? AND module='delivery-order' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
+    p=json.loads(do["payload_json"])
+    assert p["Release Status"]=="Released"
+    assert p["Status"]=="Closed"
+    assert p["Release Instruction"]=="—"
+    assert p["Valid Until"]=="2026-09-28"
+    c.close()
+
+    gate=delivery_order_eligible(job_ref="50005",hbl_no=hbl,container_no=con)
+    assert gate["eligible"] is False
+    assert gate["cargo_release_authorized"] is False
+    assert gate["release_ref"] is None
+    assert gate["release_status"]=="NONE"
+    assert gate["release_header_status"]=="NONE"
+    assert gate["real_container_release_event_found"] is False
+    assert gate["legacy_presentation_state"]["classification"]=="LEGACY_PRESENTATION_STATE"
+    assert gate["legacy_presentation_state"]["workflow_release_status"]=="RELEASED"
+    assert gate["legacy_presentation_state"]["workflow_closed"] is True
+    assert gate["legacy_presentation_state"]["delivery_order_release_status"]=="Released"
+    assert gate["legacy_presentation_state"]["delivery_order_status"]=="Closed"
+    assert gate["legacy_presentation_state"]["bl_transaction_status"]=="Closed"
+    assert gate["legacy_presentation_state"]["authoritative_for_current_release"] is False
+
+
+def test_release_header_and_container_control_must_both_be_authorized(isolated):
+    upsert_release_container(
+        release_ref="REL-TEST-001",
+        container_no=isolated["container"],
+        actor_user_id="USR-RELEASE-001",
+        action="RELEASE",
+    )
+    c=db.connect()
+    c.execute("UPDATE nvocc_release_controls SET status='PENDING' WHERE release_ref='REL-TEST-001'")
+    c.close()
+
+    gate=delivery_order_eligible(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
+    assert gate["release_status"]=="RELEASED"
+    assert gate["release_header_status"]=="PENDING"
+    assert gate["cargo_release_authorized"] is False
+    assert gate["eligible"] is False
