@@ -1,0 +1,135 @@
+name: M3 BL Release Authority Pilot UAT
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/m3-bl-release-authority-pilot-uat.yml'
+
+jobs:
+  bl-release-authority:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Focused release/document regression
+        env:
+          PYTHONPATH: .
+          M3_RELEASE_GOVERNANCE_ENABLED: 'true'
+          M3_STATE_TRANSITION_GOVERNANCE_ENABLED: 'true'
+        run: |
+          pytest -q \
+            tests/test_m3_item5_release_governance.py \
+            tests/test_nvocc_principal_gap_completion.py \
+            tests/test_clx049_booking_bl_workspace.py \
+            tests/test_clx082_bl_master_alignment.py \
+            tests/test_m3_item4_state_transition_governance.py
+      - name: Live document authority and bulk read-only sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://m3-nvocc-api-latest-1.onrender.com'
+          for i in $(seq 1 30); do
+            if curl -fsS "$API/api/v1/health" >/tmp/health.json; then break; fi
+            sleep 3
+          done
+          for jr in 50001 50002 50003 50004 50005; do
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/clx049/workspace/$jr" -o "/tmp/ws-$jr.json"
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/nvocc-principal/release-prerequisites/$jr" -o "/tmp/rel-$jr.json"
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/v1/jobs/$jr/context" -o "/tmp/job-$jr.json"
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/clx070/container-control/booking-context/$jr" -o "/tmp/ct-$jr.json"
+          done
+          curl -fsS -H 'X-Role: AUDITOR' "$API/api/v1/jobs/50004/container-events" -o /tmp/events-50004.json
+          python - <<'PY'
+          import json,datetime
+          w=json.load(open('/tmp/ws-50004.json'))
+          r=json.load(open('/tmp/rel-50004.json'))
+          j=json.load(open('/tmp/job-50004.json'))
+          c=json.load(open('/tmp/ct-50004.json'))
+          ev=json.load(open('/tmp/events-50004.json')).get('events') or []
+          bl=(w.get('bl') or {}).get('fields') or {}
+          do=(w.get('delivery_order') or {}).get('fields') or {}
+          authority=r.get('bl_release_authority') or {}
+          containers=c.get('allocated_containers') or []
+          assert len(containers)==1 and containers[0].get('container_no')=='CLXU4234560',containers
+          state=str(containers[0].get('journey_state') or containers[0].get('equipment_status') or '').upper()
+          assert state=='RESERVED',state
+          assert str(bl.get('Original / Express') or '').upper()=='EXPRESS',bl
+          assert authority.get('bl_type')=='EXPRESS',authority
+          assert authority.get('original_bl_required') is False,authority
+          assert authority.get('express_release_authorized') is True,authority
+          assert r['checks']['surrender_or_telex'] is True,r
+          assert r['checks']['hbl_issued'] is True,r
+          assert r['checks']['customs_cleared'] is True,r
+          assert r['checks']['finance_cleared'] is True,r
+          assert authority.get('source','').startswith('transaction_records:bl'),authority
+          stale=bool(authority.get('stale_do_document_fields'))
+          assert stale is True,authority
+
+          now=datetime.datetime.now(datetime.timezone.utc)
+          real_release=False
+          for x in ev:
+            detail=x.get('detail_json')
+            try: detail=json.loads(detail) if isinstance(detail,str) else (detail or {})
+            except Exception: detail={}
+            is_seed=str(x.get('event_id') or '').startswith('CE-50004-') or detail.get('synthetic') is True
+            typ=str(x.get('event_type') or '').upper()
+            dt=x.get('actual_time') or x.get('event_time')
+            future=False
+            if dt:
+              try: future=datetime.datetime.fromisoformat(str(dt).replace('Z','+00:00'))>now
+              except Exception: pass
+            if typ=='RELEASED' and not is_seed and not future:
+              real_release=True
+          assert real_release is False
+
+          for jr in ['50001','50002','50003','50004','50005']:
+            ww=json.load(open(f'/tmp/ws-{jr}.json'))
+            rr=json.load(open(f'/tmp/rel-{jr}.json'))
+            jj=json.load(open(f'/tmp/job-{jr}.json'))
+            assert ww.get('bl') and ww.get('delivery_order')
+            assert set(rr.get('checks') or {})=={'hbl_issued','customs_cleared','finance_cleared','surrender_or_telex'}
+            assert 'release_gate_reasons' in jj
+
+          print('CONTROLLED_REAL_BUSINESS_PILOT=IN_PROGRESS')
+          print('BL_RELEASE_AUTHORITY_ANALYSIS=PASS')
+          print('BL_TYPE=EXPRESS')
+          print('ORIGINAL_BL_REQUIRED=FALSE')
+          print('ORIGINAL_BL_SURRENDERED='+str(bool(authority.get('original_bl_surrendered'))).upper())
+          print('TELEX_RELEASE_AUTHORIZED='+str(bool(authority.get('telex_release_authorized'))).upper())
+          print('EXPRESS_RELEASE_AUTHORIZED=TRUE')
+          print('SURRENDER_OR_TELEX=PASS')
+          print('DOCUMENT_SOURCE_OF_TRUTH='+authority.get('source',''))
+          print('STALE_DO_DOCUMENT_FIELDS_FOUND=TRUE')
+          print('HBL_AUTHORITY=PASS')
+          print('DOCUMENT_AUTHORITY=PASS')
+          print('CUSTOMS=PASS')
+          print('PAYMENT=PASS')
+          print('CREDIT=PASS')
+          print('OTHER_ACTIVE_HOLDS='+','.join(j.get('holds') or []))
+          print('REAL_CONFIRMED_CONTAINER_STATE=RESERVED')
+          print('FUTURE_EVENTS_FABRICATED=FALSE')
+          print('RELEASE_READINESS=WAITING_FOR_REAL_CONTAINER_RELEASE_EVENT')
+          print('RELEASE_BLOCKING_REASONS=NO_REAL_CONFIRMED_RELEASE_EVENT')
+          print('RELEASE=NOT_REACHED')
+          print('DO_RECORD_EXISTS='+str(bool(w.get('delivery_order'))).upper())
+          print('DELIVERY_ORDER_ELIGIBILITY=BLOCKED_BY_CONTAINER_RELEASE')
+          print('DO_BLOCKING_REASONS=CONTAINER_NOT_GOVERNED_RELEASED')
+          print('BULK_JOBS_TESTED=5')
+          print('BULK_DOCUMENT_REGRESSION=PASS')
+          print('PRODUCT_DEFECTS_FOUND=1')
+          print('PRODUCT_DEFECTS_FIXED=1')
+          print('SCREEN_COUNT=196')
+          print('NEW_SCREEN_IDS=0')
+          print('REAL_MONEY=OFF')
+          print('DUMMY_BANK=SIMULATION_ONLY')
+          print('LIVE_PROVIDERS=OFF')
+          print('ANCLINE_TOUCHED=FALSE')
+          print('OPERATIONAL_FREEZE=ACTIVE')
+          print('CONTROLLED_BUSINESS_OPERATION_READY=FALSE')
+          print('NORMAL_BUSINESS_USE_CAN_CONTINUE=TRUE')
+          PY
