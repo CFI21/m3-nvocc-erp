@@ -6,9 +6,9 @@ from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
 
 from .db import connect, using_postgres
-from .admin import session as iam_session, permission_code as iam_permission_code
-from .bulk_permission_governance import authorize_job
-from .release_governance import resolve_bl_release_authority
+from .admin import session as iam_session, permission_code as iam_permission_code, roles_for as iam_roles_for
+from .bulk_permission_governance import authorize_job, resolve_job_scope
+from .release_governance import resolve_bl_release_authority, upsert_release_container, delivery_order_eligible
 from .item12_reporting_consolidation_governance import (
     enabled as item12_enabled,
     scoped_pnl,
@@ -112,6 +112,16 @@ CREATE TABLE IF NOT EXISTS nvocc_extension_audit(
 class WorkspaceWrite(BaseModel):
     data:dict[str,Any]=Field(default_factory=dict)
 
+class ReleaseAction(BaseModel):
+    container_no:str
+    action:str="RELEASE"
+    condition_type:Optional[str]=None
+    condition_reason:Optional[str]=None
+    condition_valid_until:Optional[str]=None
+    approver_user_ref:Optional[str]=None
+    reissue_ref:Optional[str]=None
+    crt_ref:Optional[str]=None
+
 def _now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def _role(workspace:str,role:str):
     r=(role or "VIEWER").upper()
@@ -198,6 +208,87 @@ def upsert_workspace(workspace:str,b:WorkspaceWrite,x_role:str=Header("VIEWER"),
     current=_row(c.execute(f"SELECT * FROM {w['table']} WHERE {key}=?",(ref,)).fetchone())
     _audit(c,role,x_branch_scope,workspace,ref,action,old,current);c.close()
     return {"ok":True,"workspace":workspace,"record":current}
+
+@router.post("/release-control/{release_ref}/action")
+def release_control_action(
+    release_ref:str,
+    b:ReleaseAction,
+    x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+):
+    c=connect();_ensure(c)
+    try:
+        sess=iam_session(c,x_m3_session)
+        roles={str(r["role_code"]).upper() for r in iam_roles_for(c,sess["user_id"])}
+        approved_roles={"SUPER_ADMIN","ADMIN","OPS"}
+        if not (roles & approved_roles):
+            raise HTTPException(403,{"code":"RELEASE_ROLE_NOT_ALLOWED","roles":sorted(roles)})
+
+        header=c.execute("SELECT * FROM nvocc_release_controls WHERE release_ref=?",(release_ref,)).fetchone()
+        if not header:
+            raise HTTPException(404,{"code":"RELEASE_CONTROL_NOT_FOUND"})
+        header=dict(header)
+
+        auth=authorize_job(c,sess["user_id"],header["job_ref"],"agent-tasks","edit")
+        if not auth.get("allowed"):
+            raise HTTPException(403,{"code":"RELEASE_JOB_SCOPE_DENIED","detail":auth})
+        job_scope=resolve_job_scope(c,header["job_ref"],persist=False)
+
+        office=c.execute("""SELECT c.country_code,org.org_code organization_code
+          FROM iam_offices o
+          LEFT JOIN iam_countries c ON c.id=o.country_id
+          LEFT JOIN iam_organizations org ON org.id=o.organization_id
+          WHERE o.id=?""",(sess["home_office_id"],)).fetchone()
+        office=dict(office) if office else {}
+        chosen_role="SUPER_ADMIN" if "SUPER_ADMIN" in roles else ("ADMIN" if "ADMIN" in roles else "OPS")
+
+        approver_user_id=None
+        if b.approver_user_ref:
+            ar=c.execute("SELECT user_ref,status FROM iam_users WHERE user_ref=?",(b.approver_user_ref,)).fetchone()
+            if not ar or ar["status"]!="ACTIVE":
+                raise HTTPException(403,{"code":"RELEASE_APPROVER_NOT_ACTIVE"})
+            approver_user_id=ar["user_ref"]
+
+        result=upsert_release_container(
+            release_ref=release_ref,
+            container_no=b.container_no,
+            actor_user_id=sess["user_ref"],
+            actor_type="HUMAN",
+            action=b.action,
+            condition_type=b.condition_type,
+            condition_reason=b.condition_reason,
+            condition_valid_until=b.condition_valid_until,
+            approver_user_id=approver_user_id,
+            reissue_ref=b.reissue_ref,
+            actor_role=chosen_role,
+            office_scope=sess["office_code"],
+            branch_scope=job_scope.get("branch_code"),
+            country_scope=office.get("country_code"),
+            organization_scope=office.get("organization_code"),
+            crt_ref=b.crt_ref,
+        )
+        do_gate=delivery_order_eligible(
+            job_ref=header["job_ref"],
+            hbl_no=header["hbl_no"],
+            container_no=b.container_no,
+        )
+        return {
+            "ok":True,
+            "release":result,
+            "scope":{
+                "user_ref":sess["user_ref"],
+                "role":chosen_role,
+                "office_code":sess["office_code"],
+                "branch_code":job_scope.get("branch_code"),
+                "country_code":office.get("country_code"),
+                "organization_code":office.get("organization_code"),
+                "job_ref":header["job_ref"],
+                "container_no":b.container_no,
+            },
+            "physical_event_created":False,
+            "delivery_order_gate":do_gate,
+        }
+    finally:
+        c.close()
 
 @router.get("/release-prerequisites/{job_ref}")
 def release_prerequisites(job_ref:str,x_role:str=Header("VIEWER")):
