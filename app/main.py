@@ -61,6 +61,7 @@ from .crt_governance import router as crt_governance_router
 from .mrg import router as mrg_router
 from .agent_setup import router as agent_setup_router, assert_booking_rules
 from .ho_operational_setup import router as ho_operational_setup_router
+from .final_ho_setup import router as final_ho_setup_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
@@ -106,6 +107,7 @@ app.include_router(crt_governance_router)
 app.include_router(mrg_router)
 app.include_router(agent_setup_router)
 app.include_router(ho_operational_setup_router)
+app.include_router(final_ho_setup_router)
 app.include_router(management_kpi_router)
 app.include_router(control_tower_router)
 app.include_router(operations_workbench_router)
