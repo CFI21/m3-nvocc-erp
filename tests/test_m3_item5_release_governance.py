@@ -120,11 +120,51 @@ def test_pre_delivery_revoke_and_post_delivery_hold(isolated):
         """INSERT INTO container_events(
            event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json
            ) VALUES('EVT-ITEM5-DELIVERED',?,?, 'DELIVERED',?,'TSTPOD','DELIVERED','item5-test','{}')""",
-        (con["job_id"],con["id"],(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=30)).isoformat())
+        (con["job_id"],con["id"],(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(minutes=1)).isoformat())
     )
     c.close()
     post=upsert_release_container(release_ref="REL-TEST-001",container_no=isolated["container"],actor_user_id="USR-C",action="HOLD")
     assert post["status"]=="RELEASED_WITH_POST_DELIVERY_HOLD"
+
+
+def test_future_container_event_is_not_current_release_state(isolated):
+    c=db.connect()
+    con=c.execute("SELECT id,job_id FROM containers WHERE container_no=?",(isolated["container"],)).fetchone()
+    c.execute("UPDATE containers SET journey_state=NULL,equipment_status=NULL WHERE id=?",(con["id"],))
+    c.execute(
+        """INSERT INTO container_events(
+           event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json
+           ) VALUES('EVT-ITEM5-FUTURE',?,?,'DELIVERED',?,'TSTPOD','DELIVERED','item5-test','{}')""",
+        (con["job_id"],con["id"],(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=1)).isoformat())
+    )
+    c.close()
+    out=upsert_release_container(
+        release_ref="REL-TEST-001",container_no=isolated["container"],
+        actor_user_id="USR-FUTURE-TEST",action="HOLD",
+    )
+    assert out["status"]=="REVOKED"
+
+
+def test_synthetic_container_event_is_not_current_release_state(isolated):
+    c=db.connect()
+    con=c.execute("SELECT id,job_id FROM containers WHERE container_no=?",(isolated["container"],)).fetchone()
+    c.execute("UPDATE containers SET journey_state=NULL,equipment_status=NULL WHERE id=?",(con["id"],))
+    c.execute(
+        """INSERT INTO container_events(
+           event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json
+           ) VALUES('EVT-ITEM5-SYNTHETIC',?,?,'DELIVERED',?,'TSTPOD','DELIVERED','item5-test',?)""",
+        (
+            con["job_id"],con["id"],
+            (datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(minutes=1)).isoformat(),
+            json.dumps({"synthetic":True}),
+        )
+    )
+    c.close()
+    out=upsert_release_container(
+        release_ref="REL-TEST-001",container_no=isolated["container"],
+        actor_user_id="USR-SYNTHETIC-TEST",action="HOLD",
+    )
+    assert out["status"]=="REVOKED"
 
 
 def test_delivery_order_blocks_unreleased_container(isolated):
