@@ -5,7 +5,7 @@ from fastapi import HTTPException
 
 from app import db
 from app.seed import run as seed_run
-from app.main import UpdateBody, update_record
+from app.main import UpdateBody, ActionBody, update_record, action_record
 from app.crt_governance import (
     ApplyBody,
     CreateTicket,
@@ -195,3 +195,33 @@ def test_direct_edit_after_approved_trt_is_blocked(isolated):
     with pytest.raises(HTTPException) as e:
         update_record("trt",tid,UpdateBody(version=row["version"],fields={"Remarks":"Direct change"}),x_role="OPS",x_agent_scope=None,x_customer_scope=None)
     assert e.value.detail["code"]=="CRT_REQUIRED_AFTER_APPROVAL"
+
+
+def test_transshipment_not_applicable_clears_seeded_hold_and_canonicalizes_legacy_alias(isolated):
+    c=db.connect()
+    row=c.execute("SELECT id,version,job_id FROM transaction_records WHERE module='transshipment-trt' AND external_ref='CLX-TTRT-00004'").fetchone()
+    if not row:
+        row=c.execute("SELECT id,version,job_id FROM transaction_records WHERE module='transshipment-trt' ORDER BY id LIMIT 1").fetchone()
+    tid=row["id"]; jid=row["job_id"]; version=row["version"]
+    c.execute("UPDATE transaction_records SET module='transshipment-crt',status='Open' WHERE id=?",(tid,))
+    c.execute("UPDATE workflow_states SET transshipment_status='PENDING' WHERE job_id=?",(jid,))
+    c.execute("INSERT INTO workflow_holds(job_id,code,active,created_at) VALUES(?,?,1,'2026-10-05T00:00:00Z') ON CONFLICT(job_id,code) DO UPDATE SET active=1,cleared_at=NULL",(jid,'TRANSSHIPMENT_CONFIRMATION'))
+    c.close()
+    reason='NOT_APPLICABLE: seeded transshipment hold is stale for routing without POT'
+    out=action_record('transshipment-trt',tid,'cancel',ActionBody(version=version,reason=reason),x_role='ADMIN',x_agent_scope=None,x_customer_scope=None)
+    assert out["ok"] is True
+    c=db.connect()
+    tx=c.execute("SELECT module,status,payload_json FROM transaction_records WHERE id=?",(tid,)).fetchone()
+    ws=c.execute("SELECT transshipment_status FROM workflow_states WHERE job_id=?",(jid,)).fetchone()
+    hold=c.execute("SELECT active,cleared_at FROM workflow_holds WHERE job_id=? AND code='TRANSSHIPMENT_CONFIRMATION'",(jid,)).fetchone()
+    audit=c.execute("SELECT action,metadata_json FROM audit_events WHERE transaction_id=? ORDER BY id DESC LIMIT 1",(tid,)).fetchone()
+    c.close()
+    assert tx["module"]=='transshipment-trt'
+    assert tx["status"]=='Cancelled'
+    payload=json.loads(tx["payload_json"])
+    assert payload["Connection Status"]=='Not Applicable'
+    assert payload["Hold / Release"]=='N/A'
+    assert ws["transshipment_status"]=='N/A'
+    assert hold["active"]==0 and hold["cleared_at"]
+    assert audit["action"]=='CANCEL'
+    assert reason in audit["metadata_json"]
