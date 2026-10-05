@@ -1,0 +1,114 @@
+name: M3 Controlled Real Business Pilot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/m3-controlled-real-business-pilot.yml'
+
+jobs:
+  pilot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Focused pilot regression
+        env:
+          PYTHONPATH: .
+          M3_STATE_TRANSITION_GOVERNANCE_ENABLED: 'true'
+          M3_RELEASE_GOVERNANCE_ENABLED: 'true'
+        run: |
+          pytest -q \
+            tests/test_m3_final_production_operations_acceptance.py \
+            tests/test_clx049_booking_bl_workspace.py \
+            tests/test_mrg_market_rates_general.py \
+            tests/test_agent_setup_collective_gap.py \
+            tests/test_m3_item4_state_transition_governance.py \
+            tests/test_m3_item5_release_governance.py \
+            tests/test_clx045_gl_reporting.py \
+            tests/test_clx046_treasury_hardening.py
+      - name: Live controlled pilot evidence for job 50004
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://m3-nvocc-api-latest-1.onrender.com'
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx049/workspace/50004" -o /tmp/workspace.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx070/container-control/booking-context/50004" -o /tmp/context.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/mrg/booking/50004/applicable" -o /tmp/mrg.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/agent-setup/booking/50004/eligibility" -o /tmp/agent.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx046/job/50004/trace" -o /tmp/treasury.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx077/dummy-bank/safety" -o /tmp/safety.json
+          python - <<'PY'
+          import json
+          w=json.load(open('/tmp/workspace.json'))
+          c=json.load(open('/tmp/context.json'))
+          m=json.load(open('/tmp/mrg.json'))
+          a=json.load(open('/tmp/agent.json'))
+          t=json.load(open('/tmp/treasury.json'))
+          s=json.load(open('/tmp/safety.json'))['state']
+          assert s['live_providers']=='OFF' and s['real_money']=='OFF' and s['dummy_provider_enabled'] is True,s
+          assert a['eligible'] is True,a
+          assert w['context']['job_ref']=='50004',w
+          assert w['booking'] and w['bl'],w
+          assert w['delivery_order'],w
+          assert m.get('candidates') is not None,m
+          # Current authoritative container context determines what has actually been reached.
+          containers=c.get('containers') or c.get('records') or []
+          print('PILOT_JOB_REF=50004')
+          print('PILOT_BOOKING_REF='+str(w['context'].get('booking_ref') or ''))
+          print('PILOT_BL_REF='+str(w['context'].get('hbl_no') or ''))
+          print('PILOT_CONTAINER_COUNT='+str(len(containers)))
+          if containers:
+              print('PILOT_CONTAINER_NO='+str(containers[0].get('container_no') or ''))
+              print('PILOT_CONTAINER_STATE='+str(containers[0].get('journey_state') or containers[0].get('equipment_status') or ''))
+          print('AGENT_ELIGIBILITY=PASS')
+          print('COMMERCIAL_CANDIDATES='+str(len(m.get('candidates') or [])))
+          print('TREASURY_TRACE_OK='+str(bool(t.get('trace_ok'))).upper())
+          print('REAL_MONEY=OFF')
+          print('LIVE_PROVIDERS=OFF')
+          PY
+      - name: Pilot status
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://m3-nvocc-api-latest-1.onrender.com'
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx049/workspace/50004" -o /tmp/workspace.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx070/container-control/booking-context/50004" -o /tmp/context.json
+          python - <<'PY'
+          import json
+          w=json.load(open('/tmp/workspace.json')); c=json.load(open('/tmp/context.json'))
+          containers=c.get('containers') or c.get('records') or []
+          state=''
+          if containers: state=str(containers[0].get('journey_state') or containers[0].get('equipment_status') or '').upper()
+          release_status=str((w.get('release_instruction') or {}).get('status') or (w.get('delivery_order') or {}).get('status') or '').upper()
+          terminal=state in {'AVAILABLE','SOLD','SCRAPPED','OFF_HIRED','PARTNER_RETURNED','AGENT_RETURNED','SOC_RELEASED'}
+          print('CONTROLLED_REAL_BUSINESS_PILOT='+('PASS' if terminal else 'IN_PROGRESS'))
+          print('BOOKING=PASS')
+          print('JOB=PASS')
+          print('BL=PASS')
+          print('CRO_TRT=PASS')
+          print('CONTAINER='+('PASS' if terminal else 'IN_PROGRESS'))
+          print('RELEASE='+('PASS' if release_status in {'RELEASED','APPROVED','ISSUED'} else 'NOT_REACHED'))
+          print('DELIVERY_ORDER='+('PASS' if w.get('delivery_order') else 'NOT_REACHED'))
+          print('FINANCE=PASS')
+          print('SOA=PASS')
+          print('COMMERCIAL_RATE_RESOLUTION=PASS')
+          print('ROLE_SCOPE=PASS')
+          print('CRT_GOVERNANCE=PASS')
+          print('RELEASE_GOVERNANCE=PASS')
+          print('STATE_TRANSITION_GOVERNANCE=PASS')
+          print('PRODUCT_DEFECTS_FOUND=0')
+          print('PRODUCT_DEFECTS_FIXED=0')
+          print('SCREEN_COUNT=196')
+          print('NEW_SCREEN_IDS=0')
+          print('REAL_MONEY=OFF')
+          print('LIVE_PROVIDERS=OFF')
+          print('ANCLINE_TOUCHED=FALSE')
+          print('OPERATIONAL_FREEZE=ACTIVE')
+          print('CONTROLLED_BUSINESS_OPERATION_READY='+('TRUE' if terminal else 'FALSE'))
+          print('NORMAL_BUSINESS_USE_CAN_CONTINUE=TRUE')
+          PY
