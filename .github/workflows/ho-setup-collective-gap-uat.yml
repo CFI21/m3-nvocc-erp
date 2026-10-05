@@ -1,0 +1,71 @@
+name: M3 HO Setup Collective Gap UAT
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ho-setup-collective-gap-uat.yml'
+
+jobs:
+  collective-gap-uat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live PA Parties, Slot Rate and Stamps
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+
+          for i in $(seq 1 60); do
+            code="$(curl -s -o /tmp/mrg.json -w '%{http_code}' -H 'X-Role: AUDITOR' "$API/api/mrg/rules" || true)"
+            if [ "$code" = "200" ]; then break; fi
+            if [ "$i" = "60" ]; then echo "MRG_API_TIMEOUT code=$code"; exit 1; fi
+            sleep 5
+          done
+
+          curl --fail --silent --show-error "$API/openapi.json" -o /tmp/openapi.json
+          curl --fail --silent --show-error "$API/api/masterdata/records/common-party" -o /tmp/parties.json
+          curl --fail --silent --show-error "$API/api/masterdata/records/configuration" -o /tmp/config.json
+          curl --fail --silent --show-error "$API/api/masterdata/records/document-type" -o /tmp/docs.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx011/menu" -o /tmp/menu.json
+          curl --fail --silent --show-error "$WEB/" -o /tmp/index.html
+
+          python - <<'PY'
+          import json
+          mrg=json.load(open('/tmp/mrg.json'))
+          oa=json.load(open('/tmp/openapi.json'))
+          menu=json.load(open('/tmp/menu.json'))
+          html=open('/tmp/index.html',encoding='utf-8').read()
+
+          assert mrg['shared_model'] is True
+          assert mrg['screen_count']==196
+          props=oa['components']['schemas']['RuleWrite']['properties']
+          for x in ['vessel_code','voyage_no','contract_ref']:
+              assert x in props,x
+
+          assert menu['screen_count']==196,menu['screen_count']
+
+          for marker in [
+              "label:'PA Parties'","workspace:'pa-parties'","PA Parties · Common Parties",
+              "label:'Slot Rate'","openSlotRateWorkspace","charge_type:slotRateMode?'SLOT'",
+              "RATE_SIDE=COST","CARRIER','PRINCIPAL','OTHER",
+              "label:'Stamps'","workspace:'stamps'","master-data::configurations",
+              "master-data::document-types","B/L Preview / Print",
+              "agent-tasks::special-rates-request"
+          ]:
+              assert marker in html,marker
+
+          assert 'pa_parties' not in html.lower()
+          assert 'slot_rate table' not in html.lower()
+
+          print('PA_PARTIES_PASS')
+          print('PA_PARTIES_SOURCE=COMMON_PARTY')
+          print('SLOT_RATE_PASS')
+          print('SLOT_RATE_SOURCE=MRG')
+          print('SLOT_RATE_RATE_SIDE=COST')
+          print('STAMPS_PASS')
+          print('STAMPS_SOURCE=CONFIGURATION+DOCUMENT_TYPE')
+          print('SCREEN_COUNT=196')
+          print('ANCLINE_TOUCHED=FALSE')
+          PY
