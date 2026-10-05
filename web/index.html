@@ -151,27 +151,61 @@ for(const group of businessGroups){
   businessSub+='<button class="subBtn" onclick="toggleGroup(\''+sid+'\')">▾ '+esc(group.name)+' <span class=count>'+items.length+'</span></button><div data-content="'+esc(sid)+'">'+items.map(it=>'<div class="screenLink '+(state.navContext?.label===it.label?'active':'')+'" onclick="'+(it.workspace_key?'openPrincipalWorkspace(\''+String(it.workspace_key).replaceAll("'","\\'")+'\',\''+it.label.replaceAll("'","\\'")+'\',\''+it.target.replaceAll("'","\\'")+'\',\''+group.name.replaceAll("'","\\'")+'\')':'openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'Business Navigation\',submenu:\''+group.name.replaceAll("'","\\'")+'\',label:\''+it.label.replaceAll("'","\\'")+'\'})')+'">'+esc(it.label)+'</div>').join('')+'</div>';
 }
 if(businessCount)html+='<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup(\'business-navigation\')">▾ Business Navigation <span class=count>'+businessCount+'</span></button><div data-content="business-navigation">'+businessSub+'</div></div>';
-for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];let terms=s?[s.name,s.submenu,s.domain,s.key,s.screen_id,...(s.search_terms||[])]:[];return s&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);let terms=[it.label,sub.name,d.domain,...(it.search_terms||[]),...(s?.search_terms||[])];return s&&aliasOk&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'&&(!q||'setup account container coding account setup global equipment tower equipment control container master network reposition lease depot'.includes(q))){
-  const setupTarget=state.byId['gl-accounts::account-integration'];
-  const setupAllowed=setupTarget&&screenAllowed(setupTarget);
-  if(setupAllowed){
-    subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-reference-setup\')">▾ Setup <span class=count>4</span></button><div data-content="ho-reference-setup">'+
-      '<div class="screenLink '+(state.navContext?.label==='Account Setup'?'active':'')+'" onclick="openScreen(\'gl-accounts::account-integration\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Account Setup\'})">Account Setup</div>'+
-      '<div class="screenLink '+(state.equipmentView==='containers'?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Coding</div>'+
-      '<div class="screenLink '+(state.navContext?.label==='Rates Management'?'active':'')+'" onclick="openScreen(\'agent-tasks::special-rates-request\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Rates Management\'})">Rates Management</div>'+
-      '<div class="screenLink '+(state.navContext?.label==='Auto SOA'?'active':'')+'" onclick="openScreen(\'agent-tasks::soa\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Auto SOA\'})">Auto SOA</div></div>';
-    dcount+=4;
+for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];let terms=s?[s.name,s.submenu,s.domain,s.key,s.screen_id,...(s.search_terms||[])]:[];return s&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);let terms=[it.label,sub.name,d.domain,...(it.search_terms||[]),...(s?.search_terms||[])];return s&&aliasOk&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'){
+  const hoSetupAliases=[
+    {label:'Carriers',target:'master-data::carriers'},
+    {label:'Charges',target:'master-data::charge-codes'},
+    {label:'Vessel',target:'master-data::vessels'},
+    {label:'Agent',target:'master-data::agents'},
+    {label:'Account Setup',target:'gl-accounts::account-integration'},
+    {label:'Sub Company',target:'administration::legal-entities'},
+    {label:'Currency File',target:'master-data::currencies'},
+    {label:'Route Planning',target:'master-data::routes'},
+    {label:'Container Coding',equipment:'containers',gate:'agent-tasks::container-activity'},
+    {label:'Location And Terminals',target:'master-data::locations'},
+    {label:'UN/LOCODE',target:'master-data::ports'},
+    {label:'Ports Coding',target:'master-data::ports'},
+    {label:'Service Setup',target:'master-data::services'},
+    {label:'Company',target:'administration::legal-entities'},
+    {label:'Lease Rental Contract (Purchase)',equipment:'lease',gate:'agent-tasks::container-activity'},
+    {label:'Rates Management',target:'agent-tasks::special-rates-request'},
+    {label:'Auto SOA',target:'agent-tasks::soa'}
+  ];
+  const visibleSetup=hoSetupAliases.filter(it=>{
+    const s=state.byId[it.target||it.gate];
+    return s&&screenAllowed(s)&&(!q||it.label.toLowerCase().includes(q)||'ho tasks setup'.includes(q));
+  });
+  if(visibleSetup.length){
+    subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-reference-setup\')">▾ Setup <span class=count>'+visibleSetup.length+'</span></button><div data-content="ho-reference-setup">'+
+      visibleSetup.map(it=>{
+        const active=state.navContext?.domain==='HO Tasks'&&state.navContext?.submenu==='Setup'&&state.navContext?.label===it.label;
+        const label=it.label.replaceAll("'","\\'");
+        const action=it.equipment
+          ?'openHoSetupEquipment(\''+it.equipment+'\',\''+label+'\')'
+          :'openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label+'\'})';
+        return '<div class="screenLink '+(active?'active':'')+'" onclick="'+action+'">'+esc(it.label)+'</div>';
+      }).join('')+'</div>';
+    dcount+=visibleSetup.length;
   }
-  subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-equipment-control\')">▾ Equipment Control <span class=count>6</span></button><div data-content="ho-equipment-control">'+
-    '<div class="screenLink '+(state.equipmentView==='tower'?'active':'')+'" onclick="showEquipmentWorkspace(\'tower\')">Global Equipment Tower</div>'+
-    '<div class="screenLink '+(state.equipmentView==='containers'?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Master</div>'+
-    '<div class="screenLink '+(state.equipmentView==='network'?'active':'')+'" onclick="showEquipmentWorkspace(\'network\')">Network Position & Reposition</div>'+
-    '<div class="screenLink '+(state.equipmentView==='lease'?'active':'')+'" onclick="showEquipmentWorkspace(\'lease\')">Lease Control</div>'+
-    '<div class="screenLink '+(state.equipmentView==='mr'?'active':'')+'" onclick="showEquipmentWorkspace(\'mr\')">Depot / M&R</div>'+
-    '<div class="screenLink '+(state.equipmentView==='kpi'?'active':'')+'" onclick="showEquipmentWorkspace(\'kpi\')">Equipment KPI</div></div>';
-  dcount+=6;
+  const equipmentTerms='global equipment tower equipment control container master network position reposition lease control depot m&r equipment kpi';
+  if(!q||equipmentTerms.includes(q)){
+    subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-equipment-control\')">▾ Equipment Control <span class=count>6</span></button><div data-content="ho-equipment-control">'+
+      '<div class="screenLink '+(state.equipmentView==='tower'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'tower\')">Global Equipment Tower</div>'+
+      '<div class="screenLink '+(state.equipmentView==='containers'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Master</div>'+
+      '<div class="screenLink '+(state.equipmentView==='network'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'network\')">Network Position & Reposition</div>'+
+      '<div class="screenLink '+(state.equipmentView==='lease'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'lease\')">Lease Control</div>'+
+      '<div class="screenLink '+(state.equipmentView==='mr'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'mr\')">Depot / M&R</div>'+
+      '<div class="screenLink '+(state.equipmentView==='kpi'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'kpi\')">Equipment KPI</div></div>';
+    dcount+=6;
+  }
 }
 if(!dcount)continue;let did=domainSlug(d.domain);html+=`<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup('${did}')">▾ ${esc(d.domain)} <span class=count>${dcount}</span></button><div data-content="${esc(did)}">${subHtml}</div></div>`}  $('nav').innerHTML=html}
+async function openHoSetupEquipment(view,label){
+  await showEquipmentWorkspace(view);
+  state.navContext={domain:'HO Tasks',submenu:'Setup',label};
+  renderNav();
+  renderBreadcrumb();
+}
 function renderBreadcrumb(){let s=state.current,n=state.navContext;if(n){$('breadcrumb').textContent=`M3 NVOCC ERP / ${n.domain} / ${n.submenu} / ${n.label}`;$('topTitle').textContent=n.label;$('pageTitle').textContent=n.label;document.title=`M3 NVOCC ERP — ${n.label}`}else{$('breadcrumb').textContent=`M3 NVOCC ERP / ${s.domain} / ${s.submenu} / ${s.name}`;$('topTitle').textContent=s.name;$('pageTitle').textContent=s.name;document.title=`M3 NVOCC ERP — ${s.name}`}$('favorite').textContent=state.favorites.has(s.screen_id)?'★':'☆';$('favorite').classList.toggle('on',state.favorites.has(s.screen_id))}
 function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,15);saveState()}
 function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);let i=same.findIndex(s=>s.screen_id===state.current.screen_id);return same[i+dir]?.screen_id||null}
