@@ -6,7 +6,9 @@ from fastapi import HTTPException
 
 from app import db
 from app.seed import run as seed_run
-from app.nvocc_principal_extensions import WorkspaceWrite, upsert_workspace
+from app.admin_seed import run as admin_seed_run
+from app.admin import Login, login
+from app.nvocc_principal_extensions import WorkspaceWrite, ReleaseAction, upsert_workspace, release_control_action
 from app.release_governance import (
     assert_delivery_order_eligible,
     delivery_order_eligible,
@@ -20,6 +22,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setattr(db,"DB_PATH",tmp_path/"item5.db")
     monkeypatch.setenv("M3_RELEASE_GOVERNANCE_ENABLED","true")
     seed_run(True)
+    admin_seed_run()
     c=db.connect()
     jid=c.execute("SELECT id FROM jobs WHERE job_ref='50001'").fetchone()["id"]
     hbl=c.execute("SELECT bill_no FROM bills WHERE job_id=? AND kind='HBL' ORDER BY id LIMIT 1",(jid,)).fetchone()["bill_no"]
@@ -57,14 +60,35 @@ def test_hbl_container_prerequisites_are_authoritative(isolated):
     assert p["negative_margin_blocks_release"] is False
 
 
-def test_release_one_container_and_do_eligibility(isolated):
+def test_release_authorization_does_not_fake_physical_event_or_do_eligibility(isolated):
     out=upsert_release_container(
         release_ref="REL-TEST-001",container_no=isolated["container"],
         actor_user_id="USR-RELEASE-001",action="RELEASE",
     )
     assert out["status"]=="RELEASED"
     assert out["summary_status"]=="RELEASED"
-    assert delivery_order_eligible(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])["eligible"] is True
+    gate=delivery_order_eligible(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
+    assert gate["cargo_release_authorized"] is True
+    assert gate["real_container_release_event_found"] is False
+    assert gate["eligible"] is False
+
+    c=db.connect()
+    con=c.execute("SELECT id,job_id FROM containers WHERE container_no=?",(isolated["container"],)).fetchone()
+    c.execute(
+        """INSERT INTO container_events(
+           event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json
+           ) VALUES('EVT-ITEM5-REAL-RELEASE',?,?,'RELEASED',?,'TSTPOD','RELEASED','terminal-release',?)""",
+        (
+            con["job_id"],con["id"],
+            (datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(seconds=1)).isoformat(),
+            json.dumps({"actor_user_id":"USR-PHYSICAL-001","release_ref":"REL-TEST-001"}),
+        )
+    )
+    c.close()
+    gate=delivery_order_eligible(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
+    assert gate["real_container_release_event_found"] is True
+    assert gate["real_container_release_event_ref"]=="EVT-ITEM5-REAL-RELEASE"
+    assert gate["eligible"] is True
 
 
 def test_partial_release_summary(isolated):
@@ -163,6 +187,45 @@ def test_synthetic_container_event_is_not_current_release_state(isolated):
         actor_user_id="USR-SYNTHETIC-TEST",action="HOLD",
     )
     assert out["status"]=="REVOKED"
+
+
+def test_release_control_operator_action_requires_real_session_and_approved_role(isolated):
+    with pytest.raises(HTTPException) as e:
+        release_control_action(
+            "REL-TEST-001",
+            ReleaseAction(container_no=isolated["container"],action="RELEASE"),
+            x_m3_session=None,
+        )
+    assert e.value.status_code==401
+
+    auditor=login(Login(username="auditor",password="Audit123!",mfa_code="123456"))["session_token"]
+    with pytest.raises(HTTPException) as e:
+        release_control_action(
+            "REL-TEST-001",
+            ReleaseAction(container_no=isolated["container"],action="RELEASE"),
+            x_m3_session=auditor,
+        )
+    assert e.value.detail["code"]=="RELEASE_ROLE_NOT_ALLOWED"
+
+
+def test_release_control_operator_action_is_iam_scoped_and_does_not_create_physical_event(isolated):
+    admin=login(Login(username="admin",password="Admin123!",mfa_code="123456"))["session_token"]
+    out=release_control_action(
+        "REL-TEST-001",
+        ReleaseAction(container_no=isolated["container"],action="RELEASE"),
+        x_m3_session=admin,
+    )
+    assert out["release"]["status"]=="RELEASED"
+    assert out["physical_event_created"] is False
+    assert out["scope"]["user_ref"]
+    assert out["scope"]["office_code"]
+    assert out["scope"]["country_code"]
+    assert out["scope"]["organization_code"]
+    assert out["scope"]["job_ref"]=="50001"
+    assert out["scope"]["container_no"]==isolated["container"]
+    assert out["delivery_order_gate"]["cargo_release_authorized"] is True
+    assert out["delivery_order_gate"]["real_container_release_event_found"] is False
+    assert out["delivery_order_gate"]["eligible"] is False
 
 
 def test_delivery_order_blocks_unreleased_container(isolated):
