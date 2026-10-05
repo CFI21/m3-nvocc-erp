@@ -277,6 +277,31 @@ def import_booking(job_ref:str,b:ImportBody,x_role:str=Header("VIEWER"),x_m3_ses
     finally:c.close()
 
 @router.get("/report")
-def report(mrg_type:Optional[str]=None,rate_side:Optional[str]=None,party_type:Optional[str]=None,party_code:Optional[str]=None,status:Optional[str]=None,valid_on:Optional[str]=None,
+def report(mrg_type:Optional[str]=None,rate_side:Optional[str]=None,party_type:Optional[str]=None,party_code:Optional[str]=None,
+           charge_code:Optional[str]=None,pol:Optional[str]=None,pot:Optional[str]=None,pod:Optional[str]=None,depot_code:Optional[str]=None,
+           currency:Optional[str]=None,size_type:Optional[str]=None,container_type:Optional[str]=None,status:Optional[str]=None,
+           valid_on:Optional[str]=None,latest_only:bool=False,
            x_role:str=Header("VIEWER"),x_m3_session:Optional[str]=Header(None,alias="X-M3-Session")):
-    return list_rules(mrg_type,rate_side,party_type,party_code,status,valid_on,x_role,x_m3_session)
+    c=connect()
+    try:
+        ensure(c);a=actor(c,x_m3_session,x_role);require(a,VIEW)
+        q="SELECT * FROM mrg_rules WHERE 1=1";args=[]
+        for col,val in (("mrg_type",mrg_type),("rate_side",rate_side),("party_type",party_type),("party_code",party_code),
+                        ("charge_code",charge_code),("pol",pol),("pot",pot),("pod",pod),("depot_code",depot_code),
+                        ("currency",currency),("size_type",size_type),("container_type",container_type),("status",status)):
+            if val:
+                q+=f" AND {col}=?";args.append(str(val).upper() if col in {"mrg_type","rate_side","party_type","status","currency"} else val)
+        if valid_on:
+            q+=" AND effective_from<=? AND (effective_to IS NULL OR effective_to='' OR effective_to>=?)";args.extend([valid_on,valid_on])
+        q+=" ORDER BY effective_from DESC,priority,rule_ref"
+        rows=[row(x) for x in c.execute(q,args).fetchall()]
+        if latest_only:
+            seen=set();latest=[]
+            for x in rows:
+                k=(x["mrg_type"],x["rate_side"],x["party_type"],x.get("party_code"),x["charge_code"],x.get("pol"),x.get("pot"),x.get("pod"),x.get("size_type"),x.get("container_type"))
+                if k in seen:continue
+                seen.add(k);latest.append(x)
+            rows=latest
+        for x in rows:x["slabs"]=[row(s) for s in c.execute("SELECT * FROM mrg_slabs WHERE rule_ref=? ORDER BY from_day,slab_ref",(x["rule_ref"],)).fetchall()]
+        return {"count":len(rows),"records":rows,"shared_model":True,"screen_count":196}
+    finally:c.close()
