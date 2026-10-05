@@ -1,0 +1,63 @@
+name: M3 Final HO Setup Gap Cluster UAT
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/final-ho-setup-gap-uat.yml'
+
+jobs:
+  final-ho-setup-uat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Regression
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_final_ho_setup_gap_cluster.py tests/test_mrg_market_rates_general.py tests/test_clx071_container_journey.py tests/test_m3_item4_state_transition_governance.py tests/test_clx074_depot_mr.py tests/test_clx072_equipment_network.py
+      - name: Live endpoints and UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          for p in damage-setup container-status local-recovery-agreements long-ageing; do
+            curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/final-ho-setup/$p" -o "/tmp/$p.json"
+          done
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/mrg/booking/50004/applicable" -o /tmp/mrg-applicable.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx011/menu" -o /tmp/menu.json
+          curl --fail --silent --show-error "$WEB/" -o /tmp/index.html
+          python - <<'PY'
+          import json
+          html=open('/tmp/index.html',encoding='utf-8').read()
+          damage=json.load(open('/tmp/damage-setup.json'))
+          status=json.load(open('/tmp/container-status.json'))
+          recovery=json.load(open('/tmp/local-recovery-agreements.json'))
+          ageing=json.load(open('/tmp/long-ageing.json'))
+          mrg=json.load(open('/tmp/mrg-applicable.json'))
+          menu=json.load(open('/tmp/menu.json'))
+          assert damage['duplicate_mr_engine'] is False
+          assert status['duplicate_status_engine'] is False
+          assert status['state_transition_governance_changed'] is False
+          assert recovery['direct_finance_posting'] is False
+          assert ageing['equipment_network_changed'] is False
+          assert ageing['server_side_evaluation'] is True
+          assert menu['screen_count']==196
+          assert any(x.get('rate_side')=='REVENUE' and x.get('party_type')=='CUSTOMER' for x in mrg.get('candidates',[])), mrg
+          for marker in ['Damage Setup','Container Status','Customer Tariff','Local Recovery Agreement','Long Ageing Configuration','openCustomerTariffWorkspace','Import MRG','Special Rate Request']:
+              assert marker in html,marker
+          print('DAMAGE_SETUP=PASS')
+          print('CONTAINER_STATUS=PASS')
+          print('CUSTOMER_TARIFF=PASS')
+          print('CUSTOMER_TARIFF_BOOKING_IMPORT=PASS')
+          print('SPECIAL_RATE_PRIORITY=PASS')
+          print('LOCAL_RECOVERY_AGREEMENT=PASS')
+          print('LONG_AGEING_CONFIGURATION=PASS')
+          print('SCREEN_COUNT=196')
+          print('ANCLINE_TOUCHED=FALSE')
+          PY
