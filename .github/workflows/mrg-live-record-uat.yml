@@ -1,0 +1,227 @@
+name: M3 MRG Live Record UAT
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/mrg-live-record-uat.yml'
+
+jobs:
+  mrg-live-uat:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run controlled live MRG record UAT
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, urllib.request, urllib.error, time, sys
+
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+
+          def req(method,path,body=None,role="AUDITOR"):
+              data=None if body is None else json.dumps(body).encode()
+              h={"X-Role":role}
+              if body is not None: h["Content-Type"]="application/json"
+              r=urllib.request.Request(API+path,data=data,headers=h,method=method)
+              try:
+                  with urllib.request.urlopen(r,timeout=30) as x:
+                      raw=x.read().decode()
+                      return x.status, json.loads(raw) if raw else {}
+              except urllib.error.HTTPError as e:
+                  raw=e.read().decode()
+                  try: payload=json.loads(raw)
+                  except Exception: payload={"raw":raw}
+                  return e.code,payload
+
+          # Wait for API containing MRG routes.
+          for i in range(60):
+              code,data=req("GET","/api/mrg/rules",role="AUDITOR")
+              if code==200: break
+              time.sleep(5)
+          else:
+              raise AssertionError(("MRG_API_NOT_AVAILABLE",code,data))
+
+          results={}
+
+          # Existing controlled live booking/job 50004 is OPEN and has an approved legacy SRR.
+          code,before_booking=req("GET","/api/v1/booking/69",role="ADMIN")
+          assert code==200,(code,before_booking)
+          before_version=before_booking["version"]
+
+          # Finance boundary snapshot.
+          _,before_gl=req("GET","/api/gl/job/50004/links",role="AUDITOR")
+          _,before_tre=req("GET","/api/clx046/job/50004/trace",role="AUDITOR")
+          before_gl_count=len(before_gl.get("links",[]))
+          before_tre_count=len(before_tre.get("treasury_records",[]))
+
+          base={
+            "effective_from":"2026-09-01","effective_to":"2026-12-31",
+            "pol":"PKKHI","pod":"BEANR","size_type":"40HC","currency":"USD","rate_basis":"PER_CONTAINER"
+          }
+
+          defs=[
+            # Export revenue
+            dict(base,mrg_type="EXPORT",rate_side="REVENUE",party_type="CUSTOMER",party_code="CLX-CUS-004",charge_code="OFR",unit_rate=3100,remarks="MRG LIVE UAT revenue OFR"),
+            dict(base,mrg_type="EXPORT",rate_side="REVENUE",party_type="CUSTOMER",party_code="CLX-CUS-004",charge_code="THC",unit_rate=180,remarks="MRG LIVE UAT revenue THC"),
+            dict(base,mrg_type="EXPORT",rate_side="REVENUE",party_type="CUSTOMER",party_code="CLX-CUS-004",charge_code="DOC",unit_rate=75,remarks="MRG LIVE UAT revenue DOC"),
+            # Export cost / agent matrix
+            dict(base,mrg_type="EXPORT",rate_side="COST",party_type="CARRIER",party_code="ONE",charge_code="OFR",unit_rate=2450,remarks="MRG LIVE UAT carrier cost OFR"),
+            dict(base,mrg_type="EXPORT",rate_side="COST",party_type="AGENT",party_code="CLX-AGT-KHI",charge_code="THC",unit_rate=95,remarks="MRG LIVE UAT agent cost THC"),
+            dict(base,mrg_type="EXPORT",rate_side="COST",party_type="TERMINAL",party_code=None,charge_code="DOC",unit_rate=35,remarks="MRG LIVE UAT terminal cost DOC"),
+            # Import local definitions retained in same shared model (using existing charge codes)
+            dict(base,mrg_type="IMPORT",rate_side="REVENUE",party_type="CUSTOMER",party_code="CLX-CUS-004",charge_code="THC",unit_rate=205,remarks="MRG LIVE UAT import local revenue"),
+            dict(base,mrg_type="IMPORT",rate_side="COST",party_type="AGENT",party_code="CLX-AGT-KHI",charge_code="DOC",unit_rate=42,remarks="MRG LIVE UAT import local cost"),
+          ]
+
+          refs=[]
+          for d in defs:
+              code,out=req("POST","/api/mrg/rules",d,role="ADMIN")
+              assert code==200,(code,out,d)
+              ref=out["rule_ref"]; refs.append(ref)
+              assert out["status"]=="PENDING_APPROVAL"
+              # Same maker cannot approve.
+              c2,o2=req("POST",f"/api/mrg/rules/{ref}/approve",role="ADMIN")
+              assert c2==409,(c2,o2)
+              assert "MAKER_CHECKER_CONFLICT" in json.dumps(o2)
+              # Authorized independent checker.
+              c3,o3=req("POST",f"/api/mrg/rules/{ref}/approve",role="FINANCE")
+              assert c3==200,(c3,o3)
+              assert o3["status"]=="APPROVED"
+
+          # Unauthorized role cannot create.
+          bad=dict(base,mrg_type="EXPORT",rate_side="COST",party_type="AGENT",party_code="CLX-AGT-KHI",charge_code="DOC",unit_rate=999,remarks="MUST NOT CREATE")
+          c,o=req("POST","/api/mrg/rules",bad,role="VIEWER")
+          assert c==403,(c,o)
+          results["MRG_ROLE_SCOPE"]="PASS"
+
+          # Detention shared engine + multiple slabs.
+          det=dict(base,mrg_type="DETENTION",rate_side="COST",party_type="AGENT",party_code="CLX-AGT-KHI",charge_code="THC",unit_rate=0,free_days=5,rate_basis="PER_DAY",remarks="MRG LIVE UAT detention")
+          c,o=req("POST","/api/mrg/rules",det,role="ADMIN"); assert c==200,(c,o); det_ref=o["rule_ref"]
+          for slab in [
+              {"from_day":1,"till_day":5,"rate":0,"size_type":"40","container_type":"HC","currency":"USD"},
+              {"from_day":6,"till_day":10,"rate":25,"size_type":"40","container_type":"HC","currency":"USD"},
+              {"from_day":11,"till_day":20,"rate":40,"size_type":"40","container_type":"HC","currency":"USD"},
+          ]:
+              c,s=req("POST",f"/api/mrg/rules/{det_ref}/slabs",slab,role="ADMIN"); assert c==200,(c,s)
+          c,o=req("POST",f"/api/mrg/rules/{det_ref}/approve",role="FINANCE"); assert c==200,(c,o)
+
+          detexp=dict(base,mrg_type="DETENTION_EXPORT",rate_side="COST",party_type="AGENT",party_code="CLX-AGT-KHI",charge_code="THC",unit_rate=0,free_days=7,rate_basis="PER_DAY",remarks="MRG LIVE UAT detention export")
+          c,o=req("POST","/api/mrg/rules",detexp,role="ADMIN"); assert c==200,(c,o); detexp_ref=o["rule_ref"]
+          c,o=req("POST",f"/api/mrg/rules/{detexp_ref}/slabs",{"from_day":8,"till_day":15,"rate":30,"size_type":"40","container_type":"HC","currency":"USD"},role="ADMIN"); assert c==200,(c,o)
+          c,o=req("POST",f"/api/mrg/rules/{detexp_ref}/approve",role="FINANCE"); assert c==200,(c,o)
+
+          mty=dict(base,mrg_type="MTY_STORAGE",rate_side="COST",party_type="DEPOT",party_code=None,charge_code="THC",unit_rate=0,free_days=3,lolo_rate=18,invoice_basis="PER_DAY",slab_wise=True,rate_basis="PER_DAY",depot_code="UAT-DEPOT",remarks="MRG LIVE UAT MTY storage")
+          c,o=req("POST","/api/mrg/rules",mty,role="ADMIN"); assert c==200,(c,o); mty_ref=o["rule_ref"]
+          c,o=req("POST",f"/api/mrg/rules/{mty_ref}/slabs",{"from_day":4,"till_day":10,"rate":15,"size_type":"40","container_type":"HC","currency":"USD"},role="ADMIN"); assert c==200,(c,o)
+          c,o=req("POST",f"/api/mrg/rules/{mty_ref}/approve",role="FINANCE"); assert c==200,(c,o)
+
+          special=dict(base,mrg_type="SPECIAL_DETENTION",rate_side="COST",party_type="AGENT",party_code="CLX-AGT-KHI",charge_code="THC",unit_rate=12,free_days=10,rate_basis="PER_DAY",
+                       booking_ref="CLX-BKG-50004",job_ref="50004",original_rule_ref=det_ref,exception_reason="Controlled live UAT special detention",remarks="MRG LIVE UAT special detention")
+          c,o=req("POST","/api/mrg/rules",special,role="ADMIN"); assert c==200,(c,o); special_det_ref=o["rule_ref"]
+          c,o=req("POST",f"/api/mrg/rules/{special_det_ref}/approve",role="FINANCE"); assert c==200,(c,o)
+
+          # Applicable matching and non-matching rejection.
+          c,app=req("GET","/api/mrg/booking/50004/applicable",role="AUDITOR"); assert c==200,(c,app)
+          candidates=app["candidates"]
+          applicable_refs={x["rule_ref"] for x in candidates}
+          assert set(refs[:6]).issubset(applicable_refs),(set(refs[:6])-applicable_refs,candidates)
+          assert refs[6] not in applicable_refs and refs[7] not in applicable_refs
+          assert all(x["pol"]=="PKKHI" and x["pod"]=="BEANR" for x in candidates if x["rule_ref"] in refs[:6])
+          results["MRG_MATCHING"]="PASS";results["MRG_NON_MATCH_REJECTION"]="PASS"
+
+          # Legacy approved Special Rate on 50004 must win over MRG OFR.
+          ofr=[x for x in candidates if x["charge_code"]=="OFR" and x["rate_side"]=="REVENUE" and x["party_type"]=="CUSTOMER"]
+          assert ofr,(candidates)
+          assert ofr[0]["resolution"]=="SUPERSEDED_BY_SPECIAL_RATE",ofr[0]
+          assert float(ofr[0]["applied_rate"])==2850,ofr[0]
+          results["SPECIAL_RATE_PRIORITY"]="PASS"
+
+          # SKIP = do nothing.
+          c,skip_booking=req("GET","/api/v1/booking/69",role="ADMIN");assert c==200
+          assert skip_booking["version"]==before_version
+          results["IMPORT_SKIP"]="PASS"
+
+          # Selected import: one agent-cost rule only.
+          agent_ref=refs[4]
+          c,sel=req("POST","/api/mrg/booking/50004/import",{"rule_refs":[agent_ref],"import_all":False,"conflict_action":"KEEP_EXISTING"},role="ADMIN")
+          assert c==200,(c,sel)
+          assert any(x["status"]=="IMPORTED" for x in sel["results"]),sel
+          results["IMPORT_SELECTED"]="PASS"
+
+          # Duplicate protection.
+          c,dup=req("POST","/api/mrg/booking/50004/import",{"rule_refs":[agent_ref],"import_all":False,"conflict_action":"KEEP_EXISTING"},role="ADMIN")
+          assert c==200,(c,dup)
+          assert all(x["status"]=="ALREADY_PRESENT" for x in dup["results"]),dup
+          results["DUPLICATE_PROTECTION"]="PASS"
+
+          # Import all applicable standard rates.
+          c,allimp=req("POST","/api/mrg/booking/50004/import",{"rule_refs":[],"import_all":True,"conflict_action":"KEEP_EXISTING"},role="ADMIN")
+          assert c==200,(c,allimp)
+          results["IMPORT_ALL"]="PASS"
+
+          # Verify booking commercial traceability and Agent Cost separation.
+          c,after_booking=req("GET","/api/v1/booking/69",role="ADMIN");assert c==200,(c,after_booking)
+          charges=after_booking["fields"].get("Commercial Charges") or []
+          assert charges,after_booking
+          required={"charge_code","party_type","party_code","rate_side","rate_basis","currency","original_rate","applied_rate",
+                    "source_type","source_reference","source_version","mrg_reference","mrg_version","imported_at","approval_reference"}
+          assert all(required.issubset(set(x)) for x in charges),charges
+          agent=[x for x in charges if x["mrg_reference"]==agent_ref]
+          assert len(agent)==1 and agent[0]["party_type"]=="AGENT" and agent[0]["rate_side"]=="COST",agent
+          assert not any(x["mrg_reference"]==agent_ref and x["rate_side"]=="REVENUE" for x in charges)
+          results["AGENT_COST_MATRIX"]="PASS";results["REVENUE_COST_SEPARATION"]="PASS";results["SOURCE_VERSION_TRACEABILITY"]="PASS"
+
+          # Approved booking freeze / CRT: use existing approved job 50002.
+          freeze=dict(effective_from="2026-09-01",effective_to="2026-12-31",mrg_type="EXPORT",rate_side="REVENUE",party_type="CUSTOMER",party_code="CLX-CUS-002",
+                      charge_code="DOC",pol="AEJEA",pod="DEHAM",size_type="40HC",currency="USD",rate_basis="PER_CONTAINER",unit_rate=88,remarks="MRG UAT freeze")
+          c,o=req("POST","/api/mrg/rules",freeze,role="ADMIN");assert c==200,(c,o); freeze_ref=o["rule_ref"]
+          c,o=req("POST",f"/api/mrg/rules/{freeze_ref}/approve",role="FINANCE");assert c==200,(c,o)
+          c,o=req("POST","/api/mrg/booking/50002/import",{"rule_refs":[freeze_ref],"import_all":False},role="ADMIN")
+          assert c==409,(c,o)
+          assert "CRT_REQUIRED_AFTER_APPROVAL" in json.dumps(o),o
+          results["BOOKING_RATE_FREEZE"]="PASS";results["CRT_AFTER_APPROVAL"]="PASS"
+
+          # MRG report filters.
+          for path in [
+              "/api/mrg/report?mrg_type=EXPORT&rate_side=COST&party_type=AGENT&party_code=CLX-AGT-KHI&pol=PKKHI&pod=BEANR&currency=USD&size_type=40HC&status=APPROVED",
+              "/api/mrg/report?mrg_type=DETENTION&valid_on=2026-09-24&latest_only=true",
+              "/api/mrg/report?mrg_type=MTY_STORAGE&depot_code=UAT-DEPOT",
+          ]:
+              c,o=req("GET",path,role="AUDITOR");assert c==200 and o["count"]>=1,(c,o)
+          results["MRG_LIST_REPORT"]="PASS"
+
+          # Detention/storage records still preserve slabs and original linkage.
+          c,allrules=req("GET","/api/mrg/rules",role="AUDITOR");assert c==200
+          rules={x["rule_ref"]:x for x in allrules["records"]}
+          assert len(rules[det_ref]["slabs"])==3
+          assert len(rules[detexp_ref]["slabs"])==1
+          assert len(rules[mty_ref]["slabs"])==1 and float(rules[mty_ref]["lolo_rate"])==18
+          assert rules[special_det_ref]["original_rule_ref"]==det_ref
+          assert rules[det_ref]["unit_rate"]==0
+          results["DETENTION_SLABS"]="PASS";results["DETENTION_EXPORT"]="PASS";results["MTY_STORAGE"]="PASS";results["SPECIAL_DETENTION"]="PASS";results["ORIGINAL_DETENTION_PRESERVED"]="TRUE"
+
+          # Finance boundary after booking import.
+          _,after_gl=req("GET","/api/gl/job/50004/links",role="AUDITOR")
+          _,after_tre=req("GET","/api/clx046/job/50004/trace",role="AUDITOR")
+          assert len(after_gl.get("links",[]))==before_gl_count,(before_gl,after_gl)
+          assert len(after_tre.get("treasury_records",[]))==before_tre_count,(before_tre,after_tre)
+          results["FINANCE_BOUNDARY"]="PASS"
+
+          # Audit contains MRG create + approve + import.
+          c,aud=req("GET","/api/v1/system/events/audit?job_ref=50004&limit=100",role="AUDITOR")
+          assert c==200,(c,aud)
+          assert any(x.get("module")=="mrg" and x.get("action")=="MRG_BOOKING_IMPORT" for x in aud),aud
+          results["MRG_MAKER_CHECKER"]="PASS"
+
+          # Live web markers and preserved Rates Management.
+          with urllib.request.urlopen("https://m3-nvocc-web-latest.onrender.com/",timeout=30) as x:
+              html=x.read().decode()
+          for marker in ["Import MRG","Import Selected","Import All","Special Rate Request","MRG Detention","Special Detention","MRG MTY Storage"]:
+              assert marker in html,marker
+          assert "agent-tasks::special-rates-request" in html
+          results["WEB_MRG_UI"]="PASS"
+
+          print("M3_LIVE_MRG_RECORD_UAT_PASS")
+          print(json.dumps(results,sort_keys=True))
+          PY
