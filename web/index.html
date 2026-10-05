@@ -241,15 +241,37 @@ function mrgTabs(){
 async function renderMrgWorkspace(){
   $('gridArea').innerHTML='<div class="card">Loading MRG…</div>';
   try{
-    const u=mrgWorkspaceType==='REPORT'?'/api/mrg/report':'/api/mrg/rules?mrg_type='+encodeURIComponent(mrgWorkspaceType);
+    const u=mrgWorkspaceType==='REPORT'?('/api/mrg/report'+mrgReportQuery()):('/api/mrg/rules?mrg_type='+encodeURIComponent(mrgWorkspaceType));
     const d=await mrgApi(u);mrgRows=d.records||[];
     const toolbar='<div class="toolbar"><b>'+esc(mrgWorkspaceLabel)+'</b><span class="muted">One shared MRG model · '+mrgRows.length+' rule(s)</span><span class="grow"></span>'+
-      (mrgWorkspaceType==='REPORT'?'':'<button class="btn primary" onclick="mrgNewRule()">New Rate</button>')+
+      (mrgWorkspaceType==='REPORT'?'<button class="btn" onclick="mrgResetReport()">Reset Filters</button>':'<button class="btn primary" onclick="mrgNewRule()">New Rate</button>')+
       '<button class="btn" onclick="mrgWorkspaceType=\'REPORT\';mrgWorkspaceLabel=\'MRG List / Report\';renderMrgWorkspace()">List / Report</button></div>';
     const heads=['MRG Ref','Side','Party','Charge','POL','POT','POD','Currency','Basis','Rate','Valid From','Valid To','Status','Version','Action'];
     const body=mrgRows.length?mrgRows.map(r=>'<tr><td><b>'+esc(r.rule_ref)+'</b></td><td>'+esc(r.rate_side)+'</td><td>'+esc((r.party_type||'')+' '+(r.party_code||''))+'</td><td>'+esc(r.charge_code)+'</td><td>'+esc(r.pol||'')+'</td><td>'+esc(r.pot||'')+'</td><td>'+esc(r.pod||'')+'</td><td>'+esc(r.currency)+'</td><td>'+esc(r.rate_basis)+'</td><td>'+esc(r.unit_rate)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to||'')+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.version)+'</td><td><button class="btn" onclick="mrgOpenRule(\''+esc(r.rule_ref)+'\')">Open</button></td></tr>').join(''):'<tr><td colspan="15" class="muted">No MRG rules yet.</td></tr>';
-    $('gridArea').innerHTML=mrgTabs()+'<div class="card">'+toolbar+'</div><div class="tablewrap"><table><thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
+    const filters=mrgWorkspaceType==='REPORT'?mrgReportFilters():'';
+    $('gridArea').innerHTML=mrgTabs()+filters+'<div class="card">'+toolbar+'</div><div class="tablewrap"><table><thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }catch(e){$('gridArea').innerHTML=mrgTabs()+'<div class="card badtext"><b>MRG load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+const mrgReportState={mrg_type:'',rate_side:'',party_type:'',party_code:'',charge_code:'',pol:'',pot:'',pod:'',depot_code:'',currency:'',size_type:'',container_type:'',status:'',valid_on:'',latest_only:false};
+function mrgReportQuery(){
+  const p=new URLSearchParams();
+  for(const [k,v] of Object.entries(mrgReportState))if(v!==''&&v!==false)p.set(k,String(v));
+  const s=p.toString();return s?'?'+s:'';
+}
+function mrgReportFilters(){
+  const inp=(k,l,t='text')=>'<label>'+esc(l)+'<input id="mrg-rpt-'+k+'" type="'+t+'" value="'+esc(mrgReportState[k]||'')+'"></label>';
+  return '<div class="clx79Filters">'+inp('mrg_type','MRG Type')+inp('rate_side','Revenue / Cost')+inp('party_type','Party Type')+inp('party_code','Party')+
+    inp('charge_code','Charge')+inp('pol','POL')+inp('pot','POT')+inp('pod','POD / POFD')+inp('depot_code','Depot')+inp('currency','Currency')+
+    inp('size_type','Size')+inp('container_type','Container Type')+inp('status','Status')+inp('valid_on','Valid On','date')+
+    '<label>Latest Only<select id="mrg-rpt-latest_only"><option value="false" '+(!mrgReportState.latest_only?'selected':'')+'>All</option><option value="true" '+(mrgReportState.latest_only?'selected':'')+'>Latest</option></select></label>'+
+    '<div style="grid-column:1/-1"><button class="clx79Action primary" onclick="mrgApplyReport()">Apply Filters</button></div></div>';
+}
+function mrgApplyReport(){
+  for(const k of ['mrg_type','rate_side','party_type','party_code','charge_code','pol','pot','pod','depot_code','currency','size_type','container_type','status','valid_on'])mrgReportState[k]=$('mrg-rpt-'+k)?.value||'';
+  mrgReportState.latest_only=$('mrg-rpt-latest_only')?.value==='true';renderMrgWorkspace();
+}
+function mrgResetReport(){
+  for(const k of Object.keys(mrgReportState))mrgReportState[k]=k==='latest_only'?false:'';renderMrgWorkspace();
 }
 function mrgField(name,label,type='text',value=''){
   return '<div class="formField"><label>'+esc(label)+'</label><input id="mrg-'+name+'" type="'+type+'" value="'+esc(value??'')+'"></div>';
@@ -288,11 +310,15 @@ async function mrgSaveNew(){
 }
 async function mrgOpenRule(ref){
   const r=mrgRows.find(x=>x.rule_ref===ref);if(!r)return;
-  const slabs=r.slabs||[];
+  const slabs=r.slabs||[];let original=null;
+  if(r.mrg_type==='SPECIAL_DETENTION'&&r.original_rule_ref){
+    try{const all=await mrgApi('/api/mrg/rules');original=(all.records||[]).find(x=>x.rule_ref===r.original_rule_ref)||null}catch(_){}
+  }
+  const compare=r.mrg_type==='SPECIAL_DETENTION'?'<div class="clx82Subgrid"><div class="card"><b>Special Detention Tariff</b><pre class="pre">'+esc(JSON.stringify(r,null,2))+'</pre></div><div class="card"><b>Original Applicable MRG Tariff</b><pre class="pre">'+esc(JSON.stringify(original||{rule_ref:r.original_rule_ref,status:'NOT FOUND'},null,2))+'</pre></div></div>':'<pre class="pre">'+esc(JSON.stringify(r,null,2))+'</pre>';
   $('gridArea').innerHTML=mrgTabs()+'<div class="card"><div class="toolbar"><b>'+esc(ref)+'</b><span>'+esc(r.status)+'</span><span class="grow"></span>'+
     (r.status==='PENDING_APPROVAL'?'<button class="btn primary" onclick="mrgApprove(\''+esc(ref)+'\')">Approve</button>':'')+
     ((['DETENTION','DETENTION_EXPORT','MTY_STORAGE'].includes(r.mrg_type)&&r.status!=='APPROVED')?'<button class="btn" onclick="mrgAddSlab(\''+esc(ref)+'\')">Add Slab</button>':'')+
-    '<button class="btn" onclick="renderMrgWorkspace()">Back</button></div><pre class="pre">'+esc(JSON.stringify(r,null,2))+'</pre></div>'+
+    '<button class="btn" onclick="renderMrgWorkspace()">Back</button></div>'+compare+'</div>'+
     '<div class="card"><b>Slabs</b><pre class="pre">'+esc(JSON.stringify(slabs,null,2))+'</pre></div>';
 }
 async function mrgApprove(ref){try{await mrgApi('/api/mrg/rules/'+encodeURIComponent(ref)+'/approve',{method:'POST'});await renderMrgWorkspace()}catch(e){alert(e.message)}}
