@@ -210,7 +210,7 @@ def special_rates(c,ctx):
     for r in rows:
         p=json.loads(r["payload_json"] or "{}")
         if r["booking_ref"] and r["booking_ref"]!=ctx["booking_ref"]:continue
-        code=str(p.get("Charge Code") or "").strip().upper()
+        code=str(p.get("Charge Code") or "OFR").strip().upper()
         if code:out[code]={"external_ref":r["external_ref"],"approved_rate":r["approved_rate"],"currency":p.get("Currency"),"stage":r["stage"]}
     return out
 
