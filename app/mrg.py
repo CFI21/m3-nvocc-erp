@@ -243,7 +243,7 @@ def import_booking(job_ref:str,b:ImportBody,x_role:str=Header("VIEWER"),x_m3_ses
         rows=applicable_rows(c,ctx)
         if not b.import_all:
             wanted=set(b.rule_refs);rows=[x for x in rows if x["rule_ref"] in wanted]
-        special=special_rates(c,ctx);f=ctx["fields"];existing=list(f.get("MRG Charges") or [])
+        special=special_rates(c,ctx);f=ctx["fields"];existing=list(f.get("Commercial Charges") or f.get("MRG Charges") or [])
         def k(x):return "|".join(str(x.get(n) or "").upper() for n in ("charge_code","party_type","party_code","rate_side"))
         by={k(x):x for x in existing};results=[]
         for r in rows:
@@ -264,7 +264,7 @@ def import_booking(job_ref:str,b:ImportBody,x_role:str=Header("VIEWER"),x_m3_ses
                 elif act=="ADD_AS_ADDITIONAL":existing.append(line);results.append({"key":key,"status":"ADD_AS_ADDITIONAL"})
                 else:results.append({"key":key,"status":"ALREADY_PRESENT"})
             else:existing.append(line);by[key]=line;results.append({"key":key,"status":"IMPORTED"})
-        f["MRG Charges"]=existing
+        f["Commercial Charges"]=existing
         revenue=sum(float(x.get("applied_rate") or 0) for x in existing if x.get("rate_side")=="REVENUE")
         cost=sum(float(x.get("applied_rate") or 0) for x in existing if x.get("rate_side")=="COST")
         f["MRG Expected Revenue"]=revenue;f["MRG Expected Cost"]=cost;f["MRG Expected Gross Margin"]=revenue-cost
