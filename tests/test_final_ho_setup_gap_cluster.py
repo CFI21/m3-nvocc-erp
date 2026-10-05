@@ -8,6 +8,7 @@ def test_final_ho_setup_routes_and_no_duplicate_engines():
       '/api/final-ho-setup/container-status',
       '/api/final-ho-setup/local-recovery-agreements',
       '/api/final-ho-setup/local-recovery/booking/{job_ref}/applicable',
+      '/api/final-ho-setup/local-recovery/booking/{job_ref}/apply',
       '/api/final-ho-setup/long-ageing',
     ]:
         assert p in paths
@@ -72,5 +73,8 @@ def test_existing_authoritative_models_not_replaced():
     assert 'container_damage_items' in src
     assert 'STANDARD_FLOW' in src and 'NEXT' in src
     assert 'Commercial Charges' in src
+    assert 'LOCAL_RECOVERY' in src
+    assert 'CRT_REQUIRED_AFTER_APPROVAL' in src
+    assert 'direct_finance_posting":False' in src
     assert 'scoped_containers' in src
     assert 'owner_segment' in src
