@@ -130,7 +130,6 @@ def test_pre_delivery_revoke_and_post_delivery_hold(isolated):
 def test_future_container_event_is_not_current_release_state(isolated):
     c=db.connect()
     con=c.execute("SELECT id,job_id FROM containers WHERE container_no=?",(isolated["container"],)).fetchone()
-    c.execute("UPDATE containers SET journey_state=NULL,equipment_status=NULL WHERE id=?",(con["id"],))
     c.execute(
         """INSERT INTO container_events(
            event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json
