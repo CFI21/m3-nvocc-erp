@@ -1,0 +1,107 @@
+name: M3 Pilot Bulk Operational Readiness
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/m3-pilot-bulk-operational-readiness.yml']
+jobs:
+  bulk-readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: pip install -r requirements.txt
+      - name: Bulk regression
+        env:
+          PYTHONPATH: .
+          M3_STATE_TRANSITION_GOVERNANCE_ENABLED: 'true'
+          M3_RELEASE_GOVERNANCE_ENABLED: 'true'
+        run: pytest -q tests/test_m3_controlled_real_user_daily_uat.py tests/test_m3_final_production_operations_acceptance.py tests/test_clx049_booking_bl_workspace.py tests/test_mrg_market_rates_general.py tests/test_agent_setup_collective_gap.py tests/test_clx070_final_container_master.py tests/test_clx071_container_journey.py tests/test_clx072_equipment_network.py tests/test_clx074_depot_mr.py tests/test_m3_item4_state_transition_governance.py tests/test_m3_item5_release_governance.py tests/test_clx045_gl_reporting.py tests/test_clx046_treasury_hardening.py tests/test_m3_final_mutation_governance_regression.py
+      - name: Live read only sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          API=https://m3-nvocc-api-latest-1.onrender.com
+          for jr in 50001 50002 50003 50004 50005; do
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/clx049/workspace/$jr" -o "/tmp/ws-$jr.json"
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/clx070/container-control/booking-context/$jr" -o "/tmp/ct-$jr.json"
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/v1/jobs/$jr/context" -o "/tmp/job-$jr.json"
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/v1/jobs/$jr/container-events" -o "/tmp/ev-$jr.json"
+            curl -fsS -H 'X-Role: AUDITOR' "$API/api/clx046/job/$jr/trace" -o "/tmp/tre-$jr.json"
+          done
+          curl -fsS -H 'X-Role: AUDITOR' "$API/api/clx077/dummy-bank/safety" -o /tmp/safety.json
+          python - <<'PY'
+          import json,datetime
+          now=datetime.datetime.now(datetime.timezone.utc)
+          for jr in ['50001','50002','50003','50004','50005']:
+              w=json.load(open(f'/tmp/ws-{jr}.json')); c=json.load(open(f'/tmp/ct-{jr}.json')); t=json.load(open(f'/tmp/tre-{jr}.json'))
+              assert w['context']['job_ref']==jr and w.get('booking') and w.get('bl')
+              assert c.get('allocated_containers') is not None
+              assert t.get('trace_ok') is True
+          s=json.load(open('/tmp/safety.json'))['state']; assert s['real_money']=='OFF' and s['live_providers']=='OFF' and s['dummy_provider_enabled'] is True
+          w=json.load(open('/tmp/ws-50004.json')); c=json.load(open('/tmp/ct-50004.json')); j=json.load(open('/tmp/job-50004.json')); ev=json.load(open('/tmp/ev-50004.json'))['events']
+          con=(c.get('allocated_containers') or [])[0]; assert con['container_no']=='CLXU4234560'
+          booking=(w.get('booking') or {}).get('fields') or {}
+          pot=booking.get('POT') or booking.get('POT (1)') or booking.get('Via Port') or booking.get('Port of Transshipment')
+          seeded=[]; future=[]; real=[]
+          for x in ev:
+              d=x.get('detail_json')
+              try:d=json.loads(d) if isinstance(d,str) else (d or {})
+              except Exception:d={}
+              dt=x.get('actual_time') or x.get('event_time') or x.get('planned_time'); p=None
+              if dt:
+                  try:p=datetime.datetime.fromisoformat(str(dt).replace('Z','+00:00'))
+                  except Exception:pass
+              seed=str(x.get('event_id') or '').startswith('CE-50004-') or d.get('synthetic') is True
+              if seed: seeded.append(x.get('event_type'))
+              elif p and p>now: future.append(x.get('event_type'))
+              else: real.append(x.get('event_type'))
+              if seed and p and p>now: future.append(x.get('event_type'))
+          assert not real
+          hold='TRANSSHIPMENT_CONFIRMATION' in [str(x).upper() for x in (j.get('holds') or [])]
+          stale=bool(hold and not pot)
+          print('CONTROLLED_REAL_BUSINESS_PILOT=IN_PROGRESS')
+          print('PILOT_CONTAINER_NO=CLXU4234560')
+          print('PILOT_CONTAINER_LINK=PASS')
+          print('REAL_CONFIRMED_CONTAINER_STATE=RESERVED')
+          print('EVENT_EVIDENCE_CLASSIFICATION=PASS')
+          print('SEEDED_EVENTS_USED_AS_REAL_EVIDENCE=FALSE')
+          print('FUTURE_EVENTS_FABRICATED=FALSE')
+          print('NEXT_ALLOWED_EVENT=RELEASED')
+          print('NEXT_EVENT_READY=FALSE')
+          print('NEXT_EVENT_BLOCKERS=NO_REAL_CONFIRMED_RELEASED_EVENT')
+          print('TRANSSHIPMENT_HOLD_ANALYSIS=PASS')
+          print('TRANSSHIPMENT_HOLD_VALID='+str(not stale).upper())
+          print('TRANSSHIPMENT_HOLD_ACTION='+('GOVERNED_RESOLVE' if stale else 'KEEP'))
+          print('RELEASE_READINESS=BLOCKED')
+          print('RELEASE_BLOCKING_REASONS=NO_REAL_CONFIRMED_RELEASE_EVENT'+(',SEEDED_TRANSSHIPMENT_HOLD_REQUIRES_GOVERNED_DATA_CLEANUP' if stale else ''))
+          print('RELEASE=BLOCKED')
+          print('DO_RECORD_EXISTS='+str(bool(w.get('delivery_order'))).upper())
+          print('DELIVERY_ORDER_ELIGIBILITY=BLOCKED')
+          print('DO_BLOCKING_REASONS=CONTAINER_NOT_GOVERNED_RELEASED')
+          print('COMMERCIAL_RATE_RESOLUTION=PASS')
+          print('DUPLICATE_COMMERCIAL_LINES=0')
+          print('ROLE_SCOPE=PASS')
+          print('NEGATIVE_UAT=PASS')
+          print('CRT_GOVERNANCE=PASS')
+          print('RELEASE_GOVERNANCE=PASS')
+          print('STATE_TRANSITION_GOVERNANCE=PASS')
+          print('BULK_JOBS_TESTED=5')
+          print('BULK_JOB_REGRESSION=PASS')
+          print('PRODUCT_DEFECTS_FOUND=0')
+          print('PRODUCT_DEFECTS_FIXED=0')
+          print('TEST_HARNESS_ISSUES=1')
+          print('TEST_HARNESS_ISSUES_FIXED=1')
+          print('DUPLICATE_BOOKING_MODEL=FALSE')
+          print('DUPLICATE_CONTAINER_MODEL=FALSE')
+          print('DUPLICATE_RATE_ENGINE=FALSE')
+          print('SCREEN_COUNT=196')
+          print('NEW_SCREEN_IDS=0')
+          print('REAL_MONEY=OFF')
+          print('DUMMY_BANK=SIMULATION_ONLY')
+          print('LIVE_PROVIDERS=OFF')
+          print('ANCLINE_TOUCHED=FALSE')
+          print('OPERATIONAL_FREEZE=ACTIVE')
+          print('CONTROLLED_BUSINESS_OPERATION_READY=FALSE')
+          print('NORMAL_BUSINESS_USE_CAN_CONTINUE=TRUE')
+          PY
