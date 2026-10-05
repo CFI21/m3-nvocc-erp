@@ -88,6 +88,50 @@ def _latest_do_payload(c,job_id):
     except Exception:return {}
 
 
+def resolve_bl_release_authority(c,job_id,hbl_no):
+    """Resolve cargo document authority from the authoritative B/L first.
+
+    Delivery-order fields are a release-instruction projection and may be stale;
+    they may evidence surrender/telex for an ORIGINAL B/L but never override
+    an EXPRESS/SEA WAYBILL classification held on transaction_records:bl.
+    """
+    row=c.execute(
+        """SELECT status,payload_json FROM transaction_records
+           WHERE job_id=? AND module='bl'
+           ORDER BY id DESC LIMIT 1""",(job_id,)
+    ).fetchone()
+    bl={}
+    bl_tx_status=None
+    if row:
+        bl_tx_status=row["status"]
+        try: bl=json.loads(row["payload_json"] or "{}")
+        except Exception: bl={}
+    bl_ref=str(bl.get("B/L No.") or bl.get("HBL") or "").strip()
+    if bl_ref and hbl_no and bl_ref!=hbl_no:
+        bl={}
+    release_type=normalize(bl.get("Original / Express"))
+    express=release_type in {"EXPRESS","SEA_WAYBILL","SEA_WAY_BILL","SEAWAYBILL","WAYBILL"}
+    do=_latest_do_payload(c,job_id)
+    original_status=normalize(do.get("Original BL Status"))
+    telex=str(do.get("Telex Release","")).strip().lower() in {"yes","true","1","released","approved","authorized"}
+    surrendered=original_status in {"SURRENDERED","RECEIVED"}
+    not_required=original_status=="NOT_REQUIRED"
+    authority_ok=express or telex or surrendered or not_required
+    stale_do=bool(express and original_status not in {"","NOT_REQUIRED"})
+    return {
+        "bl_type":release_type or "OTHER",
+        "original_bl_required":not express,
+        "original_bl_surrendered":surrendered,
+        "telex_release_authorized":telex,
+        "express_release_authorized":express,
+        "authority_ok":authority_ok,
+        "source":"transaction_records:bl + delivery-order release instruction",
+        "stale_do_document_fields":stale_do,
+        "bl_transaction_status":bl_tx_status,
+        "do_original_bl_status":original_status or None,
+    }
+
+
 def _container(c,container_no):
     r=c.execute("SELECT * FROM containers WHERE container_no=?",(container_no,)).fetchone()
     if not r:
@@ -159,9 +203,8 @@ def evaluate_prerequisites(
         payment_ok=normalize(j["payment_status"]) in {"CLEARED","PAID","APPROVED"} and float(j["outstanding"] or 0)<=0
         credit_ok=(not int(j["credit_hold"] or 0)) or (condition=="CREDIT_OVERRIDE" and valid_condition)
 
-        original=normalize(do.get("Original BL Status"))
-        telex=str(do.get("Telex Release","")).strip().lower() in {"yes","true","1","released","approved"}
-        surrender_raw=telex or original in {"SURRENDERED","RECEIVED","NOT_REQUIRED"}
+        bl_authority=resolve_bl_release_authority(c,j["id"],hbl_no)
+        surrender_raw=bool(bl_authority["authority_ok"])
         surrender_ok=surrender_raw or (condition=="ORIGINAL_WAIVER" and valid_condition)
 
         # Any active workflow hold is release-blocking. Specific finance/credit and
@@ -191,6 +234,8 @@ def evaluate_prerequisites(
             "condition_type":condition or None,
             "condition_valid":valid_condition,
             "active_holds":holds,
+            "bl_release_authority":bl_authority,
+            "document_source_of_truth":bl_authority["source"],
             "negative_margin_blocks_release":False,
         }
     finally:c.close()
