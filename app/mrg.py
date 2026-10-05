@@ -4,7 +4,7 @@ import datetime, json, uuid
 from typing import Any, Optional
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel, Field
-from .db import connect, tx
+from .db import connect, tx, using_postgres
 from .admin import session as iam_session, roles_for as iam_roles_for
 
 router=APIRouter(prefix="/api/mrg",tags=["M3 Market Rates General"])
@@ -38,6 +38,15 @@ def ensure(c):
       till_day INTEGER,rate REAL NOT NULL,currency TEXT,created_at TEXT NOT NULL,
       UNIQUE(rule_ref,size_type,container_type,from_day,till_day)
     )""")
+    # Additive fields on the same authoritative MRG table. No Slot Rate table/engine is created.
+    extra={"vessel_code":"TEXT","voyage_no":"TEXT","contract_ref":"TEXT"}
+    if using_postgres():
+        for col,typ in extra.items():
+            c.execute(f"ALTER TABLE mrg_rules ADD COLUMN IF NOT EXISTS {col} {typ}")
+    else:
+        cols={r["name"] for r in c.execute("PRAGMA table_info(mrg_rules)").fetchall()}
+        for col,typ in extra.items():
+            if col not in cols:c.execute(f"ALTER TABLE mrg_rules ADD COLUMN {col} {typ}")
 
 def actor(c,token,x_role):
     if token:
@@ -63,7 +72,8 @@ class RuleWrite(BaseModel):
     mrg_type:str; rate_side:str; party_type:str; charge_code:str; effective_from:str
     party_code:Optional[str]=None; charge_type:Optional[str]=None; effective_to:Optional[str]=None
     pol:Optional[str]=None; pot:Optional[str]=None; pod:Optional[str]=None; depot_code:Optional[str]=None; terminal_code:Optional[str]=None
-    route_code:Optional[str]=None; service_code:Optional[str]=None; cargo_type:Optional[str]=None; size_type:Optional[str]=None; container_type:Optional[str]=None
+    route_code:Optional[str]=None; service_code:Optional[str]=None; vessel_code:Optional[str]=None; voyage_no:Optional[str]=None; contract_ref:Optional[str]=None
+    cargo_type:Optional[str]=None; size_type:Optional[str]=None; container_type:Optional[str]=None
     currency:str="USD"; rate_basis:str="FLAT"; unit_rate:float=0; minimum_rate:Optional[float]=None; maximum_rate:Optional[float]=None
     free_days:Optional[int]=None; lolo_rate:Optional[float]=None; invoice_basis:Optional[str]=None; slab_wise:bool=False
     booking_ref:Optional[str]=None; job_ref:Optional[str]=None; original_rule_ref:Optional[str]=None; exception_reason:Optional[str]=None
@@ -120,8 +130,8 @@ def create_rule(b:RuleWrite,x_role:str=Header("VIEWER"),x_m3_session:Optional[st
            d.get("size_type"),d.get("container_type"),d["effective_from"],d.get("effective_to"))).fetchone()
         if overlap:raise HTTPException(409,{"code":"OVERLAPPING_MRG_RULE","rule_ref":overlap["rule_ref"]})
         ref="MRG-"+uuid.uuid4().hex[:12].upper()
-        cols=["rule_ref","mrg_type","rate_side","party_type","party_code","charge_code","charge_type","effective_from","effective_to","pol","pot","pod","depot_code","terminal_code","route_code","service_code","cargo_type","size_type","container_type","currency","rate_basis","unit_rate","minimum_rate","maximum_rate","free_days","lolo_rate","invoice_basis","slab_wise","booking_ref","job_ref","original_rule_ref","exception_reason","office_code","branch_code","organization_code","priority","remarks","status","version","maker","checker","approved_at","created_at","updated_at"]
-        vals=[ref,d["mrg_type"],d["rate_side"],d["party_type"],d.get("party_code"),d["charge_code"],d.get("charge_type"),d["effective_from"],d.get("effective_to"),d.get("pol"),d.get("pot"),d.get("pod"),d.get("depot_code"),d.get("terminal_code"),d.get("route_code"),d.get("service_code"),d.get("cargo_type"),d.get("size_type"),d.get("container_type"),d["currency"],d["rate_basis"],d["unit_rate"],d.get("minimum_rate"),d.get("maximum_rate"),d.get("free_days"),d.get("lolo_rate"),d.get("invoice_basis"),1 if d.get("slab_wise") else 0,d.get("booking_ref"),d.get("job_ref"),d.get("original_rule_ref"),d.get("exception_reason"),d.get("office_code"),d.get("branch_code"),d.get("organization_code"),d.get("priority",100),d.get("remarks"),"PENDING_APPROVAL",1,a["user"],None,None,now(),now()]
+        cols=["rule_ref","mrg_type","rate_side","party_type","party_code","charge_code","charge_type","effective_from","effective_to","pol","pot","pod","depot_code","terminal_code","route_code","service_code","vessel_code","voyage_no","contract_ref","cargo_type","size_type","container_type","currency","rate_basis","unit_rate","minimum_rate","maximum_rate","free_days","lolo_rate","invoice_basis","slab_wise","booking_ref","job_ref","original_rule_ref","exception_reason","office_code","branch_code","organization_code","priority","remarks","status","version","maker","checker","approved_at","created_at","updated_at"]
+        vals=[ref,d["mrg_type"],d["rate_side"],d["party_type"],d.get("party_code"),d["charge_code"],d.get("charge_type"),d["effective_from"],d.get("effective_to"),d.get("pol"),d.get("pot"),d.get("pod"),d.get("depot_code"),d.get("terminal_code"),d.get("route_code"),d.get("service_code"),d.get("vessel_code"),d.get("voyage_no"),d.get("contract_ref"),d.get("cargo_type"),d.get("size_type"),d.get("container_type"),d["currency"],d["rate_basis"],d["unit_rate"],d.get("minimum_rate"),d.get("maximum_rate"),d.get("free_days"),d.get("lolo_rate"),d.get("invoice_basis"),1 if d.get("slab_wise") else 0,d.get("booking_ref"),d.get("job_ref"),d.get("original_rule_ref"),d.get("exception_reason"),d.get("office_code"),d.get("branch_code"),d.get("organization_code"),d.get("priority",100),d.get("remarks"),"PENDING_APPROVAL",1,a["user"],None,None,now(),now()]
         c.execute(f"INSERT INTO mrg_rules({','.join(cols)}) VALUES({','.join('?' for _ in cols)})",vals)
         rec=row(c.execute("SELECT * FROM mrg_rules WHERE rule_ref=?",(ref,)).fetchone());audit(c,a,"MRG_RULE_CREATE",ref,None,rec)
         c.execute("COMMIT");return {"ok":True,"rule_ref":ref,"status":"PENDING_APPROVAL","record":rec}
@@ -137,7 +147,7 @@ def update_rule(rule_ref:str,b:RuleUpdate,x_role:str=Header("VIEWER"),x_m3_sessi
         before=row(r)
         if before["status"]=="APPROVED":raise HTTPException(409,{"code":"MRG_APPROVED_RULE_LOCKED","required":"GOVERNED_NEW_VERSION"})
         if before["version"]!=b.version:raise HTTPException(409,{"code":"OPTIMISTIC_LOCK_CONFLICT","current_version":before["version"]})
-        allowed={"party_code","charge_type","effective_from","effective_to","pol","pot","pod","depot_code","terminal_code","route_code","service_code","cargo_type","size_type","container_type","currency","rate_basis","unit_rate","minimum_rate","maximum_rate","free_days","lolo_rate","invoice_basis","slab_wise","booking_ref","job_ref","original_rule_ref","exception_reason","office_code","branch_code","organization_code","priority","remarks"}
+        allowed={"party_code","charge_type","effective_from","effective_to","pol","pot","pod","depot_code","terminal_code","route_code","service_code","vessel_code","voyage_no","contract_ref","cargo_type","size_type","container_type","currency","rate_basis","unit_rate","minimum_rate","maximum_rate","free_days","lolo_rate","invoice_basis","slab_wise","booking_ref","job_ref","original_rule_ref","exception_reason","office_code","branch_code","organization_code","priority","remarks"}
         patch={k:v for k,v in b.fields.items() if k in allowed}
         if not patch:raise HTTPException(422,{"code":"NO_ALLOWED_FIELDS"})
         merged={**before,**patch};validate_rule(merged)
@@ -198,7 +208,8 @@ def specificity(r,ctx,f):
     checks=[("party_code",{ctx["customer_code"],ctx["agent_code"],str(f.get("Carrier") or ""),str(f.get("Principal") or "")}),
             ("pol",{ctx["pol"],str(f.get("POL") or "")}),("pot",{str(f.get("POT (1)") or f.get("Via Port") or "")}),
             ("pod",{ctx["pod"],str(f.get("POD") or "")}),("service_code",{str(f.get("Service") or "")}),
-            ("route_code",{str(f.get("Route") or "")}),("size_type",{str(f.get("Equipment") or "")}),("container_type",{str(f.get("Container Type") or "")})]
+            ("route_code",{str(f.get("Route") or "")}),("vessel_code",{str(f.get("Vessel") or "")}),("voyage_no",{str(f.get("Voyage") or "")}),
+            ("size_type",{str(f.get("Equipment") or "")}),("container_type",{str(f.get("Container Type") or "")})]
     for k,vals in checks:
         if r.get(k):score+=10 if str(r[k]) in vals else -1000
     return score-int(r.get("priority") or 100)
@@ -253,7 +264,8 @@ def import_booking(job_ref:str,b:ImportBody,x_role:str=Header("VIEWER"),x_m3_ses
               "rate_basis":r["rate_basis"],"currency":sp.get("currency") if sp else r["currency"],"original_rate":r["unit_rate"],
               "applied_rate":sp["approved_rate"] if sp else r["unit_rate"],"source_type":"SPECIAL_RATE" if sp else "MRG",
               "source_reference":sp["external_ref"] if sp else r["rule_ref"],"source_version":r["version"],"mrg_reference":r["rule_ref"],
-              "mrg_version":r["version"],"approval_reference":sp["external_ref"] if sp else r["rule_ref"],"imported_at":now(),
+              "mrg_version":r["version"],"contract_ref":r.get("contract_ref"),"vessel_code":r.get("vessel_code"),"voyage_no":r.get("voyage_no"),
+              "approval_reference":sp["external_ref"] if sp else r["rule_ref"],"imported_at":now(),
               "resolution":"SUPERSEDED_BY_SPECIAL_RATE" if sp else "MRG_APPLIED"}
             key=k(line)
             if key in by:
