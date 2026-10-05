@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 from .db import connect, using_postgres
 from .admin import session as iam_session, permission_code as iam_permission_code
 from .bulk_permission_governance import authorize_job
+from .release_governance import resolve_bl_release_authority
 from .item12_reporting_consolidation_governance import (
     enabled as item12_enabled,
     scoped_pnl,
