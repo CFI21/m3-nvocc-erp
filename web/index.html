@@ -166,6 +166,8 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
     {label:'UN/LOCODE',target:'master-data::ports'},
     {label:'Ports Coding',target:'master-data::ports'},
     {label:'Service Setup',target:'master-data::services'},
+    {label:'Principle Setup',workspace:'principal-setup',target:'master-data::common-partys'},
+    {label:'Investor Setup',workspace:'investor-setup',target:'master-data::common-partys'},
     {label:'Company',target:'administration::legal-entities'},
     {label:'Lease Rental Contract (Purchase)',equipment:'lease',gate:'agent-tasks::container-activity'},
     {label:'Rates Management',target:'agent-tasks::special-rates-request'},
@@ -180,9 +182,11 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
       visibleSetup.map(it=>{
         const active=state.navContext?.domain==='HO Tasks'&&state.navContext?.submenu==='Setup'&&state.navContext?.label===it.label;
         const label=it.label.replaceAll("'","\\'");
-        const action=it.equipment
-          ?'openHoSetupEquipment(\''+it.equipment+'\',\''+label+'\')'
-          :'openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label+'\'})';
+        const action=it.workspace
+          ?'openHoGovernedSetup(\''+it.workspace+'\',\''+label+'\',\''+it.target.replaceAll("'","\\'")+'\')'
+          :it.equipment
+            ?'openHoSetupEquipment(\''+it.equipment+'\',\''+label+'\')'
+            :'openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label+'\'})';
         return '<div class="screenLink '+(active?'active':'')+'" onclick="'+action+'">'+esc(it.label)+'</div>';
       }).join('')+'</div>';
     dcount+=visibleSetup.length;
@@ -205,6 +209,61 @@ async function openHoSetupEquipment(view,label){
   state.navContext={domain:'HO Tasks',submenu:'Setup',label};
   renderNav();
   renderBreadcrumb();
+}
+function hoSetupRoleAllowed(workspace){
+  const r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;
+  const allowed=workspace==='principal-setup'
+    ?['ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','EQUIPMENT_MANAGER','AUDITOR','VIEWER']
+    :['ADMIN','FINANCE','GL_MANAGER','GL_ACCOUNTANT','EQUIPMENT_MANAGER','AUDITOR','VIEWER'];
+  return allowed.includes(r);
+}
+async function openHoGovernedSetup(workspace,label,target){
+  const s=state.byId[target];if(!s||!screenAllowed(s))return;
+  state.current=s;state.navContext={domain:'HO Tasks',submenu:'Setup',label};state.selected=null;
+  $('favorite').style.visibility='hidden';renderNav();renderBreadcrumb();
+  $('flow').innerHTML='<div class="opFollow"><b>Governed setup subworkspace</b><span>Reuses existing authoritative M3 party / container / finance sources</span></div>';
+  history.pushState(null,'','#ho-setup='+encodeURIComponent(workspace));
+  $('screenMeta').innerHTML='<div class="opHeader"><span class="opHeaderTitle">'+esc(label)+'</span><span class="grow"></span><span class="status ok">196-screen model preserved · no duplicate persistence</span></div>';
+  if(!hoSetupRoleAllowed(workspace)){
+    $('gridArea').innerHTML='<div class="card badtext"><b>Role not authorized for this setup workspace.</b></div>';return;
+  }
+  $('gridArea').innerHTML='<div class="card">Loading '+esc(label)+'…</div>';
+  if(workspace==='principal-setup')await renderHoPrincipalSetup();
+  else if(workspace==='investor-setup')await renderHoInvestorSetup();
+}
+async function renderHoPrincipalSetup(){
+  try{
+    const [parties,boxes]=await Promise.all([
+      api('/api/masterdata/records/common-party'),
+      equipmentApi('/api/clx070/container-control/containers?limit=2000')
+    ]);
+    const scoped=boxes.records||[], byCode=new Map((parties||[]).map(p=>[String(p.record_key||''),p]));
+    const agg=new Map();
+    for(const x of scoped){
+      const code=String(x.principal_code||'').trim();if(!code)continue;
+      if(!agg.has(code))agg.set(code,{principal_code:code,containers:0,branches:new Set(),offices:new Set(),agents:new Set(),statuses:new Set()});
+      const a=agg.get(code);a.containers++;
+      if(x.branch_code)a.branches.add(x.branch_code);if(x.office_code)a.offices.add(x.office_code);if(x.agent_code)a.agents.add(x.agent_code);if(x.equipment_status)a.statuses.add(x.equipment_status);
+    }
+    const rows=[...agg.values()].map(a=>{const p=byCode.get(a.principal_code),payload=p?.payload||{};return {
+      code:a.principal_code,name:p?.display_name||payload.name||'—',party_status:p?.status||'UNMATCHED',
+      containers:a.containers,branches:[...a.branches].join(', '),offices:[...a.offices].join(', '),agents:[...a.agents].join(', '),container_status:[...a.statuses].join(', ')
+    }});
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Principle Setup</b><span class="muted">Authoritative Common Parties + scoped Container Master principal_code. Changes remain on the existing Master Data maker-checker path.</span><span class="grow"></span><button class="btn primary" onclick="openScreen(\'master-data::common-partys\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Principle Setup · Common Parties\'})">Manage Common Parties</button></div></div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Principal Code</th><th>Name</th><th>Party Status</th><th>Containers</th><th>Branches</th><th>Offices</th><th>Agents</th><th>Container Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>'<tr><td><b>'+esc(r.code)+'</b></td><td>'+esc(r.name)+'</td><td>'+esc(r.party_status)+'</td><td>'+esc(r.containers)+'</td><td>'+esc(r.branches)+'</td><td>'+esc(r.offices)+'</td><td>'+esc(r.agents)+'</td><td>'+esc(r.container_status)+'</td></tr>').join(''):'<tr><td colspan="8" class="muted">No principal-linked containers are visible in the current authorized scope.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Principle Setup load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoInvestorSetup(){
+  try{
+    const d=await equipmentApi('/api/clx070/container-control/containers?owner_party_type=INVESTOR&limit=2000');
+    const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Investor Setup</b><span class="muted">Existing owner_party_type=INVESTOR + existing container share-rule / financial-ledger governance. Share rules remain maker-checker controlled.</span><span class="grow"></span><button class="btn" onclick="openScreen(\'master-data::common-partys\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Investor Setup · Common Parties\'})">Manage Investor Party</button><button class="btn primary" onclick="openHoSetupEquipment(\'finance\',\'Investor Setup · Financials\')">Container Financials</button></div></div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Action</th><th>Container</th><th>Investor Party</th><th>Principal</th><th>Branch</th><th>Office</th><th>Agent</th><th>Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(x=>'<tr><td><button class="btn" onclick="showContainerDetail(\''+String(x.container_no||'').replaceAll("'","\\'")+'\')">Open</button></td><td><b>'+esc(x.container_no||'')+'</b></td><td>'+esc(x.owner_party_code||'')+'</td><td>'+esc(x.principal_code||'')+'</td><td>'+esc(x.branch_code||'')+'</td><td>'+esc(x.office_code||'')+'</td><td>'+esc(x.agent_code||'')+'</td><td>'+esc(x.equipment_status||'')+'</td></tr>').join(''):'<tr><td colspan="8" class="muted">No investor-owned containers are visible in the current authorized scope.</td></tr>')+
+      '</tbody></table></div><div class="equipNote">Open a container to use the existing INVESTOR_SHARE rule creation/approval and Container Financial Ledger. No second investor-share engine is introduced.</div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Investor Setup load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
 function renderBreadcrumb(){let s=state.current,n=state.navContext;if(n){$('breadcrumb').textContent=`M3 NVOCC ERP / ${n.domain} / ${n.submenu} / ${n.label}`;$('topTitle').textContent=n.label;$('pageTitle').textContent=n.label;document.title=`M3 NVOCC ERP — ${n.label}`}else{$('breadcrumb').textContent=`M3 NVOCC ERP / ${s.domain} / ${s.submenu} / ${s.name}`;$('topTitle').textContent=s.name;$('pageTitle').textContent=s.name;document.title=`M3 NVOCC ERP — ${s.name}`}$('favorite').textContent=state.favorites.has(s.screen_id)?'★':'☆';$('favorite').classList.toggle('on',state.favorites.has(s.screen_id))}
 function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,15);saveState()}
