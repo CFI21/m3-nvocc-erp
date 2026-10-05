@@ -248,6 +248,9 @@ def release_control_action(
                 raise HTTPException(403,{"code":"RELEASE_APPROVER_NOT_ACTIVE"})
             approver_user_id=ar["user_ref"]
 
+        # Authorization is complete; release governance owns its own transaction/connection.
+        # Close this IAM/scope connection first so sqlite test/dev cannot self-lock.
+        c.close()
         result=upsert_release_container(
             release_ref=release_ref,
             container_no=b.container_no,
@@ -288,7 +291,8 @@ def release_control_action(
             "delivery_order_gate":do_gate,
         }
     finally:
-        c.close()
+        try:c.close()
+        except Exception:pass
 
 @router.get("/release-prerequisites/{job_ref}")
 def release_prerequisites(job_ref:str,x_role:str=Header("VIEWER")):
