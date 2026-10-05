@@ -45,7 +45,7 @@ def isolated(tmp_path, monkeypatch):
          FROM jobs j JOIN containers ct ON ct.job_id=j.id JOIN bills b ON b.job_id=j.id AND b.kind='HBL'
          WHERE j.job_ref='50001' LIMIT 1""",
       (
-        json.dumps({"Original BL Status":"SURRENDERED","Telex Release":"No"}),
+        json.dumps({"Original BL Status":"SURRENDERED","Telex Release":"No","Release Instruction":"EXPRESS RELEASE","Valid Until":(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(days=1)).isoformat()}),
         datetime.datetime.now(datetime.timezone.utc).isoformat(),
         datetime.datetime.now(datetime.timezone.utc).isoformat(),
       )
