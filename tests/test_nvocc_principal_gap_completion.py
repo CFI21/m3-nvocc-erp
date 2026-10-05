@@ -93,7 +93,7 @@ def test_ts_branch_operations_has_full_stage_fields_and_branch_scope(isolated):
 def test_release_gate_derives_authoritative_prerequisites(isolated):
     r=release_prerequisites('50001',x_role='AUDITOR')
     assert set(r['checks'])=={'hbl_issued','customs_cleared','finance_cleared','surrender_or_telex'}
-    assert r['authoritative_sources']==['bills','workflow_states','finance_states','delivery-order transaction']
+    assert r['authoritative_sources']==['bills','workflow_states','finance_states','transaction_records:bl','delivery-order release instruction']
     assert isinstance(r['release_ready'],bool)
 
 def test_mbl_hbl_linkage_reuses_existing_bills_and_gl(isolated):
