@@ -149,12 +149,22 @@ def _container_state(c,con:dict) -> str:
     state=normalize(con.get("journey_state") or con.get("equipment_status"))
     if state:
         return state
-    row=c.execute(
-        """SELECT event_type,status FROM container_events
-           WHERE container_id=? ORDER BY event_time DESC,id DESC LIMIT 1""",
+    rows=c.execute(
+        """SELECT event_id,event_type,status,event_time,detail_json FROM container_events
+           WHERE container_id=? ORDER BY event_time DESC,id DESC""",
         (con["id"],)
-    ).fetchone()
-    if row:
+    ).fetchall()
+    current=datetime.datetime.now(datetime.timezone.utc)
+    for row in rows:
+        event_time=parse_dt(row["event_time"])
+        if event_time and event_time>current:
+            continue
+        try:
+            detail=json.loads(row["detail_json"] or "{}")
+        except Exception:
+            detail={}
+        if detail.get("synthetic") is True:
+            continue
         return normalize(row["event_type"] or row["status"])
     return "AVAILABLE"
 
