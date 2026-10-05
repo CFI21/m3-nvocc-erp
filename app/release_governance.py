@@ -468,22 +468,62 @@ def delivery_order_eligible(*,job_ref:str,hbl_no:str,container_no:str) -> dict[s
         return {"eligible":True,"governance_enabled":False}
     c=connect()
     try:
+        legacy=c.execute(
+            """SELECT w.release_status,w.closed,
+                      (SELECT status FROM transaction_records
+                       WHERE job_id=j.id AND module='delivery-order'
+                       ORDER BY id DESC LIMIT 1) do_tx_status,
+                      (SELECT payload_json FROM transaction_records
+                       WHERE job_id=j.id AND module='delivery-order'
+                       ORDER BY id DESC LIMIT 1) do_payload,
+                      (SELECT status FROM transaction_records
+                       WHERE job_id=j.id AND module='bl'
+                       ORDER BY id DESC LIMIT 1) bl_tx_status
+               FROM jobs j JOIN workflow_states w ON w.job_id=j.id
+               WHERE j.job_ref=?""",
+            (job_ref,)
+        ).fetchone()
+        legacy_presentation={}
+        if legacy:
+            try:
+                do_payload=json.loads(legacy["do_payload"] or "{}")
+            except Exception:
+                do_payload={}
+            legacy_presentation={
+                "classification":"LEGACY_PRESENTATION_STATE",
+                "workflow_release_status":legacy["release_status"],
+                "workflow_closed":bool(legacy["closed"]),
+                "delivery_order_transaction_status":legacy["do_tx_status"],
+                "delivery_order_release_status":do_payload.get("Release Status"),
+                "delivery_order_status":do_payload.get("Status"),
+                "bl_transaction_status":legacy["bl_tx_status"],
+                "authoritative_for_current_release":False,
+            }
+
         rows=[dict(x) for x in c.execute(
-            """SELECT rc.release_ref,cc.status
+            """SELECT rc.release_ref,rc.status release_header_status,cc.status
                FROM nvocc_release_controls rc
                JOIN nvocc_release_container_control cc ON cc.release_ref=rc.release_ref
                WHERE rc.job_ref=? AND rc.hbl_no=? AND cc.container_no=?
                ORDER BY cc.id DESC""",
             (job_ref,hbl_no,container_no)
         )]
-        cargo_authorized=bool(rows and rows[0]["status"] in {"RELEASED","CONDITIONAL","RELEASED_WITH_POST_DELIVERY_HOLD"})
+        authorized_states={"RELEASED","CONDITIONAL","RELEASED_WITH_POST_DELIVERY_HOLD"}
+        cargo_authorized=bool(
+            rows
+            and rows[0]["release_header_status"] in authorized_states
+            and rows[0]["status"] in authorized_states
+        )
         physical=real_container_release_event(c,container_no)
         eligible=bool(cargo_authorized and physical["found"])
         return {
             "eligible":eligible,
             "governance_enabled":True,
+            "authority_source":"nvocc_release_controls + nvocc_release_container_control + real container RELEASED event",
+            "legacy_presentation_state":legacy_presentation,
             "release_ref":rows[0]["release_ref"] if rows else None,
             "release_status":rows[0]["status"] if rows else "NONE",
+            "release_header_status":rows[0]["release_header_status"] if rows else "NONE",
             "cargo_release_authorized":cargo_authorized,
             "real_container_release_event_found":bool(physical["found"]),
             "real_container_release_event_ref":physical["event_ref"],
