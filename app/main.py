@@ -60,6 +60,7 @@ from .nvocc_principal_extensions import router as nvocc_principal_extensions_rou
 from .crt_governance import router as crt_governance_router
 from .mrg import router as mrg_router
 from .agent_setup import router as agent_setup_router, assert_booking_rules
+from .ho_operational_setup import router as ho_operational_setup_router
 
 HERE=Path(__file__).resolve().parent
 META=json.loads((HERE/'module_meta.json').read_text())
