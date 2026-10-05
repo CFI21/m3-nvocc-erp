@@ -207,18 +207,17 @@ def release_prerequisites(job_ref:str,x_role:str=Header("VIEWER")):
       (SELECT payload_json FROM transaction_records WHERE job_id=j.id AND module='delivery-order' ORDER BY id DESC LIMIT 1) do_payload
       FROM jobs j JOIN workflow_states w ON w.job_id=j.id JOIN finance_states f ON f.job_id=j.id WHERE j.job_ref=?""",(job_ref,)).fetchone()
     if not row: c.close(); raise HTTPException(404,"Job not found")
-    r=dict(row);p={}
-    try:p=json.loads(r.get("do_payload") or "{}")
-    except Exception:pass
+    r=dict(row)
     bl_ok=bool(r.get("hbl_no")) and str(r.get("documentation_status","")).upper() not in {"PENDING","BLOCKED","MISSING"}
     customs_ok=str(r.get("customs_status","")).upper() in {"CLEARED","PASS","APPROVED","NOT_REQUIRED"}
     finance_ok=(str(r.get("payment_status","")).upper() in {"CLEARED","PAID","APPROVED"} and float(r.get("outstanding") or 0)<=0 and not int(r.get("credit_hold") or 0))
-    original=str(p.get("Original BL Status","")).upper()
-    telex=str(p.get("Telex Release","")).lower() in {"yes","true","1","released","approved"}
-    surrender_ok=telex or original in {"SURRENDERED","RECEIVED","NOT_REQUIRED"}
+    authority=resolve_bl_release_authority(c,r["id"],r.get("hbl_no"))
+    surrender_ok=bool(authority["authority_ok"])
     c.close()
     checks={"hbl_issued":bl_ok,"customs_cleared":customs_ok,"finance_cleared":finance_ok,"surrender_or_telex":surrender_ok}
-    return {"job_ref":job_ref,"hbl_no":r.get("hbl_no"),"checks":checks,"release_ready":all(checks.values()),"authoritative_sources":["bills","workflow_states","finance_states","delivery-order transaction"]}
+    return {"job_ref":job_ref,"hbl_no":r.get("hbl_no"),"checks":checks,"release_ready":all(checks.values()),
+            "bl_release_authority":authority,
+            "authoritative_sources":["bills","workflow_states","finance_states","transaction_records:bl","delivery-order release instruction"]}
 
 @router.get("/bl-linkage/{job_ref}")
 def bl_linkage(job_ref:str,x_role:str=Header("VIEWER")):
