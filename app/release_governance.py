@@ -239,6 +239,11 @@ def evaluate_prerequisites(
 
         do=_latest_do_payload(c,j["id"])
         holds=_active_holds(c,j["id"])
+        release_instruction=str(do.get("Release Instruction") or do.get("Release Type") or "").strip()
+        release_valid_until=parse_dt(do.get("Valid Until"))
+        release_instruction_ok=bool(release_instruction) and (
+            release_valid_until is None or release_valid_until>=datetime.datetime.now(datetime.timezone.utc)
+        )
         bl_ok=normalize(h["status"]) in {"ISSUED","RELEASED","APPROVED"}
         docs_ok=normalize(j["documentation_status"]) not in {"PENDING","BLOCKED","MISSING","SI_PENDING","VGM_MISSING"}
         customs_raw=normalize(j["customs_status"]) in {"CLEARED","PASS","APPROVED","NOT_REQUIRED"}
@@ -263,6 +268,7 @@ def evaluate_prerequisites(
             "payment_cleared":payment_ok,
             "credit_clear":credit_ok,
             "surrender_or_telex":surrender_ok,
+            "release_instruction_valid":release_instruction_ok,
             "no_legal_compliance_document_hold":not blocked_hold_codes,
             "container_eligible":container_ok,
         }
@@ -279,6 +285,12 @@ def evaluate_prerequisites(
             "active_holds":holds,
             "bl_release_authority":bl_authority,
             "document_source_of_truth":bl_authority["source"],
+            "release_instruction":{
+                "value":release_instruction or None,
+                "valid_until":do.get("Valid Until"),
+                "valid":release_instruction_ok,
+                "source":"transaction_records:delivery-order",
+            },
             "negative_margin_blocks_release":False,
         }
     finally:c.close()
