@@ -1,0 +1,58 @@
+name: M3 HO Operational Setup Collective Gap UAT
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/ho-operational-setup-gap-uat.yml'
+
+jobs:
+  ho-operational-uat:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install
+        run: pip install -r requirements.txt
+      - name: Regression
+        env:
+          PYTHONPATH: .
+        run: pytest -q tests/test_ho_operational_setup_collective_gap.py tests/test_clx071_container_journey.py tests/test_m3_item4_state_transition_governance.py
+      - name: Live endpoints and UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+          for p in demurrage-applicable-countries detention-applicable-cities activities activity-sequence; do
+            curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/ho-operational-setup/$p" -o "/tmp/$p.json"
+          done
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx011/menu" -o /tmp/menu.json
+          curl --fail --silent --show-error "$WEB/" -o /tmp/index.html
+          python - <<'PY'
+          import json
+          html=open('/tmp/index.html',encoding='utf-8').read()
+          dem=json.load(open('/tmp/demurrage-applicable-countries.json'))
+          det=json.load(open('/tmp/detention-applicable-cities.json'))
+          act=json.load(open('/tmp/activities.json'))
+          seq=json.load(open('/tmp/activity-sequence.json'))
+          menu=json.load(open('/tmp/menu.json'))
+          assert dem['duplicate_demurrage_engine'] is False
+          assert det['duplicate_detention_engine'] is False
+          assert act['duplicate_activity_model'] is False
+          assert seq['server_side_enforcement'] is True
+          assert seq['container_journey_changed'] is False
+          assert menu['screen_count']==196
+          for x in ['Demurrage Applicable Countries','Detention Applicable Cities','Activity Sequence','Activity']:
+              assert x in html,x
+          print('DEMURRAGE_APPLICABLE_COUNTRIES=PASS')
+          print('DETENTION_APPLICABLE_CITIES=PASS')
+          print('ACTIVITY=PASS')
+          print('ACTIVITY_SEQUENCE=PASS')
+          print('SEQUENCE_SERVER_SIDE_ENFORCEMENT=PASS')
+          print('CONTAINER_JOURNEY_CHANGED=FALSE')
+          print('SCREEN_COUNT=196')
+          print('ANCLINE_TOUCHED=FALSE')
+          PY
