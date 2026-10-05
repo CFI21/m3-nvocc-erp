@@ -176,6 +176,10 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
     {label:'Currency File',target:'master-data::currencies'},
     {label:'Route Planning',target:'master-data::routes'},
     {label:'Container Coding',equipment:'containers',gate:'agent-tasks::container-activity'},
+    {label:'Demurrage Applicable Countries',workspace:'demurrage-countries',target:'master-data::configurations'},
+    {label:'Detention Applicable Cities',workspace:'detention-cities',target:'master-data::configurations'},
+    {label:'Activity Sequence',workspace:'activity-sequence',target:'agent-tasks::container-activity'},
+    {label:'Activity',workspace:'activity',target:'agent-tasks::container-activity'},
     {label:'Location And Terminals',target:'master-data::locations'},
     {label:'UN/LOCODE',target:'master-data::ports'},
     {label:'Ports Coding',target:'master-data::ports'},
@@ -401,8 +405,8 @@ async function openHoSetupEquipment(view,label){
 }
 function hoSetupRoleAllowed(workspace){
   const r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;
-  if(['principal-setup','pa-parties','stamps','agent-relation','agent-volume-restriction','agent-network'].includes(workspace))
-    return ['ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','OPS','FINANCE','AUDITOR','VIEWER'].includes(r);
+  if(['principal-setup','pa-parties','stamps','agent-relation','agent-volume-restriction','agent-network','demurrage-countries','detention-cities','activity','activity-sequence'].includes(workspace))
+    return ['ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','OPS','FINANCE','EQUIPMENT_MANAGER','AUDITOR','VIEWER'].includes(r);
   return ['ADMIN','FINANCE','GL_MANAGER','GL_ACCOUNTANT','EQUIPMENT_MANAGER','AUDITOR','VIEWER'].includes(r);
 }
 async function openHoGovernedSetup(workspace,label,target){
@@ -423,6 +427,10 @@ async function openHoGovernedSetup(workspace,label,target){
   else if(workspace==='agent-relation')await renderHoAgentRelation();
   else if(workspace==='agent-volume-restriction')await renderHoAgentVolumeRestriction();
   else if(workspace==='agent-network')await renderHoAgentNetwork();
+  else if(workspace==='demurrage-countries')await renderHoDemurrageCountries();
+  else if(workspace==='detention-cities')await renderHoDetentionCities();
+  else if(workspace==='activity')await renderHoActivity();
+  else if(workspace==='activity-sequence')await renderHoActivitySequence();
 }
 async function renderHoPaParties(){
   try{
@@ -488,6 +496,57 @@ async function renderHoAgentNetwork(){
       (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(r.record_key)+'</b></td><td>'+esc(p.agent_code||'')+'</td><td>'+esc(p.network_type||'')+'</td><td>'+esc(p.country||'')+'</td><td>'+esc(p.branch_code||p.office_code||'')+'</td><td>'+esc(p.port||p.port_coverage||'')+'</td><td>'+esc(p.principal_code||p.related_party_code||'')+'</td><td>'+esc(p.service_code||p.trade_lane||'')+'</td><td>'+esc(r.effective_from||p.effective_from||'')+'</td><td>'+esc(r.effective_to||p.effective_to||'')+'</td><td>'+esc(r.status)+'</td></tr>'}).join(''):'<tr><td colspan="11" class="muted">No approved Agent Network configuration. Existing Agent master and Booking routing remain authoritative.</td></tr>')+
       '</tbody></table></div>';
   }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Agent Network load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function hoOperationalApi(path){
+  const r=await fetch('/api/ho-operational-setup/'+path,{headers:{'X-Role':state.role}});
+  const t=await r.text();let x={};try{x=t?JSON.parse(t):{}}catch(_){x={detail:t}}
+  if(!r.ok)throw new Error(typeof x.detail==='string'?x.detail:JSON.stringify(x.detail||x));
+  return x;
+}
+function hoConfigButtons(label){
+  return '<button class="btn primary" onclick="openScreen(\'master-data::configurations\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Configuration\'})">Manage Governed Configuration</button>'+
+    '<button class="btn" onclick="openScreen(\'master-data::locations\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Locations\'})">Locations</button>'+
+    '<button class="btn" onclick="openScreen(\'master-data::ports\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Ports\'})">Ports</button>';
+}
+async function renderHoDemurrageCountries(){
+  try{
+    const d=await hoOperationalApi('demurrage-applicable-countries');const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Demurrage Applicable Countries</b><span class="muted">Country applicability only; existing MRG/detention tariff engine remains authoritative.</span><span class="grow"></span>'+hoConfigButtons('Demurrage Applicable Countries')+'</div></div>'+
+      '<div class="equipNote">Authoritative source: '+esc(d.source)+' · Duplicate demurrage engine: '+esc(d.duplicate_demurrage_engine?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Rule</th><th>Country</th><th>Carrier</th><th>Principal</th><th>Agent</th><th>Movement</th><th>Applicable</th><th>Priority</th><th>Effective From</th><th>Effective To</th><th>Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(r.record_key)+'</b></td><td>'+esc(p.country||'')+'</td><td>'+esc(p.carrier_code||'')+'</td><td>'+esc(p.principal_code||'')+'</td><td>'+esc(p.agent_code||'')+'</td><td>'+esc(p.movement||'')+'</td><td>'+esc(p.applicable??'YES')+'</td><td>'+esc(p.priority||100)+'</td><td>'+esc(r.effective_from||p.effective_from||'')+'</td><td>'+esc(r.effective_to||p.effective_to||'')+'</td><td>'+esc(r.status)+'</td></tr>'}).join(''):'<tr><td colspan="11" class="muted">No country applicability overrides. Existing tariff behavior remains unchanged.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Demurrage Applicable Countries load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoDetentionCities(){
+  try{
+    const d=await hoOperationalApi('detention-applicable-cities');const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Detention Applicable Cities</b><span class="muted">City/location applicability for existing MRG Detention and MRG Detention Export.</span><span class="grow"></span>'+hoConfigButtons('Detention Applicable Cities')+'</div></div>'+
+      '<div class="equipNote">Authoritative source: '+esc(d.source)+' · Duplicate detention engine: '+esc(d.duplicate_detention_engine?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Rule</th><th>Country</th><th>City / Location</th><th>Port</th><th>Movement</th><th>Agent</th><th>Principal / Carrier</th><th>Applicable</th><th>Priority</th><th>Effective Dates</th><th>Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(r.record_key)+'</b></td><td>'+esc(p.country||'')+'</td><td>'+esc(p.city||p.location||'')+'</td><td>'+esc(p.port||'')+'</td><td>'+esc(p.movement||'')+'</td><td>'+esc(p.agent_code||'')+'</td><td>'+esc(p.principal_code||p.carrier_code||'')+'</td><td>'+esc(p.applicable??'YES')+'</td><td>'+esc(p.priority||100)+'</td><td>'+esc((r.effective_from||p.effective_from||'')+' → '+(r.effective_to||p.effective_to||''))+'</td><td>'+esc(r.status)+'</td></tr>'}).join(''):'<tr><td colspan="11" class="muted">No city applicability overrides. Existing detention tariff behavior remains unchanged.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Detention Applicable Cities load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoActivity(){
+  try{
+    const d=await hoOperationalApi('activities');const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Activity</b><span class="muted">Governed view over existing CLX-071 Container Journey event definitions. No duplicate event model.</span><span class="grow"></span><button class="btn primary" onclick="openScreen(\'agent-tasks::container-activity\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Activity · Container Activity\'})">Container Activity</button><button class="btn" onclick="openScreen(\'master-data::configurations\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Activity Metadata\'})">Metadata Configuration</button></div></div>'+
+      '<div class="equipNote">Authoritative source: '+esc(d.source)+' · Duplicate activity model: '+esc(d.duplicate_activity_model?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>#</th><th>Activity Code</th><th>Name</th><th>Category</th><th>Applies To</th><th>Mandatory</th><th>Source</th></tr></thead><tbody>'+
+      rows.map(r=>'<tr><td>'+esc(r.sequence_hint)+'</td><td><b>'+esc(r.activity_code)+'</b></td><td>'+esc(r.activity_name)+'</td><td>'+esc(r.activity_category)+'</td><td>'+esc(r.applies_to_module)+'</td><td>'+esc(r.mandatory?'YES':'NO')+'</td><td>'+esc(r.source)+'</td></tr>').join('')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Activity load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoActivitySequence(){
+  try{
+    const d=await hoOperationalApi('activity-sequence');const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Activity Sequence</b><span class="muted">Existing server-authoritative CLX-071 transition map. Invalid transitions remain blocked unless governed override is authorized and audited.</span><span class="grow"></span><button class="btn primary" onclick="openScreen(\'agent-tasks::container-activity\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Activity Sequence · Container Journey\'})">Container Journey</button></div></div>'+
+      '<div class="equipNote">Server-side enforcement: '+esc(d.server_side_enforcement?'PASS':'FAIL')+' · Container Journey changed: '+esc(d.container_journey_changed?'YES':'NO')+' · Source: '+esc(d.source)+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Process</th><th>Previous Activity</th><th>Next Activity</th><th>Mandatory Predecessor</th><th>Server Enforced</th><th>Source</th></tr></thead><tbody>'+
+      rows.map(r=>'<tr><td>'+esc(r.process)+'</td><td><b>'+esc(r.previous_activity)+'</b></td><td>'+esc(r.next_activity)+'</td><td>'+esc(r.mandatory_predecessor?'YES':'NO')+'</td><td>'+esc(r.server_enforced?'YES':'NO')+'</td><td>'+esc(r.source)+'</td></tr>').join('')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Activity Sequence load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
 async function renderHoPrincipalSetup(){
   try{
