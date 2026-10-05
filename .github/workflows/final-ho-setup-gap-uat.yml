@@ -1,5 +1,5 @@
 name: M3 Final HO Setup Gap Cluster UAT
-# rerun after Special Rate assertion alignment
+# rerun after backend-authoritative Special Rate assertion
 
 on:
   push:
