@@ -187,6 +187,11 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
     {label:'Principle Setup',workspace:'principal-setup',target:'master-data::common-partys'},
     {label:'Investor Setup',workspace:'investor-setup',target:'master-data::common-partys'},
     {label:'Company',target:'administration::legal-entities'},
+    {label:'Damage Setup',workspace:'damage-setup',target:'master-data::configurations'},
+    {label:'Container Status',workspace:'container-status',target:'agent-tasks::container-activity'},
+    {label:'Customer Tariff',customerTariff:true,target:'master-data::charge-codes'},
+    {label:'Local Recovery Agreement',workspace:'local-recovery',target:'master-data::configurations'},
+    {label:'Long Ageing Configuration',workspace:'long-ageing',target:'agent-tasks::container-activity'},
     {label:'Lease Rental Contract (Purchase)',equipment:'lease',gate:'agent-tasks::container-activity'},
     {label:'Rates Management',target:'agent-tasks::special-rates-request'},
     {label:'Auto SOA',target:'agent-tasks::soa'}
@@ -200,9 +205,11 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
       visibleSetup.map(it=>{
         const active=state.navContext?.domain==='HO Tasks'&&state.navContext?.submenu==='Setup'&&state.navContext?.label===it.label;
         const label=it.label.replaceAll("'","\\'");
-        const action=it.slot
-          ?'openSlotRateWorkspace()'
-          :it.mrg
+        const action=it.customerTariff
+          ?'openCustomerTariffWorkspace()'
+          :it.slot
+            ?'openSlotRateWorkspace()'
+            :it.mrg
             ?'openMrgWorkspace(\''+it.mrg+'\',\''+label+'\')'
             :it.workspace
             ?'openHoGovernedSetup(\''+it.workspace+'\',\''+label+'\',\''+it.target.replaceAll("'","\\'")+'\')'
@@ -230,6 +237,7 @@ let mrgWorkspaceType='GENERAL';
 let mrgWorkspaceLabel='MRG';
 let mrgRows=[];
 let slotRateMode=false;
+let customerTariffMode=false;
 async function mrgApi(url,opt={}){
   const headers={'X-Role':state.role,...(opt.headers||{})};
   const r=await fetch(url,{...opt,headers});
@@ -238,7 +246,7 @@ async function mrgApi(url,opt={}){
   return x;
 }
 async function openMrgWorkspace(type,label){
-  slotRateMode=false;mrgWorkspaceType=type;mrgWorkspaceLabel=label;
+  slotRateMode=false;customerTariffMode=false;mrgWorkspaceType=type;mrgWorkspaceLabel=label;
   const s=state.byId['master-data::charge-codes'];if(!s)return;
   state.current=s;state.navContext={domain:'HO Tasks',submenu:'Setup',label};state.selected=null;
   $('favorite').style.visibility='hidden';renderNav();renderBreadcrumb();
@@ -248,7 +256,7 @@ async function openMrgWorkspace(type,label){
   await renderMrgWorkspace();
 }
 async function openSlotRateWorkspace(){
-  slotRateMode=true;mrgWorkspaceType='GENERAL';mrgWorkspaceLabel='Slot Rate';
+  customerTariffMode=false;slotRateMode=true;mrgWorkspaceType='GENERAL';mrgWorkspaceLabel='Slot Rate';
   const s=state.byId['master-data::charge-codes'];if(!s)return;
   state.current=s;state.navContext={domain:'HO Tasks',submenu:'Setup',label:'Slot Rate'};state.selected=null;
   $('favorite').style.visibility='hidden';renderNav();renderBreadcrumb();
@@ -257,24 +265,38 @@ async function openSlotRateWorkspace(){
   $('screenMeta').innerHTML='<div class="opHeader"><span class="opHeaderTitle">Slot Rate</span><span class="grow"></span><span class="status ok">Authoritative source: MRG</span></div>';
   await renderMrgWorkspace();
 }
+async function openCustomerTariffWorkspace(){
+  slotRateMode=false;customerTariffMode=true;mrgWorkspaceType='GENERAL';mrgWorkspaceLabel='Customer Tariff';
+  const s=state.byId['master-data::charge-codes'];if(!s)return;
+  state.current=s;state.navContext={domain:'HO Tasks',submenu:'Setup',label:'Customer Tariff'};state.selected=null;
+  $('favorite').style.visibility='hidden';renderNav();renderBreadcrumb();
+  $('flow').innerHTML='<div class="opFollow"><b>Customer Tariff</b><span>Filtered MRG REVENUE workspace · PARTY_TYPE=CUSTOMER · no second tariff engine</span></div>';
+  history.pushState(null,'','#ho-setup=customer-tariff');
+  $('screenMeta').innerHTML='<div class="opHeader"><span class="opHeaderTitle">Customer Tariff</span><span class="grow"></span><span class="status ok">Authoritative source: MRG</span></div>';
+  await renderMrgWorkspace();
+}
 function mrgTabs(){
   if(slotRateMode)return '<div class="equipNote"><b>Slot Rate</b> · same MRG table and approval engine · RATE_SIDE=COST · MRG types GENERAL / EXPORT / TRANSSHIPMENT only.</div>';
+  if(customerTariffMode)return '<div class="equipNote"><b>Customer Tariff</b> · same MRG table and approval engine · RATE_SIDE=REVENUE · PARTY_TYPE=CUSTOMER.</div>';
   const xs=[['GENERAL','MRG'],['EXPORT','Export'],['IMPORT','Import'],['TRANSSHIPMENT','Transshipment'],['DETENTION','Detention'],['DETENTION_EXPORT','Detention Export'],['MTY_STORAGE','MTY Storage'],['SPECIAL_DETENTION','Special Detention'],['REPORT','List / Report']];
   return '<div class="clx78Tabs">'+xs.map(x=>'<button class="'+(mrgWorkspaceType===x[0]?'active':'')+'" onclick="mrgWorkspaceType=\''+x[0]+'\';mrgWorkspaceLabel=\''+x[1].replaceAll("'","\\'")+'\';renderMrgWorkspace()">'+esc(x[1])+'</button>').join('')+'</div>';
 }
 async function renderMrgWorkspace(){
   $('gridArea').innerHTML='<div class="card">Loading MRG…</div>';
   try{
-    const u=slotRateMode?'/api/mrg/rules?rate_side=COST':(mrgWorkspaceType==='REPORT'?('/api/mrg/report'+mrgReportQuery()):('/api/mrg/rules?mrg_type='+encodeURIComponent(mrgWorkspaceType)));
+    const u=customerTariffMode?'/api/mrg/rules?rate_side=REVENUE&party_type=CUSTOMER':(slotRateMode?'/api/mrg/rules?rate_side=COST':(mrgWorkspaceType==='REPORT'?('/api/mrg/report'+mrgReportQuery()):('/api/mrg/rules?mrg_type='+encodeURIComponent(mrgWorkspaceType))));
     const d=await mrgApi(u);mrgRows=d.records||[];
     if(slotRateMode)mrgRows=mrgRows.filter(r=>r.rate_side==='COST'&&['GENERAL','EXPORT','TRANSSHIPMENT'].includes(r.mrg_type)&&(r.charge_type==='SLOT'||r.charge_code==='OFR')&&['CARRIER','PRINCIPAL','OTHER'].includes(r.party_type));
+    if(customerTariffMode)mrgRows=mrgRows.filter(r=>r.rate_side==='REVENUE'&&r.party_type==='CUSTOMER'&&['GENERAL','EXPORT','IMPORT','TRANSSHIPMENT'].includes(r.mrg_type));
     const toolbar='<div class="toolbar"><b>'+esc(mrgWorkspaceLabel)+'</b><span class="muted">One shared MRG model · '+mrgRows.length+' rule(s)</span><span class="grow"></span>'+
-      (slotRateMode?'<button class="btn primary" onclick="mrgNewRule()">New Slot Rate</button>':(mrgWorkspaceType==='REPORT'?'<button class="btn" onclick="mrgResetReport()">Reset Filters</button>':'<button class="btn primary" onclick="mrgNewRule()">New Rate</button>'))+
-      (slotRateMode?'':'<button class="btn" onclick="mrgWorkspaceType=\'REPORT\';mrgWorkspaceLabel=\'MRG List / Report\';renderMrgWorkspace()">List / Report</button>')+'</div>';
-    const heads=slotRateMode?['MRG Ref','Type','Slot Operator','POL','POT','POD','Vessel','Voyage','Contract / Tariff','Currency','Basis','Rate','Valid From','Valid To','Status','Action']:['MRG Ref','Side','Party','Charge','POL','POT','POD','Currency','Basis','Rate','Valid From','Valid To','Status','Version','Action'];
-    const body=mrgRows.length?mrgRows.map(r=>slotRateMode
+      (customerTariffMode?'<button class="btn primary" onclick="mrgNewRule()">New Customer Tariff</button>':(slotRateMode?'<button class="btn primary" onclick="mrgNewRule()">New Slot Rate</button>':(mrgWorkspaceType==='REPORT'?'<button class="btn" onclick="mrgResetReport()">Reset Filters</button>':'<button class="btn primary" onclick="mrgNewRule()">New Rate</button>')))+
+      ((slotRateMode||customerTariffMode)?'':'<button class="btn" onclick="mrgWorkspaceType=\'REPORT\';mrgWorkspaceLabel=\'MRG List / Report\';renderMrgWorkspace()">List / Report</button>')+'</div>';
+    const heads=customerTariffMode?['MRG Ref','Type','Customer','Charge','POL','POT','POD','Route / Service','Contract / Tariff','Currency','Basis','Rate','Valid From','Valid To','Status','Action']:(slotRateMode?['MRG Ref','Type','Slot Operator','POL','POT','POD','Vessel','Voyage','Contract / Tariff','Currency','Basis','Rate','Valid From','Valid To','Status','Action']:['MRG Ref','Side','Party','Charge','POL','POT','POD','Currency','Basis','Rate','Valid From','Valid To','Status','Version','Action']);
+    const body=mrgRows.length?mrgRows.map(r=>customerTariffMode
+      ?'<tr><td><b>'+esc(r.rule_ref)+'</b></td><td>'+esc(r.mrg_type)+'</td><td>'+esc(r.party_code||'')+'</td><td>'+esc(r.charge_code)+'</td><td>'+esc(r.pol||'')+'</td><td>'+esc(r.pot||'')+'</td><td>'+esc(r.pod||'')+'</td><td>'+esc((r.route_code||'')+' '+(r.service_code||''))+'</td><td>'+esc(r.contract_ref||'')+'</td><td>'+esc(r.currency)+'</td><td>'+esc(r.rate_basis)+'</td><td>'+esc(r.unit_rate)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to||'')+'</td><td>'+esc(r.status)+'</td><td><button class="btn" onclick="mrgOpenRule(\''+esc(r.rule_ref)+'\')">Open</button></td></tr>'
+      :slotRateMode
       ?'<tr><td><b>'+esc(r.rule_ref)+'</b></td><td>'+esc(r.mrg_type)+'</td><td>'+esc((r.party_type||'')+' '+(r.party_code||''))+'</td><td>'+esc(r.pol||'')+'</td><td>'+esc(r.pot||'')+'</td><td>'+esc(r.pod||'')+'</td><td>'+esc(r.vessel_code||'')+'</td><td>'+esc(r.voyage_no||'')+'</td><td>'+esc(r.contract_ref||'')+'</td><td>'+esc(r.currency)+'</td><td>'+esc(r.rate_basis)+'</td><td>'+esc(r.unit_rate)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to||'')+'</td><td>'+esc(r.status)+'</td><td><button class="btn" onclick="mrgOpenRule(\''+esc(r.rule_ref)+'\')">Open</button></td></tr>'
-      :'<tr><td><b>'+esc(r.rule_ref)+'</b></td><td>'+esc(r.rate_side)+'</td><td>'+esc((r.party_type||'')+' '+(r.party_code||''))+'</td><td>'+esc(r.charge_code)+'</td><td>'+esc(r.pol||'')+'</td><td>'+esc(r.pot||'')+'</td><td>'+esc(r.pod||'')+'</td><td>'+esc(r.currency)+'</td><td>'+esc(r.rate_basis)+'</td><td>'+esc(r.unit_rate)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to||'')+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.version)+'</td><td><button class="btn" onclick="mrgOpenRule(\''+esc(r.rule_ref)+'\')">Open</button></td></tr>').join(''):'<tr><td colspan="'+(slotRateMode?'16':'15')+'" class="muted">No '+(slotRateMode?'Slot Rate':'MRG')+' rules yet.</td></tr>';
+      :'<tr><td><b>'+esc(r.rule_ref)+'</b></td><td>'+esc(r.rate_side)+'</td><td>'+esc((r.party_type||'')+' '+(r.party_code||''))+'</td><td>'+esc(r.charge_code)+'</td><td>'+esc(r.pol||'')+'</td><td>'+esc(r.pot||'')+'</td><td>'+esc(r.pod||'')+'</td><td>'+esc(r.currency)+'</td><td>'+esc(r.rate_basis)+'</td><td>'+esc(r.unit_rate)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to||'')+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.version)+'</td><td><button class="btn" onclick="mrgOpenRule(\''+esc(r.rule_ref)+'\')">Open</button></td></tr>').join(''):'<tr><td colspan="'+((slotRateMode||customerTariffMode)?'16':'15')+'" class="muted">No '+(customerTariffMode?'Customer Tariff':(slotRateMode?'Slot Rate':'MRG'))+' rules yet.</td></tr>';
     const filters=mrgWorkspaceType==='REPORT'?mrgReportFilters():'';
     $('gridArea').innerHTML=mrgTabs()+filters+'<div class="card">'+toolbar+'</div><div class="tablewrap"><table><thead><tr>'+heads.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+body+'</tbody></table></div>';
   }catch(e){$('gridArea').innerHTML=mrgTabs()+'<div class="card badtext"><b>MRG load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
@@ -307,6 +329,21 @@ function mrgSelect(name,label,values,current=''){
   return '<div class="formField"><label>'+esc(label)+'</label><select id="mrg-'+name+'">'+values.map(v=>'<option '+(v===current?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select></div>';
 }
 function mrgNewRule(){
+  if(customerTariffMode){
+    $('gridArea').innerHTML=mrgTabs()+'<div class="clx82Section"><div class="clx82Head">New Customer Tariff</div><div class="clx82Body"><div class="formGrid">'+
+      mrgSelect('mrg_type','MRG Scope',['GENERAL','EXPORT','IMPORT','TRANSSHIPMENT'],'GENERAL')+
+      mrgField('party_code','Customer Code')+mrgField('charge_code','Charge Code')+
+      mrgField('effective_from','Effective From','date')+mrgField('effective_to','Effective To','date')+
+      mrgField('pol','POL')+mrgField('pot','POT')+mrgField('pod','POD / POFD')+
+      mrgField('route_code','Route / Trade Lane')+mrgField('service_code','Service')+
+      mrgField('size_type','Equipment Size')+mrgField('container_type','Container Type')+
+      mrgField('currency','Currency','text','USD')+mrgField('rate_basis','Rate Basis','text','PER_CONTAINER')+
+      mrgField('unit_rate','Revenue Rate','number','0')+mrgField('minimum_rate','Minimum','number')+mrgField('maximum_rate','Maximum','number')+
+      mrgField('contract_ref','Contract / Tariff Ref')+mrgField('priority','Priority','number','100')+mrgField('remarks','Remarks')+
+      '<div class="formNote">Stored in the existing MRG model as RATE_SIDE=REVENUE and PARTY_TYPE=CUSTOMER. Booking continues to use Import MRG and Special Rate priority.</div>'+
+      '<div class="formActions"><button class="btn" onclick="renderMrgWorkspace()">Cancel</button><button class="btn primary" onclick="mrgSaveNew()">Submit for Approval</button></div></div></div></div>';
+    return;
+  }
   if(slotRateMode){
     $('gridArea').innerHTML=mrgTabs()+'<div class="clx82Section"><div class="clx82Head">New Slot Rate</div><div class="clx82Body"><div class="formGrid">'+
       mrgSelect('mrg_type','MRG Scope',['GENERAL','EXPORT','TRANSSHIPMENT'],'GENERAL')+
@@ -344,7 +381,7 @@ function mrgNewRule(){
 }
 async function mrgSaveNew(){
   const val=n=>document.getElementById('mrg-'+n)?.value||null;
-  const body={mrg_type:slotRateMode?(val('mrg_type')||'GENERAL'):mrgWorkspaceType,rate_side:slotRateMode?'COST':val('rate_side'),party_type:val('party_type'),party_code:val('party_code'),charge_code:val('charge_code'),
+  const body={mrg_type:(slotRateMode||customerTariffMode)?(val('mrg_type')||'GENERAL'):mrgWorkspaceType,rate_side:customerTariffMode?'REVENUE':(slotRateMode?'COST':val('rate_side')),party_type:customerTariffMode?'CUSTOMER':val('party_type'),party_code:val('party_code'),charge_code:val('charge_code'),
     charge_type:slotRateMode?'SLOT':val('charge_type'),effective_from:val('effective_from'),effective_to:val('effective_to'),pol:val('pol'),pot:val('pot'),pod:val('pod'),
     depot_code:val('depot_code'),terminal_code:val('terminal_code'),route_code:val('route_code'),service_code:val('service_code'),
     vessel_code:val('vessel_code'),voyage_no:val('voyage_no'),contract_ref:val('contract_ref'),cargo_type:val('cargo_type'),
@@ -405,7 +442,7 @@ async function openHoSetupEquipment(view,label){
 }
 function hoSetupRoleAllowed(workspace){
   const r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;
-  if(['principal-setup','pa-parties','stamps','agent-relation','agent-volume-restriction','agent-network','demurrage-countries','detention-cities','activity','activity-sequence'].includes(workspace))
+  if(['principal-setup','pa-parties','stamps','agent-relation','agent-volume-restriction','agent-network','demurrage-countries','detention-cities','activity','activity-sequence','damage-setup','container-status','local-recovery','long-ageing'].includes(workspace))
     return ['ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','OPS','FINANCE','EQUIPMENT_MANAGER','AUDITOR','VIEWER'].includes(r);
   return ['ADMIN','FINANCE','GL_MANAGER','GL_ACCOUNTANT','EQUIPMENT_MANAGER','AUDITOR','VIEWER'].includes(r);
 }
@@ -431,6 +468,10 @@ async function openHoGovernedSetup(workspace,label,target){
   else if(workspace==='detention-cities')await renderHoDetentionCities();
   else if(workspace==='activity')await renderHoActivity();
   else if(workspace==='activity-sequence')await renderHoActivitySequence();
+  else if(workspace==='damage-setup')await renderHoDamageSetup();
+  else if(workspace==='container-status')await renderHoContainerStatus();
+  else if(workspace==='local-recovery')await renderHoLocalRecovery();
+  else if(workspace==='long-ageing')await renderHoLongAgeing();
 }
 async function renderHoPaParties(){
   try{
@@ -547,6 +588,56 @@ async function renderHoActivitySequence(){
       rows.map(r=>'<tr><td>'+esc(r.process)+'</td><td><b>'+esc(r.previous_activity)+'</b></td><td>'+esc(r.next_activity)+'</td><td>'+esc(r.mandatory_predecessor?'YES':'NO')+'</td><td>'+esc(r.server_enforced?'YES':'NO')+'</td><td>'+esc(r.source)+'</td></tr>').join('')+
       '</tbody></table></div>';
   }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Activity Sequence load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function finalHoApi(path){
+  const r=await fetch('/api/final-ho-setup/'+path,{headers:{'X-Role':state.role}});
+  const t=await r.text();let x={};try{x=t?JSON.parse(t):{}}catch(_){x={detail:t}}
+  if(!r.ok)throw new Error(typeof x.detail==='string'?x.detail:JSON.stringify(x.detail||x));
+  return x;
+}
+function finalHoConfigButton(label){
+  return '<button class="btn primary" onclick="openScreen(\'master-data::configurations\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Configuration\'})">Manage Governed Configuration</button>';
+}
+async function renderHoDamageSetup(){
+  try{
+    const d=await finalHoApi('damage-setup');const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Damage Setup</b><span class="muted">Governed catalog over CLX-074 inspection/damage/M&R. No duplicate M&R engine.</span><span class="grow"></span>'+finalHoConfigButton('Damage Setup')+'<button class="btn" onclick="showEquipmentWorkspace(\'mr\')">Depot / M&R</button></div></div>'+
+      '<div class="equipNote">Source: '+esc(d.source)+' · Duplicate M&R engine: '+esc(d.duplicate_mr_engine?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Damage Code</th><th>Description</th><th>Category</th><th>Component</th><th>Location</th><th>Severity</th><th>Repair</th><th>Inspection</th><th>Default Hold</th><th>Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(p.damage_code||r.record_key)+'</b></td><td>'+esc(p.description||r.display_name||'')+'</td><td>'+esc(p.damage_category||'')+'</td><td>'+esc(p.component_code||'')+'</td><td>'+esc(p.location_code||'')+'</td><td>'+esc(p.severity||'')+'</td><td>'+esc(p.repair_required?'YES':'NO')+'</td><td>'+esc(p.inspection_required?'YES':'NO')+'</td><td>'+esc(p.default_hold?'YES':'NO')+'</td><td>'+esc(r.status)+'</td></tr>'}).join(''):'<tr><td colspan="10" class="muted">No governed damage catalog configured. Existing CLX-074 operational damage capture remains authoritative.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Damage Setup load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoContainerStatus(){
+  try{
+    const d=await finalHoApi('container-status');const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Container Status</b><span class="muted">Read/governed view of the existing CLX-071 state machine. Configuration cannot bypass state-transition governance.</span><span class="grow"></span><button class="btn primary" onclick="showEquipmentWorkspace(\'containers\')">Container Master</button><button class="btn" onclick="showEquipmentWorkspace(\'journey\')">Journey</button></div></div>'+
+      '<div class="equipNote">Source: '+esc(d.source)+' · Duplicate status engine: '+esc(d.duplicate_status_engine?'YES':'NO')+' · Transition governance changed: '+esc(d.state_transition_governance_changed?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Status Code</th><th>Name</th><th>Category</th><th>Bookable</th><th>Hold</th><th>Terminal</th><th>Allowed Next Status</th><th>Source</th></tr></thead><tbody>'+
+      rows.map(r=>'<tr><td><b>'+esc(r.status_code)+'</b></td><td>'+esc(r.display_name)+'</td><td>'+esc(r.operational_category)+'</td><td>'+esc(r.available_for_booking?'YES':'NO')+'</td><td>'+esc(r.hold_state?'YES':'NO')+'</td><td>'+esc(r.terminal_state?'YES':'NO')+'</td><td>'+esc((r.allowed_next_status||[]).join(', '))+'</td><td>'+esc(r.source)+'</td></tr>').join('')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Container Status load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoLocalRecovery(){
+  try{
+    const d=await finalHoApi('local-recovery-agreements');const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Local Recovery Agreement</b><span class="muted">Expected commercial recovery configuration only. Finance remains authoritative for invoice/payment.</span><span class="grow"></span>'+finalHoConfigButton('Local Recovery Agreement')+'</div></div>'+
+      '<div class="equipNote">Source: '+esc(d.source)+' · Direct finance posting: '+esc(d.direct_finance_posting?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Agreement</th><th>Recover From</th><th>Recover To / Cost Owner</th><th>Charge</th><th>Route / Port</th><th>Service</th><th>Currency</th><th>Basis</th><th>Rate / %</th><th>Effective Dates</th><th>Status</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>{const p=r.payload||{};return '<tr><td><b>'+esc(r.record_key)+'</b></td><td>'+esc(p.recover_from_party_code||'')+'</td><td>'+esc(p.recover_to_party_code||'')+'</td><td>'+esc(p.charge_code||'')+'</td><td>'+esc((p.route_code||'')+' '+(p.port_code||''))+'</td><td>'+esc(p.service_code||'')+'</td><td>'+esc(p.currency||'')+'</td><td>'+esc(p.recovery_basis||'')+'</td><td>'+esc(p.recovery_rate||'')+'</td><td>'+esc((r.effective_from||p.effective_from||'')+' → '+(r.effective_to||p.effective_to||''))+'</td><td>'+esc(r.status)+'</td></tr>'}).join(''):'<tr><td colspan="11" class="muted">No active Local Recovery Agreement configuration.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Local Recovery Agreement load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function renderHoLongAgeing(){
+  try{
+    const d=await finalHoApi('long-ageing');const rows=d.records||[];
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Long Ageing Configuration</b><span class="muted">Server-side threshold classification over existing Container idle_days / Equipment Network data.</span><span class="grow"></span>'+finalHoConfigButton('Long Ageing Configuration')+'<button class="btn" onclick="showEquipmentWorkspace(\'network\')">Equipment Network</button><button class="btn" onclick="showEquipmentWorkspace(\'kpi\')">Equipment KPI</button></div></div>'+
+      '<div class="kpis"><div class="card kpi"><span>Normal</span><b>'+esc(d.summary?.NORMAL||0)+'</b></div><div class="card kpi"><span>Warning</span><b>'+esc(d.summary?.WARNING||0)+'</b></div><div class="card kpi"><span>Critical</span><b>'+esc(d.summary?.CRITICAL||0)+'</b></div></div>'+
+      '<div class="equipNote">Source: '+esc(d.source)+' · Server-side evaluation: '+esc(d.server_side_evaluation?'YES':'NO')+' · Equipment Network changed: '+esc(d.equipment_network_changed?'YES':'NO')+'</div>'+
+      '<div class="tablewrap"><table><thead><tr><th>Container</th><th>Idle Days</th><th>Classification</th><th>Warning</th><th>Critical</th><th>Port</th><th>Depot</th><th>Branch / Agent</th><th>Ownership</th><th>Rule</th><th>Action / Escalation</th></tr></thead><tbody>'+
+      (rows.length?rows.map(r=>'<tr><td><b>'+esc(r.container_no)+'</b></td><td>'+esc(r.idle_days)+'</td><td>'+esc(r.classification)+'</td><td>'+esc(r.warning_threshold)+'</td><td>'+esc(r.critical_threshold)+'</td><td>'+esc(r.port||'')+'</td><td>'+esc(r.depot||'')+'</td><td>'+esc((r.branch||'')+' '+(r.agent||''))+'</td><td>'+esc(r.ownership_type||'')+'</td><td>'+esc(r.source_rule)+'</td><td>'+esc((r.action_required||'')+' '+(r.escalation_role||''))+'</td></tr>').join(''):'<tr><td colspan="11" class="muted">No scoped AVAILABLE containers.</td></tr>')+
+      '</tbody></table></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Long Ageing Configuration load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
 async function renderHoPrincipalSetup(){
   try{
