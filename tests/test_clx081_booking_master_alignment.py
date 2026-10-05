@@ -63,7 +63,7 @@ def test_charge_grid_exact_column_contract():
     for x in cols: assert x in b,x
     assert "/api/gl/job/" in HTML
     assert "/api/clx046/job/" in HTML
-    assert "No parallel charge model" in HTML
+    assert "no parallel Booking model" in HTML
 
 def test_no_new_booking_model_or_schema():
     m=json.loads((ROOT/'CLX081_BOOKING_FIELD_MATRIX.json').read_text())
