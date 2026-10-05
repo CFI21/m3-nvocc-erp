@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel, Field
 from typing import Optional, Any
 import json, uuid, datetime, hashlib
-from .db import connect
+from .db import connect, using_postgres
 from .admin import session as iam_session, roles_for as iam_roles_for
 
 router=APIRouter(prefix='/api/masterdata',tags=['CLX-010 Master Data Governance'])
@@ -120,7 +120,9 @@ def overview():
 @router.get('/records/{domain}')
 def records(domain:str):
     if domain not in DOMAINS:raise HTTPException(404,'Unknown domain')
-    c=connect();init_schema(c);rows=[]
+    c=connect();
+    if not using_postgres(): init_schema(c)
+    rows=[]
     for r in c.execute('SELECT * FROM md_records WHERE domain=? ORDER BY record_key',(domain,)):
         d=dict(r);d['payload']=json.loads(d.pop('payload_json'));rows.append(d)
     c.close();return rows
