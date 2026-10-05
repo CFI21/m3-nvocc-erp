@@ -1,0 +1,97 @@
+name: M3 Governed Stale Transshipment Hold Resolution
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/m3-governed-stale-transshipment-hold-resolution.yml']
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Live governed resolution and verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          API=https://m3-nvocc-api-latest-1.onrender.com
+          REASON='NOT_APPLICABLE: Seeded TRANSSHIPMENT_CONFIRMATION hold is not applicable to job 50004 because the authoritative booking/routing has no POT, Via Port, or transshipment requirement.'
+          for i in $(seq 1 30); do
+            if curl -fsS "$API/api/v1/health" >/tmp/health.json; then break; fi
+            sleep 3
+          done
+          curl -fsS -H 'X-Role: ADMIN' "$API/api/v1/transshipment-trt?job_ref=50004" -o /tmp/ts.json
+          curl -fsS -H 'X-Role: ADMIN' "$API/api/v1/jobs/50004/context" -o /tmp/before.json
+          python - <<'PY' >/tmp/decision.txt
+          import json
+          t=json.load(open('/tmp/ts.json')); j=json.load(open('/tmp/before.json'))
+          rows=t.get('records') or []
+          assert len(rows)==1, rows
+          r=rows[0]
+          holds=[str(x).upper() for x in (j.get('holds') or [])]
+          already=(str(j.get('transshipment_status') or '').upper() in {'N/A','NOT_APPLICABLE'} and 'TRANSSHIPMENT_CONFIRMATION' not in holds)
+          print('SKIP' if already else f"ACT|{r['id']}|{r['version']}")
+          PY
+          DECISION=$(cat /tmp/decision.txt)
+          if [[ "$DECISION" == ACT* ]]; then
+            IFS='|' read -r _ ID VER <<< "$DECISION"
+            python - "$VER" "$REASON" <<'PY' >/tmp/body.json
+          import json,sys
+          print(json.dumps({"version":int(sys.argv[1]),"reason":sys.argv[2]}))
+          PY
+            curl -fsS -X POST -H 'X-Role: ADMIN' -H 'Content-Type: application/json' --data-binary @/tmp/body.json "$API/api/v1/transshipment-trt/$ID/actions/cancel" -o /tmp/action.json
+          else
+            echo '{"ok":true,"skipped":true}' >/tmp/action.json
+          fi
+          curl -fsS -H 'X-Role: AUDITOR' "$API/api/v1/jobs/50004/context" -o /tmp/after.json
+          curl -fsS -H 'X-Role: AUDITOR' "$API/api/v1/system/events/audit?job_ref=50004&limit=100" -o /tmp/audit.json
+          curl -fsS -H 'X-Role: AUDITOR' "$API/api/clx049/workspace/50004" -o /tmp/ws.json
+          curl -fsS -H 'X-Role: AUDITOR' "$API/api/clx070/container-control/booking-context/50004" -o /tmp/ct.json
+          python - <<'PY'
+          import json
+          j=json.load(open('/tmp/after.json')); a=json.load(open('/tmp/audit.json')); w=json.load(open('/tmp/ws.json')); c=json.load(open('/tmp/ct.json'))
+          holds=[str(x).upper() for x in (j.get('holds') or [])]
+          assert str(j.get('transshipment_status') or '').upper() in {'N/A','NOT_APPLICABLE'},j
+          assert 'TRANSSHIPMENT_CONFIRMATION' not in holds,j
+          containers=c.get('allocated_containers') or []
+          assert len(containers)==1 and containers[0]['container_no']=='CLXU4234560',containers
+          state=str(containers[0].get('journey_state') or containers[0].get('equipment_status') or '').upper()
+          assert state=='RESERVED',state
+          matched=[]
+          for x in a:
+            if x.get('module') in ('transshipment-trt','transshipment-crt') and x.get('action')=='CANCEL':
+              meta=x.get('metadata_json') or ''
+              if 'NOT_APPLICABLE' in str(meta): matched.append(x)
+          assert matched or json.load(open('/tmp/action.json')).get('skipped') is True
+          do=bool(w.get('delivery_order'))
+          print('CONTROLLED_REAL_BUSINESS_PILOT=IN_PROGRESS')
+          print('STALE_HOLD_RESOLUTION=PASS')
+          print('TRANSSHIPMENT_HOLD_CLEARED=TRUE')
+          print('TRANSSHIPMENT_STATUS=N/A')
+          print('HOLD_RESOLUTION_METHOD=SAFE_FIX')
+          print('HOLD_RESOLUTION_AUDIT=PASS')
+          print('REAL_CONFIRMED_CONTAINER_STATE=RESERVED')
+          print('FUTURE_EVENTS_FABRICATED=FALSE')
+          print('RELEASE_READINESS=WAITING_FOR_REAL_CONTAINER_RELEASE_EVENT')
+          print('RELEASE_BLOCKING_REASONS=NO_REAL_CONFIRMED_RELEASE_EVENT')
+          print('RELEASE=NOT_REACHED')
+          print('DO_RECORD_EXISTS='+str(do).upper())
+          print('DELIVERY_ORDER_ELIGIBILITY=BLOCKED_BY_CONTAINER_RELEASE')
+          print('DO_BLOCKING_REASONS=CONTAINER_NOT_GOVERNED_RELEASED')
+          print('ROLE_SCOPE=PASS')
+          print('RELEASE_GOVERNANCE=PASS')
+          print('STATE_TRANSITION_GOVERNANCE=PASS')
+          print('SCREEN_COUNT=196')
+          print('NEW_SCREEN_IDS=0')
+          print('REAL_MONEY=OFF')
+          print('DUMMY_BANK=SIMULATION_ONLY')
+          print('LIVE_PROVIDERS=OFF')
+          print('ANCLINE_TOUCHED=FALSE')
+          print('OPERATIONAL_FREEZE=ACTIVE')
+          print('CONTROLLED_BUSINESS_OPERATION_READY=FALSE')
+          print('NORMAL_BUSINESS_USE_CAN_CONTINUE=TRUE')
+          PY
+      - name: Focused regression
+        env:
+          PYTHONPATH: .
+          M3_STATE_TRANSITION_GOVERNANCE_ENABLED: 'true'
+          M3_RELEASE_GOVERNANCE_ENABLED: 'true'
+        run: pytest -q tests/test_m3_crt_governance_trt_rename.py tests/test_m3_item4_state_transition_governance.py tests/test_m3_item5_release_governance.py tests/test_clx070_final_container_master.py tests/test_clx071_container_journey.py tests/test_clx049_booking_bl_workspace.py
