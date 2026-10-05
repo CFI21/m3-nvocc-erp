@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-import json
+import json, datetime
 from typing import Any, Optional
 from fastapi import APIRouter, Header, HTTPException
-from .db import connect
+from pydantic import BaseModel, Field
+from .db import connect, tx
 from .clx071_container_journey import STANDARD_FLOW, NEXT
 from .clx072_equipment_network import scoped_containers, norm_state, owner_segment
 from .clx070_container_master_control import actor
 
 router=APIRouter(prefix="/api/final-ho-setup",tags=["M3 Final HO Setup Gaps"])
+
+class RecoveryApplyBody(BaseModel):
+    agreement_refs:list[str]=Field(default_factory=list)
+    apply_all:bool=False
+
+def _now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 
 def _row(r): return dict(r) if r else {}
 def _payload(r):
@@ -109,6 +116,63 @@ def local_recovery_booking(job_ref:str,x_role:str=Header("VIEWER")):
                         "recover_to_party_code":p.get("recover_to_party_code"),"currency":p.get("currency"),"priority":p.get("priority",100)})
         out.sort(key=lambda x:int(x.get("priority") or 100))
         return {"job_ref":job_ref,"booking_ref":ctx["booking_ref"],"expected_only":True,"direct_finance_posting":False,"count":len(out),"records":out}
+    finally:c.close()
+
+@router.post("/local-recovery/booking/{job_ref}/apply")
+def apply_local_recovery(job_ref:str,b:RecoveryApplyBody,x_role:str=Header("OPS")):
+    c=connect();tx(c)
+    try:
+        r=c.execute("""SELECT j.id job_id,j.job_ref,j.pol,j.pod,b.booking_ref,c.code customer_code,
+          t.id booking_tx_id,t.status booking_status,t.version booking_version,t.payload_json
+          FROM jobs j JOIN bookings b ON b.id=j.booking_id JOIN customers c ON c.id=j.customer_id
+          LEFT JOIN transaction_records t ON t.job_id=j.id AND t.module='booking'
+          WHERE j.job_ref=? ORDER BY t.id LIMIT 1""",(job_ref,)).fetchone()
+        if not r:raise HTTPException(404,{"code":"JOB_NOT_FOUND"})
+        ctx=_row(r)
+        if not ctx.get("booking_tx_id"):raise HTTPException(404,{"code":"BOOKING_TRANSACTION_NOT_FOUND"})
+        if str(ctx.get("booking_status") or "").upper() in {"APPROVED","RELEASED","ISSUED","COMPLETED","CLOSED"}:
+            raise HTTPException(409,{"code":"CRT_REQUIRED_AFTER_APPROVAL","module":"booking","record_id":ctx["booking_tx_id"]})
+        fields=_payload(r);day=str(fields.get("Booking Date") or "9999-12-31")
+        charges=list(fields.get("Commercial Charges") or [])
+        agreements=_configs(c,"LOCAL_RECOVERY_AGREEMENT")
+        if not b.apply_all:
+            wanted=set(b.agreement_refs);agreements=[x for x in agreements if x["record_key"] in wanted]
+        results=[]
+        for rec in agreements:
+            p=rec["payload"]
+            if not _active(p,day) or not _matches_recovery(p,ctx,fields):continue
+            code=str(p.get("charge_code") or "")
+            base=sum(float(x.get("applied_rate") or 0) for x in charges if x.get("source_type")!="LOCAL_RECOVERY" and (not code or x.get("charge_code")==code))
+            basis=str(p.get("recovery_basis") or "PERCENT").upper()
+            rate=float(p.get("recovery_rate") or 0)
+            amount=rate if basis=="FIXED" else round(base*rate/100,2)
+            side=str(p.get("rate_side") or "REVENUE").upper()
+            party_code=p.get("recover_from_party_code")
+            key="|".join([rec["record_key"],code,side,str(party_code or "")])
+            existing=next((x for x in charges if x.get("local_recovery_key")==key),None)
+            if existing:
+                results.append({"agreement_ref":rec["record_key"],"status":"ALREADY_PRESENT","amount":existing.get("applied_rate")})
+                continue
+            line={
+              "charge_code":code or "LOCAL_RECOVERY","party_type":p.get("recover_from_party_type") or "CUSTOMER","party_code":party_code,
+              "rate_side":side,"rate_basis":basis,"currency":p.get("currency") or "USD","original_rate":rate,"applied_rate":amount,
+              "source_type":"LOCAL_RECOVERY","source_reference":rec["record_key"],"source_version":rec.get("version"),
+              "approval_reference":rec["record_key"],"imported_at":_now(),"local_recovery_key":key,
+              "recover_to_party_code":p.get("recover_to_party_code"),"base_amount":base,"recovery_rate":rate
+            }
+            charges.append(line);results.append({"agreement_ref":rec["record_key"],"status":"IMPORTED","amount":amount})
+        fields["Commercial Charges"]=charges
+        revenue=sum(float(x.get("applied_rate") or 0) for x in charges if x.get("rate_side")=="REVENUE")
+        cost=sum(float(x.get("applied_rate") or 0) for x in charges if x.get("rate_side")=="COST")
+        fields["MRG Expected Revenue"]=revenue;fields["MRG Expected Cost"]=cost;fields["MRG Expected Gross Margin"]=revenue-cost
+        cur=c.execute("UPDATE transaction_records SET payload_json=?,version=version+1,updated_at=? WHERE id=? AND version=?",
+                      (json.dumps(fields,sort_keys=True,separators=(",",":")),_now(),ctx["booking_tx_id"],ctx["booking_version"]))
+        if cur.rowcount!=1:raise HTTPException(409,{"code":"OPTIMISTIC_LOCK_CONFLICT"})
+        c.execute("COMMIT")
+        return {"ok":True,"job_ref":job_ref,"results":results,"expected_revenue":revenue,"expected_cost":cost,
+                "expected_gross_margin":revenue-cost,"direct_finance_posting":False}
+    except HTTPException:
+        c.execute("ROLLBACK");raise
     finally:c.close()
 
 def _aging_rule(rows,crow):
