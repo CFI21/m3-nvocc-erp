@@ -23,7 +23,7 @@ def row(r): return dict(r) if r else {}
 
 def ensure(c):
     c.execute("""CREATE TABLE IF NOT EXISTS mrg_rules(
-      id INTEGER PRIMARY KEY,rule_ref TEXT NOT NULL UNIQUE,mrg_type TEXT NOT NULL,rate_side TEXT NOT NULL,
+      rule_ref TEXT PRIMARY KEY,mrg_type TEXT NOT NULL,rate_side TEXT NOT NULL,
       party_type TEXT NOT NULL,party_code TEXT,charge_code TEXT NOT NULL,charge_type TEXT,
       effective_from TEXT NOT NULL,effective_to TEXT,pol TEXT,pot TEXT,pod TEXT,depot_code TEXT,terminal_code TEXT,
       route_code TEXT,service_code TEXT,cargo_type TEXT,size_type TEXT,container_type TEXT,currency TEXT NOT NULL,
@@ -34,7 +34,7 @@ def ensure(c):
       version INTEGER NOT NULL DEFAULT 1,maker TEXT NOT NULL,checker TEXT,approved_at TEXT,created_at TEXT NOT NULL,updated_at TEXT NOT NULL
     )""")
     c.execute("""CREATE TABLE IF NOT EXISTS mrg_slabs(
-      id INTEGER PRIMARY KEY,rule_ref TEXT NOT NULL,size_type TEXT,container_type TEXT,from_day INTEGER NOT NULL,
+      slab_ref TEXT PRIMARY KEY,rule_ref TEXT NOT NULL,size_type TEXT,container_type TEXT,from_day INTEGER NOT NULL,
       till_day INTEGER,rate REAL NOT NULL,currency TEXT,created_at TEXT NOT NULL,
       UNIQUE(rule_ref,size_type,container_type,from_day,till_day)
     )""")
@@ -48,7 +48,7 @@ def actor(c,token,x_role):
         return {"user":s["user_ref"],"role":role,"roles":roles}
     role=(x_role or "VIEWER").upper()
     if role=="SUPER_ADMIN": role="ADMIN"
-    return {"user":"header-user","role":role,"roles":{role}}
+    return {"user":"header-"+role,"role":role,"roles":{role}}
 
 def require(a,allowed):
     if not (a["roles"]&allowed): raise HTTPException(403,{"code":"MRG_ROLE_DENIED"})
@@ -100,9 +100,9 @@ def list_rules(mrg_type:Optional[str]=None,rate_side:Optional[str]=None,party_ty
         for col,val in (("mrg_type",mrg_type),("rate_side",rate_side),("party_type",party_type),("party_code",party_code),("status",status)):
             if val:q+=f" AND {col}=?";args.append(str(val).upper() if col in {"mrg_type","rate_side","party_type","status"} else val)
         if active_on:q+=" AND effective_from<=? AND (effective_to IS NULL OR effective_to='' OR effective_to>=?)";args.extend([active_on,active_on])
-        q+=" ORDER BY mrg_type,rate_side,priority,id"
+        q+=" ORDER BY mrg_type,rate_side,priority,rule_ref"
         out=[row(x) for x in c.execute(q,args).fetchall()]
-        for x in out:x["slabs"]=[row(s) for s in c.execute("SELECT * FROM mrg_slabs WHERE rule_ref=? ORDER BY from_day,id",(x["rule_ref"],)).fetchall()]
+        for x in out:x["slabs"]=[row(s) for s in c.execute("SELECT * FROM mrg_slabs WHERE rule_ref=? ORDER BY from_day,slab_ref",(x["rule_ref"],)).fetchall()]
         return {"count":len(out),"records":out,"shared_model":True,"screen_count":196}
     finally:c.close()
 
@@ -156,7 +156,8 @@ def add_slab(rule_ref:str,b:SlabWrite,x_role:str=Header("VIEWER"),x_m3_session:O
         if not r:raise HTTPException(404,{"code":"MRG_RULE_NOT_FOUND"})
         if r["status"]=="APPROVED":raise HTTPException(409,{"code":"MRG_APPROVED_RULE_LOCKED"})
         if b.till_day is not None and b.till_day<b.from_day:raise HTTPException(422,{"code":"INVALID_SLAB_RANGE"})
-        c.execute("INSERT INTO mrg_slabs(rule_ref,size_type,container_type,from_day,till_day,rate,currency,created_at) VALUES(?,?,?,?,?,?,?,?)",(rule_ref,b.size_type,b.container_type,b.from_day,b.till_day,b.rate,b.currency or r["currency"],now()))
+        slab_ref="MSL-"+uuid.uuid4().hex[:12].upper()
+        c.execute("INSERT INTO mrg_slabs(slab_ref,rule_ref,size_type,container_type,from_day,till_day,rate,currency,created_at) VALUES(?,?,?,?,?,?,?,?,?)",(slab_ref,rule_ref,b.size_type,b.container_type,b.from_day,b.till_day,b.rate,b.currency or r["currency"],now()))
         audit(c,a,"MRG_SLAB_CREATE",rule_ref,metadata=b.model_dump());c.execute("COMMIT");return {"ok":True}
     except HTTPException:c.execute("ROLLBACK");raise
     finally:c.close()
