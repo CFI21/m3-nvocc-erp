@@ -1,0 +1,46 @@
+name: M3 Controlled Production Activation Verify
+on:
+  push:
+    branches: [activation-verify-20261005]
+    paths:
+      - ".github/workflows/m3-activation-verify.yml"
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production traffic and safety locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          API="https://m3-nvocc-api-latest-1.onrender.com"
+          WEB="https://m3-nvocc-web-latest.onrender.com"
+
+          curl --fail --silent --show-error "$API/api/v1/health" -o /tmp/health.json
+          curl --fail --silent --show-error "$API/api/clx016/readiness" -o /tmp/readiness.json
+          curl --fail --silent --show-error "$API/api/v1/modules" -o /tmp/modules.json
+          curl --fail --silent --show-error "$WEB/healthz" -o /tmp/web-health.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx077/dummy-bank/safety" -o /tmp/safety.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx049/verify" -o /tmp/clx049.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/clx046/verify" -o /tmp/clx046.json
+          curl --fail --silent --show-error -H 'X-Role: AUDITOR' "$API/api/agent-setup/booking/50004/eligibility" -o /tmp/elig.json
+
+          python - <<'PY'
+          import json
+          h=json.load(open('/tmp/health.json'))
+          r=json.load(open('/tmp/readiness.json'))
+          s=json.load(open('/tmp/safety.json'))
+          assert h['project']=='M3 NVOCC ERP',h
+          assert h['database']=='postgres',h
+          assert r['database_target_approved'] is True,r
+          assert r['database_health']=='ok',r
+          assert r['jobs_50001_50005']==5,r
+          assert r['production_traffic']=='ON',r
+          assert r['live_providers']=='OFF',r
+          assert r['real_money']=='OFF',r
+          assert r['ready'] is True,r
+          assert s.get('real_money') in ('OFF',False,None),s
+          print('CONTROLLED_PRODUCTION_TRAFFIC_ON_PASS')
+          print('LIVE_PROVIDERS_OFF_PASS')
+          print('REAL_MONEY_OFF_PASS')
+          print('PILOT_READ_SMOKE_PASS')
+          PY
