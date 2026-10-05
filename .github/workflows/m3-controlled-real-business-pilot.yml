@@ -93,7 +93,7 @@ jobs:
           print('CRO_TRT=PASS')
           print('CONTAINER='+('PASS' if terminal else 'IN_PROGRESS'))
           print('RELEASE='+('PASS' if release_status in {'RELEASED','APPROVED','ISSUED'} else 'NOT_REACHED'))
-          print('DELIVERY_ORDER='+('PASS' if w.get('delivery_order') else 'NOT_REACHED'))
+          print('DELIVERY_ORDER='+('PASS' if (w.get('delivery_order') and release_status in {'RELEASED','APPROVED','ISSUED'}) else ('BLOCKED_BY_RELEASE' if w.get('delivery_order') else 'NOT_REACHED')))
           print('FINANCE=PASS')
           print('SOA=PASS')
           print('COMMERCIAL_RATE_RESOLUTION=PASS')
