@@ -168,6 +168,39 @@ def _container_state(c,con:dict) -> str:
         return normalize(row["event_type"] or row["status"])
     return "AVAILABLE"
 
+def real_container_release_event(c,container_no:str) -> dict[str,Any]:
+    con=_container(c,container_no)
+    rows=c.execute(
+        """SELECT event_id,event_type,status,event_time,source_module,detail_json
+           FROM container_events
+           WHERE container_id=? AND (upper(event_type)='RELEASED' OR upper(status)='RELEASED')
+           ORDER BY event_time DESC,id DESC""",
+        (con["id"],)
+    ).fetchall()
+    current=datetime.datetime.now(datetime.timezone.utc)
+    for row in rows:
+        event_time=parse_dt(row["event_time"])
+        if not event_time or event_time>current:
+            continue
+        try:
+            detail=json.loads(row["detail_json"] or "{}")
+        except Exception:
+            detail={}
+        if detail.get("synthetic") is True:
+            continue
+        actor=str(detail.get("actor_user_id") or detail.get("actor") or "").strip()
+        if not actor or actor.upper().startswith(("AI","BOT","SERVICE")):
+            continue
+        return {
+            "found":True,
+            "event_ref":row["event_id"],
+            "event_time":row["event_time"],
+            "actor_user_id":actor,
+            "source_module":row["source_module"],
+            "detail":detail,
+        }
+    return {"found":False,"event_ref":None,"event_time":None,"actor_user_id":None,"source_module":None,"detail":{}}
+
 
 def evaluate_prerequisites(
     *,
@@ -431,12 +464,19 @@ def delivery_order_eligible(*,job_ref:str,hbl_no:str,container_no:str) -> dict[s
                ORDER BY cc.id DESC""",
             (job_ref,hbl_no,container_no)
         )]
-        eligible=bool(rows and rows[0]["status"] in {"RELEASED","CONDITIONAL","RELEASED_WITH_POST_DELIVERY_HOLD"})
+        cargo_authorized=bool(rows and rows[0]["status"] in {"RELEASED","CONDITIONAL","RELEASED_WITH_POST_DELIVERY_HOLD"})
+        physical=real_container_release_event(c,container_no)
+        eligible=bool(cargo_authorized and physical["found"])
         return {
             "eligible":eligible,
             "governance_enabled":True,
             "release_ref":rows[0]["release_ref"] if rows else None,
             "release_status":rows[0]["status"] if rows else "NONE",
+            "cargo_release_authorized":cargo_authorized,
+            "real_container_release_event_found":bool(physical["found"]),
+            "real_container_release_event_ref":physical["event_ref"],
+            "real_container_release_actor":physical["actor_user_id"],
+            "real_container_release_timestamp":physical["event_time"],
         }
     finally:c.close()
 
