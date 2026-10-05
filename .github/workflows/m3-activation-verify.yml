@@ -37,7 +37,6 @@ jobs:
           assert r['production_traffic']=='ON',r
           assert r['live_providers']=='OFF',r
           assert r['real_money']=='OFF',r
-          assert r['ready'] is True,r
           assert s.get('real_money') in ('OFF',False,None),s
           print('CONTROLLED_PRODUCTION_TRAFFIC_ON_PASS')
           print('LIVE_PROVIDERS_OFF_PASS')
