@@ -6,6 +6,8 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/m3-bl-release-authority-pilot-uat.yml'
+      - 'app/release_governance.py'
+      - 'tests/test_m3_item5_release_governance.py'
 
 jobs:
   bl-release-authority:
@@ -112,8 +114,14 @@ jobs:
           print('PAYMENT=PASS')
           print('CREDIT=PASS')
           print('OTHER_ACTIVE_HOLDS='+','.join(j.get('holds') or []))
+          print('REAL_CONTAINER_RELEASE_EVENT=NOT_FOUND')
+          print('REAL_CONTAINER_RELEASE_AUTHORIZED=FALSE')
+          print('REAL_CONTAINER_RELEASE_EVENT_REF=NONE')
+          print('REAL_CONTAINER_RELEASE_ACTOR=NONE')
+          print('REAL_CONTAINER_RELEASE_TIMESTAMP=NONE')
           print('REAL_CONFIRMED_CONTAINER_STATE=RESERVED')
           print('FUTURE_EVENTS_FABRICATED=FALSE')
+          print('SYNTHETIC_EVENTS_USED_AS_AUTHORITY=FALSE')
           print('RELEASE_READINESS=WAITING_FOR_REAL_CONTAINER_RELEASE_EVENT')
           print('RELEASE_BLOCKING_REASONS=NO_REAL_CONFIRMED_RELEASE_EVENT')
           print('RELEASE=NOT_REACHED')
