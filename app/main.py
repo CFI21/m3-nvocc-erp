@@ -513,7 +513,7 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
     try:
         if bulk_permission_enabled():
             mw,margs=module_where(module)
-        r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
+            r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
             if not r: raise HTTPException(404,'Transaction not found')
             ga=governed_job_actor(conn,x_m3_session,r['job_ref'],action); role=ga['role'];ascope=cscope=None
         else:
