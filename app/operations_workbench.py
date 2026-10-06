@@ -220,11 +220,17 @@ def _sync_items(c,items:list[dict],role:str,actor:str):
                 _history(c,item["exception_key"],role,actor,"AUTO_REOPEN",old.get("work_status"),"OPEN",old.get("owner"),team,None,
                          "Underlying condition became active again")
         else:
-            c.execute("""INSERT INTO operations_work_items(exception_key,team,category,job_id,job_ref,work_status,sla_due_at,escalation_state,
+            inserted=c.execute("""INSERT INTO operations_work_items(exception_key,team,category,job_id,job_ref,work_status,sla_due_at,escalation_state,
                          source_active,last_seen_at,created_at,updated_at)
-                         VALUES(?,?,?,?,?,'OPEN',?,?,1,?,?,?)""",
+                         VALUES(?,?,?,?,?,'OPEN',?,?,1,?,?,?) ON CONFLICT(exception_key) DO NOTHING""",
                       (item["exception_key"],team,item["category"],item.get("job_id"),item.get("job_ref"),due,escalation,stamp,stamp,stamp))
-            _history(c,item["exception_key"],role,actor,"AUTO_CREATE",None,"OPEN",None,team,None,"Derived from approved source data")
+            if inserted.rowcount:
+                _history(c,item["exception_key"],role,actor,"AUTO_CREATE",None,"OPEN",None,team,None,"Derived from approved source data")
+            else:
+                c.execute("""UPDATE operations_work_items SET team=COALESCE(team,?),category=?,job_id=?,job_ref=?,
+                             sla_due_at=COALESCE(sla_due_at,?),escalation_state=?,last_seen_at=?,source_active=1,
+                             updated_at=?,version=version+1 WHERE exception_key=?""",
+                          (team,item["category"],item.get("job_id"),item.get("job_ref"),due,escalation,stamp,stamp,item["exception_key"]))
     rows=c.execute("SELECT * FROM operations_work_items WHERE source_active=1 AND work_status<>'CLOSED'").fetchall()
     for rr in rows:
         d=dict(rr)
