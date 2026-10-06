@@ -29,3 +29,49 @@ def test_workbench_source_preserves_underlying_contract():
     assert "AGENT" in READ_ROLES
     assert "AGENT" not in WRITE_ROLES
     assert {"ADMIN","OPS","DOCS","FINANCE"} <= WRITE_ROLES
+
+
+def test_sync_items_tolerates_concurrent_create_without_duplicate_history():
+    from app.operations_workbench import _sync_items
+
+    key="CUT:69:SI Cut-off"
+
+    class Cursor:
+        def __init__(self,rows=None,rowcount=0):
+            self._rows=rows or []
+            self.rowcount=rowcount
+        def fetchall(self):
+            return self._rows
+
+    class Connection:
+        def __init__(self):
+            self.conflict_update=False
+            self.history_writes=0
+        def execute(self,sql,params=()):
+            compact=" ".join(sql.split())
+            if compact=="SELECT * FROM operations_work_items":
+                return Cursor([])
+            if compact.startswith("INSERT INTO operations_work_items"):
+                assert "ON CONFLICT(exception_key) DO NOTHING" in compact
+                return Cursor(rowcount=0)
+            if compact.startswith("UPDATE operations_work_items SET team=COALESCE(team,?)"):
+                self.conflict_update=True
+                return Cursor(rowcount=1)
+            if compact.startswith("INSERT INTO operations_work_history"):
+                self.history_writes+=1
+                return Cursor(rowcount=1)
+            if compact.startswith("SELECT * FROM operations_work_items WHERE source_active=1"):
+                return Cursor([{"exception_key":key,"work_status":"OPEN","owner":None,"team":"OPS"}])
+            raise AssertionError(compact)
+
+    c=Connection()
+    _sync_items(c,[{
+        "exception_key":key,
+        "category":"CUTOFF_RISK",
+        "job_id":69,
+        "job_ref":"26469",
+        "sla_hours":4,
+    }],"OPS","ops-user")
+
+    assert c.conflict_update is True
+    assert c.history_writes==0
