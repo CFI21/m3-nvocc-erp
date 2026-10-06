@@ -942,7 +942,7 @@ async function openScreen(id,navContext=null,historyMode='push'){
   }catch(e){$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
 }
 
-const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','transshipment-trt','delivery-order']);
+const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','import-trt','transshipment-trt','delivery-order']);
 let clx83PreviewState=null;
 function clx83Pick(base,...names){for(const n of names){const v=base?.[n];if(v!==undefined&&v!==null&&String(v)!=='')return v}return ''}
 function clx83RO(label,value,opts={}){
@@ -982,7 +982,7 @@ async function renderClx083OperationalMaster(){
   const ident=related?.identity||{};
   const key=state.current.key;
   const isCro=key==='cro';
-  const isTrt=['trt','export-trt','transshipment-trt'].includes(key);
+  const isTrt=['trt','export-trt','import-trt','transshipment-trt'].includes(key);
   const isDo=key==='delivery-order';
   let out='<div class="clx78Workspace">';
   if(isCro){
@@ -1044,8 +1044,8 @@ async function renderClx083OperationalMaster(){
   }
   if(isTrt){
     const pot=clx83Pick(base,'POT','POT (1)','Via Port','Transshipment Port');
-    out+=clx83Section('CRT / Transshipment Master',clx83Grid([
-      clx83RO('CRT No.',clx83Pick(base,'CRT No.','TS TRT No.','Export TRT No.')),
+    out+=clx83Section('TRT / Transshipment Master',clx83Grid([
+      clx83RO('TRT No.',clx83Pick(base,'TRT No.','Import TRT No.','TS TRT No.','Export TRT No.','CRT No.')),
       clx83RO('Job',jr),
       clx83RO('Booking',clx83Pick(base,'Booking No.','Booking')),
       clx83RO('B/L',clx83Pick(base,'B/L','BL','HBL','MBL')),
@@ -2340,14 +2340,14 @@ async function showExecutiveHome(){
       clx85Kpi('Active Jobs',sm.jobs_open??0,'Control Tower jobs',"showControlTower()")+
       clx85Kpi('B/L',bl.length,'Authoritative B/L records',"openScreen('agent-tasks::bl')")+
       clx85Kpi('CRO',cro.length,'Container release orders',"openScreen('agent-tasks::cro')")+
-      clx85Kpi('CRT / TS',crt.length,'Transshipment records',"openScreen('agent-tasks::transshipment-trt')")+
+      clx85Kpi('TRT / TS',crt.length,'Transshipment records',"openScreen('agent-tasks::transshipment-trt')")+
       clx85Kpi('Delivery Orders',delivery.length,'Existing DO records',"openScreen('agent-tasks::delivery-order')")+
       clx85Kpi('Containers',eqCount,'CLX-070 container master',"showEquipmentWorkspace('containers')")+
       clx85Kpi('Available Equipment',available,'CLX-070 availability',"showEquipmentWorkspace('tower')")+
       clx85Kpi('Gate In',gateIn,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('Loaded',loaded,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('In Transit',inTransit,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
-      clx85Kpi('Transshipment',transship,'CLX-071 / CRT','showEquipmentWorkspace(\'journey\')')+
+      clx85Kpi('Transshipment',transship,'CLX-071 / TRT','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('Discharged',discharged,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('Empty Return',emptyReturn,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('Overdue',overdue,'Existing SLA/journey exceptions',"showOpsWorkbench('overdue')")+
