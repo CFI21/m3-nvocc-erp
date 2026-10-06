@@ -5,7 +5,7 @@ ROOT=Path(__file__).resolve().parents[1]
 HTML=(ROOT/'web/index.html').read_text(encoding='utf-8')
 
 def test_operational_key_scope():
-    assert "const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','transshipment-trt','delivery-order'])" in HTML
+    assert "const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','import-trt','transshipment-trt','delivery-order'])" in HTML
     assert "renderClx083OperationalMaster" in HTML
 
 def test_cro_master_fields_and_authoritative_container_link():
@@ -19,8 +19,8 @@ def test_release_controls_existing_record_only():
     for x in ['Container Release Control','Empty Release','Pickup Authorization','Payment Hold','Document Hold','Equipment Hold','Depot Release Status','Released By','Released Date','Authorized Override','Override Reason']:
         assert x in HTML,x
 
-def test_crt_and_conditional_pot_logic():
-    for x in ['CRT / Transshipment Master','CRT No.','Original Vessel / Voyage','POT','Next Vessel / Voyage','TS Agent','Discharge Date','Connection ETD','Connection ETA','Hold','Exception','Remarks']:
+def test_trt_and_conditional_pot_logic():
+    for x in ['TRT / Transshipment Master','TRT No.','Original Vessel / Voyage','POT','Next Vessel / Voyage','TS Agent','Discharge Date','Connection ETD','Connection ETA','Hold','Exception','Remarks']:
         assert x in HTML,x
     assert "POT Conditional Logic" in HTML
     assert "Direct shipment / no POT detected" in HTML
