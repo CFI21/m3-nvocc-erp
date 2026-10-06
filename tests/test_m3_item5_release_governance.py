@@ -8,6 +8,7 @@ from app import db
 from app.seed import run as seed_run
 from app.admin_seed import run as admin_seed_run
 from app.admin import Login, login
+from app.main import ActionBody, action_record
 from app.nvocc_principal_extensions import WorkspaceWrite, ReleaseAction, upsert_workspace, release_control_action
 from app.release_governance import (
     assert_delivery_order_eligible,
@@ -466,3 +467,81 @@ def test_release_header_and_container_control_must_both_be_authorized(isolated):
     assert gate["release_header_status"]=="PENDING"
     assert gate["cargo_release_authorized"] is False
     assert gate["eligible"] is False
+
+
+def test_legacy_job50003_transaction_labels_do_not_override_workflow_controls(isolated):
+    c=db.connect()
+    jid=c.execute("SELECT id FROM jobs WHERE job_ref='50003'").fetchone()["id"]
+    w=c.execute("SELECT documentation_status,vgm_status,customs_status,release_status FROM workflow_states WHERE job_id=?",(jid,)).fetchone()
+    assert w["documentation_status"]=="SI PENDING"
+    assert w["vgm_status"]=="PENDING"
+    assert w["customs_status"]=="PENDING"
+    assert w["release_status"]=="BLOCKED"
+    assert c.execute("SELECT COUNT(*) n FROM workflow_holds WHERE job_id=? AND code='DOCUMENTATION_PENDING' AND active=1",(jid,)).fetchone()["n"]==1
+
+    # Reproduce the live legacy presentation labels explicitly in the isolated DB.
+    for module in ("bl","cro","delivery-order"):
+        row=c.execute("SELECT id,payload_json FROM transaction_records WHERE job_id=? AND module=? ORDER BY id DESC LIMIT 1",(jid,module)).fetchone()
+        p=json.loads(row["payload_json"])
+        p["Status"]="Released"
+        if module=="delivery-order":
+            p["Release Status"]="Approved"
+            p["Release Instruction"]="—"
+            p["Valid Until"]="2026-09-26"
+        c.execute("UPDATE transaction_records SET status='Released',payload_json=? WHERE id=?",(json.dumps(p),row["id"]))
+    do=c.execute("SELECT id,version FROM transaction_records WHERE job_id=? AND module='delivery-order' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
+    c.close()
+
+    # The transaction label does not clear or supersede authoritative workflow controls.
+    out=action_record(
+        "delivery-order",do["id"],"release",ActionBody(version=do["version"]),
+        x_role="ADMIN",x_agent_scope=None,x_customer_scope=None,
+    )
+    assert out.status_code==422
+    body=json.loads(out.body)
+    assert body["detail"]["code"] in {"RELEASE_BLOCKED","DELIVERY_ORDER_CONTAINER_NOT_RELEASED"}
+    c=db.connect()
+    w2=c.execute("SELECT documentation_status,vgm_status,customs_status,release_status FROM workflow_states WHERE job_id=?",(jid,)).fetchone()
+    c.close()
+    assert dict(w2)==dict(w)
+
+
+def test_governed_delivery_order_rechecks_new_workflow_hold_before_release(isolated):
+    upsert_release_container(
+        release_ref="REL-TEST-001",
+        container_no=isolated["container"],
+        actor_user_id="USR-AUTH-001",
+        action="RELEASE",
+    )
+    c=db.connect()
+    jid=c.execute("SELECT id FROM jobs WHERE job_ref='50001'").fetchone()["id"]
+    con=c.execute("SELECT id FROM containers WHERE job_id=? ORDER BY id LIMIT 1",(jid,)).fetchone()
+    c.execute(
+        """INSERT INTO container_events(
+           event_id,job_id,container_id,event_type,event_time,location,status,source_module,detail_json
+           ) VALUES('EVT-DOC-AUTH-REAL',?,?,'RELEASED',?,'TSTPOD','RELEASED','terminal-release',?)""",
+        (
+            jid,con["id"],
+            (datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(seconds=1)).isoformat(),
+            json.dumps({"actor_user_id":"USR-PHYSICAL-002","release_ref":"REL-TEST-001"}),
+        )
+    )
+    # Simulate a newly imposed authoritative documentation hold after release authorization.
+    c.execute("UPDATE workflow_states SET documentation_status='SI PENDING' WHERE job_id=?",(jid,))
+    c.execute(
+        "INSERT INTO workflow_holds(job_id,code,active,created_at) VALUES(?,?,1,?) ON CONFLICT(job_id,code) DO UPDATE SET active=1,cleared_at=NULL",
+        (jid,"DOCUMENTATION_PENDING",datetime.datetime.now(datetime.timezone.utc).isoformat())
+    )
+    do=c.execute("SELECT id,version FROM transaction_records WHERE job_id=? AND module='delivery-order' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
+    c.close()
+
+    gate=delivery_order_eligible(job_ref="50001",hbl_no=isolated["hbl"],container_no=isolated["container"])
+    assert gate["eligible"] is True  # cargo + physical authority exist
+    out=action_record(
+        "delivery-order",do["id"],"release",ActionBody(version=do["version"]),
+        x_role="ADMIN",x_agent_scope=None,x_customer_scope=None,
+    )
+    assert out.status_code==422
+    body=json.loads(out.body)
+    assert body["detail"]["code"]=="RELEASE_BLOCKED"
+    assert "DOCUMENTATION_PENDING" in body["detail"]["reasons"]
