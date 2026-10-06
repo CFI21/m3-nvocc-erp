@@ -19,7 +19,7 @@ def test_clx085_authoritative_sources():
 
 def test_executive_home_operational_financial_commercial_kpis():
     b=home_block()
-    for x in ["Operational KPI","Bookings","Active Jobs","B/L","CRO","CRT / TS","Delivery Orders","Containers","Available Equipment","Gate In","Loaded","In Transit","Discharged","Empty Return","Overdue","Detention","Damage / Hold"]:
+    for x in ["Operational KPI","Bookings","Active Jobs","B/L","CRO","TRT / TS","Delivery Orders","Containers","Available Equipment","Gate In","Loaded","In Transit","Discharged","Empty Return","Overdue","Detention","Damage / Hold"]:
         assert x in b,x
     for x in ["Financial KPI","Revenue","Cost","Gross Profit","Margin","Customer AR","Vendor AP","Cash Received","Cash Paid","SOA Records","Finance Attention"]:
         assert x in b,x
