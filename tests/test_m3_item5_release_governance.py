@@ -430,6 +430,7 @@ def test_legacy_seeded_released_closed_state_cannot_bypass_current_authority(iso
         "Valid Until":"2026-09-28",
     })
     c.execute("UPDATE transaction_records SET status='Closed',payload_json=? WHERE id=?",(json.dumps(p),do["id"]))
+    c.execute("UPDATE transaction_records SET status='Closed' WHERE job_id=? AND module='bl'",(jid,))
     c.execute("UPDATE workflow_states SET release_status='RELEASED',closed=1 WHERE job_id=?",(jid,))
     c.close()
 
