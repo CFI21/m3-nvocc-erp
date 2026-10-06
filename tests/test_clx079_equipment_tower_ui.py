@@ -64,4 +64,4 @@ def test_safety_acceptance():
 def test_recommended_action_review_is_wired():
     b=tower_block()
     assert "networkRecommendations=' + " not in b
-    assert "onclick=\"showEquipmentWorkspace('network')\">Review</button>" in b
+    assert r'onclick="showEquipmentWorkspace(\'network\')">Review</button>' in b
