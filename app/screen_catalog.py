@@ -95,7 +95,7 @@ BUSINESS_NAV_ALIASES = {
         {'label':'Booking','target':'agent-tasks::booking','search_terms':['booking','bkg']},
         {'label':'Job Planning','target':'agent-tasks::planning','search_terms':['job','job planning','planning']},
         {'label':'CRO','target':'agent-tasks::cro','search_terms':['cro','container release order']},
-        {'label':'CRT','target':'agent-tasks::trt','search_terms':['trt','terminal release ticket']},
+        {'label':'TRT','target':'agent-tasks::trt','search_terms':['trt','terminal release ticket','crt']},
         {'label':'Export TRT','target':'agent-tasks::export-trt','search_terms':['export','export crt']},
         {'label':'Import TRT','target':'agent-tasks::import-trt','search_terms':['import','import crt']},
         {'label':'Transshipment TRT','target':'agent-tasks::transshipment-trt','search_terms':['transshipment','ts','transshipment crt']},

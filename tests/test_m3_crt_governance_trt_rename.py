@@ -50,6 +50,15 @@ def approve_role(ref, role, user):
     )
 
 
+def test_business_navigation_uses_trt_label_and_keeps_legacy_crt_search_alias():
+    from app.screen_catalog import BUSINESS_NAV_ALIASES
+    ops=BUSINESS_NAV_ALIASES["Transaction / Operations"]
+    trt=next(x for x in ops if x["target"]=="agent-tasks::trt")
+    assert trt["label"]=="TRT"
+    assert "crt" in trt["search_terms"]
+    assert all(not (x["target"]=="agent-tasks::trt" and x["label"]=="CRT") for x in ops)
+
+
 def test_operational_crt_is_renamed_to_trt_everywhere_current(isolated):
     catalog=build_catalog()
     ids={x["screen_id"] for x in catalog["screens"]}
