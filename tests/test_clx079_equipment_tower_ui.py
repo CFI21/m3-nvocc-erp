@@ -59,3 +59,9 @@ def test_safety_acceptance():
     assert x['REAL_MONEY_READY'] is False
     assert x['REAL_PROVIDER_READY'] is False
     assert x['backend_model_changed'] is False
+
+
+def test_recommended_action_review_is_wired():
+    b=tower_block()
+    assert "networkRecommendations=' + " not in b
+    assert r'onclick="showEquipmentWorkspace(\'network\')">Review</button>' in b

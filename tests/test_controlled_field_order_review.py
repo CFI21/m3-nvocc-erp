@@ -75,10 +75,10 @@ def test_existing_bl_gate_and_order_are_preserved():
     freeze=json.loads((ROOT/'M3_BACKEND_FREEZE_ACCEPTANCE.json').read_text())
     assert freeze['production_baseline_guard']['source_unclassified']==355
 
-def test_cro_crt_release_do_keep_existing_authoritative_master():
+def test_cro_trt_release_do_keep_existing_authoritative_master():
     for x in [
       'CRO Basic Info / Routing','CRO No.','Equipment Allocation','Container Release Control',
-      'CRT / Transshipment Master','POT Conditional Logic','Direct shipment / no POT detected',
+      'TRT / Transshipment Master','POT Conditional Logic','Direct shipment / no POT detected',
       'Delivery Order Master','Release Instruction — Same Authoritative Delivery Record',
       'Empty Return Location','Payment Status','Customs Status','Freight Status','Release Status'
     ]:
