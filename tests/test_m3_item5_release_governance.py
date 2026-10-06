@@ -492,14 +492,14 @@ def test_legacy_job50003_transaction_labels_do_not_override_workflow_controls(is
     do=c.execute("SELECT id,version FROM transaction_records WHERE job_id=? AND module='delivery-order' ORDER BY id DESC LIMIT 1",(jid,)).fetchone()
     c.close()
 
-    # The transaction label does not clear or supersede authoritative workflow controls.
-    out=action_record(
-        "delivery-order",do["id"],"release",ActionBody(version=do["version"]),
-        x_role="ADMIN",x_agent_scope=None,x_customer_scope=None,
-    )
-    assert out.status_code==422
-    body=json.loads(out.body)
-    assert body["detail"]["code"] in {"RELEASE_BLOCKED","DELIVERY_ORDER_CONTAINER_NOT_RELEASED"}
+    # The transaction label does not clear or supersede authoritative controls.
+    # With no governed cargo/physical release, the stronger governed gate blocks first.
+    with pytest.raises(HTTPException) as e:
+        action_record(
+            "delivery-order",do["id"],"release",ActionBody(version=do["version"]),
+            x_role="ADMIN",x_agent_scope=None,x_customer_scope=None,
+        )
+    assert e.value.detail["code"]=="DELIVERY_ORDER_CONTAINER_NOT_RELEASED"
     c=db.connect()
     w2=c.execute("SELECT documentation_status,vgm_status,customs_status,release_status FROM workflow_states WHERE job_id=?",(jid,)).fetchone()
     c.close()
