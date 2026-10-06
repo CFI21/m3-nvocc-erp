@@ -71,7 +71,8 @@ def test_loading_empty_error_and_responsive_containment_states_exist():
 
 def test_master_ui_and_major_frontend_workspaces_remain_present():
     for marker in [
-        "Booking Basic & Routing",
+        '<div class="clx81GroupTitle">BASIC</div>',
+        '<div class="clx81GroupTitle">ROUTING</div>',
         "B/L Basic Info & Routing",
         "CRO Basic Info / Routing",
         "Delivery Order Master",
