@@ -135,7 +135,7 @@ window.fetch=(input,init={})=>{
 <script>
 const state={menu:[],screens:[],byId:{},current:null,rows:[],filtered:[],selected:null,sortKey:'',sortAsc:true,page:1,pageSize:20,status:'',savedView:'',role:'ADMIN',equipmentView:'',favorites:new Set(JSON.parse(localStorage.getItem('m3clx011-favorites')||'[]')),recent:JSON.parse(localStorage.getItem('m3clx011-recent')||'[]')};
 const esc=v=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
-const $=id=>document.getElementById(id);const api=async(url,opts={})=>{let r=await fetch(url,opts);if(!r.ok)throw new Error(await r.text());return r.json()};
+const $=id=>document.getElementById(id);const api=async(url,opts={})=>{let r=await fetch(url,opts);if(!r.ok){const e=new Error(await r.text());e.status=r.status;throw e}return r.json()};
 function domainSlug(d){return d.toLowerCase().replace(/\s*\/\s*/g,'-').replace(/\s+/g,'-').replace(/&/g,'and')}
 function saveState(){localStorage.setItem('m3clx011-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('m3clx011-recent',JSON.stringify(state.recent.slice(0,15)))}
 function toggleGroup(id){let x=document.querySelector(`[data-content="${CSS.escape(id)}"]`);if(x)x.classList.toggle('collapse')}
@@ -939,7 +939,7 @@ async function openScreen(id,navContext=null,historyMode='push'){
       $('gridArea').innerHTML=renderGrid();await renderQuickActions();
     }
     api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});
-  }catch(e){$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
+  }catch(e){const denied=e.status===401||e.status===403;$('gridArea').innerHTML=denied?`<div class="card empty"><b>Permission denied</b><div class="muted">Your current M3 role or data scope does not allow this screen or record.</div></div>`:`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
 }
 
 const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','transshipment-trt','delivery-order']);
@@ -1044,8 +1044,8 @@ async function renderClx083OperationalMaster(){
   }
   if(isTrt){
     const pot=clx83Pick(base,'POT','POT (1)','Via Port','Transshipment Port');
-    out+=clx83Section('CRT / Transshipment Master',clx83Grid([
-      clx83RO('CRT No.',clx83Pick(base,'CRT No.','TS TRT No.','Export TRT No.')),
+    out+=clx83Section('TRT / Transshipment Master',clx83Grid([
+      clx83RO('TRT No.',clx83Pick(base,'TRT No.','TS TRT No.','Export TRT No.','CRT No.')),
       clx83RO('Job',jr),
       clx83RO('Booking',clx83Pick(base,'Booking No.','Booking')),
       clx83RO('B/L',clx83Pick(base,'B/L','BL','HBL','MBL')),
@@ -1063,7 +1063,7 @@ async function renderClx083OperationalMaster(){
       clx83RO('Remarks',clx83Pick(base,'Remarks'),{full:true,textarea:true})
     ]));
     out+=clx83Section('POT Conditional Logic',pot?
-      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing CRT/booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-trt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
+      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing TRT / legacy booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-trt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
       '<div class="equipNote">Direct shipment / no POT detected. POT, TS Agent and connecting vessel/voyage controls remain inactive; no transshipment data is forced.</div>');
   }
   if(isDo){
@@ -1112,7 +1112,7 @@ async function renderClx083OperationalMaster(){
     clx83Link('agent-tasks::booking','Booking',jr)+
     clx83Link('agent-tasks::bl','B/L',jr)+
     clx83Link('agent-tasks::cro','CRO',jr)+
-    clx83Link('agent-tasks::transshipment-trt','CRT / Transshipment',jr)+
+    clx83Link('agent-tasks::transshipment-trt','TRT / Transshipment',jr)+
     clx83Link('agent-tasks::delivery-order','Delivery Order',jr)+
     clx83Link('agent-tasks::container-activity','Container Journey',jr)+
     clx83Link('gl-accounts::invoice','Invoice',jr)+
@@ -1997,7 +1997,7 @@ async function renderClx084FinanceMaster(){
   ])+clx84Rows('Posted GL report context',reports));
   out+=clx84Section('Payment / Receipt & Document Links','<div class="formActions">'+
     clx84Link('agent-tasks::booking','Booking',jr)+clx84Link('agent-tasks::bl','B/L',jr)+clx84Link('agent-tasks::cro','CRO',jr)+
-    clx84Link('agent-tasks::transshipment-trt','CRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
+    clx84Link('agent-tasks::transshipment-trt','TRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
     clx84Link('gl-accounts::invoice','Invoice',jr)+clx84Link('gl-accounts::bills','Bill / AP',jr)+
     clx84Link('gl-accounts::receipt','Receipt',jr)+clx84Link('gl-accounts::payment','Payment',jr)+
     clx84Link('gl-accounts::voucher','GL Voucher',jr)+clx84Link('agent-tasks::soa','SOA',jr)+
@@ -2340,14 +2340,14 @@ async function showExecutiveHome(){
       clx85Kpi('Active Jobs',sm.jobs_open??0,'Control Tower jobs',"showControlTower()")+
       clx85Kpi('B/L',bl.length,'Authoritative B/L records',"openScreen('agent-tasks::bl')")+
       clx85Kpi('CRO',cro.length,'Container release orders',"openScreen('agent-tasks::cro')")+
-      clx85Kpi('CRT / TS',crt.length,'Transshipment records',"openScreen('agent-tasks::transshipment-trt')")+
+      clx85Kpi('TRT / TS',crt.length,'Transshipment records',"openScreen('agent-tasks::transshipment-trt')")+
       clx85Kpi('Delivery Orders',delivery.length,'Existing DO records',"openScreen('agent-tasks::delivery-order')")+
       clx85Kpi('Containers',eqCount,'CLX-070 container master',"showEquipmentWorkspace('containers')")+
       clx85Kpi('Available Equipment',available,'CLX-070 availability',"showEquipmentWorkspace('tower')")+
       clx85Kpi('Gate In',gateIn,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('Loaded',loaded,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('In Transit',inTransit,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
-      clx85Kpi('Transshipment',transship,'CLX-071 / CRT','showEquipmentWorkspace(\'journey\')')+
+      clx85Kpi('Transshipment',transship,'CLX-071 / TRT','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('Discharged',discharged,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('Empty Return',emptyReturn,'CLX-071 journey','showEquipmentWorkspace(\'journey\')')+
       clx85Kpi('Overdue',overdue,'Existing SLA/journey exceptions',"showOpsWorkbench('overdue')")+
