@@ -1,0 +1,47 @@
+{
+  "acceptance": "M3_FINAL_FRONTEND_ACCEPTANCE",
+  "status": "FROZEN",
+  "accepted_main": "e887053ba386c293a457eacbcb28617711f93ce1",
+  "source_frontend_baseline": "5535e58f701b86293056e3ef9183de765591201b",
+  "frozen_backend_baseline": "dcd53690a72702144c5aa11622db43784e5d37d4",
+  "screen_count": 196,
+  "frontend_only": true,
+  "backend_freeze": true,
+  "business_model_changed": false,
+  "new_clx": false,
+  "new_module": false,
+  "duplicate_screen_or_data": false,
+  "ancline_touched": false,
+  "real_money": false,
+  "live_providers": false,
+  "dummy_bank": "SIMULATION_ONLY",
+  "live_web": {
+    "service": "m3-nvocc-web:latest",
+    "deploy_id": "dep-db2geq3bc2fs738i5ic0",
+    "deploy_status": "live",
+    "image_sha": "sha256:f51e8c7046ea672cbb74045a8c682d10249b060c185247ce6b34a6e5a65c3347",
+    "build_workflow_sha": "e887053ba386c293a457eacbcb28617711f93ce1"
+  },
+  "validation": {
+    "web_image_build": "PASS",
+    "predeploy_gate": "PASS",
+    "live_production_smoke": "PASS",
+    "real_runtime_integration": "PASS",
+    "container_master_governance": "PASS",
+    "container_journey": "PASS",
+    "equipment_network": "PASS",
+    "equipment_cost_optimization": "PASS",
+    "depot_mr": "PASS",
+    "bl_release_authority": "PASS",
+    "principal_gap_completion": "PASS",
+    "final_bulk_erp_regression": "PASS",
+    "final_live_dummy_bank_regression": "PASS"
+  },
+  "excluded_legacy_test": {
+    "workflow": "CLX-070 Staging Smoke",
+    "classification": "LEGACY_TEST_EXPECTATION",
+    "reason": "Workflow still expects production traffic to be locked with HTTP 503 / PRODUCTION_TRAFFIC_LOCKED although controlled production is active. Live production smoke and runtime integration pass; this is not a frontend product defect."
+  },
+  "verified_frontend_runtime_defects_remaining": 0,
+  "freeze_rule": "No further frontend changes unless a verified runtime/UI defect is reproduced. Backend may reopen only for BACKEND_PRODUCT_DEFECT."
+}
