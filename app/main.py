@@ -557,13 +557,16 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
                         granular_do_release=True
                 except HTTPException:
                     raise
-            if not granular_do_release:
-                reasons=release_gate(ctx)
-                if reasons:
-                    for code in reasons: exception(conn,code,module,tid,r['job_id'],'Release blocked by server-side workflow gate')
-                    audit(conn,role,ascope or cscope,'RELEASE_BLOCKED',module,tid,r['job_id'],before,before,{'reasons':reasons})
-                    conn.execute('COMMIT')
-                    return JSONResponse({'detail':{'code':'RELEASE_BLOCKED','reasons':reasons}},status_code=422)
+            # Current workflow controls remain authoritative even after a governed
+            # cargo/physical release was previously authorized. A later VGM,
+            # documentation, customs, transshipment, payment or explicit hold must
+            # still block the Delivery Order action.
+            reasons=release_gate(ctx)
+            if reasons:
+                for code in reasons: exception(conn,code,module,tid,r['job_id'],'Release blocked by server-side workflow gate')
+                audit(conn,role,ascope or cscope,'RELEASE_BLOCKED',module,tid,r['job_id'],before,before,{'reasons':reasons,'granular_do_release':granular_do_release})
+                conn.execute('COMMIT')
+                return JSONResponse({'detail':{'code':'RELEASE_BLOCKED','reasons':reasons}},status_code=422)
             new_status='Released'
             if not granular_do_release:
                 conn.execute("UPDATE workflow_states SET release_status='RELEASED',version=version+1 WHERE job_id=?",(r['job_id'],))
