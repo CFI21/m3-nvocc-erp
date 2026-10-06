@@ -19,8 +19,8 @@ def test_release_controls_existing_record_only():
     for x in ['Container Release Control','Empty Release','Pickup Authorization','Payment Hold','Document Hold','Equipment Hold','Depot Release Status','Released By','Released Date','Authorized Override','Override Reason']:
         assert x in HTML,x
 
-def test_crt_and_conditional_pot_logic():
-    for x in ['CRT / Transshipment Master','CRT No.','Original Vessel / Voyage','POT','Next Vessel / Voyage','TS Agent','Discharge Date','Connection ETD','Connection ETA','Hold','Exception','Remarks']:
+def test_trt_and_conditional_pot_logic():
+    for x in ['TRT / Transshipment Master','TRT No.','Original Vessel / Voyage','POT','Next Vessel / Voyage','TS Agent','Discharge Date','Connection ETD','Connection ETA','Hold','Exception','Remarks']:
         assert x in HTML,x
     assert "POT Conditional Logic" in HTML
     assert "Direct shipment / no POT detected" in HTML
