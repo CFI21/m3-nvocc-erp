@@ -78,7 +78,7 @@ def test_master_ui_and_major_frontend_workspaces_remain_present():
         "Delivery Order Master",
         "Operations Workbench",
         "Control Tower",
-        "Management KPI",
+        "showKpiTrends()",
         "Global Stock",
         "Depot &amp; M&amp;R",
         "Financials",
