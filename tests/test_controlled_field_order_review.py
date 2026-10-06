@@ -83,6 +83,8 @@ def test_cro_trt_release_do_keep_existing_authoritative_master():
       'Empty Return Location','Payment Status','Customs Status','Freight Status','Release Status'
     ]:
         assert x in HTML,x
+    assert "clx83Link('agent-tasks::transshipment-trt','TRT / Transshipment',jr)" in HTML
+    assert "clx83Link('agent-tasks::transshipment-trt','CRT / Transshipment',jr)" not in HTML
 
 def test_container_and_finance_governance_preserved():
     for x in [
