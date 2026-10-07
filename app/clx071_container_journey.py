@@ -514,7 +514,7 @@ def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,fin
         )
       ORDER BY g.id""",(job_id,detention_ref,detention_ref)).fetchall()]
     committed_status={"APPROVED","POSTED","ISSUED","OPEN","PARTIALLY PAID","PARTIALLY_PAID","PAID","SETTLED"}
-    invoice_refs=[];invoice_fx={};total_invoiced=0.0;advance_invoiced=0.0;final_invoiced=0.0;draft_amount=0.0
+    invoice_refs=[];invoice_fx={};invoice_stage={};total_invoiced=0.0;advance_invoiced=0.0;final_invoiced=0.0;draft_amount=0.0
     total_invoiced_base=0.0;advance_invoiced_base=0.0;final_invoiced_base=0.0
     due_dates=[];currencies=set()
     for inv in invoices:
@@ -523,6 +523,7 @@ def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,fin
         curr=str(p.get("Currency") or "USD").upper();currencies.add(curr)
         st=str(inv.get("status") or p.get("Status") or "").upper()
         stage=str(p.get("Detention Stage") or p.get("Calculation Stage") or "").upper()
+        invoice_stage[ref]=stage
         if p.get("Due Date"):due_dates.append(str(p["Due Date"]))
         if st=="DRAFT":
             draft_amount+=amount;continue
@@ -534,7 +535,7 @@ def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,fin
         else:
             advance_invoiced+=amount;advance_invoiced_base+=base
 
-    credit_amount=0.0;credit_base=0.0
+    credit_amount=0.0;credit_base=0.0;advance_credit_base=0.0;final_credit_base=0.0
     if invoice_refs:
         marks=",".join("?" for _ in invoice_refs)
         credits=[dict(r) for r in conn.execute(f"""SELECT * FROM gl_records
@@ -542,7 +543,11 @@ def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,fin
             AND UPPER(COALESCE(status,'')) NOT IN ('DRAFT','REJECTED','CANCELLED','CANCELED','REVERSED','VOID')""",invoice_refs).fetchall()]
         for cr in credits:
             p=_detention_payload(cr);amount=_detention_num(p.get("Amount"));credit_amount+=amount
-            credit_base+=round(amount*_detention_invoice_fx(conn,cr,p),2)
+            base=round(amount*_detention_invoice_fx(conn,cr,p),2);credit_base+=base
+            if invoice_stage.get(cr.get("source_ref")) in {"ACTUAL","FINAL","ADDITIONAL","FINAL_ADDITIONAL"}:
+                final_credit_base+=base
+            else:
+                advance_credit_base+=base
         allocs=[dict(r) for r in conn.execute(f"""SELECT a.*,t.status,t.updated_at,t.payload_json
           FROM treasury_allocations a JOIN treasury_records t ON t.id=a.treasury_record_id
           WHERE UPPER(a.source_type)='INVOICE' AND a.source_ref IN ({marks})
@@ -569,9 +574,10 @@ def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,fin
       "credit_adjustment":round(credit_amount,2),"net_invoiced":net_invoiced,
       "paid_amount":paid_amount,"outstanding_balance":outstanding,
       "advance_invoiced_base":round(advance_invoiced_base,2),"final_invoiced_base":round(final_invoiced_base,2),
+      "advance_credit_base":round(advance_credit_base,2),"final_credit_base":round(final_credit_base,2),
       "total_invoiced_base":round(total_invoiced_base,2),"credit_adjustment_base":round(credit_base,2),
       "net_invoiced_base":net_invoiced_base,"paid_base":paid_base,"outstanding_base":outstanding_base,
-      "advance_invoiced_final_currency":converted(max(0.0,advance_invoiced_base-credit_base)),
+      "advance_invoiced_final_currency":converted(max(0.0,advance_invoiced_base-advance_credit_base)),
       "final_document_currency":str(final_currency or "").upper() or None,"final_fx_rate":final_rate or None,
       "last_payment_date":last_payment,"collection_status":collection_status
     }
