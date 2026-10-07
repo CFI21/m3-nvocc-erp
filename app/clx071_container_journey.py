@@ -661,6 +661,18 @@ def _detention_charge_lines(payload):
     return list(x) if isinstance(x,list) else []
 
 
+def _detention_actual_segments_for_journey(conn,container_id,job_id):
+    if not table_exists(conn,"detention_segments"):return []
+    return [dict(r) for r in conn.execute("""SELECT * FROM detention_segments
+      WHERE container_id=? AND job_id=? AND stage='ACTUAL' ORDER BY id""",(container_id,job_id)).fetchall()]
+
+def _detention_last_covered_for_journey(conn,container_id,job_id):
+    if not table_exists(conn,"detention_segments"):return None
+    r=conn.execute("""SELECT covered_till FROM detention_segments
+      WHERE container_id=? AND job_id=? AND stage IN ('ADVANCE','ONGOING')
+      ORDER BY covered_till DESC,id DESC LIMIT 1""",(container_id,job_id)).fetchone()
+    return r["covered_till"] if r else None
+
 def _detention_event_time(conn,container_id,event_type):
     r=conn.execute("""SELECT COALESCE(actual_time,event_time) t FROM container_events
       WHERE container_id=? AND event_type=? AND COALESCE(actual_time,event_time) IS NOT NULL
@@ -1102,6 +1114,12 @@ def post_event(container_no:str,b:EventBody,x_role:str=Header("OPS"),x_m3_sessio
         a=actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(conn)
         c=get_container(conn,container_no,a);before=dict(c);frm=current_state(c);to=event_state(b.event_type)
         valid=validate_transition(frm,to)
+        correction_mode=str(b.governance_mode or "").upper()=="CORRECTION"
+        if frm=="EMPTY_RETURN" and correction_mode:
+            jid=c["job_id"]
+            if jid and _detention_actual_segments_for_journey(conn,c["id"],jid):
+                raise HTTPException(409,{"code":"ACTUAL_ALREADY_POSTED","container":container_no,
+                                         "required_path":"CRT","reason":"Empty Return is immutable after Actual detention finalization"})
         governance_active=False
         try:
             from .state_transition_governance import enabled as state_governance_enabled, authorize_container_transition
@@ -1142,6 +1160,22 @@ def post_event(container_no:str,b:EventBody,x_role:str=Header("OPS"),x_m3_sessio
         if to not in {"AVAILABLE","INSPECTION","PURCHASE_RECEIVED","AGENT_STOCK_RECEIVED","PARTNER_STOCK_RECEIVED","SOC_ACCEPTED","ALLOCATED_FOR_SALE"} and not job:
             raise HTTPException(409,{"code":"JOURNEY_EVENT_REQUIRES_BOOKING_JOB"})
         actual=b.actual_time or now()
+        if to=="EMPTY_RETURN":
+            _detention_require_segment_store(conn)
+            depot=b.depot_code or c["depot_code"]
+            if not depot:
+                raise HTTPException(409,{"code":"EMPTY_RETURN_DEPOT_REQUIRED","container":container_no})
+            actual_dt=parse_dt(actual)
+            if not actual_dt:raise HTTPException(422,{"code":"INVALID_EMPTY_RETURN_TIME"})
+            existing_actual=_detention_actual_segments_for_journey(conn,c["id"],job["id"])
+            if existing_actual:
+                raise HTTPException(409,{"code":"ACTUAL_ALREADY_POSTED","container":container_no,
+                                         "actual_segment_refs":[x["segment_ref"] for x in existing_actual],"required_path":"CRT"})
+            covered_till=_detention_last_covered_for_journey(conn,c["id"],job["id"])
+            covered_dt=parse_dt(covered_till)
+            if covered_dt and actual_dt<covered_dt:
+                raise HTTPException(409,{"code":"ER_BEFORE_COVERED_PERIOD","empty_return":actual,
+                                         "covered_till":covered_till,"container":container_no})
         loc=" / ".join(x for x in [b.port_code or c["current_port"],b.agent_code or c["agent_code"],b.depot_code or c["depot_code"]] if x)
         planned=conn.execute("""SELECT * FROM container_events WHERE container_id=? AND event_type=? AND event_phase='PLAN' AND actual_time IS NULL
                                 ORDER BY planned_time,id LIMIT 1""",(c["id"],to)).fetchone()
