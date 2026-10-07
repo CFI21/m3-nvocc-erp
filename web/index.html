@@ -836,11 +836,13 @@ function renderDetentionProcess(){
       '<td>'+v('Job Ref','job_ref','Job')+'</td><td>'+v('HBL','HBL No','BL Ref')+'</td><td>'+v('MBL','MBL No')+'</td>'+
       '<td><b>'+v('Container','Container No')+'</b></td><td>'+v('Size / Type','Size/Type','size_type')+'</td>'+
       '<td>'+v('Customer','Agent / Customer')+'</td><td>'+v('Principal','Principal Name')+'</td>'+
-      '<td>'+v('Issue Date','Release Date','Gate-out')+'</td><td>'+v('Empty Return','Return Date')+'</td><td>'+v('Calculate Till Date','Calc Till Date','End Date')+'</td>'+
+      '<td>'+v('Process Status','Status')+'</td><td>'+v('Calculation Stage')+'</td>'+
+      '<td>'+v('Gate-out','Issue Date','Release Date')+'</td><td>'+v('Detention Start')+'</td><td>'+v('Previous Advance Till Date')+'</td><td>'+v('Calculate Till Date','Advance Till Date')+'</td><td>'+v('Empty Return','Return Date')+'</td>'+
       '<td>'+v('Free Days','Free')+'</td><td>'+v('Chargeable Days','Charge Days','Log Days')+'</td><td>'+v('Rate Group')+'</td><td>'+v('Tariff Code','Tariff')+'</td>'+
       '<td>'+v('Rate')+'</td><td>'+v('Currency')+'</td><td>'+v('FX Rate','Ex. Rate','Exchange Rate')+'</td>'+
       '<td>'+v('Plug-in Amount','Plugin')+'</td><td>'+v('Amount','Detention Amount')+'</td><td>'+v('Additional Detention','Additional Amount')+'</td>'+
-      '<td>'+v('Advance Detention','Advance Amount')+'</td><td>'+v('Actual Detention','Actual Amount')+'</td><td>'+v('Local Amount')+'</td>'+
+      '<td>'+v('Advance Detention','Advance Amount')+'</td><td>'+v('Ongoing Detention')+'</td><td>'+v('Actual Detention','Actual Amount')+'</td><td>'+v('Difference')+'</td>'+
+      '<td>'+v('Total Invoiced')+'</td><td>'+v('Paid Amount')+'</td><td>'+v('Outstanding Balance')+'</td><td>'+v('Collection Status')+'</td>'+
       '<td>'+v('Status','status')+'</td><td>'+v('Remarks')+'</td></tr>';
   }).join(''):'<tr><td colspan="25" class="muted">No detention process records in the current authorized scope.</td></tr>';
   $('gridArea').innerHTML=
