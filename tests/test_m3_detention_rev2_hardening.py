@@ -133,3 +133,18 @@ def test_rev2_ui_remains_existing_screen_only():
     assert "Other Charges" in HTML
     assert "Open Detention Collection" in HTML
     assert "Create Draft Invoice → Finance" in HTML
+
+
+def test_rev2_rollback_switch_seed_preserves_existing_disabled_value():
+    import sqlite3
+    conn = sqlite3.connect(":memory:")
+    conn.execute("CREATE TABLE md_config(id INTEGER PRIMARY KEY, config_key TEXT UNIQUE, config_value TEXT, value_type TEXT, scope TEXT, status TEXT, version INTEGER)")
+    start = MIGRATION.index("INSERT INTO public.md_config")
+    end = MIGRATION.index(";", start) + 1
+    seed_sql = MIGRATION[start:end].replace("public.", "")
+    conn.execute(seed_sql)
+    assert conn.execute("SELECT config_value FROM md_config").fetchone()[0] == "true"
+    conn.execute("UPDATE md_config SET config_value='false'")
+    conn.execute(seed_sql)
+    assert conn.execute("SELECT COUNT(*), config_value FROM md_config").fetchone() == (1, "false")
+    conn.close()

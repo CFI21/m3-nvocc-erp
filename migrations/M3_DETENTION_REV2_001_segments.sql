@@ -55,7 +55,7 @@ ALTER TABLE public.detention_segments ENABLE ROW LEVEL SECURITY;
 INSERT INTO public.md_config(id,config_key,config_value,value_type,scope,status,version)
 SELECT COALESCE(MAX(id),0)+1,'DETENTION_CALCULATION_ENABLED','true','BOOLEAN','GLOBAL','ACTIVE',1
 FROM public.md_config
-WHERE NOT EXISTS (
+HAVING NOT EXISTS (
   SELECT 1 FROM public.md_config WHERE config_key='DETENTION_CALCULATION_ENABLED' AND scope='GLOBAL'
 );
 
