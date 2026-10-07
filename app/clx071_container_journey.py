@@ -343,7 +343,164 @@ def _detention_num(v):
     try:return float(v or 0)
     except Exception:return 0.0
 
-def _detention_finance_summary(conn,detention_ref,job_id):
+def _detention_calculation_enabled(conn):
+    if not table_exists(conn,"md_config"):return True
+    r=conn.execute("""SELECT config_value FROM md_config
+      WHERE config_key='DETENTION_CALCULATION_ENABLED' AND scope='GLOBAL' AND status='ACTIVE'
+      ORDER BY version DESC,id DESC LIMIT 1""").fetchone()
+    if not r:return True
+    return str(r["config_value"] or "").strip().lower() in {"1","true","yes","on","enabled"}
+
+def _detention_require_segment_store(conn):
+    if not table_exists(conn,"detention_segments"):
+        raise HTTPException(503,{"code":"SEGMENT_TABLE_MISSING"})
+
+def _detention_fx_rate(conn,currency,asof):
+    cur=str(currency or "USD").upper();day=(str(asof or now())[:10])
+    if cur=="USD":return {"rate":1.0,"rate_date":day,"base_currency":"USD"}
+    r=conn.execute("""SELECT rate,rate_date,base_currency FROM gl_fx_rates
+      WHERE currency=? AND base_currency='USD' AND date(rate_date)<=date(?) AND status='ACTIVE'
+      ORDER BY date(rate_date) DESC,id DESC LIMIT 1""",(cur,day)).fetchone()
+    if not r:
+        raise HTTPException(409,{"code":"FX_RATE_MISSING_ON_SEGMENT","currency":cur,"date":day})
+    return {"rate":float(r["rate"]),"rate_date":str(r["rate_date"]),"base_currency":str(r["base_currency"] or "USD")}
+
+def _detention_tariff_snapshot(rule):
+    slabs=[]
+    for s in rule.get("slabs") or []:
+        slabs.append({
+          "slab_ref":s.get("slab_ref"),"size_type":s.get("size_type"),"container_type":s.get("container_type"),
+          "from_day":s.get("from_day"),"till_day":s.get("till_day"),"rate":_detention_num(s.get("rate")),
+          "currency":s.get("currency")
+        })
+    return {
+      "rule_ref":rule.get("rule_ref"),"version":int(rule.get("version") or 1),
+      "mrg_type":rule.get("mrg_type"),"rate_side":rule.get("rate_side"),"party_type":rule.get("party_type"),
+      "party_code":rule.get("party_code"),"charge_code":rule.get("charge_code"),"charge_type":rule.get("charge_type"),
+      "effective_from":rule.get("effective_from"),"effective_to":rule.get("effective_to"),
+      "currency":rule.get("currency"),"rate_basis":rule.get("rate_basis"),"unit_rate":_detention_num(rule.get("unit_rate")),
+      "minimum_rate":None if rule.get("minimum_rate") is None else _detention_num(rule.get("minimum_rate")),
+      "maximum_rate":None if rule.get("maximum_rate") is None else _detention_num(rule.get("maximum_rate")),
+      "free_days":int(rule.get("free_days") or 0),"slab_wise":int(rule.get("slab_wise") or 0),"slabs":slabs
+    }
+
+def _detention_direction_refs(txr,payload):
+    revenue=str(payload.get("Customer Detention Ref") or txr["external_ref"])
+    cost=str(payload.get("Principal Detention Ref") or (str(txr["external_ref"])+"-COST"))
+    if revenue==cost:
+        raise HTTPException(409,{"code":"DETENTION_REF_DIRECTION_COLLISION","detention_ref":revenue})
+    return {"AGENT_TO_CUSTOMER":revenue,"PRINCIPAL_TO_AGENT":cost}
+
+def _detention_direction_ref(txr,payload,commercial_direction):
+    return _detention_direction_refs(txr,payload)[_detention_direction(commercial_direction)]
+
+def _detention_segment_rows(conn,transaction_id,commercial_direction,stages=None):
+    _detention_require_segment_store(conn)
+    sql="SELECT * FROM detention_segments WHERE transaction_id=? AND commercial_direction=?"
+    args=[transaction_id,_detention_direction(commercial_direction)]
+    if stages:
+        marks=",".join("?" for _ in stages);sql+=f" AND stage IN ({marks})";args.extend(stages)
+    sql+=" ORDER BY sequence,id"
+    return [dict(r) for r in conn.execute(sql,args).fetchall()]
+
+def _detention_history_from_segments(rows):
+    out=[]
+    for r in rows:
+        out.append({
+          "segment_ref":r["segment_ref"],"calculation_ref":r["calculation_ref"],"sequence":r["sequence"],
+          "stage":r["stage"],"rule_ref":r["rule_ref"],"tariff_version":r["tariff_version"],
+          "rate_group":r["rate_group"],"rate":_detention_num(r["rate"]),
+          "currency":r["document_currency"],"fx_rate":_detention_num(r["fx_rate"]),
+          "base_currency":r["base_currency"],"base_amount":_detention_num(r["base_amount"]),
+          "covered_from":r["covered_from"],"covered_till":r["covered_till"],
+          "segment_days":r["segment_days"],"segment_amount":_detention_num(r["segment_amount"]),
+          "cumulative_days":r["cumulative_days"],"cumulative_amount":_detention_num(r["cumulative_amount"]),
+          "cumulative_base_amount":_detention_num(r["cumulative_base_amount"]),
+          "commercial_direction":r["commercial_direction"],"calculated_at":r["calculated_at"]
+        })
+    return out
+
+def _detention_history_state(history):
+    valid=[x for x in history if isinstance(x,dict) and str(x.get("stage") or "").upper() in {"ADVANCE","ONGOING"}]
+    if not valid:return {"total_days":0,"cumulative_amount":0.0,"cumulative_base_amount":0.0,"covered_till":None}
+    latest=max(valid,key=lambda x:(int(_detention_num(x.get("sequence"))),str(x.get("covered_till") or "")))
+    return {
+      "total_days":int(_detention_num(latest.get("cumulative_days"))),
+      "cumulative_amount":round(_detention_num(latest.get("cumulative_amount")),2),
+      "cumulative_base_amount":round(_detention_num(latest.get("cumulative_base_amount")),2),
+      "covered_till":latest.get("covered_till")
+    }
+
+def _detention_segment_hash(values):
+    raw=json.dumps(values,sort_keys=True,separators=(",",":"),default=str).encode("utf-8")
+    return hashlib.sha256(raw).hexdigest()
+
+def _detention_insert_segment(conn,*,txr,ctx,a,detention_ref,direction,stage,sequence,calculation_ref,
+                              covered_from,covered_till,segment_days,cumulative_days,segment_amount,
+                              cumulative_amount,cumulative_base_amount,rule,rate,free_days,fx):
+    snapshot=_detention_tariff_snapshot(rule)
+    base_amount=round(float(segment_amount)*float(fx["rate"]),2)
+    values={
+      "transaction_id":txr["id"],"job_id":ctx["job_id"],"container_id":ctx["container_id"],
+      "detention_ref":detention_ref,"commercial_direction":direction,"stage":stage,"sequence":sequence,
+      "covered_from":dtiso(covered_from),"covered_till":dtiso(covered_till),"segment_days":int(segment_days),
+      "cumulative_days":int(cumulative_days),"segment_amount":round(segment_amount,2),
+      "cumulative_amount":round(cumulative_amount,2),"cumulative_base_amount":round(cumulative_base_amount,2),
+      "document_currency":str(rule.get("currency") or "USD").upper(),"fx_rate":float(fx["rate"]),
+      "fx_rate_date":fx["rate_date"],"base_currency":fx["base_currency"],"base_amount":base_amount,
+      "rule_ref":rule["rule_ref"],"tariff_version":int(rule.get("version") or 1),
+      "tariff_effective_from":rule.get("effective_from"),"tariff_effective_to":rule.get("effective_to"),
+      "tariff_snapshot_json":json.dumps(snapshot,sort_keys=True),
+      "tariff_charge_code":str(rule.get("charge_code") or "DETENTION"),"rate_group":str(rule.get("mrg_type") or "DETENTION"),
+      "rate":round(rate,6),"rate_basis":str(rule.get("rate_basis") or "PER_DAY"),"free_days":int(free_days),
+      "calculated_at":now(),"calculated_by":a["user"],"calculation_ref":calculation_ref
+    }
+    values["calculation_hash"]=_detention_segment_hash(values)
+    cur=conn.execute("""INSERT INTO detention_segments(
+      segment_ref,calculation_ref,transaction_id,job_id,container_id,detention_ref,commercial_direction,stage,sequence,
+      covered_from,covered_till,segment_days,cumulative_days,segment_amount,cumulative_amount,cumulative_base_amount,
+      document_currency,fx_rate,fx_rate_date,base_currency,base_amount,rule_ref,tariff_version,tariff_effective_from,
+      tariff_effective_to,tariff_snapshot_json,tariff_charge_code,rate_group,rate,rate_basis,free_days,
+      calculated_at,calculated_by,calculation_hash
+    ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id""",(
+      "DSEG-"+uuid.uuid4().hex[:14].upper(),values["calculation_ref"],values["transaction_id"],values["job_id"],
+      values["container_id"],values["detention_ref"],values["commercial_direction"],values["stage"],values["sequence"],
+      values["covered_from"],values["covered_till"],values["segment_days"],values["cumulative_days"],
+      values["segment_amount"],values["cumulative_amount"],values["cumulative_base_amount"],values["document_currency"],
+      values["fx_rate"],values["fx_rate_date"],values["base_currency"],values["base_amount"],values["rule_ref"],
+      values["tariff_version"],values["tariff_effective_from"],values["tariff_effective_to"],values["tariff_snapshot_json"],
+      values["tariff_charge_code"],values["rate_group"],values["rate"],values["rate_basis"],values["free_days"],
+      values["calculated_at"],values["calculated_by"],values["calculation_hash"]
+    ))
+    row_id=cur.fetchone()["id"]
+    return dict(conn.execute("SELECT * FROM detention_segments WHERE id=?",(row_id,)).fetchone())
+
+def _detention_build_parts(conn,ctx,direction,due,first_day,last_day):
+    if last_day<first_day:return []
+    groups=[]
+    for day_index in range(int(first_day),int(last_day)+1):
+        day_dt=due+datetime.timedelta(days=day_index-1)
+        rule=_detention_select_rule(conn,ctx,day_dt.date().isoformat(),direction)
+        key=(rule["rule_ref"],int(rule.get("version") or 1))
+        if groups and groups[-1]["key"]==key:
+            groups[-1]["last_day"]=day_index;groups[-1]["covered_till"]=day_dt
+        else:
+            groups.append({"key":key,"rule":rule,"first_day":day_index,"last_day":day_index,
+                           "covered_from":day_dt,"covered_till":day_dt})
+    return groups
+
+def _detention_invoice_fx(conn,inv,payload):
+    currency=str(payload.get("Currency") or "USD").upper()
+    if currency=="USD":return 1.0
+    v=conn.execute("""SELECT exchange_rate FROM gl_vouchers WHERE gl_record_id=?
+      AND UPPER(COALESCE(status,'')) NOT IN ('REVERSED','CANCELLED','CANCELED','VOID')
+      ORDER BY id DESC LIMIT 1""",(inv["id"],)).fetchone()
+    if v and _detention_num(v["exchange_rate"])>0:return _detention_num(v["exchange_rate"])
+    rate=_detention_num(payload.get("Exchange Rate") or payload.get("FX Rate"))
+    if rate>0:return rate
+    raise HTTPException(409,{"code":"FX_RATE_MISSING_ON_SEGMENT","invoice_ref":inv["external_ref"],"currency":currency})
+
+def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,final_fx_rate=None):
     invoices=[dict(r) for r in conn.execute("""SELECT DISTINCT g.*
       FROM gl_records g
       WHERE g.job_id=? AND g.module='invoice'
@@ -357,33 +514,35 @@ def _detention_finance_summary(conn,detention_ref,job_id):
         )
       ORDER BY g.id""",(job_id,detention_ref,detention_ref)).fetchall()]
     committed_status={"APPROVED","POSTED","ISSUED","OPEN","PARTIALLY PAID","PARTIALLY_PAID","PAID","SETTLED"}
-    invoice_refs=[];total_invoiced=0.0;advance_invoiced=0.0;final_invoiced=0.0;draft_amount=0.0
+    invoice_refs=[];invoice_fx={};total_invoiced=0.0;advance_invoiced=0.0;final_invoiced=0.0;draft_amount=0.0
+    total_invoiced_base=0.0;advance_invoiced_base=0.0;final_invoiced_base=0.0
     due_dates=[];currencies=set()
     for inv in invoices:
         p=_detention_payload(inv);ref=inv["external_ref"];invoice_refs.append(ref)
         amount=_detention_num(p.get("Invoice Amount") or p.get("Amount") or p.get("Net Amount"))
-        curr=str(p.get("Currency") or "").strip()
-        if curr:currencies.add(curr)
+        curr=str(p.get("Currency") or "USD").upper();currencies.add(curr)
         st=str(inv.get("status") or p.get("Status") or "").upper()
         stage=str(p.get("Detention Stage") or p.get("Calculation Stage") or "").upper()
         if p.get("Due Date"):due_dates.append(str(p["Due Date"]))
         if st=="DRAFT":
-            draft_amount+=amount
-            continue
-        if st not in committed_status:
-            continue
-        total_invoiced+=amount
-        if stage in {"ACTUAL","FINAL","ADDITIONAL","FINAL_ADDITIONAL"}:final_invoiced+=amount
-        else:advance_invoiced+=amount
+            draft_amount+=amount;continue
+        if st not in committed_status:continue
+        fx=_detention_invoice_fx(conn,inv,p);invoice_fx[ref]=fx;base=round(amount*fx,2)
+        total_invoiced+=amount;total_invoiced_base+=base
+        if stage in {"ACTUAL","FINAL","ADDITIONAL","FINAL_ADDITIONAL"}:
+            final_invoiced+=amount;final_invoiced_base+=base
+        else:
+            advance_invoiced+=amount;advance_invoiced_base+=base
 
-    credit_amount=0.0
+    credit_amount=0.0;credit_base=0.0
     if invoice_refs:
         marks=",".join("?" for _ in invoice_refs)
         credits=[dict(r) for r in conn.execute(f"""SELECT * FROM gl_records
           WHERE module='credit-note' AND source_type='invoice' AND source_ref IN ({marks})
             AND UPPER(COALESCE(status,'')) NOT IN ('DRAFT','REJECTED','CANCELLED','CANCELED','REVERSED','VOID')""",invoice_refs).fetchall()]
-        credit_amount=sum(_detention_num(_detention_payload(x).get("Amount")) for x in credits)
-
+        for cr in credits:
+            p=_detention_payload(cr);amount=_detention_num(p.get("Amount"));credit_amount+=amount
+            credit_base+=round(amount*_detention_invoice_fx(conn,cr,p),2)
         allocs=[dict(r) for r in conn.execute(f"""SELECT a.*,t.status,t.updated_at,t.payload_json
           FROM treasury_allocations a JOIN treasury_records t ON t.id=a.treasury_record_id
           WHERE UPPER(a.source_type)='INVOICE' AND a.source_ref IN ({marks})
@@ -391,45 +550,50 @@ def _detention_finance_summary(conn,detention_ref,job_id):
     else:
         allocs=[]
     paid_amount=round(sum(_detention_num(x.get("allocated_amount")) for x in allocs),2)
-    net_invoiced=round(max(0.0,total_invoiced-credit_amount),2)
-    outstanding=round(max(0.0,net_invoiced-paid_amount),2)
+    paid_base=round(sum(_detention_num(x.get("allocated_amount"))*invoice_fx.get(x.get("source_ref"),1.0) for x in allocs),2)
+    net_invoiced=round(max(0.0,total_invoiced-credit_amount),2);net_invoiced_base=round(max(0.0,total_invoiced_base-credit_base),2)
+    outstanding=round(max(0.0,net_invoiced-paid_amount),2);outstanding_base=round(max(0.0,net_invoiced_base-paid_base),2)
     last_payment=max((str(x.get("updated_at") or "") for x in allocs),default="") or None
-    today=utcnow().date().isoformat()
-    overdue=bool(outstanding>0 and any(d and d<today for d in due_dates))
-    if net_invoiced<=0:collection_status="NOT INVOICED"
-    elif outstanding<=0:collection_status="PAID"
-    elif paid_amount>0:collection_status="PARTIALLY PAID"
+    today=utcnow().date().isoformat();overdue=bool(outstanding_base>0 and any(d and d<today for d in due_dates))
+    if net_invoiced_base<=0:collection_status="NOT INVOICED"
+    elif outstanding_base<=0:collection_status="PAID"
+    elif paid_base>0:collection_status="PARTIALLY PAID"
     elif overdue:collection_status="OVERDUE"
     else:collection_status="INVOICED"
+    final_rate=float(final_fx_rate or 0)
+    converted=lambda base:round(base/final_rate,2) if final_rate>0 else None
     return {
-      "invoice_refs":invoice_refs,"currency":next(iter(currencies),None),
+      "invoice_refs":invoice_refs,"currency":next(iter(currencies),None) if len(currencies)<=1 else "MIXED",
       "draft_invoice_amount":round(draft_amount,2),"advance_invoiced":round(advance_invoiced,2),
       "final_invoiced":round(final_invoiced,2),"total_invoiced":round(total_invoiced,2),
       "credit_adjustment":round(credit_amount,2),"net_invoiced":net_invoiced,
       "paid_amount":paid_amount,"outstanding_balance":outstanding,
+      "advance_invoiced_base":round(advance_invoiced_base,2),"final_invoiced_base":round(final_invoiced_base,2),
+      "total_invoiced_base":round(total_invoiced_base,2),"credit_adjustment_base":round(credit_base,2),
+      "net_invoiced_base":net_invoiced_base,"paid_base":paid_base,"outstanding_base":outstanding_base,
+      "advance_invoiced_final_currency":converted(max(0.0,advance_invoiced_base-credit_base)),
+      "final_document_currency":str(final_currency or "").upper() or None,"final_fx_rate":final_rate or None,
       "last_payment_date":last_payment,"collection_status":collection_status
     }
 
-def _detention_history(payload,commercial_direction="AGENT_TO_CUSTOMER"):
-    h=payload.get(_detention_side(commercial_direction)["history_key"])
-    return list(h) if isinstance(h,list) else []
-
-def _detention_history_state(history):
-    valid=[x for x in history if isinstance(x,dict)]
-    if not valid:return {"total_days":0,"cumulative_amount":0.0,"covered_till":None}
-    total_days=max(int(_detention_num(x.get("cumulative_days"))) for x in valid)
-    cumulative_amount=max(_detention_num(x.get("cumulative_amount")) for x in valid)
-    parsed=[(parse_dt(x.get("covered_till")),x.get("covered_till")) for x in valid if x.get("covered_till")]
-    parsed=[x for x in parsed if x[0]]
-    covered=max(parsed,key=lambda x:x[0])[1] if parsed else None
-    return {"total_days":total_days,"cumulative_amount":round(cumulative_amount,2),"covered_till":covered}
-
-
+def _detention_reefer_classification(ctx):
+    size=str(ctx.get("size_type") or "").upper().replace("-","").replace(" ","")
+    category=str(ctx.get("container_type") or "").upper().strip()
+    reefer_size=bool(size and ("RF" in size or "RQ" in size or "RH" in size or "REEFER" in size))
+    known_nonreefer_size=bool(size and any(x in size for x in ("GP","HC","FR","OT","TK")) and not reefer_size)
+    reefer_category=category=="REEFER"
+    known_nonreefer_category=category in {"DRY","OOG","OPEN TOP","FLAT RACK","TANK","GENERAL"}
+    if (reefer_size and known_nonreefer_category) or (known_nonreefer_size and reefer_category):
+        raise HTTPException(409,{"code":"REEFER_CLASSIFICATION_CONFLICT","size_type":ctx.get("size_type"),
+                                 "container_category":ctx.get("container_type")})
+    if reefer_size:return True
+    if known_nonreefer_size:return False
+    if reefer_category:return True
+    if known_nonreefer_category:return False
+    return False
 
 def _detention_is_reefer(ctx):
-    values=[ctx.get("size_type"),ctx.get("container_type"),ctx.get("cargo_type")]
-    x=" ".join(str(v or "").upper() for v in values)
-    return "REEFER" in x or any(t in x for t in ("20RF","40RF","45RF","RF "))
+    return _detention_reefer_classification(ctx)
 
 def _detention_charge_category(rule):
     mt=str(rule.get("mrg_type") or "").upper()
