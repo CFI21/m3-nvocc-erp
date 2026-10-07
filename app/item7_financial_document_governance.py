@@ -167,10 +167,12 @@ def validate_correction(conn, module, fields, job_id=None, source_type=None, sou
         code='CREDIT_EXCEEDS_INVOICE' if detention_credit else 'CORRECTION_EXCEEDS_ORIGINAL'
         raise HTTPException(422,{'code':code,'original_amount':original,'existing_corrections':existing,'requested':amount,
                                  'invoice_ref':ref,'segment_ref':segment_ref})
-    dup=conn.execute("""SELECT id,external_ref FROM gl_records WHERE module=? AND source_ref=?
-      AND status NOT IN ('Cancelled','Reversed') AND json_extract(payload_json,'$.Amount')=?
-      AND COALESCE(json_extract(payload_json,'$.Reason'),'')=COALESCE(?, '') LIMIT 1""",
-      (module,ref,str(fields.get('Amount')),fields.get('Reason'))).fetchone()
+    dup=None
+    for candidate in conn.execute("""SELECT id,external_ref,payload_json,status FROM gl_records
+      WHERE module=? AND source_ref=? AND UPPER(COALESCE(status,'')) NOT IN ('CANCELLED','CANCELED','REVERSED','VOID')""",(module,ref)):
+        cp=_record_fields(candidate)
+        if str(cp.get('Amount'))==str(fields.get('Amount')) and str(cp.get('Reason') or '')==str(fields.get('Reason') or ''):
+            dup=candidate;break
     if dup: raise HTTPException(409,{'code':'DUPLICATE_FINANCIAL_CORRECTION','existing_ref':dup['external_ref']})
     return {'source_document_id':src['id'],'source_module':src['module'],'source_ref':ref,'original_amount':original,
             'party':party,'detention_segment_ref':segment_ref}
