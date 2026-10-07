@@ -1,4 +1,4 @@
-name: CLX-070 Staging Smoke
+name: CLX-070 Deployment Mode Smoke
 
 on:
   push:
@@ -8,6 +8,9 @@ on:
       - "Dockerfile.web"
       - ".github/workflows/clx070-staging-smoke.yml"
   workflow_dispatch:
+  pull_request:
+    paths:
+      - ".github/workflows/clx070-staging-smoke.yml"
 
 jobs:
   smoke:
@@ -15,7 +18,7 @@ jobs:
     steps:
       - name: Wait for Render image services
         run: sleep 35
-      - name: Verify staging endpoints and traffic lock
+      - name: Verify endpoints and declared deployment safeguards
         shell: bash
         run: |
           set -euo pipefail
@@ -24,16 +27,38 @@ jobs:
           curl --fail --silent --show-error --retry 8 --retry-delay 4 --retry-all-errors "$WEB/healthz" -o /tmp/web-health.json
           curl --fail --silent --show-error --retry 8 --retry-delay 4 --retry-all-errors "$WEB/" -o /tmp/index.html
           curl --fail --silent --show-error --retry 8 --retry-delay 4 --retry-all-errors "$API/api/v1/health" -o /tmp/api-health.json
-          code=$(curl --silent --output /tmp/locked.json --write-out "%{http_code}" "$API/api/clx070/equipment/readiness")
-          test "$code" = "503"
+          curl --fail --silent --show-error "$API/api/clx016/readiness" -o /tmp/readiness.json
           grep -q "Equipment Control" /tmp/index.html
           grep -q "showEquipmentWorkspace" /tmp/index.html
-          grep -q "PRODUCTION_TRAFFIC_LOCKED" /tmp/locked.json
           python - <<'PY'
-          import json
+          import json, urllib.request, urllib.error
           w=json.load(open('/tmp/web-health.json'))
           a=json.load(open('/tmp/api-health.json'))
           assert w['status']=='ok',w
           assert a['project']=='M3 NVOCC ERP',a
-          print('CLX070_STAGING_SMOKE_PASS')
+          readiness=json.load(open('/tmp/readiness.json'))
+          assert readiness['database_health']=='ok', readiness
+          assert readiness['database_target_approved'] is True, readiness
+          assert readiness['live_providers']=='OFF' and readiness['real_money']=='OFF', readiness
+          mode=readiness['production_traffic']
+          assert mode in {'ON','OFF'}, readiness
+          url='https://m3-nvocc-api-latest-1.onrender.com'
+          try:
+              with urllib.request.urlopen(url+'/api/clx070/equipment/readiness',timeout=30) as response:
+                  code=response.status; equipment=json.load(response)
+          except urllib.error.HTTPError as error:
+              code=error.code; equipment=json.load(error)
+          if mode=='OFF':
+              assert code==503 and equipment['detail']['code']=='PRODUCTION_TRAFFIC_LOCKED', (code,equipment)
+          else:
+              assert code==200, (code,equipment)
+              request=urllib.request.Request(url+'/api/clx077/dummy-bank/safety',headers={'X-Role':'AUDITOR'})
+              with urllib.request.urlopen(request,timeout=30) as response:
+                  safety=json.load(response)
+              state=safety['state']
+              assert state['production_traffic']=='ON', state
+              assert state['live_providers']=='OFF' and state['real_money']=='OFF', state
+              assert state['real_provider_rows_enabled']==0 and state['real_money_provider_rows_enabled']==0, state
+              assert safety['real_money_movement'] is False, safety
+          print('CLX070_DEPLOYMENT_MODE_SMOKE_PASS mode='+mode)
           PY
