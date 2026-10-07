@@ -58,3 +58,20 @@ FROM public.md_config
 WHERE NOT EXISTS (
   SELECT 1 FROM public.md_config WHERE config_key='DETENTION_CALCULATION_ENABLED' AND scope='GLOBAL'
 );
+
+CREATE OR REPLACE FUNCTION public.detention_segment_immutable_guard()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  RAISE EXCEPTION 'DETENTION_SEGMENT_IMMUTABLE';
+END;
+$$;
+
+DROP TRIGGER IF EXISTS detention_segments_immutable_update ON public.detention_segments;
+CREATE TRIGGER detention_segments_immutable_update
+BEFORE UPDATE ON public.detention_segments
+FOR EACH ROW EXECUTE FUNCTION public.detention_segment_immutable_guard();
+
+DROP TRIGGER IF EXISTS detention_segments_immutable_delete ON public.detention_segments;
+CREATE TRIGGER detention_segments_immutable_delete
+BEFORE DELETE ON public.detention_segments
+FOR EACH ROW EXECUTE FUNCTION public.detention_segment_immutable_guard();
