@@ -844,10 +844,12 @@ function renderDetentionProcess(){
       '<td>'+v('Status','status')+'</td><td>'+v('Remarks')+'</td></tr>';
   }).join(''):'<tr><td colspan="25" class="muted">No detention process records in the current authorized scope.</td></tr>';
   $('gridArea').innerHTML=
-    '<div class="opGridToolbar"><b>Detention Process</b><input id="detProcessSearch" placeholder="Search job / B/L / container / customer"><label>Process Date <input id="detProcessDate" type="date"></label><span class="grow"></span>'+
-    '<button class="btn primary" onclick="runDetentionCalculation()">Start Process</button>'+
+    '<div class="opGridToolbar"><b>Detention Process</b><input id="detProcessSearch" placeholder="Search job / B/L / container / customer"><label>Advance / Calculate Till <input id="detProcessDate" type="date"></label><span class="grow"></span>'+
+    '<button class="btn primary" onclick="runDetentionCalculation(\'ADVANCE\')">Calculate Advance</button>'+
+    '<button class="btn" onclick="runDetentionCalculation(\'ONGOING\')">Recalculate Ongoing</button>'+
+    '<button class="btn" onclick="runDetentionCalculation(\'ACTUAL\')">Calculate Actual</button>'+
     '<button class="btn" onclick="openScreen(state.current.screen_id,state.navContext)">Refresh</button><button class="btn" onclick="exportCsv()">Export</button></div>'+
-    '<div class="equipNote">Operational calculation stage only · server calculation uses Container Journey + approved REVENUE MRG Detention / Export / Special Detention. Missing approved rate = blocked; no fallback or invented charge. No GL posting occurs here.</div>'+
+    '<div class="equipNote">RUNNING detention uses non-overlapping Advance / Ongoing periods. EMPTY_RETURN fixes Actual detention. Finance and Treasury remain authoritative for invoiced, paid and outstanding values; no GL or payment posting occurs from this process screen.</div>'+
     detentionProcessSummary()+
     '<div class="opGridWrap"><table><thead><tr><th></th><th>Job #</th><th>HBL #</th><th>MBL #</th><th>Container #</th><th>Size / Type</th><th>Customer</th><th>Principal</th><th>Issue / Release</th><th>Return</th><th>Calc Till</th><th>Free</th><th>Charge Days</th><th>Rate Group</th><th>Tariff</th><th>Rate</th><th>Curr</th><th>FX</th><th>Plug-in</th><th>Detention</th><th>Additional</th><th>Advance</th><th>Actual</th><th>Local</th><th>Status / Remarks</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
     detentionSelectedProcessDetail();
