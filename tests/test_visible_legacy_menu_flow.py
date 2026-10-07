@@ -12,8 +12,11 @@ def test_legacy_reference_flow_is_visible_without_duplicate_screens():
     assert "▾ Setup <span class=count>'+visibleSetup.length+'</span>" in HTML
     assert 'Account Setup' in HTML
     assert "gl-accounts::account-integration" in HTML
-    assert 'Container Coding' in HTML
+    assert 'Container Coding' not in HTML
     assert "showEquipmentWorkspace('containers')" in HTML
+    assert 'Equipment Size & Type' in HTML
+    assert "master-data::equipment-types" in HTML
+    assert 'Container Category' in HTML
     assert 'Rates Management' in HTML
     assert "agent-tasks::special-rates-request" in HTML
     assert 'Auto SOA' in HTML
