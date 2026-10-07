@@ -720,6 +720,37 @@ async function runDetentionCalculation(stage='AUTO'){
   }catch(e){alert('Detention calculation blocked: '+e.message)}
 }
 
+function detentionCurrentHistory(r=state.selected){const p=rowPayload(r);return Array.isArray(p['Advance History'])?p['Advance History']:[]}
+function detentionHistoryHtml(history){
+  if(!history?.length)return '<div class="equipNote">No advance detention period has been calculated yet.</div>';
+  return '<div class="tablewrap"><table><thead><tr><th>#</th><th>Stage</th><th>Covered From</th><th>Covered Till</th><th>Days</th><th>Amount</th><th>Currency</th><th>Tariff</th></tr></thead><tbody>'+
+    history.map(x=>'<tr><td>'+esc(x.sequence||'')+'</td><td>'+esc(x.stage||'')+'</td><td>'+esc(x.covered_from||'')+'</td><td>'+esc(x.covered_till||'')+'</td><td>'+esc(x.segment_days??'')+'</td><td>'+detentionMoney(x.segment_amount||0,x.currency||'')+'</td><td>'+esc(x.currency||'')+'</td><td>'+esc(x.rule_ref||'')+'</td></tr>').join('')+
+    '</tbody></table></div>';
+}
+function detentionFinanceHtml(s){
+  const f=s?.finance||{};
+  return '<div class="clx82Section"><div class="clx82Head">Finance / Collection · Read Only</div><div class="clx82Body"><div class="equipGrid">'+
+    '<div class="equipKpi">Advance Invoiced<b>'+detentionMoney(f.advance_invoiced||0,f.currency||'')+'</b></div>'+
+    '<div class="equipKpi">Final Invoiced<b>'+detentionMoney(f.final_invoiced||0,f.currency||'')+'</b></div>'+
+    '<div class="equipKpi">Paid<b>'+detentionMoney(f.paid_amount||0,f.currency||'')+'</b></div>'+
+    '<div class="equipKpi">Balance<b>'+detentionMoney(f.outstanding_balance||0,f.currency||'')+'</b></div></div>'+
+    '<div class="clx82Grid">'+clx82DerivedField('Draft Invoice Amount',detentionMoney(f.draft_invoice_amount||0,f.currency||''))+
+    clx82DerivedField('Total Invoiced',detentionMoney(f.total_invoiced||0,f.currency||''))+
+    clx82DerivedField('Credit / Adjustment',detentionMoney(f.credit_adjustment||0,f.currency||''))+
+    clx82DerivedField('Last Payment Date',esc(f.last_payment_date||'—'))+
+    clx82DerivedField('Collection Status',esc(f.collection_status||'NOT INVOICED'))+'</div>'+
+    '<div class="equipNote">Payment is read from existing Finance / Treasury receipt allocations only. No payment or GL posting is available from Detention Process.</div></div></div>';
+}
+async function loadDetentionLiveSummary(){
+  if(detentionMode()!=='process'||!state.selected?.id)return;
+  try{
+    const s=await equipmentApi('/api/clx071/journey/detention/'+encodeURIComponent(state.selected.id)+'/summary');
+    const f=$('detFinanceLive');if(f)f.innerHTML=detentionFinanceHtml(s);
+    const h=$('detHistoryLive');if(h)h.innerHTML=detentionHistoryHtml(s.history||[]);
+    const x=$('detProcessLiveStatus');if(x)x.textContent=(s.process_status||'RUNNING')+' / '+(s.calculation_stage||'ADVANCE');
+  }catch(e){const f=$('detFinanceLive');if(f)f.innerHTML='<div class="card badtext">'+esc(e.message)+'</div>'}
+}
+
 function detentionProcessRows(){
   return (state.rows||[]).map(r=>{
     const currency=detentionValue(r,'Currency','currency');
