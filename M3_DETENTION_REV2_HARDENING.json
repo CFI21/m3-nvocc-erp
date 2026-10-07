@@ -62,25 +62,31 @@
       ]
     }
   },
-  "blockers": [
-    {
-      "code": "SEGMENT_TABLE_MISSING",
-      "severity": "MERGE_BLOCKER",
-      "finding": "No existing detention/transaction child-line table exists in the M3 production schema. Relevant existing tables include transaction_records, container_financial_ledger, gl_voucher_lines, mrg_rules, mrg_slabs and audit_events, but none is an authoritative child table for detention Advance/Ongoing/Actual segments.",
-      "revision2_requirement": "Segment rows MUST live in an EXISTING detention transaction child table; no new DB table is allowed.",
-      "impact": [
-        "Cannot truthfully implement immutable per-segment tariff version pinning",
-        "Cannot persist per-segment FX rate/base currency in the required child storage",
-        "Cannot bind partial credits safely to segment #",
-        "Cannot guarantee segment-level rollback/reversal lineage without violating the storage rule"
-      ],
-      "required_next_action": "Explicitly relax ONLY the no-new-DB-table constraint and authorize one additive detention segment child table linked to transaction_records.id, or name an existing approved child table that must be used."
-    }
-  ],
-  "merge_policy": "DRAFT_ONLY_UNTIL_BLOCKERS_EMPTY",
+  "blockers": [],
+  "merge_policy": "MERGE_ONLY_AFTER_REQUIRED_CI_AND_MIGRATION_ACCEPTANCE_PASS",
   "deployment_policy": {
     "api_deploy_required": true,
     "reason": "Revision 2 requires backend endpoint/governance changes once storage is authorized."
   },
-  "prior_live_main_sha": "5896823c3dee08db446b508d9b6c53854ce9881a"
+  "prior_live_main_sha": "5896823c3dee08db446b508d9b6c53854ce9881a",
+  "status": "IMPLEMENTED_PENDING_CI",
+  "authorized_change": {
+    "detention_segment_child_table": "detention_segments",
+    "parent": "transaction_records.id",
+    "additive_only": true,
+    "authorized": true
+  },
+  "resolved_controls": {
+    "tariff_version_pinning": true,
+    "fx_reconciliation": true,
+    "credit_bound": true,
+    "reefer_conflict_guard": true,
+    "charge_master_source_named": true,
+    "detention_ref_scope": true,
+    "empty_return_guards": true,
+    "segment_storage": "detention_segments",
+    "rollback_config": "md_config.DETENTION_CALCULATION_ENABLED",
+    "audit_existing_framework": true,
+    "negative_tests": "tests/test_m3_detention_rev2_hardening.py"
+  }
 }
