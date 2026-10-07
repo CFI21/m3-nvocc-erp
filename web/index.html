@@ -738,8 +738,8 @@ function detentionCurrentHistory(r=state.selected){
 }
 function detentionHistoryHtml(history){
   if(!history?.length)return '<div class="equipNote">No advance detention period has been calculated yet for '+esc(detentionDirectionLabel())+'.</div>';
-  return '<div class="tablewrap"><table><thead><tr><th>#</th><th>Stage</th><th>Covered From</th><th>Covered Till</th><th>Days</th><th>Amount</th><th>Currency</th><th>Tariff</th></tr></thead><tbody>'+
-    history.map(x=>'<tr><td>'+esc(x.sequence||'')+'</td><td>'+esc(x.stage||'')+'</td><td>'+esc(x.covered_from||'')+'</td><td>'+esc(x.covered_till||'')+'</td><td>'+esc(x.segment_days??'')+'</td><td>'+detentionMoney(x.segment_amount||0,x.currency||'')+'</td><td>'+esc(x.currency||'')+'</td><td>'+esc(x.rule_ref||'')+'</td></tr>').join('')+
+  return '<div class="tablewrap"><table><thead><tr><th>#</th><th>Stage</th><th>Segment Ref</th><th>Covered From</th><th>Covered Till</th><th>Days</th><th>Amount</th><th>Currency</th><th>FX</th><th>Base Amount</th><th>Tariff</th><th>Version</th></tr></thead><tbody>'+
+    history.map(x=>'<tr><td>'+esc(x.sequence||'')+'</td><td>'+esc(x.stage||'')+'</td><td>'+esc(x.segment_ref||'')+'</td><td>'+esc(x.covered_from||'')+'</td><td>'+esc(x.covered_till||'')+'</td><td>'+esc(x.segment_days??'')+'</td><td>'+detentionMoney(x.segment_amount||0,x.currency||'')+'</td><td>'+esc(x.currency||'')+'</td><td>'+esc(x.fx_rate||'')+'</td><td>'+detentionMoney(x.base_amount||0,x.base_currency||'USD')+'</td><td>'+esc(x.rule_ref||'')+'</td><td>'+esc(x.tariff_version||'')+'</td></tr>').join('')+
     '</tbody></table></div>';
 }
 function detentionFinanceHtml(s){
@@ -771,7 +771,8 @@ async function runDetentionCalculation(stage='AUTO'){
     });
     const label=r.stage==='ACTUAL'?'Actual':(r.stage==='ONGOING'?'Ongoing':'Advance');
     const amount=r.stage==='ACTUAL'?Number(r.actual||0):Number(r.segment_amount||0);
-    alert(detentionDirectionLabel()+' · '+label+' detention calculated: '+r.currency+' '+amount.toFixed(2)+' · '+r.total_chargeable_days+' chargeable day(s) · '+r.rule_ref);
+    const segs=r.segments||[],tariffs=[...new Set(segs.map(x=>x.rule_ref+' v'+x.tariff_version))].join(', ');
+    alert(detentionDirectionLabel()+' · '+label+' detention calculated: '+r.currency+' '+amount.toFixed(2)+' · '+r.total_chargeable_days+' chargeable day(s)'+(tariffs?' · '+tariffs:''));
     await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert('Detention calculation blocked: '+e.message)}
 }
@@ -808,15 +809,9 @@ async function removeDetentionCharge(lineRef){
 }
 function detentionChargeTabsHtml(){
   const reefer=!!detentionLiveState.summary?.reefer;
-  const tabs=[
-    ['DETENTION','Detention / Demurrage',false],
-    ['PLUGIN','Plug-in',!reefer],
-    ['PORT','Port Charges',false],
-    ['OTHER','Other Charges',false]
-  ];
-  return '<div class="clx78Tabs">'+tabs.map(([k,l,disabled])=>
-    '<button '+(disabled?'disabled title="Plug-in applies only to reefer equipment"':'onclick="setDetentionChargeTab(\''+k+'\')"')+
-    ' class="'+(detentionChargeTab===k?'active':'')+'">'+esc(l)+'</button>').join('')+'</div>';
+  const tabs=[['DETENTION','Detention / Demurrage'],...(reefer?[['PLUGIN','Plug-in']]:[]),['PORT','Port Charges'],['OTHER','Other Charges']];
+  return '<div class="clx78Tabs">'+tabs.map(([k,l])=>
+    '<button onclick="setDetentionChargeTab(\''+k+'\')" class="'+(detentionChargeTab===k?'active':'')+'">'+esc(l)+'</button>').join('')+'</div>';
 }
 function detentionChargePanelHtml(){
   const s=detentionLiveState.summary||{},side=detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?s.principal:s.customer;
@@ -858,7 +853,7 @@ async function loadDetentionLiveSummary(){
     const s=await equipmentApi('/api/clx071/journey/detention/'+encodeURIComponent(state.selected.id)+'/summary');
     detentionLiveState.summary=s;
     const side=detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?s.principal:s.customer;
-    const f=$('detFinanceLive');if(f)f.innerHTML=detentionFinanceHtml(s);
+    const f=$('detFinanceLive');if(f)f.innerHTML=detentionFinanceHtml(s)+(s.status_warning?'<div class="equipNote">'+esc(s.status_warning.code)+' · '+esc(s.status_warning.process_status)+' + '+esc(s.status_warning.collection_status)+'</div>':'');
     const h=$('detHistoryLive');if(h)h.innerHTML=detentionHistoryHtml(side?.history||[]);
     const x=$('detProcessLiveStatus');if(x)x.textContent=(side?.process_status||'RUNNING')+' / '+(side?.calculation_stage||'ADVANCE');
     detentionLiveState.lines=(s.ancillary_charges||[]).filter(x=>x.commercial_direction===detentionCommercialDirection);
