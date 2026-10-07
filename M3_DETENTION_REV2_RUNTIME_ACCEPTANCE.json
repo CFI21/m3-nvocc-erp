@@ -1,0 +1,58 @@
+{
+  "artifact": "M3_DETENTION_REV2_RUNTIME_ACCEPTANCE",
+  "starting_head": "fc75ccccd919f0a5f68ac91e7f9c5183c8fd2b6e",
+  "scope": {
+    "m3_only": true,
+    "screen_count": 196,
+    "new_screens": 0,
+    "new_modules": 0,
+    "new_clx": 0,
+    "ancline_touched": false,
+    "production_data_touched": false,
+    "real_money": "OFF"
+  },
+  "verified_fixes": [
+    "SQLite row access during detention calculation",
+    "Duplicate covered-day recalculation rejection",
+    "FX reconciliation compares posted advances with their linked immutable segments rather than all accrued segments"
+  ],
+  "runtime_validation": {
+    "suite": "tests/test_m3_detention_rev2_runtime.py",
+    "tests_passed": 16,
+    "environment": "isolated SQLite adapter with accepted journey migration columns",
+    "customer_advance_ongoing_actual_finance_link": "PASS",
+    "principal_advance_ongoing_actual_bill_link": "PASS",
+    "authorized_draft_invoice_creation": "PASS",
+    "authenticated_role_spoof_denial": "PASS",
+    "agent_scope_denial": "PASS",
+    "stage_and_finance_audit": "PASS",
+    "tariff_split_snapshot_pinning": "PASS",
+    "posted_document_unchanged": "PASS",
+    "rollback_and_negative_controls": "PASS"
+  },
+  "postgres_migration_validation": {
+    "script": "scripts/m3_detention_rev2_postgres_acceptance.mjs",
+    "engine": "PostgreSQL 18.3 embedded through PGlite 0.5.8",
+    "first_application": "PASS",
+    "replay": "PASS",
+    "disabled_switch_preserved": "PASS",
+    "immutable_update_delete": "PASS",
+    "untrusted_RLS_select_insert": "PASS",
+    "limitation": "Isolated minimal parent-table fixture; not hosted production schema or service-role verification"
+  },
+  "github_required_checks": {
+    "main_protected": false,
+    "branch_contexts": [],
+    "repository_rulesets": [],
+    "policy": "No GitHub-enforced required checks were configured at inspection. User/PR acceptance still requires successful current-head CI."
+  },
+  "full_local_regression": {
+    "status": "PASS",
+    "passed": 702,
+    "seconds": 112.31
+  },
+  "release_status": "PENDING_CURRENT_HEAD_CI_AND_DEPLOYMENT",
+  "merge": false,
+  "deployment": false,
+  "live_smoke": "NOT_RUN"
+}

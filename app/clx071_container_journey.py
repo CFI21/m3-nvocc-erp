@@ -8,6 +8,7 @@ import datetime, json, uuid, hashlib
 from .db import connect, tx, table_exists
 from .clx070_container_master_control import actor, require_action, get_container, audit, scope_clause, now
 from .mrg import ensure as ensure_mrg
+from .item7_financial_document_governance import _detention_segment_refs
 
 router=APIRouter(prefix="/api/clx071/journey",tags=["CLX-071 Full Container Journey"])
 
@@ -542,6 +543,7 @@ def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,fin
         )
       ORDER BY g.id""",(job_id,detention_ref,detention_ref)).fetchall()]
     committed_status={"APPROVED","POSTED","ISSUED","OPEN","PARTIALLY PAID","PARTIALLY_PAID","PAID","SETTLED"}
+    advance_segment_refs=set()
     invoice_refs=[];invoice_fx={};invoice_stage={};total_invoiced=0.0;advance_invoiced=0.0;final_invoiced=0.0;draft_amount=0.0
     total_invoiced_base=0.0;advance_invoiced_base=0.0;final_invoiced_base=0.0
     due_dates=[];currencies=set()
@@ -562,7 +564,14 @@ def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,fin
             final_invoiced+=amount;final_invoiced_base+=base
         else:
             advance_invoiced+=amount;advance_invoiced_base+=base
+            advance_segment_refs.update(_detention_segment_refs(p))
 
+    advance_segment_base=0.0
+    if advance_segment_refs:
+        marks=",".join("?" for _ in advance_segment_refs)
+        advance_segment_base=round(sum(_detention_num(r["base_amount"]) for r in conn.execute(
+          f"SELECT base_amount FROM detention_segments WHERE detention_ref=? AND segment_ref IN ({marks})",
+          (detention_ref,*sorted(advance_segment_refs))).fetchall()),2)
     credit_amount=0.0;credit_base=0.0;advance_credit_base=0.0;final_credit_base=0.0
     if invoice_refs:
         marks=",".join("?" for _ in invoice_refs)
@@ -596,6 +605,7 @@ def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,fin
     final_rate=float(final_fx_rate or 0)
     converted=lambda base:round(base/final_rate,2) if final_rate>0 else None
     return {
+      "advance_segment_base":advance_segment_base,
       "invoice_refs":invoice_refs,"currency":next(iter(currencies),None) if len(currencies)<=1 else "MIXED",
       "draft_invoice_amount":round(draft_amount,2),"advance_invoiced":round(advance_invoiced,2),
       "final_invoiced":round(final_invoiced,2),"total_invoiced":round(total_invoiced,2),
@@ -955,6 +965,10 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
             raise HTTPException(409,{"code":"DETENTION_DAY_REGRESSION","covered_days":hs["total_days"],
                                      "calculated_days":total_days,"commercial_direction":direction})
 
+        if not actual_return and history and total_days==hs["total_days"]:
+            raise HTTPException(409,{"code":"DETENTION_PERIOD_ALREADY_COVERED","covered_till":hs["covered_till"],
+                                     "requested_till":dtiso(calc_until),"commercial_direction":direction})
+
         stage="ACTUAL" if actual_return else ("ADVANCE" if not history else "ONGOING")
         first_day=hs["total_days"]+1;last_day=total_days
         calculation_ref="DCAL-"+uuid.uuid4().hex[:14].upper()
@@ -975,7 +989,7 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
         else:
             for part in parts:
                 rule=part["rule"];days=part["last_day"]-part["first_day"]+1
-                amount,rate=_detention_amount(rule,days,c.get("size_type"),payload.get("Container Category"),part["first_day"])
+                amount,rate=_detention_amount(rule,days,c["size_type"],payload.get("Container Category"),part["first_day"])
                 fx=_detention_fx_rate(conn,rule.get("currency") or "USD",now())
                 cumulative_base=round(cumulative_base+amount*fx["rate"],2)
                 cumulative_amount=round(cumulative_base/fx["rate"],2)
@@ -1010,8 +1024,8 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
         if stage=="ACTUAL":
             if direction=="AGENT_TO_CUSTOMER":
                 prior_applied=_detention_num(finance.get("advance_invoiced_final_currency"))
-                advance_invoice_base=max(0.0,_detention_num(finance.get("advance_invoiced_base"))-_detention_num(finance.get("advance_credit_base")))
-                fx_reconciliation_base=round(advance_invoice_base-float(new_hs["cumulative_base_amount"] or 0),2)
+                # Compare posted advances with their linked immutable segments, not uninvoiced accruals.
+                fx_reconciliation_base=round(_detention_num(finance.get("advance_invoiced_base"))-_detention_num(finance.get("advance_segment_base")),2)
             else:
                 prior_applied=advance_display;fx_reconciliation_base=0.0
             difference=round(actual_amount-prior_applied,2);final_due=round(max(0.0,difference),2);credit_required=round(max(0.0,-difference),2)
