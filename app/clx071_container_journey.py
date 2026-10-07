@@ -448,6 +448,8 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
 
         if requested_stage=="ACTUAL" and not actual_return:
             raise HTTPException(409,{"code":"EMPTY_RETURN_REQUIRED_FOR_ACTUAL","container":c["container_no"]})
+        if actual_return and requested_stage in {"ADVANCE","ONGOING"}:
+            raise HTTPException(409,{"code":"EMPTY_RETURN_REQUIRES_ACTUAL","container":c["container_no"],"empty_return":actual_return_raw})
         if requested_stage=="ADVANCE" and history:
             raise HTTPException(409,{"code":"ADVANCE_ALREADY_STARTED_USE_ONGOING","covered_till":hs["covered_till"]})
         if requested_stage=="ONGOING" and not history:
