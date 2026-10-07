@@ -812,12 +812,17 @@ function detentionSelectedProcessDetail(){
       clx82DerivedField('Status',v('Status','status'))+
     '</div>'+
     '<div class="formActions">'+
-      '<button class="btn" onclick="openAgentForm(\'edit\')">Edit / Save Calculation</button>'+
-      '<button class="btn" onclick="runDetentionCalculation()">Recalculate</button>'+
+      '<button class="btn primary" onclick="runDetentionCalculation(\'ADVANCE\')">Calculate Advance</button>'+
+      '<button class="btn" onclick="runDetentionCalculation(\'ONGOING\')">Recalculate Ongoing</button>'+
+      '<button class="btn" onclick="runDetentionCalculation(\'ACTUAL\')">Calculate Actual</button>'+
       '<button class="btn primary" onclick="openScreen(\'gl-accounts::invoice\',{domain:\'HO Tasks\',submenu:\'Transaction\',label:\'Detention Draft Invoice\'})">Create Draft Invoice → Finance</button>'+
+      '<button class="btn" onclick="openDetentionMode(\'collection\')">Open Detention Collection</button>'+
+      '<button class="btn" onclick="openScreen(\'gl-accounts::invoice\')">Open Invoice / AR</button>'+
     '</div>'+
-    '<div class="equipNote">Advance / Actual stays linked to this existing detention record. Posted Finance documents are never overwritten; further invoice or credit handling remains in the existing Finance governance.</div>'+
-  '</div></div>';
+    '<div class="equipNote">RUNNING detention advances only over uncovered days. EMPTY_RETURN stops the physical clock; process completion is independent from collection closure.</div>'+
+  '</div></div>'+
+  '<div class="clx82Section"><div class="clx82Head">Advance / Ongoing Period History</div><div class="clx82Body"><div id="detHistoryLive">'+detentionHistoryHtml(detentionCurrentHistory(r))+'</div></div></div>'+
+  '<div id="detFinanceLive">'+detentionFinanceHtml({finance:{currency:curr,advance_invoiced:detentionNum(r,'Advance Invoiced'),final_invoiced:detentionNum(r,'Additional / Final Invoiced'),total_invoiced:detentionNum(r,'Total Invoiced'),paid_amount:detentionNum(r,'Paid Amount'),outstanding_balance:detentionNum(r,'Outstanding Balance'),credit_adjustment:detentionNum(r,'Credit / Adjustment'),collection_status:detentionValue(r,'Collection Status')}})+'</div>';
 }
 function renderDetentionProcess(){
   const rows=state.rows||[];
