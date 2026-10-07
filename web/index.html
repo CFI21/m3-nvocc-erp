@@ -706,14 +706,16 @@ function detentionMoney(n,c=''){
   return (c?esc(c)+' ':'')+x.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
-async function runDetentionCalculation(){
+async function runDetentionCalculation(stage='AUTO'){
   if(!state.selected?.id){alert('Select a detention process record first.');return}
   try{
     const calculateTill=$('detProcessDate')?.value||null;
     const r=await equipmentApi('/api/clx071/journey/detention/'+encodeURIComponent(state.selected.id)+'/calculate',{
-      method:'POST',body:JSON.stringify({calculate_till:calculateTill})
+      method:'POST',body:JSON.stringify({calculate_till:calculateTill,requested_stage:stage})
     });
-    alert((r.stage==='ACTUAL'?'Actual':'Advance')+' detention calculated: '+r.currency+' '+Number(r.amount||0).toFixed(2)+' · '+r.chargeable_days+' chargeable day(s) · '+r.rule_ref);
+    const label=r.stage==='ACTUAL'?'Actual':(r.stage==='ONGOING'?'Ongoing':'Advance');
+    const amount=r.stage==='ACTUAL'?Number(r.actual||0):Number(r.segment_amount||0);
+    alert(label+' detention calculated: '+r.currency+' '+amount.toFixed(2)+' · total '+r.total_chargeable_days+' chargeable day(s) · '+r.rule_ref);
     await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert('Detention calculation blocked: '+e.message)}
 }
