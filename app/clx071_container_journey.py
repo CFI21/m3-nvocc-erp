@@ -500,6 +500,27 @@ def _detention_invoice_fx(conn,inv,payload):
     if rate>0:return rate
     raise HTTPException(409,{"code":"FX_RATE_MISSING_ON_SEGMENT","invoice_ref":inv["external_ref"],"currency":currency})
 
+def _detention_fx_gain_loss_mapping(conn):
+    if not table_exists(conn,"gl_account_mappings"):return None
+    accepted_sources={"FX","FX_REVALUATION","FX-REVALUATION","EXCHANGE_RATE"}
+    accepted_events={"FX_GAIN_LOSS","FX_REALIZED","REALIZED_FX","EXCHANGE_RATE_GAIN_LOSS","REALIZED"}
+    rows=[dict(r) for r in conn.execute("SELECT * FROM gl_account_mappings WHERE active=1 ORDER BY id").fetchall()]
+    for r in rows:
+        if str(r.get("source_module") or "").upper() in accepted_sources or str(r.get("event_type") or "").upper() in accepted_events:
+            return r
+    return None
+
+PROCESS_COLLECTION_MATRIX={
+  "RUNNING":{"NOT INVOICED","INVOICED","PARTIALLY PAID","PAID","OVERDUE","DISPUTED"},
+  "COMPLETE":{"NOT INVOICED","INVOICED","PARTIALLY PAID","PAID","OVERDUE","DISPUTED","CLOSED"},
+}
+def _detention_status_warning(process_status,collection_status):
+    ps=str(process_status or "RUNNING").upper()
+    cs=str(collection_status or "NOT INVOICED").upper().replace("_"," ")
+    allowed=PROCESS_COLLECTION_MATRIX.get(ps,set())
+    return None if cs in allowed else {"code":"DETENTION_STATUS_COMBINATION_WARNING","process_status":ps,
+                                       "collection_status":cs,"blocking":False}
+
 def _detention_finance_summary(conn,detention_ref,job_id,final_currency=None,final_fx_rate=None):
     invoices=[dict(r) for r in conn.execute("""SELECT DISTINCT g.*
       FROM gl_records g
@@ -732,11 +753,17 @@ def detention_summary(record_id:int,x_role:str=Header("VIEWER"),
         principal=_detention_side_summary(conn,txr,ctx,payload,"PRINCIPAL_TO_AGENT",empty_return)
         finance=_detention_finance_summary(conn,customer["detention_ref"],ctx["job_id"])
         lines=_detention_charge_lines(payload)
+        status_warning=_detention_status_warning(customer["process_status"],finance["collection_status"])
         return {"record_id":record_id,"detention_ref":customer["detention_ref"],
                 "principal_detention_ref":principal["detention_ref"],"empty_return":empty_return,
                 "calculation_enabled":_detention_calculation_enabled(conn),
                 "reefer":_detention_is_reefer(ctx),"customer":customer,"principal":principal,
-                "finance":finance,"ancillary_charges":lines,"segment_storage":"detention_segments","screen_count":196}
+                "finance":finance,"status_warning":status_warning,
+                "ancillary_charges":lines,"segment_storage":"detention_segments",
+                "charge_master_source":"APPROVED mrg_rules.charge_code",
+                "tariff_version_source":"mrg_rules.rule_ref + mrg_rules.version",
+                "fx_source":"gl_fx_rates","fx_gain_loss_mapping":bool(_detention_fx_gain_loss_mapping(conn)),
+                "screen_count":196}
     finally:conn.close()
 
 @router.get("/detention/{record_id}/charge-options")
@@ -981,6 +1008,11 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
             else:
                 prior_applied=advance_display;fx_reconciliation_base=0.0
             difference=round(actual_amount-prior_applied,2);final_due=round(max(0.0,difference),2);credit_required=round(max(0.0,-difference),2)
+            if abs(fx_reconciliation_base)>0.005 and not _detention_fx_gain_loss_mapping(conn):
+                raise HTTPException(409,{"code":"FX_GAIN_LOSS_MAPPING_MISSING",
+                                         "fx_reconciliation_base":fx_reconciliation_base,
+                                         "required_source":"gl_account_mappings",
+                                         "required_event":"FX_GAIN_LOSS / REALIZED_FX"})
             process_status="COMPLETE";calculation_stage="ACTUAL"
         else:
             difference=0.0;final_due=0.0;credit_required=0.0;fx_reconciliation_base=0.0
@@ -1025,6 +1057,7 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
         if cur.rowcount!=1:raise HTTPException(409,{"code":"OPTIMISTIC_LOCK_CONFLICT"})
 
         segment_refs=[r["segment_ref"] for r in inserted]
+        status_warning=_detention_status_warning(process_status,finance.get("collection_status"))
         audit(conn,a,"DETENTION_STAGE_TRANSITION",c["id"],ctx["job_id"],before,payload,{
           "record_id":record_id,"detention_ref":detention_ref,"calculation_ref":calculation_ref,
           "commercial_direction":direction,"rate_side":side["rate_side"],"calculation_stage":calculation_stage,
@@ -1034,7 +1067,7 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
                  "base_currency":r["base_currency"]} for r in inserted],
           "from_till":[{"from":r["covered_from"],"till":r["covered_till"],"days":r["segment_days"]} for r in inserted],
           "actual_amount":actual_amount,"difference":difference,"fx_reconciliation_base":fx_reconciliation_base,
-          "gl_posted":False,"payment_posted":False
+          "status_warning":status_warning,"gl_posted":False,"payment_posted":False
         })
         conn.execute("COMMIT")
         return {"ok":True,"record_id":record_id,"detention_ref":detention_ref,"calculation_ref":calculation_ref,
