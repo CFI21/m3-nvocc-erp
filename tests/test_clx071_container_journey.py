@@ -89,3 +89,35 @@ def test_detention_process_frontend_binds_existing_screen_to_server_engine():
     assert "/api/clx071/journey/detention/" in html
     assert "Create Draft Invoice → Finance" in html
     assert "No GL posting occurs here" in html
+
+
+def test_running_detention_advance_ongoing_actual_contract():
+    import app.main as main
+    paths=set(main.app.openapi()["paths"])
+    assert "/api/clx071/journey/detention/{record_id}/calculate" in paths
+    assert "/api/clx071/journey/detention/{record_id}/summary" in paths
+
+    from app.clx071_container_journey import _detention_history_state
+    h=[
+      {"cumulative_days":5,"cumulative_amount":50,"covered_till":"2026-10-20T00:00:00+00:00"},
+      {"cumulative_days":8,"cumulative_amount":80,"covered_till":"2026-10-23T00:00:00+00:00"},
+    ]
+    s=_detention_history_state(h)
+    assert s["total_days"]==8
+    assert s["cumulative_amount"]==80
+    assert s["covered_till"].startswith("2026-10-23")
+
+
+def test_detention_process_ui_has_running_advance_ongoing_actual_actions():
+    html=Path("web/index.html").read_text()
+    for marker in [
+      "Calculate Advance","Recalculate Ongoing","Calculate Actual",
+      "Previous Advance Till","Advance / Calculate Till","Ongoing Days",
+      "Actual Chargeable Days","Total Chargeable Days",
+      "Advance / Ongoing Period History","Finance / Collection · Read Only",
+      "/api/clx071/journey/detention/"
+    ]:
+        assert marker in html
+    assert "Create Draft Invoice → Finance" in html
+    assert "Open Detention Collection" in html
+    assert "Open Invoice / AR" in html
