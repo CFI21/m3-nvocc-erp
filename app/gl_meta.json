@@ -685,6 +685,8 @@
         "Invoice Ref",
         "Currency",
         "Amount",
+        "Detention Segment Ref",
+        "Reason Code",
         "Reason",
         "Status"
       ]
