@@ -91,13 +91,13 @@ def test_authenticated_196_screen_field_api_action_state_and_audit_sweep(isolate
                 assert route["mode"] in {"EXISTING_API","EXISTING_GOVERNANCE","MASTER_DATA_GOVERNANCE"}
         navigation_event(sid,x_role="VIEWER",x_actor_id="final-frontend-audit",x_m3_session=token)
         visited.add(sid)
-    audit=events(500,x_role="VIEWER",x_m3_session=token)
+    audit=events(500,x_role="VIEWER",x_m3_session=token,x_agent_scope=None,x_customer_scope=None,x_branch_scope=None,x_depot_scope=None,x_office_scope=None)
     nav={x["screen_id"] for x in audit if x["action"]=="NAVIGATE" and x["actor_id"]=="final-frontend-audit"}
     assert nav==visited and len(nav)==196
 
 def test_authenticated_role_and_data_scope_are_server_authoritative(isolated):
     auditor=login(Login(username="auditor",password="Audit123!",mfa_code="123456"))["session_token"]
-    out=screen_data("agent-tasks::booking",x_role="SUPER_ADMIN",x_m3_session=auditor)
+    out=screen_data("treasury::treasury-dashboard",x_role="SUPER_ADMIN",x_m3_session=auditor)
     assert out["role"]=="AUDITOR"
     assert not (set(quick_actions("agent-tasks::booking","VIEWER")["visible_actions"]) & MUTATIONS)
     ops=login(Login(username="ops.rtm",password="Ops123!",mfa_code="123456"))["session_token"]
