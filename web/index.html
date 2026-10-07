@@ -1547,23 +1547,67 @@ async function renderQuickActions(epoch=state.viewEpoch){
   actions=[...new Set(actions)];
   $('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>';
 }
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(state.current?.key==='detention-collection'){renderDetentionWorkspace();return;}if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span>'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button>')+'</div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
+async function selectRow(index){
+  const epoch=++state.viewEpoch,screenId=state.current?.screen_id,role=state.role;
+  let rows=calcRows();state.selected=rows[index]||null;
+  await renderQuickActions(epoch);
+  if(!viewCurrent(epoch,screenId,role))return;
+  if(state.current?.key==='detention-collection'){renderDetentionWorkspace();return;}
+  if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}
+  if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}
+  if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span>'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button>')+'</div></div>';await renderInlineAgentScreen();return}
+  if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}
+  openDrawer('details');
+}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
-async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
-async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
-async function loadAudit(){let jr=selectedJob();try{let x=await api('/api/clx011/events?limit=40');let html=`<div class=card><b>CLX-011 screen/action audit</b></div><pre class=pre>${esc(JSON.stringify(x.slice(0,20),null,2))}</pre>`;if(jr){let y=await api('/api/v1/system/events/audit?job_ref='+jr+'&limit=30');html+=`<div class=card><b>Job ${jr} domain audit</b></div><pre class=pre>${esc(JSON.stringify(y,null,2))}</pre>`}$('tab-audit').innerHTML=html}catch(e){$('tab-audit').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
+async function openDrawer(tab='details'){
+  const epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role;
+  if(!state.selected&&state.rows.length)state.selected=state.rows[0];
+  $('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;
+  drawerTabs(tab);$('drawer').classList.add('open');
+  $('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;
+  await loadRelated(epoch,screenId,role);
+  if(!viewCurrent(epoch,screenId,role))return;
+  await loadAudit(epoch,screenId,role);
+}
+async function loadRelated(epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role){
+  const jr=selectedJob();
+  if(!jr){if(viewCurrent(epoch,screenId,role))$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}
+  try{
+    const d=await api('/api/clx011/related/'+jr);
+    if(!viewCurrent(epoch,screenId,role)||selectedJob()!==jr)return;
+    const lr=d.linked_records;
+    $('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`;
+  }catch(e){if(viewCurrent(epoch,screenId,role)&&selectedJob()===jr)$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}
+}
+async function loadAudit(epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role){
+  const jr=selectedJob();
+  try{
+    const x=await api('/api/clx011/events?limit=40');
+    if(!viewCurrent(epoch,screenId,role)||selectedJob()!==jr)return;
+    let html=`<div class=card><b>CLX-011 screen/action audit</b></div><pre class=pre>${esc(JSON.stringify(x.slice(0,20),null,2))}</pre>`;
+    if(jr){
+      const y=await api('/api/v1/system/events/audit?job_ref='+jr+'&limit=30');
+      if(!viewCurrent(epoch,screenId,role)||selectedJob()!==jr)return;
+      html+=`<div class=card><b>Job ${jr} domain audit</b></div><pre class=pre>${esc(JSON.stringify(y,null,2))}</pre>`;
+    }
+    $('tab-audit').innerHTML=html;
+  }catch(e){if(viewCurrent(epoch,screenId,role)&&selectedJob()===jr)$('tab-audit').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}
+}
 function showJson(title,obj){$('drawerTitle').textContent=title;$('tab-details').innerHTML='<pre class=pre>'+esc(JSON.stringify(JSON.parse(obj),null,2))+'</pre>';drawerTabs('details')}
 
 
 
 async function renderAgentUsersChild(){
   if(!state.current||!state.selected)return;
+  const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   const key=state.current.key||'';
   if(!['agent','agents'].includes(key))return;
   const code=state.selected.record_key||state.selected.code||state.selected.AgentCode||state.selected.agent_code;
   if(!code)return;
   try{
     const d=await api('/api/admin/agents/'+encodeURIComponent(code)+'/users');
+    if(!viewCurrent(epoch,screenId,role))return;
     const rows=d.users||[];
     const pending=d.pending_requests||[];
     const party=d.party_match?esc(d.party_match.record_key+' · '+d.party_match.display_name):'<span class="warntext">No exact Common Party link</span>';
@@ -1607,18 +1651,19 @@ function clx49Headers(w){
 }
 async function openClx49Link(screenId,jr){
   await openScreen(screenId);
+  if(state.current?.screen_id!==screenId)return;
   const i=state.rows.findIndex(r=>String(r.job_ref??r['Job Ref']??'')===String(jr));
   if(i>=0)await selectRow(i);
 }
 function clx49FieldEditor(record,fields){
   if(!record)return '<div class="card empty">No existing authoritative record for this job.</div>';
-  const p=record.fields||{};
+  const p=record.fields||{},disabled=viewerReadOnly()?' disabled':'';
   const names=(fields&&fields.length?fields:Object.keys(p)).filter(x=>x!=='Job Ref');
   return '<div class="formGrid">'+names.map(name=>{
     const full=/instruction|remarks|description|reason|authorization|notify/i.test(name);
     const val=p[name]??'';
     return '<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+
-      (full?'<textarea data-clx49-field="'+esc(name)+'">'+esc(val)+'</textarea>':'<input data-clx49-field="'+esc(name)+'" value="'+esc(val)+'">')+'</div>';
+      (full?'<textarea data-clx49-field="'+esc(name)+'"'+disabled+'>'+esc(val)+'</textarea>':'<input data-clx49-field="'+esc(name)+'" value="'+esc(val)+'"'+disabled+'>')+'</div>';
   }).join('')+'</div>';
 }
 function clx49ContextHeader(w){
@@ -1637,9 +1682,9 @@ function clx49Nav(w){
 function clx82NativeField(record,key,label,opts={}){
   const p=record?.fields||{},v=p[key]??'';
   const cls=opts.full?' full':(opts.wide?' wide':'');
-  const type=opts.type||'text';
+  const type=opts.type||'text',disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
   return '<div class="clx82Field'+cls+'"><label>'+esc(label||key)+'</label>'+
-    (opts.textarea?'<textarea data-clx49-field="'+esc(key)+'">'+esc(v)+'</textarea>':'<input type="'+esc(type)+'" data-clx49-field="'+esc(key)+'" value="'+esc(v)+'">')+
+    (opts.textarea?'<textarea data-clx49-field="'+esc(key)+'"'+disabled+'>'+esc(v)+'</textarea>':'<input type="'+esc(type)+'" data-clx49-field="'+esc(key)+'" value="'+esc(v)+'"'+disabled+'>')+
     '</div>';
 }
 function clx82DerivedField(label,value,opts={}){
@@ -1703,7 +1748,7 @@ function clx49RecordForTab(w,tab){
   return {module:null,record:null};
 }
 async function clx49RenderBlTab(tab){
-  const w=clx49Workspace;clx49ActiveTab=tab;
+  const w=clx49Workspace,epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role;clx49ActiveTab=tab;
   const x=clx49RecordForTab(w,tab),r=x.record;
   const bp=w.booking?.fields||{},bl=w.bl?.fields||{},doF=w.delivery_order?.fields||{};
   let html=clx49ContextHeader(w)+clx49Nav(w);
@@ -1842,9 +1887,10 @@ async function clx49RenderBlTab(tab){
     html+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'bl\','+r.id+','+r.version+')">Save B/L</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button></div></div>';
   }
   html+='</div>';
+  if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab)return;
   $('gridArea').innerHTML=renderGrid()+html;
   if(tab==='Booking Info'){
-    clx82FinanceSummary(w).then(x=>{const el=$('clx82FinanceArea');if(el)el.innerHTML=x});
+    clx82FinanceSummary(w).then(x=>{if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab)return;const el=$('clx82FinanceArea');if(el)el.innerHTML=x});
   }
 }
 function clx82ShowPreview(){
@@ -1884,7 +1930,7 @@ function clx49BookingTogglePot(){
 let clx78BookingBottomTab='Agreed Charges';
 function clx78Field(record,key,label,opts={}){
   const p=record?.fields||{}, val=p[key]??'';
-  const disabled=opts.disabled?' disabled':'';
+  const disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
   const cls=opts.full?' full':(opts.wide?' wide':'');
   const type=opts.type||'text';
   const note=opts.review?'<span class="clx81Review">REVIEW LATER</span>':'';
@@ -1896,7 +1942,7 @@ function clx78Field(record,key,label,opts={}){
 function clx81Bool(v){return ['1','true','yes','y','on'].includes(String(v??'').toLowerCase())}
 function clx81Check(record,key,label,opts={}){
   const p=record?.fields||{},checked=clx81Bool(p[key]);
-  const disabled=opts.disabled?' disabled':'';
+  const disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
   return '<label class="clx81Check"><input type="checkbox" data-clx49-field="'+esc(key)+'" '+(checked?'checked ':'')+disabled+'>'+esc(label)+'</label>';
 }
 function clx81SetBottom(tab){clx78BookingBottomTab=tab;clx49RenderBooking('Booking Info')}
@@ -1986,7 +2032,7 @@ async function clx78BookingBottom(w){
         ['Principal Net',['Principal Net','principal_net']],
         ['Customer AR',['Customer AR','customer_ar']]
       ];
-      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · Booking commercial payload + linked operational / GL sources · no parallel Booking model.</div><div class="toolbar"><button class="btn primary" onclick="openMrgImportForBooking()">Import MRG</button><button class="btn" onclick="openAgentForm(\'edit\')">Add Manual Charge</button><button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button><span class="muted">MRG import is optional.</span></div>'+
+      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · Booking commercial payload + linked operational / GL sources · no parallel Booking model.</div><div class="toolbar">'+writeUi('<button class="btn primary" onclick="openMrgImportForBooking()">Import MRG</button><button class="btn" onclick="openAgentForm(\'edit\')">Add Manual Charge</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button><span class="muted">MRG import is optional.</span></div>'+
         '<div class="tablewrap"><table><thead><tr>'+cols.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'</tr></thead><tbody>'+
         (rows.length?rows.map(r=>'<tr>'+cols.map(x=>'<td>'+esc(pick(r,...x[1]))+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="16">No linked agreed-charge records yet.</td></tr>')+
         '</tbody></table></div></div>';
@@ -2003,7 +2049,7 @@ async function clx78BookingBottom(w){
   }catch(e){return '<div class="clx78Ledger"><div class="equipNote">'+esc(e.message)+'</div></div>'}
 }
 async function clx49RenderBooking(tab){
-  const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
+  const w=clx49Workspace,epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role,bottomTab=clx78BookingBottomTab,r=w.booking;clx49ActiveTab=tab;
   const p=r?.fields||{};
   const displayTab=tab==='Booking Info'?'Basic Info':tab;
   const hasPot1=!!String(p['POT (1)']||p['Via Port']||p['Transshipment Port']||'').trim();
@@ -2079,6 +2125,7 @@ async function clx49RenderBooking(tab){
   }
   html+='</div>';
   if(r)html+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(displayTab)+'</button>')+'<button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
+  if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab||(tab==='Booking Info'&&clx78BookingBottomTab!==bottomTab))return;
   $('gridArea').innerHTML=renderGrid()+html;
   if(tab==='Booking Info'){
     for(const n of ['Via Port','Transshipment Port','POT (1)','POT (2)'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);

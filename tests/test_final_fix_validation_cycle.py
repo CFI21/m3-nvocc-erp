@@ -35,6 +35,12 @@ def test_verified_frontend_race_filter_viewer_and_status_fixes_are_present():
     assert "if(role==='VIEWER')actions=actions.filter(x=>!UI_MUTATIONS.has(x))" in HTML
     assert "if(state.current){await openScreen(state.current.screen_id,state.navContext,'replace');return;}" in HTML
 
+    assert "const epoch=++state.viewEpoch,screenId=state.current?.screen_id,role=state.role;" in HTML
+    assert "async function loadRelated(epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role)" in HTML
+    assert "clx49Workspace!==w||clx49ActiveTab!==tab" in HTML
+    assert "const p=record.fields||{},disabled=viewerReadOnly()?' disabled':'';" in HTML
+    assert "const disabled=(opts.disabled||viewerReadOnly())?' disabled':'';" in HTML
+
 def test_clx056_trt_presentation_is_consistent_without_breaking_legacy_read_or_governance_crt():
     assert "existing CRT/booking record" not in HTML
     assert "existing TRT / legacy booking record" in HTML
