@@ -13,6 +13,54 @@ CREATE TABLE IF NOT EXISTS workflow_holds(id INTEGER PRIMARY KEY, job_id INTEGER
 CREATE TABLE IF NOT EXISTS transaction_records(id INTEGER PRIMARY KEY, module TEXT NOT NULL, external_ref TEXT NOT NULL, job_id INTEGER NOT NULL REFERENCES jobs(id), booking_id INTEGER NOT NULL REFERENCES bookings(id), customer_id INTEGER NOT NULL REFERENCES customers(id), agent_id INTEGER NOT NULL REFERENCES agents(id), container_id INTEGER REFERENCES containers(id), voyage_id INTEGER NOT NULL REFERENCES voyages(id), bill_id INTEGER REFERENCES bills(id), status TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, payload_json TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL, UNIQUE(module,external_ref));
 CREATE INDEX IF NOT EXISTS idx_tx_module_job ON transaction_records(module,job_id);
 CREATE INDEX IF NOT EXISTS idx_tx_agent ON transaction_records(agent_id);
+CREATE TABLE IF NOT EXISTS detention_segments(
+ id INTEGER PRIMARY KEY,
+ segment_ref TEXT NOT NULL UNIQUE,
+ calculation_ref TEXT NOT NULL,
+ transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE,
+ job_id INTEGER NOT NULL REFERENCES jobs(id),
+ container_id INTEGER NOT NULL REFERENCES containers(id),
+ detention_ref TEXT NOT NULL,
+ commercial_direction TEXT NOT NULL CHECK(commercial_direction IN ('AGENT_TO_CUSTOMER','PRINCIPAL_TO_AGENT')),
+ stage TEXT NOT NULL CHECK(stage IN ('ADVANCE','ONGOING','ACTUAL')),
+ sequence INTEGER NOT NULL CHECK(sequence>=1),
+ covered_from TEXT NOT NULL,
+ covered_till TEXT NOT NULL,
+ segment_days INTEGER NOT NULL CHECK(segment_days>=0),
+ cumulative_days INTEGER NOT NULL CHECK(cumulative_days>=0),
+ segment_amount REAL NOT NULL CHECK(segment_amount>=0),
+ cumulative_amount REAL NOT NULL CHECK(cumulative_amount>=0),
+ cumulative_base_amount REAL NOT NULL CHECK(cumulative_base_amount>=0),
+ document_currency TEXT NOT NULL,
+ fx_rate REAL NOT NULL CHECK(fx_rate>0),
+ fx_rate_date TEXT NOT NULL,
+ base_currency TEXT NOT NULL DEFAULT 'USD',
+ base_amount REAL NOT NULL CHECK(base_amount>=0),
+ rule_ref TEXT NOT NULL,
+ tariff_version INTEGER NOT NULL CHECK(tariff_version>=1),
+ tariff_effective_from TEXT,
+ tariff_effective_to TEXT,
+ tariff_snapshot_json TEXT NOT NULL,
+ tariff_charge_code TEXT NOT NULL,
+ rate_group TEXT NOT NULL,
+ rate REAL NOT NULL CHECK(rate>=0),
+ rate_basis TEXT NOT NULL,
+ free_days INTEGER NOT NULL CHECK(free_days>=0),
+ calculated_at TEXT NOT NULL,
+ calculated_by TEXT NOT NULL,
+ calculation_hash TEXT NOT NULL UNIQUE,
+ UNIQUE(transaction_id,commercial_direction,sequence),
+ UNIQUE(transaction_id,commercial_direction,stage,covered_from,covered_till,rule_ref,tariff_version)
+);
+CREATE INDEX IF NOT EXISTS idx_detention_segments_tx_direction ON detention_segments(transaction_id,commercial_direction,sequence);
+CREATE INDEX IF NOT EXISTS idx_detention_segments_calculation ON detention_segments(calculation_ref,sequence);
+CREATE INDEX IF NOT EXISTS idx_detention_segments_container ON detention_segments(container_id,commercial_direction,covered_till);
+CREATE TRIGGER IF NOT EXISTS detention_segments_immutable_update
+BEFORE UPDATE ON detention_segments
+BEGIN SELECT RAISE(ABORT,'DETENTION_SEGMENT_IMMUTABLE'); END;
+CREATE TRIGGER IF NOT EXISTS detention_segments_immutable_delete
+BEFORE DELETE ON detention_segments
+BEGIN SELECT RAISE(ABORT,'DETENTION_SEGMENT_IMMUTABLE'); END;
 CREATE TABLE IF NOT EXISTS audit_events(id INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, actor_role TEXT NOT NULL, actor_scope TEXT, action TEXT NOT NULL, module TEXT, transaction_id INTEGER, job_id INTEGER REFERENCES jobs(id), before_json TEXT, after_json TEXT, metadata_json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS exception_events(id INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, code TEXT NOT NULL, severity TEXT NOT NULL, module TEXT, transaction_id INTEGER, job_id INTEGER REFERENCES jobs(id), detail TEXT NOT NULL, resolved INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS idempotency_keys(id INTEGER PRIMARY KEY, actor_role TEXT NOT NULL, idem_key TEXT NOT NULL, request_hash TEXT NOT NULL, response_json TEXT NOT NULL, status_code INTEGER NOT NULL, created_at TEXT NOT NULL, UNIQUE(actor_role,idem_key));

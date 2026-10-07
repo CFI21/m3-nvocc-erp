@@ -1,0 +1,92 @@
+{
+  "artifact": "M3_DETENTION_REV2_HARDENING",
+  "baseline_main_sha": "5896823c3dee08db446b508d9b6c53854ce9881a",
+  "scope": {
+    "m3_only": true,
+    "ancline_untouched": true,
+    "screen_count": 196,
+    "new_screen_ids": 0,
+    "new_clx": false,
+    "new_module": false
+  },
+  "resolved_sources": {
+    "tariff_source": {
+      "table": "mrg_rules",
+      "key": "rule_ref",
+      "version_column": "version",
+      "effective_columns": [
+        "effective_from",
+        "effective_to"
+      ],
+      "approval": "status=APPROVED",
+      "history_note": "segment must pin rule_ref + version + immutable tariff snapshot"
+    },
+    "tariff_slabs": {
+      "table": "mrg_slabs",
+      "join": "rule_ref"
+    },
+    "fx_source": {
+      "table": "gl_fx_rates",
+      "base_currency": "USD",
+      "required_blocker": "FX_RATE_MISSING_ON_SEGMENT"
+    },
+    "charge_master_source": {
+      "table": "mrg_rules",
+      "field": "charge_code",
+      "selection_rule": "only APPROVED applicable MRG rows may be picked",
+      "required_blocker": "UNAPPROVED_CHARGE_CODE"
+    },
+    "credit_governance": {
+      "component": "app/item7_financial_document_governance.py",
+      "existing_bound_error": "CORRECTION_EXCEEDS_ORIGINAL",
+      "revision2_error": "CREDIT_EXCEEDS_INVOICE"
+    },
+    "audit_source": {
+      "table": "audit_events",
+      "framework": "existing CLX-071 audit()"
+    },
+    "rollback_config": {
+      "table": "md_config",
+      "key": "DETENTION_CALCULATION_ENABLED",
+      "type": "BOOLEAN",
+      "note": "reuse existing config table; no new feature-flag table"
+    },
+    "journey_source": {
+      "tables": [
+        "container_events",
+        "containers"
+      ],
+      "events": [
+        "GATE_OUT_FULL",
+        "EMPTY_RETURN"
+      ]
+    }
+  },
+  "blockers": [],
+  "merge_policy": "MERGE_ONLY_AFTER_REQUIRED_CI_AND_MIGRATION_ACCEPTANCE_PASS",
+  "deployment_policy": {
+    "api_deploy_required": true,
+    "reason": "Revision 2 requires backend endpoint/governance changes once storage is authorized."
+  },
+  "prior_live_main_sha": "5896823c3dee08db446b508d9b6c53854ce9881a",
+  "status": "IMPLEMENTED_PENDING_CI",
+  "authorized_change": {
+    "detention_segment_child_table": "detention_segments",
+    "parent": "transaction_records.id",
+    "additive_only": true,
+    "authorized": true
+  },
+  "resolved_controls": {
+    "tariff_version_pinning": true,
+    "fx_reconciliation": true,
+    "credit_bound": true,
+    "reefer_conflict_guard": true,
+    "charge_master_source_named": true,
+    "detention_ref_scope": true,
+    "empty_return_guards": true,
+    "segment_storage": "detention_segments",
+    "rollback_config": "md_config.DETENTION_CALCULATION_ENABLED",
+    "audit_existing_framework": true,
+    "negative_tests": "tests/test_m3_detention_rev2_hardening.py"
+  }
+}

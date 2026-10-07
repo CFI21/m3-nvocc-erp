@@ -99,8 +99,8 @@ def test_running_detention_advance_ongoing_actual_contract():
 
     from app.clx071_container_journey import _detention_history_state
     h=[
-      {"cumulative_days":5,"cumulative_amount":50,"covered_till":"2026-10-20T00:00:00+00:00"},
-      {"cumulative_days":8,"cumulative_amount":80,"covered_till":"2026-10-23T00:00:00+00:00"},
+      {"stage":"ADVANCE","sequence":1,"cumulative_days":5,"cumulative_amount":50,"covered_till":"2026-10-20T00:00:00+00:00"},
+      {"stage":"ONGOING","sequence":2,"cumulative_days":8,"cumulative_amount":80,"covered_till":"2026-10-23T00:00:00+00:00"},
     ]
     s=_detention_history_state(h)
     assert s["total_days"]==8
@@ -155,7 +155,7 @@ def test_detention_existing_screen_has_commercial_direction_and_subcharge_tabs()
       "Apply / Refresh Tariff","Add Charge",
       "PLUGIN_REQUIRES_REEFER",
       "Create Draft Invoice → Finance",
-      "Open Principal Bill / AP","Open Principal / Agent SOA",
+      "Create Principal Bill / AP","Open Principal / Agent SOA",
     ]:
         assert marker in html or marker in Path("app/clx071_container_journey.py").read_text()
     assert "commercial_direction:detentionCommercialDirection" in html
