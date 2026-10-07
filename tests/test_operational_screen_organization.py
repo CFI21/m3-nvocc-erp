@@ -40,3 +40,18 @@ def test_visible_reference_setup_flow_is_navigation_only():
     assert "showEquipmentWorkspace('containers')" in HTML
     assert 'Equipment Size & Type' in HTML
     assert "master-data::equipment-types" in HTML
+
+
+def test_detention_process_and_collection_are_distinct_existing_frontend_stages():
+    assert "function renderDetentionProcess" in HTML
+    assert "function renderDetentionCollection" in HTML
+    assert "Detention Process" in HTML
+    assert "Detention Collection" in HTML
+    assert "Sale Invoice Detention" in HTML  # existing catalog alias is presentation-normalized at init
+    assert "Create Draft Invoice → Finance" in HTML
+    assert "Receivable / follow-up stage only" in HTML
+    assert "Operational calculation stage only" in HTML
+    assert "agent-tasks::detention-collection" in HTML
+    assert "gl-accounts::invoice" in HTML
+    assert "gl-accounts::receipt" in HTML
+    assert "agent-tasks::soa" in HTML
