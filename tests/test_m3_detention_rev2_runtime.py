@@ -32,10 +32,13 @@ def case(tmp_path, monkeypatch):
         c.execute("""INSERT INTO mrg_rules(rule_ref,mrg_type,rate_side,party_type,charge_code,effective_from,currency,rate_basis,unit_rate,free_days,status,version,maker,created_at,updated_at)
         VALUES(?,'DETENTION',?,?,'DET','2026-01-01','USD','PER_DAY',?,0,'APPROVED',1,'test','2026-01-01','2026-01-01')""", (ref,side,party,rate))
     c.close()
+    from app.admin import Login, login
+    r['_session'] = login(Login(username='admin', password='Admin123!', mfa_code='123456'))['session_token']
     return r
 
 def calculate(case, stage, till, direction='AGENT_TO_CUSTOMER', **kwargs):
-    return journey.calculate_detention(case['id'],journey.DetentionCalculationBody(requested_stage=stage,calculate_till=till,commercial_direction=direction),x_role=kwargs.get('role','SUPER_ADMIN'),x_m3_session=kwargs.get('session'),x_agent_scope=kwargs.get('agent'),x_branch_scope=None,x_depot_scope=None)
+    session = kwargs.get('session', case['_session'] if 'role' not in kwargs else None)
+    return journey.calculate_detention(case['id'],journey.DetentionCalculationBody(requested_stage=stage,calculate_till=till,commercial_direction=direction),x_role=kwargs.get('role','VIEWER'),x_m3_session=session,x_agent_scope=kwargs.get('agent'),x_branch_scope=None,x_depot_scope=None)
 
 def returned(case, at):
     c=db.connect()

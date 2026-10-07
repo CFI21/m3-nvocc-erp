@@ -54,5 +54,21 @@
   "release_status": "PENDING_CURRENT_HEAD_CI_AND_DEPLOYMENT",
   "merge": false,
   "deployment": false,
-  "live_smoke": "NOT_RUN"
+  "live_smoke": "NOT_RUN",
+  "final_release_follow_up": {
+    "base_main": "104cfdfa36504b08fc04f19d4b7a479606d079e3",
+    "product_changes": false,
+    "harness_fix": "Verify declared OFF staging lock or accepted ON live mode; enforce live providers OFF and real money OFF in both modes",
+    "authenticated_stage_transitions": "PASS: both directions, default authenticated admin session overrides VIEWER header",
+    "runtime_suite": "16 passed",
+    "final_regression": "702 passed in 97.80s",
+    "harness_mode_and_negative_safeguards": "5 passed",
+    "corrected_live_harness": "PASS mode=ON",
+    "live_authenticated_admin_and_auditor_summary": "PASS, record 31, screen_count=196",
+    "live_authenticated_auditor_role_spoof_denial": "403 EQUIPMENT_POLICY_DENIED",
+    "hosted_login_audit": "PASS for both accounts; validation sessions revoked",
+    "business_data_changes": false,
+    "live_positive_stage_or_finance_writes": "NOT_REPEATED: verified in isolated acceptance only; no fabricated live events",
+    "next_phase_ready": "PENDING_FOLLOW_UP_CI_AND_MERGE"
+  }
 }
