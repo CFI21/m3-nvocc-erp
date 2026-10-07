@@ -484,6 +484,31 @@ def _detention_event_time(conn,container_id,event_type):
       ORDER BY COALESCE(actual_time,event_time) DESC,id DESC LIMIT 1""",(container_id,event_type)).fetchone()
     return r["t"] if r else None
 
+
+def _detention_side_summary(payload,commercial_direction,empty_return):
+    side=_detention_side(commercial_direction);prefix=side["prefix"]
+    history=_detention_history(payload,commercial_direction);hs=_detention_history_state(history)
+    process_status=str(payload.get(prefix+"Process Status") or
+      ("COMPLETE" if empty_return and str(payload.get(prefix+"Calculation Stage") or "").upper()=="ACTUAL" else "RUNNING")).upper()
+    stage=str(payload.get(prefix+"Calculation Stage") or
+      ("ACTUAL_PENDING" if empty_return else ("ONGOING" if history else "ADVANCE"))).upper()
+    return {
+      "commercial_direction":_detention_direction(commercial_direction),"rate_side":side["rate_side"],
+      "process_status":process_status,"calculation_stage":stage,"history":history,
+      "covered_till":hs["covered_till"],"covered_days":hs["total_days"],
+      "advance_detention":_detention_num(payload.get(prefix+"Advance Detention")),
+      "ongoing_detention":_detention_num(payload.get(prefix+"Ongoing Detention")),
+      "actual_detention":_detention_num(payload.get(prefix+"Actual Detention")),
+      "difference":_detention_num(payload.get(prefix+"Difference")),
+      "currency":payload.get(prefix+"Currency") or payload.get("Currency"),
+      "tariff":payload.get(prefix+"Tariff"),"tariff_code":payload.get(prefix+"Tariff Code"),
+      "free_days":payload.get(prefix+"Free Days"),"detention_start":payload.get(prefix+"Detention Start"),
+      "previous_advance_till":payload.get(prefix+"Previous Advance Till Date"),
+      "next_charge_start":payload.get(prefix+"Next Charge Start Date"),
+      "calculate_till":payload.get(prefix+"Calculate Till Date"),
+      "total_chargeable_days":payload.get(prefix+"Total Chargeable Days"),
+    }
+
 @router.get("/detention/{record_id}/summary")
 def detention_summary(record_id:int,x_role:str=Header("VIEWER"),
                       x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
@@ -496,15 +521,118 @@ def detention_summary(record_id:int,x_role:str=Header("VIEWER"),
         txr,ctx=_detention_context(conn,record_id)
         c=get_container(conn,ctx["container_no"],a)
         if int(c["id"])!=int(ctx["container_id"]):raise HTTPException(409,{"code":"DETENTION_CONTAINER_SCOPE_MISMATCH"})
-        payload=_detention_payload(txr);history=_detention_history(payload);hs=_detention_history_state(history)
+        payload=_detention_payload(txr);empty_return=_detention_event_time(conn,c["id"],"EMPTY_RETURN")
+        customer=_detention_side_summary(payload,"AGENT_TO_CUSTOMER",empty_return)
+        principal=_detention_side_summary(payload,"PRINCIPAL_TO_AGENT",empty_return)
         finance=_detention_finance_summary(conn,txr["external_ref"],ctx["job_id"])
-        empty_return=_detention_event_time(conn,c["id"],"EMPTY_RETURN")
-        process_status=str(payload.get("Process Status") or ("COMPLETE" if empty_return and str(payload.get("Calculation Stage") or "").upper()=="ACTUAL" else "RUNNING")).upper()
-        stage=str(payload.get("Calculation Stage") or ("ACTUAL_PENDING" if empty_return else ("ONGOING" if history else "ADVANCE"))).upper()
-        return {"record_id":record_id,"detention_ref":txr["external_ref"],"process_status":process_status,
-                "calculation_stage":stage,"empty_return":empty_return,"history":history,
-                "covered_till":hs["covered_till"],"covered_days":hs["total_days"],
-                "finance":finance,"screen_count":196}
+        lines=_detention_charge_lines(payload)
+        return {"record_id":record_id,"detention_ref":txr["external_ref"],"empty_return":empty_return,
+                "reefer":_detention_is_reefer(ctx),"customer":customer,"principal":principal,
+                "finance":finance,"ancillary_charges":lines,"screen_count":196}
+    finally:conn.close()
+
+@router.get("/detention/{record_id}/charge-options")
+def detention_charge_options(record_id:int,commercial_direction:str="AGENT_TO_CUSTOMER",x_role:str=Header("VIEWER"),
+                             x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+                             x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),
+                             x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),
+                             x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
+    conn=connect()
+    try:
+        a=actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope)
+        txr,ctx=_detention_context(conn,record_id)
+        c=get_container(conn,ctx["container_no"],a)
+        if int(c["id"])!=int(ctx["container_id"]):raise HTTPException(409,{"code":"DETENTION_CONTAINER_SCOPE_MISMATCH"})
+        gate_out=_detention_event_time(conn,c["id"],"GATE_OUT_FULL") or c["free_time_start"]
+        active_on=(parse_dt(gate_out) or utcnow()).date().isoformat()
+        d=_detention_direction(commercial_direction)
+        options=_detention_charge_options(conn,ctx,active_on,d)
+        lines=[x for x in _detention_charge_lines(_detention_payload(txr)) if x.get("commercial_direction")==d]
+        return {"record_id":record_id,"detention_ref":txr["external_ref"],"commercial_direction":d,
+                "rate_side":_detention_side(d)["rate_side"],"reefer":_detention_is_reefer(ctx),
+                "options":options,"lines":lines,"screen_count":196}
+    finally:conn.close()
+
+@router.post("/detention/{record_id}/charges")
+def add_detention_charge(record_id:int,b:DetentionChargeBody,x_role:str=Header("OPS"),
+                         x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+                         x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),
+                         x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),
+                         x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
+    conn=connect()
+    try:
+        a=actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(conn)
+        txr,ctx=_detention_context(conn,record_id)
+        c=get_container(conn,ctx["container_no"],a)
+        if int(c["id"])!=int(ctx["container_id"]):raise HTTPException(409,{"code":"DETENTION_CONTAINER_SCOPE_MISMATCH"})
+        d=_detention_direction(b.commercial_direction)
+        gate_out=_detention_event_time(conn,c["id"],"GATE_OUT_FULL") or c["free_time_start"]
+        active_on=(parse_dt(gate_out) or utcnow()).date().isoformat()
+        options=_detention_charge_options(conn,ctx,active_on,d)
+        rule=next((x for x in options if x["rule_ref"]==b.rule_ref),None)
+        if not rule:raise HTTPException(409,{"code":"DETENTION_CHARGE_RULE_NOT_APPLICABLE","rule_ref":b.rule_ref,"commercial_direction":d})
+        category=rule["category"]
+        if category=="PLUGIN" and not _detention_is_reefer(ctx):
+            raise HTTPException(409,{"code":"PLUGIN_REQUIRES_REEFER","container":ctx["container_no"]})
+        payload=_detention_payload(txr);lines=_detention_charge_lines(payload)
+        if any(x.get("rule_ref")==b.rule_ref and x.get("commercial_direction")==d and x.get("status","ACTIVE")=="ACTIVE" for x in lines):
+            raise HTTPException(409,{"code":"ANCILLARY_CHARGE_ALREADY_APPLIED","rule_ref":b.rule_ref,"commercial_direction":d})
+        amount,rate=_detention_charge_amount(rule,b.quantity)
+        line={
+          "line_ref":"DCH-"+uuid.uuid4().hex[:12].upper(),"commercial_direction":d,
+          "rate_side":rule["rate_side"],"category":category,"rule_ref":rule["rule_ref"],
+          "charge_code":rule["charge_code"],"charge_type":rule.get("charge_type"),
+          "party_type":rule["party_type"],"party_code":rule.get("party_code"),
+          "quantity":round(float(b.quantity),4),"rate":rate,"currency":rule["currency"],"amount":amount,
+          "rate_basis":rule["rate_basis"],"remarks":b.remarks or rule.get("remarks"),"status":"ACTIVE","created_at":now()
+        }
+        lines.append(line);before={**payload};payload["Ancillary Charges"]=lines
+        cur=conn.execute("""UPDATE transaction_records SET payload_json=?,version=version+1,updated_at=?
+          WHERE id=? AND module='detention-collection' AND version=?""",
+          (json.dumps(payload,sort_keys=True),now(),record_id,txr["version"]))
+        if cur.rowcount!=1:raise HTTPException(409,{"code":"OPTIMISTIC_LOCK_CONFLICT"})
+        audit(conn,a,"DETENTION_ANCILLARY_ADD",c["id"],ctx["job_id"],before,payload,{
+          "record_id":record_id,"line_ref":line["line_ref"],"rule_ref":b.rule_ref,"category":category,
+          "commercial_direction":d,"rate_side":rule["rate_side"],"amount":amount,"currency":rule["currency"],
+          "gl_posted":False,"payment_posted":False
+        })
+        conn.execute("COMMIT")
+        return {"ok":True,"record_id":record_id,"detention_ref":txr["external_ref"],"line":line,
+                "gl_posted":False,"payment_posted":False,"screen_count":196}
+    except HTTPException:
+        try:conn.execute("ROLLBACK")
+        except Exception:pass
+        raise
+    finally:conn.close()
+
+@router.delete("/detention/{record_id}/charges/{line_ref}")
+def remove_detention_charge(record_id:int,line_ref:str,x_role:str=Header("OPS"),
+                            x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+                            x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),
+                            x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),
+                            x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
+    conn=connect()
+    try:
+        a=actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(conn)
+        txr,ctx=_detention_context(conn,record_id);c=get_container(conn,ctx["container_no"],a)
+        payload=_detention_payload(txr);lines=_detention_charge_lines(payload)
+        target=next((x for x in lines if x.get("line_ref")==line_ref),None)
+        if not target:raise HTTPException(404,{"code":"DETENTION_CHARGE_LINE_NOT_FOUND","line_ref":line_ref})
+        if target.get("invoice_ref"):raise HTTPException(409,{"code":"INVOICED_CHARGE_CANNOT_BE_REMOVED","line_ref":line_ref})
+        before={**payload};payload["Ancillary Charges"]=[x for x in lines if x.get("line_ref")!=line_ref]
+        cur=conn.execute("""UPDATE transaction_records SET payload_json=?,version=version+1,updated_at=?
+          WHERE id=? AND module='detention-collection' AND version=?""",
+          (json.dumps(payload,sort_keys=True),now(),record_id,txr["version"]))
+        if cur.rowcount!=1:raise HTTPException(409,{"code":"OPTIMISTIC_LOCK_CONFLICT"})
+        audit(conn,a,"DETENTION_ANCILLARY_REMOVE",c["id"],ctx["job_id"],before,payload,{
+          "record_id":record_id,"line_ref":line_ref,"rule_ref":target.get("rule_ref"),
+          "commercial_direction":target.get("commercial_direction"),"gl_posted":False,"payment_posted":False
+        })
+        conn.execute("COMMIT");return {"ok":True,"removed":line_ref,"screen_count":196}
+    except HTTPException:
+        try:conn.execute("ROLLBACK")
+        except Exception:pass
+        raise
     finally:conn.close()
 
 @router.post("/detention/{record_id}/calculate")
@@ -519,7 +647,8 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
         txr,ctx=_detention_context(conn,record_id)
         c=get_container(conn,ctx["container_no"],a)
         if int(c["id"])!=int(ctx["container_id"]):raise HTTPException(409,{"code":"DETENTION_CONTAINER_SCOPE_MISMATCH"})
-        payload=_detention_payload(txr);history=_detention_history(payload);hs=_detention_history_state(history)
+        payload=_detention_payload(txr);direction=_detention_direction(b.commercial_direction);side=_detention_side(direction)
+        prefix=side["prefix"];history=_detention_history(payload,direction);hs=_detention_history_state(history)
         requested_stage=str(b.requested_stage or "AUTO").upper()
         if requested_stage not in {"AUTO","ADVANCE","ONGOING","ACTUAL"}:
             raise HTTPException(422,{"code":"INVALID_DETENTION_STAGE","requested_stage":requested_stage})
@@ -528,125 +657,116 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
         if not gate_out:raise HTTPException(409,{"code":"GATE_OUT_FULL_REQUIRED","container":c["container_no"]})
         start=parse_dt(gate_out)
         if not start:raise HTTPException(409,{"code":"INVALID_GATE_OUT_FULL_TIME","container":c["container_no"]})
-        active_on=start.date().isoformat()
-        ctx["free_time_start"]=gate_out
-        rule=_detention_select_rule(conn,ctx,active_on)
+        active_on=start.date().isoformat();ctx["free_time_start"]=gate_out
+        rule=_detention_select_rule(conn,ctx,active_on,direction)
         if history and any(str(x.get("rule_ref") or "") not in {"",rule["rule_ref"]} for x in history if isinstance(x,dict)):
-            raise HTTPException(409,{"code":"MRG_RULE_CHANGED_DURING_ACTIVE_DETENTION","current_rule":rule["rule_ref"]})
+            raise HTTPException(409,{"code":"MRG_RULE_CHANGED_DURING_ACTIVE_DETENTION","current_rule":rule["rule_ref"],"commercial_direction":direction})
         free_days=int(rule["free_days"] if rule.get("free_days") is not None else (c["free_days"] or 0))
         due=start+datetime.timedelta(days=free_days)
-        actual_return_raw=_detention_event_time(conn,c["id"],"EMPTY_RETURN")
-        actual_return=parse_dt(actual_return_raw)
+        actual_return_raw=_detention_event_time(conn,c["id"],"EMPTY_RETURN");actual_return=parse_dt(actual_return_raw)
 
         if requested_stage=="ACTUAL" and not actual_return:
             raise HTTPException(409,{"code":"EMPTY_RETURN_REQUIRED_FOR_ACTUAL","container":c["container_no"]})
         if actual_return and requested_stage in {"ADVANCE","ONGOING"}:
             raise HTTPException(409,{"code":"EMPTY_RETURN_REQUIRES_ACTUAL","container":c["container_no"],"empty_return":actual_return_raw})
         if requested_stage=="ADVANCE" and history:
-            raise HTTPException(409,{"code":"ADVANCE_ALREADY_STARTED_USE_ONGOING","covered_till":hs["covered_till"]})
+            raise HTTPException(409,{"code":"ADVANCE_ALREADY_STARTED_USE_ONGOING","covered_till":hs["covered_till"],"commercial_direction":direction})
         if requested_stage=="ONGOING" and not history:
-            raise HTTPException(409,{"code":"NO_PRIOR_ADVANCE_USE_ADVANCE"})
+            raise HTTPException(409,{"code":"NO_PRIOR_ADVANCE_USE_ADVANCE","commercial_direction":direction})
 
         requested=parse_dt(b.calculate_till) if b.calculate_till else None
         if b.calculate_till and not requested:raise HTTPException(422,{"code":"INVALID_CALCULATE_TILL"})
-        if actual_return:
-            calc_until=actual_return
-        else:
-            calc_until=requested or utcnow()
+        calc_until=actual_return or requested or utcnow()
         if calc_until<start:raise HTTPException(422,{"code":"CALCULATE_TILL_BEFORE_GATE_OUT"})
-
-        delta=(calc_until-due).total_seconds()
-        total_days=max(0,int((delta+86399)//86400))
+        delta=(calc_until-due).total_seconds();total_days=max(0,int((delta+86399)//86400))
         cumulative_amount,rate=_detention_amount(rule,total_days,c.get("size_type"),payload.get("Container Category"))
-        finance=_detention_finance_summary(conn,txr["external_ref"],ctx["job_id"])
+        finance=_detention_finance_summary(conn,txr["external_ref"],ctx["job_id"]) if direction=="AGENT_TO_CUSTOMER" else {
+          "draft_invoice_amount":0.0,"advance_invoiced":0.0,"final_invoiced":0.0,"total_invoiced":0.0,
+          "credit_adjustment":0.0,"paid_amount":0.0,"outstanding_balance":0.0,"last_payment_date":None,"collection_status":"N/A"
+        }
         is_actual=actual_return is not None
 
         if not is_actual:
             covered=parse_dt(hs["covered_till"]) if hs["covered_till"] else None
             if covered and calc_until<=covered:
-                raise HTTPException(409,{"code":"DETENTION_PERIOD_ALREADY_COVERED","covered_till":hs["covered_till"],"requested_till":dtiso(calc_until)})
+                raise HTTPException(409,{"code":"DETENTION_PERIOD_ALREADY_COVERED","covered_till":hs["covered_till"],
+                                         "requested_till":dtiso(calc_until),"commercial_direction":direction})
             if total_days<hs["total_days"]:
-                raise HTTPException(409,{"code":"DETENTION_DAY_REGRESSION","covered_days":hs["total_days"],"calculated_days":total_days})
-            segment_days=total_days-hs["total_days"]
-            segment_amount=round(max(0.0,cumulative_amount-hs["cumulative_amount"]),2)
+                raise HTTPException(409,{"code":"DETENTION_DAY_REGRESSION","covered_days":hs["total_days"],
+                                         "calculated_days":total_days,"commercial_direction":direction})
+            segment_days=total_days-hs["total_days"];segment_amount=round(max(0.0,cumulative_amount-hs["cumulative_amount"]),2)
             stage="ADVANCE" if not history else "ONGOING"
             prior_till=parse_dt(hs["covered_till"]) if hs["covered_till"] else None
             segment_from=due if not history else ((prior_till+datetime.timedelta(days=1)) if prior_till else due)
-            entry={
-              "sequence":len(history)+1,"stage":stage,"rule_ref":rule["rule_ref"],
-              "rate_group":rule["mrg_type"],"rate":rate,"currency":str(rule.get("currency") or payload.get("Currency") or "USD"),
-              "covered_from":dtiso(segment_from),"covered_till":dtiso(calc_until),
-              "segment_days":segment_days,"segment_amount":segment_amount,
-              "cumulative_days":total_days,"cumulative_amount":cumulative_amount,"calculated_at":now()
-            }
-            history.append(entry)
-            process_status="RUNNING"
-            calculation_stage=stage
-            advance_total=cumulative_amount
-            actual_amount=_detention_num(payload.get("Actual Detention") or payload.get("Actual Amount"))
-            difference=0.0
-            final_due=0.0
-            credit_required=0.0
+            history.append({
+              "sequence":len(history)+1,"stage":stage,"rule_ref":rule["rule_ref"],"rate_group":rule["mrg_type"],
+              "rate":rate,"currency":str(rule.get("currency") or payload.get(prefix+"Currency") or payload.get("Currency") or "USD"),
+              "covered_from":dtiso(segment_from),"covered_till":dtiso(calc_until),"segment_days":segment_days,
+              "segment_amount":segment_amount,"cumulative_days":total_days,"cumulative_amount":cumulative_amount,
+              "commercial_direction":direction,"calculated_at":now()
+            })
+            process_status="RUNNING";calculation_stage=stage;advance_total=cumulative_amount
+            actual_amount=_detention_num(payload.get(prefix+"Actual Detention"));difference=0.0;final_due=0.0;credit_required=0.0
         else:
-            process_status="COMPLETE"
-            calculation_stage="ACTUAL"
-            segment_days=max(0,total_days-hs["total_days"])
-            segment_amount=round(max(0.0,cumulative_amount-hs["cumulative_amount"]),2)
-            advance_total=hs["cumulative_amount"]
-            actual_amount=cumulative_amount
-            prior_invoiced=max(0.0,round(finance["advance_invoiced"]-finance["credit_adjustment"],2))
-            difference=round(actual_amount-prior_invoiced,2)
-            final_due=round(max(0.0,difference),2)
-            credit_required=round(max(0.0,-difference),2)
+            process_status="COMPLETE";calculation_stage="ACTUAL";segment_days=max(0,total_days-hs["total_days"])
+            segment_amount=round(max(0.0,cumulative_amount-hs["cumulative_amount"]),2);advance_total=hs["cumulative_amount"];actual_amount=cumulative_amount
+            if direction=="AGENT_TO_CUSTOMER":
+                prior_applied=max(0.0,round(finance["advance_invoiced"]-finance["credit_adjustment"],2))
+            else:
+                prior_applied=advance_total
+            difference=round(actual_amount-prior_applied,2);final_due=round(max(0.0,difference),2);credit_required=round(max(0.0,-difference),2)
 
-        currency=str(rule.get("currency") or payload.get("Currency") or "USD")
+        currency=str(rule.get("currency") or payload.get(prefix+"Currency") or payload.get("Currency") or "USD")
         fields={
-          "Reference":txr["external_ref"],"Job Ref":ctx["job_ref"],"Container":c["container_no"],
-          "Process Status":process_status,"Calculation Stage":calculation_stage,
-          "Gate-out":gate_out,"Detention Start":dtiso(due),"Empty Return":actual_return_raw or "",
-          "Free Days":free_days,"Previous Advance Till Date":hs["covered_till"] or "",
-          "Next Charge Start Date":dtiso(due if not hs["covered_till"] else ((parse_dt(hs["covered_till"])+datetime.timedelta(days=1)) if parse_dt(hs["covered_till"]) else due)),
-          "Advance Till Date":dtiso(calc_until) if not is_actual else (hs["covered_till"] or ""),
-          "Calculate Till Date":dtiso(calc_until),"Previous Advance Days":hs["total_days"],
-          "Advance Days":segment_days if not is_actual else hs["total_days"],
-          "Ongoing Days":segment_days if calculation_stage=="ONGOING" else 0,
-          "Actual Chargeable Days":total_days if is_actual else 0,"Total Chargeable Days":total_days,
-          "Tariff":rule["rule_ref"],"Tariff Code":rule["charge_code"],"Rate Group":rule["mrg_type"],"Rate":rate,
-          "Currency":currency,"Current Advance Amount":segment_amount if not is_actual else 0,
-          "Advance Detention":round(advance_total,2),"Ongoing Detention":segment_amount if calculation_stage=="ONGOING" else 0,
-          "Actual Detention":round(actual_amount,2),"Difference":difference,
-          "Final / Additional Due":final_due,"Credit / Adjustment Required":credit_required,
-          "Draft Invoice Amount":finance["draft_invoice_amount"],"Advance Invoiced":finance["advance_invoiced"],
-          "Additional / Final Invoiced":finance["final_invoiced"],"Total Invoiced":finance["total_invoiced"],
-          "Paid Amount":finance["paid_amount"],"Credit / Adjustment":finance["credit_adjustment"],
-          "Outstanding Balance":finance["outstanding_balance"],"Last Payment Date":finance["last_payment_date"] or "",
-          "Collection Status":finance["collection_status"],"Advance History":history,
-          "Status":process_status
+          prefix+"Process Status":process_status,prefix+"Calculation Stage":calculation_stage,
+          prefix+"Gate-out":gate_out,prefix+"Detention Start":dtiso(due),prefix+"Empty Return":actual_return_raw or "",
+          prefix+"Free Days":free_days,prefix+"Previous Advance Till Date":hs["covered_till"] or "",
+          prefix+"Next Charge Start Date":dtiso(due if not hs["covered_till"] else ((parse_dt(hs["covered_till"])+datetime.timedelta(days=1)) if parse_dt(hs["covered_till"]) else due)),
+          prefix+"Advance Till Date":dtiso(calc_until) if not is_actual else (hs["covered_till"] or ""),
+          prefix+"Calculate Till Date":dtiso(calc_until),prefix+"Previous Advance Days":hs["total_days"],
+          prefix+"Advance Days":segment_days if not is_actual else hs["total_days"],
+          prefix+"Ongoing Days":segment_days if calculation_stage=="ONGOING" else 0,
+          prefix+"Actual Chargeable Days":total_days if is_actual else 0,prefix+"Total Chargeable Days":total_days,
+          prefix+"Tariff":rule["rule_ref"],prefix+"Tariff Code":rule["charge_code"],prefix+"Rate Group":rule["mrg_type"],prefix+"Rate":rate,
+          prefix+"Currency":currency,prefix+"Current Advance Amount":segment_amount if not is_actual else 0,
+          prefix+"Advance Detention":round(advance_total,2),prefix+"Ongoing Detention":segment_amount if calculation_stage=="ONGOING" else 0,
+          prefix+"Actual Detention":round(actual_amount,2),prefix+"Difference":difference,
+          prefix+"Final / Additional Due":final_due,prefix+"Credit / Adjustment Required":credit_required,
+          side["history_key"]:history
         }
+        if direction=="AGENT_TO_CUSTOMER":
+            fields.update({
+              "Reference":txr["external_ref"],"Job Ref":ctx["job_ref"],"Container":c["container_no"],
+              "Draft Invoice Amount":finance["draft_invoice_amount"],"Advance Invoiced":finance["advance_invoiced"],
+              "Additional / Final Invoiced":finance["final_invoiced"],"Total Invoiced":finance["total_invoiced"],
+              "Paid Amount":finance["paid_amount"],"Credit / Adjustment":finance["credit_adjustment"],
+              "Outstanding Balance":finance["outstanding_balance"],"Last Payment Date":finance["last_payment_date"] or "",
+              "Collection Status":finance["collection_status"],"Status":process_status
+            })
         before={**payload};payload.update(fields)
+        db_status=process_status if direction=="AGENT_TO_CUSTOMER" else txr["status"]
         cur=conn.execute("""UPDATE transaction_records SET payload_json=?,status=?,version=version+1,updated_at=?
           WHERE id=? AND module='detention-collection' AND version=?""",
-          (json.dumps(payload,sort_keys=True),process_status,now(),record_id,txr["version"]))
+          (json.dumps(payload,sort_keys=True),db_status,now(),record_id,txr["version"]))
         if cur.rowcount!=1:raise HTTPException(409,{"code":"OPTIMISTIC_LOCK_CONFLICT"})
         audit(conn,a,"DETENTION_CALCULATE",c["id"],ctx["job_id"],before,payload,{
           "record_id":record_id,"rule_ref":rule["rule_ref"],"mrg_type":rule["mrg_type"],
-          "rate_side":"REVENUE","calculation_stage":calculation_stage,"process_status":process_status,
-          "segment_days":segment_days,"total_chargeable_days":total_days,"segment_amount":segment_amount,
-          "actual_amount":actual_amount,"advance_invoiced":finance["advance_invoiced"],
+          "commercial_direction":direction,"rate_side":side["rate_side"],"calculation_stage":calculation_stage,
+          "process_status":process_status,"segment_days":segment_days,"total_chargeable_days":total_days,
+          "segment_amount":segment_amount,"actual_amount":actual_amount,
+          "advance_invoiced":finance["advance_invoiced"] if direction=="AGENT_TO_CUSTOMER" else None,
           "difference":difference,"currency":currency,"gl_posted":False,"payment_posted":False
         })
         conn.execute("COMMIT")
-        return {"ok":True,"record_id":record_id,"detention_ref":txr["external_ref"],
-                "process_status":process_status,"stage":calculation_stage,"rule_ref":rule["rule_ref"],
-                "mrg_type":rule["mrg_type"],"free_days":free_days,"gate_out":gate_out,
-                "detention_start":dtiso(due),"previous_advance_till":hs["covered_till"],
-                "calculate_till":dtiso(calc_until),"empty_return":actual_return_raw,
-                "advance_days":segment_days if not is_actual else hs["total_days"],
+        return {"ok":True,"record_id":record_id,"detention_ref":txr["external_ref"],"commercial_direction":direction,
+                "rate_side":side["rate_side"],"process_status":process_status,"stage":calculation_stage,
+                "rule_ref":rule["rule_ref"],"mrg_type":rule["mrg_type"],"free_days":free_days,"gate_out":gate_out,
+                "detention_start":dtiso(due),"previous_advance_till":hs["covered_till"],"calculate_till":dtiso(calc_until),
+                "empty_return":actual_return_raw,"advance_days":segment_days if not is_actual else hs["total_days"],
                 "ongoing_days":segment_days if calculation_stage=="ONGOING" else 0,
                 "actual_chargeable_days":total_days if is_actual else 0,"total_chargeable_days":total_days,
-                "rate":rate,"currency":currency,"segment_amount":segment_amount,
-                "advance":round(advance_total,2),"actual":round(actual_amount,2),
-                "difference":difference,"final_due":final_due,"credit_required":credit_required,
+                "rate":rate,"currency":currency,"segment_amount":segment_amount,"advance":round(advance_total,2),
+                "actual":round(actual_amount,2),"difference":difference,"final_due":final_due,"credit_required":credit_required,
                 "finance":finance,"gl_posted":False,"payment_posted":False,"screen_count":196}
     except HTTPException:
         try:conn.execute("ROLLBACK")
