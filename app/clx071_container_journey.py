@@ -456,6 +456,13 @@ def _detention_insert_segment(conn,*,txr,ctx,a,detention_ref,direction,stage,seq
       "calculated_at":now(),"calculated_by":a["user"],"calculation_ref":calculation_ref
     }
     values["calculation_hash"]=_detention_segment_hash(values)
+    collision=conn.execute("""SELECT transaction_id,commercial_direction FROM detention_segments
+      WHERE detention_ref=? AND (transaction_id<>? OR commercial_direction<>?) LIMIT 1""",
+      (detention_ref,txr["id"],direction)).fetchone()
+    if collision:
+        raise HTTPException(409,{"code":"DETENTION_REF_DIRECTION_COLLISION","detention_ref":detention_ref,
+                                 "transaction_id":collision["transaction_id"],
+                                 "commercial_direction":collision["commercial_direction"]})
     cur=conn.execute("""INSERT INTO detention_segments(
       segment_ref,calculation_ref,transaction_id,job_id,container_id,detention_ref,commercial_direction,stage,sequence,
       covered_from,covered_till,segment_days,cumulative_days,segment_amount,cumulative_amount,cumulative_base_amount,
