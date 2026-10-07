@@ -806,9 +806,13 @@ function detentionSelectedProcessDetail(){
       clx82DerivedField('Tariff Code',v('Tariff Code','Tariff'))+
       clx82DerivedField('Currency',v('Currency'))+
       clx82DerivedField('FX Rate',v('FX Rate','Ex. Rate','Exchange Rate'))+
-      clx82DerivedField('Advance Detention',detentionMoney(advance,detentionValue(r,'Currency'))) +
-      clx82DerivedField('Actual Detention',detentionMoney(actual,detentionValue(r,'Currency'))) +
-      clx82DerivedField('Difference',detentionMoney(difference,detentionValue(r,'Currency'))) +
+      clx82DerivedField('Current Advance',detentionMoney(detentionNum(r,'Current Advance Amount'),curr))+
+      clx82DerivedField('Advance Detention',detentionMoney(advance,curr))+
+      clx82DerivedField('Ongoing Detention',detentionMoney(detentionNum(r,'Ongoing Detention'),curr))+
+      clx82DerivedField('Actual Detention',detentionMoney(actual,curr))+
+      clx82DerivedField('Difference',detentionMoney(difference,curr))+
+      clx82DerivedField('Final / Additional Due',detentionMoney(detentionNum(r,'Final / Additional Due'),curr))+
+      clx82DerivedField('Credit / Adjustment Required',detentionMoney(detentionNum(r,'Credit / Adjustment Required'),curr))+
       clx82DerivedField('Status',v('Status','status'))+
     '</div>'+
     '<div class="formActions">'+
