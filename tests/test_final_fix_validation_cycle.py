@@ -8,6 +8,7 @@ from app.masterdata_seed import run as masterdata_seed_run
 from app.admin import Login, login
 from app.screen_catalog import build_catalog
 from app.screen_integration import action_route, events, field_contract, navigation_event, quick_actions, related, screen_data
+import app.bulk_permission_governance as permission_gov
 
 ROOT=Path(__file__).resolve().parents[1]
 HTML=(ROOT/"web/index.html").read_text(encoding="utf-8")
@@ -19,6 +20,13 @@ MUTATIONS={"create","edit","copy","approve","release","hold","cancel","amend","r
 def isolated(tmp_path,monkeypatch):
     monkeypatch.setattr(db,"DB_PATH",tmp_path/"final_frontend_audit.db")
     seed_run(True); admin_seed_run(); masterdata_seed_run()
+    c=db.connect()
+    try:
+        for jr in ('50001','50002','50003','50004','50005'):
+            permission_gov.resolve_job_scope(c,jr,persist=True)
+        c.commit()
+    finally:
+        c.close()
     return db.DB_PATH
 
 def test_verified_frontend_race_filter_viewer_and_status_fixes_are_present():
