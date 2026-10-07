@@ -49,7 +49,7 @@ def test_detention_process_and_collection_are_distinct_existing_frontend_stages(
     assert "Detention Collection" in HTML
     assert "Sale Invoice Detention" in HTML  # existing catalog alias is presentation-normalized at init
     assert "Create Draft Invoice → Finance" in HTML
-    assert "Receivable / follow-up stage only" in HTML
+    assert "Receivable / follow-up stage for Agent → Customer only." in HTML
     assert "Operational calculation stage only" in HTML
     assert "agent-tasks::detention-collection" in HTML
     assert "gl-accounts::invoice" in HTML
