@@ -286,7 +286,16 @@ def _detention_context(conn,record_id):
     if not container:raise HTTPException(409,{"code":"DETENTION_CONTAINER_REQUIRED","record_id":record_id})
     c=dict(container)
     direction=str(payload.get("Direction") or payload.get("Import / Export") or payload.get("Movement Type") or "").upper()
-    ctx={**d,**c,"payload":payload,"container_no":c.get("container_no"),"direction":direction}
+    ctx={
+      "transaction_id":d["id"],"job_id":d["job_id"],"job_ref":d["job_ref"],"booking_ref":d["booking_ref"],
+      "pol":d["pol"],"pod":d["pod"],"office_code":d.get("office_code"),"branch_code":d.get("branch_code"),
+      "organization_code":d.get("organization_code"),"customer_code":d.get("customer_code"),
+      "agent_code":d.get("agent_code"),"container_id":c["id"],"container_no":c.get("container_no"),
+      "size_type":c.get("size_type"),"container_type":payload.get("Container Category"),
+      "depot_code":c.get("depot_code"),"owner_party_code":c.get("owner_party_code"),
+      "principal_code":c.get("principal_code"),"custody_agent_code":c.get("agent_code"),
+      "payload":payload,"direction":direction
+    }
     return txr,ctx
 
 def _detention_event_time(conn,container_id,event_type):
@@ -306,7 +315,7 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
         a=actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(conn)
         txr,ctx=_detention_context(conn,record_id)
         c=get_container(conn,ctx["container_no"],a)
-        if int(c["id"])!=int(ctx["id"]):ctx.update(dict(c))
+        if int(c["id"])!=int(ctx["container_id"]):raise HTTPException(409,{"code":"DETENTION_CONTAINER_SCOPE_MISMATCH"})
         payload=_detention_payload(txr)
         gate_out=_detention_event_time(conn,c["id"],"GATE_OUT_FULL") or c["free_time_start"]
         if not gate_out:raise HTTPException(409,{"code":"GATE_OUT_FULL_REQUIRED","container":c["container_no"]})
