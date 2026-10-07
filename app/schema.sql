@@ -16,6 +16,7 @@ CREATE INDEX IF NOT EXISTS idx_tx_agent ON transaction_records(agent_id);
 CREATE TABLE IF NOT EXISTS detention_segments(
  id INTEGER PRIMARY KEY,
  segment_ref TEXT NOT NULL UNIQUE,
+ calculation_ref TEXT NOT NULL,
  transaction_id INTEGER NOT NULL REFERENCES transaction_records(id) ON DELETE CASCADE,
  job_id INTEGER NOT NULL REFERENCES jobs(id),
  container_id INTEGER NOT NULL REFERENCES containers(id),
@@ -52,6 +53,7 @@ CREATE TABLE IF NOT EXISTS detention_segments(
  UNIQUE(transaction_id,commercial_direction,stage,covered_from,covered_till,rule_ref,tariff_version)
 );
 CREATE INDEX IF NOT EXISTS idx_detention_segments_tx_direction ON detention_segments(transaction_id,commercial_direction,sequence);
+CREATE INDEX IF NOT EXISTS idx_detention_segments_calculation ON detention_segments(calculation_ref,sequence);
 CREATE INDEX IF NOT EXISTS idx_detention_segments_container ON detention_segments(container_id,commercial_direction,covered_till);
 CREATE TABLE IF NOT EXISTS audit_events(id INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, actor_role TEXT NOT NULL, actor_scope TEXT, action TEXT NOT NULL, module TEXT, transaction_id INTEGER, job_id INTEGER REFERENCES jobs(id), before_json TEXT, after_json TEXT, metadata_json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS exception_events(id INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, code TEXT NOT NULL, severity TEXT NOT NULL, module TEXT, transaction_id INTEGER, job_id INTEGER REFERENCES jobs(id), detail TEXT NOT NULL, resolved INTEGER NOT NULL DEFAULT 0);
