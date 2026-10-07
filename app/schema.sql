@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS detention_segments(
  cumulative_days INTEGER NOT NULL CHECK(cumulative_days>=0),
  segment_amount REAL NOT NULL CHECK(segment_amount>=0),
  cumulative_amount REAL NOT NULL CHECK(cumulative_amount>=0),
+ cumulative_base_amount REAL NOT NULL CHECK(cumulative_base_amount>=0),
  document_currency TEXT NOT NULL,
  fx_rate REAL NOT NULL CHECK(fx_rate>0),
  fx_rate_date TEXT NOT NULL,
