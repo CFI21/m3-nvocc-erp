@@ -778,7 +778,8 @@ function detentionSelectedProcessDetail(){
   const v=(...k)=>esc(detentionValue(r,...k)||'—');
   const advance=detentionNum(r,'Advance Detention','advance_detention','Advance Amount');
   const actual=detentionNum(r,'Actual Detention','actual_detention','Actual Amount');
-  const difference=actual-advance;
+  const difference=detentionNum(r,'Difference')||(actual-advance);
+  const curr=detentionValue(r,'Currency')||'';
   return '<div class="clx82Section"><div class="clx82Head">Advance / Actual Detention Detail · '+v('Reference','external_ref')+'</div><div class="clx82Body">'+
     '<div class="clx82Grid">'+
       clx82DerivedField('Job #',v('Job Ref','job_ref'))+
