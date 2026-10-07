@@ -3,9 +3,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import Any, Optional
-import datetime, json, uuid
+import datetime, json, uuid, hashlib
 
-from .db import connect, tx
+from .db import connect, tx, table_exists
 from .clx070_container_master_control import actor, require_action, get_container, audit, scope_clause, now
 from .mrg import ensure as ensure_mrg
 
