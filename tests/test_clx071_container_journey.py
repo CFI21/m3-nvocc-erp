@@ -58,3 +58,113 @@ def test_manifest_keeps_production_locked():
 def test_exception_decision_enforces_container_custody_scope():
     src=Path("app/clx071_container_journey.py").read_text()
     assert 'get_container(conn,e["container_no"],a)' in src
+
+
+def test_detention_calculation_endpoint_is_same_clx071_engine():
+    import app.main as main
+    paths=set(main.app.openapi()["paths"])
+    assert "/api/clx071/journey/detention/{record_id}/calculate" in paths
+
+
+def test_detention_amount_reuses_mrg_rate_and_slabs():
+    from app.clx071_container_journey import _detention_amount
+    rule={"rule_ref":"R1","rate_basis":"PER_DAY","unit_rate":12,"minimum_rate":None,"maximum_rate":None,"slab_wise":0,"slabs":[]}
+    amount,rate=_detention_amount(rule,5,"40HC",None)
+    assert amount==60
+    assert rate==12
+    slab={"rule_ref":"R2","slab_wise":1,"slabs":[
+      {"from_day":1,"till_day":3,"rate":10,"size_type":"40HC","container_type":None},
+      {"from_day":4,"till_day":None,"rate":15,"size_type":"40HC","container_type":None},
+    ]}
+    amount,rate=_detention_amount(slab,5,"40HC",None)
+    assert amount==60
+    assert rate==12
+
+
+def test_detention_process_frontend_binds_existing_screen_to_server_engine():
+    html=Path("web/index.html").read_text()
+    assert "function renderDetentionProcess" in html
+    assert "function renderDetentionCollection" in html
+    assert "runDetentionCalculation" in html
+    assert "/api/clx071/journey/detention/" in html
+    assert "Create Draft Invoice → Finance" in html
+    assert "No payment or GL posting" in html
+
+
+def test_running_detention_advance_ongoing_actual_contract():
+    import app.main as main
+    paths=set(main.app.openapi()["paths"])
+    assert "/api/clx071/journey/detention/{record_id}/calculate" in paths
+    assert "/api/clx071/journey/detention/{record_id}/summary" in paths
+
+    from app.clx071_container_journey import _detention_history_state
+    h=[
+      {"cumulative_days":5,"cumulative_amount":50,"covered_till":"2026-10-20T00:00:00+00:00"},
+      {"cumulative_days":8,"cumulative_amount":80,"covered_till":"2026-10-23T00:00:00+00:00"},
+    ]
+    s=_detention_history_state(h)
+    assert s["total_days"]==8
+    assert s["cumulative_amount"]==80
+    assert s["covered_till"].startswith("2026-10-23")
+
+
+def test_detention_process_ui_has_running_advance_ongoing_actual_actions():
+    html=Path("web/index.html").read_text()
+    for marker in [
+      "Calculate Advance","Recalculate Ongoing","Calculate Actual",
+      "Previous Advance Till","Advance / Calculate Till","Ongoing Days",
+      "Actual Chargeable Days","Total Chargeable Days",
+      "Advance / Ongoing Period History","Finance / Collection · Read Only",
+      "/api/clx071/journey/detention/"
+    ]:
+        assert marker in html
+    assert "Create Draft Invoice → Finance" in html
+    assert "Open Detention Collection" in html
+    assert "Open Invoice / AR" in html
+
+
+def test_detention_principal_agent_customer_and_charge_tabs_contract():
+    import app.main as main
+    paths=set(main.app.openapi()["paths"])
+    assert "/api/clx071/journey/detention/{record_id}/calculate" in paths
+    assert "/api/clx071/journey/detention/{record_id}/summary" in paths
+    assert "/api/clx071/journey/detention/{record_id}/charge-options" in paths
+    assert "/api/clx071/journey/detention/{record_id}/charges" in paths
+    assert "/api/clx071/journey/detention/{record_id}/charges/{line_ref}" in paths
+
+    from app.clx071_container_journey import (
+        _detention_side,_detention_charge_category,_detention_charge_amount,_detention_is_reefer
+    )
+    assert _detention_side("AGENT_TO_CUSTOMER")["rate_side"]=="REVENUE"
+    assert _detention_side("PRINCIPAL_TO_AGENT")["rate_side"]=="COST"
+    assert _detention_charge_category({"mrg_type":"GENERAL","charge_code":"PLUGIN","charge_type":"","party_type":"CUSTOMER"})=="PLUGIN"
+    assert _detention_charge_category({"mrg_type":"GENERAL","charge_code":"THC","charge_type":"","party_type":"CUSTOMER"})=="PORT"
+    assert _detention_charge_category({"mrg_type":"GENERAL","charge_code":"DOC","charge_type":"","party_type":"CUSTOMER"})=="OTHER"
+    assert _detention_charge_category({"mrg_type":"DETENTION","charge_code":"THC","charge_type":"","party_type":"AGENT"})=="DETENTION"
+    amount,rate=_detention_charge_amount({"rule_ref":"X","rate_basis":"PER_DAY","unit_rate":7,"minimum_rate":None,"maximum_rate":None},3)
+    assert amount==21 and rate==7
+    assert _detention_is_reefer({"size_type":"40RF","container_type":"","cargo_type":""}) is True
+    assert _detention_is_reefer({"size_type":"40HC","container_type":"DRY","cargo_type":""}) is False
+
+
+def test_detention_existing_screen_has_commercial_direction_and_subcharge_tabs():
+    html=Path("web/index.html").read_text()
+    for marker in [
+      "Principal → Agent · Cost","Agent → Customer · Revenue",
+      "Detention / Demurrage","Plug-in","Port Charges","Other Charges",
+      "Apply / Refresh Tariff","Add Charge",
+      "PLUGIN_REQUIRES_REEFER",
+      "Create Draft Invoice → Finance",
+      "Open Principal Bill / AP","Open Principal / Agent SOA",
+    ]:
+        assert marker in html or marker in Path("app/clx071_container_journey.py").read_text()
+    assert "commercial_direction:detentionCommercialDirection" in html
+    assert "No payment or GL posting" in html
+
+
+def test_no_new_detention_table_or_parallel_rate_engine():
+    src=Path("app/clx071_container_journey.py").read_text()
+    assert "CREATE TABLE" not in src[src.index("def _detention_payload"):src.index("def scope_container_query")]
+    assert "mrg_rules" in src
+    assert "Ancillary Charges" in src
+    assert "DETENTION_ANCILLARY_ADD" in src

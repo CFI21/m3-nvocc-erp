@@ -141,6 +141,7 @@ function domainSlug(d){return d.toLowerCase().replace(/\s*\/\s*/g,'-').replace(/
 function saveState(){localStorage.setItem('m3clx011-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('m3clx011-recent',JSON.stringify(state.recent.slice(0,15)))}
 function toggleGroup(id){let x=document.querySelector(`[data-content="${CSS.escape(id)}"]`);if(x)x.classList.toggle('collapse')}
 function screenAllowed(s){let r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;return !Array.isArray(s.roles)||!s.roles.length||s.roles.includes(r)}
+function screenDisplayName(id){if(id==='master-data::equipment-types')return 'Equipment Size & Type';if(id==='master-data::container-types')return 'Container Category';return state.byId[id]?.name||id}
 function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';
 const businessGroups=state.businessNavigation?.groups||[];
 let businessSub='',businessCount=0;
@@ -152,7 +153,7 @@ for(const group of businessGroups){
   businessSub+='<button class="subBtn" onclick="toggleGroup(\''+sid+'\')">▾ '+esc(group.name)+' <span class=count>'+items.length+'</span></button><div data-content="'+esc(sid)+'">'+items.map(it=>'<div class="screenLink '+(state.navContext?.label===it.label?'active':'')+'" onclick="'+(it.workspace_key?'openPrincipalWorkspace(\''+String(it.workspace_key).replaceAll("'","\\'")+'\',\''+it.label.replaceAll("'","\\'")+'\',\''+it.target.replaceAll("'","\\'")+'\',\''+group.name.replaceAll("'","\\'")+'\')':'openScreen(\''+it.target.replaceAll("'","\\'")+'\',{domain:\'Business Navigation\',submenu:\''+group.name.replaceAll("'","\\'")+'\',label:\''+it.label.replaceAll("'","\\'")+'\'})')+'">'+esc(it.label)+'</div>').join('')+'</div>';
 }
 if(businessCount)html+='<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup(\'business-navigation\')">▾ Business Navigation <span class=count>'+businessCount+'</span></button><div data-content="business-navigation">'+businessSub+'</div></div>';
-for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];let terms=s?[s.name,s.submenu,s.domain,s.key,s.screen_id,...(s.search_terms||[])]:[];return s&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);let terms=[it.label,sub.name,d.domain,...(it.search_terms||[]),...(s?.search_terms||[])];return s&&aliasOk&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(state.byId[id].name)}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'){
+for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submenus){let ids=(sub.screens||[]).filter(id=>{let s=state.byId[id];let terms=s?[s.name,s.submenu,s.domain,s.key,s.screen_id,...(s.search_terms||[])]:[];return s&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});let items=(sub.items||[]).filter(it=>{let s=state.byId[it.target],r=state.role==='SUPER_ADMIN'?'ADMIN':state.role,aliasOk=!Array.isArray(it.roles)||!it.roles.length||it.roles.includes(r);let terms=[it.label,sub.name,d.domain,...(it.search_terms||[]),...(s?.search_terms||[])];return s&&aliasOk&&screenAllowed(s)&&(!q||terms.some(x=>String(x||'').toLowerCase().includes(q)))});if(!ids.length&&!items.length)continue;dcount+=ids.length+items.length;let sid=domainSlug(d.domain+'-'+sub.name);let normal=ids.map(id=>`<div class="screenLink ${state.current?.screen_id===id&&!state.navContext?'active':''}" data-screen="${esc(id)}" onclick="openScreen('${id.replaceAll("'","\'")}')">${esc(screenDisplayName(id))}</div>`).join('');let aliases=items.map(it=>`<div class="screenLink ${state.navContext?.label===it.label?'active':''}" data-screen="${esc(it.target)}" onclick="openScreen('${it.target.replaceAll("'","\'")}',{domain:'${d.domain.replaceAll("'","\'")}',submenu:'${sub.name.replaceAll("'","\'")}',label:'${it.label.replaceAll("'","\'")}'})">${esc(it.label)}</div>`).join('');subHtml+=`<button class="subBtn" onclick="toggleGroup('${sid}')">▾ ${esc(sub.name)} <span class=count>${ids.length+items.length}</span></button><div data-content="${esc(sid)}">${normal}${aliases}</div>`}if(d.domain==='HO Tasks'){
   const hoSetupAliases=[
     {label:'Carriers',target:'master-data::carriers'},
     {label:'Charges',target:'master-data::charge-codes'},
@@ -176,7 +177,6 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
     {label:'Sub Company',target:'administration::legal-entities'},
     {label:'Currency File',target:'master-data::currencies'},
     {label:'Route Planning',target:'master-data::routes'},
-    {label:'Container Coding',equipment:'containers',gate:'agent-tasks::container-activity'},
     {label:'Demurrage Applicable Countries',workspace:'demurrage-countries',target:'master-data::configurations'},
     {label:'Detention Applicable Cities',workspace:'detention-cities',target:'master-data::configurations'},
     {label:'Activity Sequence',workspace:'activity-sequence',target:'agent-tasks::container-activity'},
@@ -221,16 +221,17 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
       }).join('')+'</div>';
     dcount+=visibleSetup.length;
   }
-  const equipmentTerms='global equipment tower equipment control container master network position reposition lease control depot m&r equipment kpi';
+  const equipmentTerms='global equipment tower equipment control container master equipment size type container category network position reposition lease control depot m&r equipment kpi';
   if(!q||equipmentTerms.includes(q)){
-    subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-equipment-control\')">▾ Equipment Control <span class=count>6</span></button><div data-content="ho-equipment-control">'+
+    subHtml+='<button class="subBtn" onclick="toggleGroup(\'ho-equipment-control\')">▾ Equipment Control <span class=count>7</span></button><div data-content="ho-equipment-control">'+
       '<div class="screenLink '+(state.equipmentView==='tower'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'tower\')">Global Equipment Tower</div>'+
       '<div class="screenLink '+(state.equipmentView==='containers'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'containers\')">Container Master</div>'+
+      '<div class="screenLink '+(state.current?.screen_id==='master-data::equipment-types'&&state.navContext?.submenu==='Equipment Control'?'active':'')+'" onclick="openScreen(\'master-data::equipment-types\',{domain:\'HO Tasks\',submenu:\'Equipment Control\',label:\'Equipment Size & Type\'})">Equipment Size & Type</div>'+
       '<div class="screenLink '+(state.equipmentView==='network'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'network\')">Network Position & Reposition</div>'+
       '<div class="screenLink '+(state.equipmentView==='lease'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'lease\')">Lease Control</div>'+
       '<div class="screenLink '+(state.equipmentView==='mr'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'mr\')">Depot / M&R</div>'+
       '<div class="screenLink '+(state.equipmentView==='kpi'&&!state.navContext?'active':'')+'" onclick="showEquipmentWorkspace(\'kpi\')">Equipment KPI</div></div>';
-    dcount+=6;
+    dcount+=7;
   }
 }
 if(!dcount)continue;let did=domainSlug(d.domain);html+=`<div class="menuBlock"><button class="domainBtn" onclick="toggleGroup('${did}')">▾ ${esc(d.domain)} <span class=count>${dcount}</span></button><div data-content="${esc(did)}">${subHtml}</div></div>`}  $('nav').innerHTML=html}
@@ -677,6 +678,333 @@ async function renderHoInvestorSetup(){
 function renderBreadcrumb(){let s=state.current,n=state.navContext;if(n){$('breadcrumb').textContent=`M3 NVOCC ERP / ${n.domain} / ${n.submenu} / ${n.label}`;$('topTitle').textContent=n.label;$('pageTitle').textContent=n.label;document.title=`M3 NVOCC ERP — ${n.label}`}else{$('breadcrumb').textContent=`M3 NVOCC ERP / ${s.domain} / ${s.submenu} / ${s.name}`;$('topTitle').textContent=s.name;$('pageTitle').textContent=s.name;document.title=`M3 NVOCC ERP — ${s.name}`}$('favorite').textContent=state.favorites.has(s.screen_id)?'★':'☆';$('favorite').classList.toggle('on',state.favorites.has(s.screen_id))}
 function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,15);saveState()}
 function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);let i=same.findIndex(s=>s.screen_id===state.current.screen_id);return same[i+dir]?.screen_id||null}
+
+
+let detentionCommercialDirection='PRINCIPAL_TO_AGENT';
+let detentionChargeTab='DETENTION';
+let detentionLiveState={summary:null,options:[],lines:[]};
+
+function detentionMode(){
+  if(state.current?.key!=='detention-collection')return '';
+  return state.navContext?.label==='Detention Process'?'process':'collection';
+}
+function openDetentionMode(mode){
+  const ctx=mode==='process'
+    ?{domain:'HO Tasks',submenu:'Transaction',label:'Detention Process'}
+    :{domain:'HO Tasks',submenu:'Utilities',label:'Detention Collection'};
+  return openScreen('agent-tasks::detention-collection',ctx);
+}
+function detentionValue(r,...keys){
+  const p=rowPayload(r);
+  for(const k of keys){
+    const v=r?.[k]??p?.[k];
+    if(v!==undefined&&v!==null&&String(v)!=='')return v;
+  }
+  return '';
+}
+function detentionNum(r,...keys){
+  const n=Number(String(detentionValue(r,...keys)||0).replaceAll(',',''));
+  return Number.isFinite(n)?n:0;
+}
+function detentionMoney(n,c=''){
+  const x=Number(n||0);
+  return (c?esc(c)+' ':'')+x.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function detentionDirectionLabel(){
+  return detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?'Principal → Agent':'Agent → Customer';
+}
+function detentionSidePrefix(){return detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?'Principal ':''}
+function detentionSideValue(r,key,...fallback){
+  const p=detentionSidePrefix();
+  return detentionValue(r,p+key,...fallback);
+}
+function detentionSideNum(r,key,...fallback){
+  const p=detentionSidePrefix();
+  return detentionNum(r,p+key,...fallback);
+}
+function setDetentionCommercialDirection(v){
+  detentionCommercialDirection=v;
+  detentionChargeTab='DETENTION';
+  detentionLiveState={summary:null,options:[],lines:[]};
+  if(detentionMode()==='process')renderDetentionProcess();
+}
+function setDetentionChargeTab(v){
+  detentionChargeTab=v;
+  const el=$('detChargePanel');if(el)el.innerHTML=detentionChargePanelHtml();
+}
+function detentionCurrentHistory(r=state.selected){
+  const p=rowPayload(r),k=detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?'Principal Advance History':'Advance History';
+  return Array.isArray(p[k])?p[k]:[];
+}
+function detentionHistoryHtml(history){
+  if(!history?.length)return '<div class="equipNote">No advance detention period has been calculated yet for '+esc(detentionDirectionLabel())+'.</div>';
+  return '<div class="tablewrap"><table><thead><tr><th>#</th><th>Stage</th><th>Covered From</th><th>Covered Till</th><th>Days</th><th>Amount</th><th>Currency</th><th>Tariff</th></tr></thead><tbody>'+
+    history.map(x=>'<tr><td>'+esc(x.sequence||'')+'</td><td>'+esc(x.stage||'')+'</td><td>'+esc(x.covered_from||'')+'</td><td>'+esc(x.covered_till||'')+'</td><td>'+esc(x.segment_days??'')+'</td><td>'+detentionMoney(x.segment_amount||0,x.currency||'')+'</td><td>'+esc(x.currency||'')+'</td><td>'+esc(x.rule_ref||'')+'</td></tr>').join('')+
+    '</tbody></table></div>';
+}
+function detentionFinanceHtml(s){
+  if(detentionCommercialDirection==='PRINCIPAL_TO_AGENT'){
+    return '<div class="clx82Section"><div class="clx82Head">Principal → Agent Settlement</div><div class="clx82Body">'+
+      '<div class="equipNote">This is the COST side. Detention Process calculates the principal/agent exposure only. Bills, principal/agent SOA, payment and GL remain in the existing Finance / SOA governance.</div>'+
+      '<div class="formActions"><button class="btn" onclick="openScreen(\'gl-accounts::bills\')">Open Bills / AP</button><button class="btn" onclick="openScreen(\'agent-tasks::soa\')">Open Principal / Agent SOA</button></div>'+
+    '</div></div>';
+  }
+  const f=s?.finance||{};
+  return '<div class="clx82Section"><div class="clx82Head">Agent → Customer Finance / Collection · Read Only</div><div class="clx82Body"><div class="equipGrid">'+
+    '<div class="equipKpi">Advance Invoiced<b>'+detentionMoney(f.advance_invoiced||0,f.currency||'')+'</b></div>'+
+    '<div class="equipKpi">Final Invoiced<b>'+detentionMoney(f.final_invoiced||0,f.currency||'')+'</b></div>'+
+    '<div class="equipKpi">Paid<b>'+detentionMoney(f.paid_amount||0,f.currency||'')+'</b></div>'+
+    '<div class="equipKpi">Balance<b>'+detentionMoney(f.outstanding_balance||0,f.currency||'')+'</b></div></div>'+
+    '<div class="clx82Grid">'+clx82DerivedField('Draft Invoice Amount',detentionMoney(f.draft_invoice_amount||0,f.currency||''))+
+    clx82DerivedField('Total Invoiced',detentionMoney(f.total_invoiced||0,f.currency||''))+
+    clx82DerivedField('Credit / Adjustment',detentionMoney(f.credit_adjustment||0,f.currency||''))+
+    clx82DerivedField('Last Payment Date',esc(f.last_payment_date||'—'))+
+    clx82DerivedField('Collection Status',esc(f.collection_status||'NOT INVOICED'))+'</div>'+
+    '<div class="equipNote">Customer payment is read from existing Finance / Treasury receipt allocations only. No payment or GL posting is available from Detention Process.</div></div></div>';
+}
+async function runDetentionCalculation(stage='AUTO'){
+  if(!state.selected?.id){alert('Select a detention process record first.');return}
+  try{
+    const calculateTill=$('detProcessDate')?.value||null;
+    const r=await equipmentApi('/api/clx071/journey/detention/'+encodeURIComponent(state.selected.id)+'/calculate',{
+      method:'POST',body:JSON.stringify({calculate_till:calculateTill,requested_stage:stage,commercial_direction:detentionCommercialDirection})
+    });
+    const label=r.stage==='ACTUAL'?'Actual':(r.stage==='ONGOING'?'Ongoing':'Advance');
+    const amount=r.stage==='ACTUAL'?Number(r.actual||0):Number(r.segment_amount||0);
+    alert(detentionDirectionLabel()+' · '+label+' detention calculated: '+r.currency+' '+amount.toFixed(2)+' · '+r.total_chargeable_days+' chargeable day(s) · '+r.rule_ref);
+    await openScreen(state.current.screen_id,state.navContext);
+  }catch(e){alert('Detention calculation blocked: '+e.message)}
+}
+async function loadDetentionChargeOptions(){
+  if(!state.selected?.id)return;
+  try{
+    const d=await equipmentApi('/api/clx071/journey/detention/'+encodeURIComponent(state.selected.id)+'/charge-options?commercial_direction='+encodeURIComponent(detentionCommercialDirection));
+    detentionLiveState.options=d.options||[];detentionLiveState.lines=d.lines||[];
+    if(detentionChargeTab==='PLUGIN'&&!d.reefer)detentionChargeTab='DETENTION';
+    const el=$('detChargePanel');if(el)el.innerHTML=detentionChargePanelHtml();
+  }catch(e){
+    const el=$('detChargePanel');if(el)el.innerHTML='<div class="card badtext">Charge options unavailable: '+esc(e.message)+'</div>';
+  }
+}
+async function addDetentionCharge(){
+  if(!state.selected?.id)return alert('Select a detention process record first.');
+  const rule=$('detChargeRule')?.value,qty=Number($('detChargeQty')?.value||1),remarks=$('detChargeRemarks')?.value||'';
+  if(!rule)return alert('Select an approved tariff / charge first.');
+  if(!(qty>0))return alert('Quantity / days must be greater than zero.');
+  try{
+    await equipmentApi('/api/clx071/journey/detention/'+encodeURIComponent(state.selected.id)+'/charges',{
+      method:'POST',body:JSON.stringify({rule_ref:rule,quantity:qty,commercial_direction:detentionCommercialDirection,remarks})
+    });
+    await loadDetentionLiveSummary();
+  }catch(e){alert('Charge not added: '+e.message)}
+}
+async function removeDetentionCharge(lineRef){
+  if(!state.selected?.id)return;
+  if(!confirm('Remove this un-invoiced detention charge line?'))return;
+  try{
+    await equipmentApi('/api/clx071/journey/detention/'+encodeURIComponent(state.selected.id)+'/charges/'+encodeURIComponent(lineRef),{method:'DELETE'});
+    await loadDetentionLiveSummary();
+  }catch(e){alert('Charge not removed: '+e.message)}
+}
+function detentionChargeTabsHtml(){
+  const reefer=!!detentionLiveState.summary?.reefer;
+  const tabs=[
+    ['DETENTION','Detention / Demurrage',false],
+    ['PLUGIN','Plug-in',!reefer],
+    ['PORT','Port Charges',false],
+    ['OTHER','Other Charges',false]
+  ];
+  return '<div class="clx78Tabs">'+tabs.map(([k,l,disabled])=>
+    '<button '+(disabled?'disabled title="Plug-in applies only to reefer equipment"':'onclick="setDetentionChargeTab(\''+k+'\')"')+
+    ' class="'+(detentionChargeTab===k?'active':'')+'">'+esc(l)+'</button>').join('')+'</div>';
+}
+function detentionChargePanelHtml(){
+  const s=detentionLiveState.summary||{},side=detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?s.principal:s.customer;
+  if(detentionChargeTab==='DETENTION'){
+    const cur=side?.currency||'';
+    return detentionChargeTabsHtml()+
+      '<div class="clx82Section"><div class="clx82Head">'+esc(detentionDirectionLabel())+' · Detention / Demurrage</div><div class="clx82Body">'+
+      '<div class="equipGrid">'+
+        '<div class="equipKpi">Advance<b>'+detentionMoney(side?.advance_detention||0,cur)+'</b></div>'+
+        '<div class="equipKpi">Ongoing<b>'+detentionMoney(side?.ongoing_detention||0,cur)+'</b></div>'+
+        '<div class="equipKpi">Actual<b>'+detentionMoney(side?.actual_detention||0,cur)+'</b></div>'+
+        '<div class="equipKpi">Difference<b>'+detentionMoney(side?.difference||0,cur)+'</b></div>'+
+      '</div>'+
+      '<div class="equipNote">Detention is calculated by CLX-071 + the approved MRG detention tariff. Demurrage, where separately configured, must use an approved charge/tariff source and is never guessed from detention.</div>'+
+      '</div></div>';
+  }
+  const options=(detentionLiveState.options||[]).filter(x=>x.category===detentionChargeTab);
+  const lines=(detentionLiveState.lines||[]).filter(x=>x.category===detentionChargeTab);
+  const label={PLUGIN:'Plug-in',PORT:'Port Charges',OTHER:'Other Charges'}[detentionChargeTab]||detentionChargeTab;
+  const rows=lines.length?lines.map(x=>'<tr><td><button class="rowAction" onclick="removeDetentionCharge(\''+esc(x.line_ref)+'\')">✕</button></td>'+
+    '<td>'+esc(x.charge_code||'')+'</td><td>'+esc(x.party_type||'')+' '+esc(x.party_code||'')+'</td><td>'+esc(x.quantity||'')+'</td><td>'+esc(x.rate||'')+'</td><td>'+esc(x.currency||'')+'</td><td>'+esc(x.amount||'')+'</td><td>'+esc(x.rule_ref||'')+'</td><td>'+esc(x.remarks||'')+'</td></tr>').join('')
+    :'<tr><td colspan="9" class="muted">No '+esc(label)+' lines applied.</td></tr>';
+  const optionHtml=options.map(x=>'<option value="'+esc(x.rule_ref)+'">'+esc(x.charge_code)+' · '+esc(x.party_type)+' · '+esc(x.currency)+' '+esc(x.unit_rate)+' / '+esc(x.rate_basis)+' · '+esc(x.rule_ref)+'</option>').join('');
+  const blocked=!options.length;
+  return detentionChargeTabsHtml()+
+    '<div class="clx82Section"><div class="clx82Head">'+esc(detentionDirectionLabel())+' · '+esc(label)+'</div><div class="clx82Body">'+
+      '<div class="toolbar"><label>Approved Tariff <select id="detChargeRule"><option value="">Select…</option>'+optionHtml+'</select></label>'+
+      '<label>Qty / Days <input id="detChargeQty" type="number" min="0.0001" step="0.01" value="1"></label>'+
+      '<label>Remarks <input id="detChargeRemarks" placeholder="Optional"></label>'+
+      '<button class="btn" onclick="loadDetentionChargeOptions()">Apply / Refresh Tariff</button>'+
+      '<button class="btn primary" '+(blocked?'disabled':'onclick="addDetentionCharge()"')+'>Add Charge</button></div>'+
+      (blocked?'<div class="equipNote">No approved applicable '+esc(label)+' tariff exists for this job/container/commercial side. The charge is blocked until an approved MRG rule exists.</div>':'')+
+      '<div class="tablewrap"><table><thead><tr><th></th><th>Charge Code</th><th>Party</th><th>Qty / Days</th><th>Rate</th><th>Curr</th><th>Amount</th><th>Tariff</th><th>Remarks</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+    '</div></div>';
+}
+async function loadDetentionLiveSummary(){
+  if(detentionMode()!=='process'||!state.selected?.id)return;
+  try{
+    const s=await equipmentApi('/api/clx071/journey/detention/'+encodeURIComponent(state.selected.id)+'/summary');
+    detentionLiveState.summary=s;
+    const side=detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?s.principal:s.customer;
+    const f=$('detFinanceLive');if(f)f.innerHTML=detentionFinanceHtml(s);
+    const h=$('detHistoryLive');if(h)h.innerHTML=detentionHistoryHtml(side?.history||[]);
+    const x=$('detProcessLiveStatus');if(x)x.textContent=(side?.process_status||'RUNNING')+' / '+(side?.calculation_stage||'ADVANCE');
+    detentionLiveState.lines=(s.ancillary_charges||[]).filter(x=>x.commercial_direction===detentionCommercialDirection);
+    await loadDetentionChargeOptions();
+  }catch(e){const f=$('detFinanceLive');if(f)f.innerHTML='<div class="card badtext">'+esc(e.message)+'</div>'}
+}
+function detentionProcessRows(){
+  return (state.rows||[]).map(r=>{
+    const curr=detentionSideValue(r,'Currency','Currency','currency');
+    return {r,currency:curr,
+      advance:detentionSideNum(r,'Advance Detention','Advance Detention','Advance Amount'),
+      ongoing:detentionSideNum(r,'Ongoing Detention','Ongoing Detention'),
+      actual:detentionSideNum(r,'Actual Detention','Actual Detention','Actual Amount')};
+  });
+}
+function detentionProcessSummary(){
+  const rows=detentionProcessRows(),sum=k=>rows.reduce((a,x)=>a+Number(x[k]||0),0);
+  return '<div class="equipGrid">'+
+    '<div class="equipKpi">'+esc(detentionDirectionLabel())+'<b>'+(detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?'COST':'REVENUE')+'</b></div>'+
+    '<div class="equipKpi">Advance<b>'+detentionMoney(sum('advance'))+'</b></div>'+
+    '<div class="equipKpi">Ongoing<b>'+detentionMoney(sum('ongoing'))+'</b></div>'+
+    '<div class="equipKpi">Actual<b>'+detentionMoney(sum('actual'))+'</b></div>'+
+  '</div>';
+}
+function detentionSelectedProcessDetail(){
+  const r=state.selected;if(!r)return '<div class="card empty">Select a detention process row to view detention detail.</div>';
+  const v=(key,...fallback)=>esc(detentionSideValue(r,key,...fallback)||'—');
+  const common=(...keys)=>esc(detentionValue(r,...keys)||'—');
+  const curr=detentionSideValue(r,'Currency','Currency')||'';
+  const advance=detentionSideNum(r,'Advance Detention','Advance Detention','Advance Amount');
+  const actual=detentionSideNum(r,'Actual Detention','Actual Detention','Actual Amount');
+  const difference=detentionSideNum(r,'Difference','Difference')||(actual-advance);
+  const customer=detentionCommercialDirection==='AGENT_TO_CUSTOMER';
+  return '<div class="clx82Section"><div class="clx82Head">'+esc(detentionDirectionLabel())+' · Detention Detail · '+common('Reference','external_ref')+
+    ' <span class="pill" id="detProcessLiveStatus">'+v('Process Status','Status')+' / '+v('Calculation Stage')+'</span></div><div class="clx82Body">'+
+    '<div class="clx82Grid">'+
+      clx82DerivedField('Job #',common('Job Ref','job_ref'))+
+      clx82DerivedField('Customer',common('Customer','Agent / Customer'))+
+      clx82DerivedField('Principal',common('Principal','Principal Name'))+
+      clx82DerivedField('Agent',common('Agent','Agent / Customer'))+
+      clx82DerivedField('Terminal',common('Terminal','Port Terminal'))+
+      clx82DerivedField('Empty Depot',common('Empty Depot','Return Depot','Depot'))+
+      clx82DerivedField('Container #',common('Container','Container No'))+
+      clx82DerivedField('Size / Type',common('Size / Type','Size/Type','size_type'))+
+      clx82DerivedField('HBL #',common('HBL','HBL No','BL Ref'))+
+      clx82DerivedField('MBL #',common('MBL','MBL No'))+
+      clx82DerivedField('Process Status',v('Process Status','Status'))+
+      clx82DerivedField('Calculation Stage',v('Calculation Stage'))+
+      clx82DerivedField('Gate Out Full',v('Gate-out','Gate-out','Issue Date','Release Date'))+
+      clx82DerivedField('Free Days',v('Free Days','Free Days','Free'))+
+      clx82DerivedField('Detention Start',v('Detention Start','Detention Start'))+
+      clx82DerivedField('Previous Advance Till',v('Previous Advance Till Date','Previous Advance Till Date'))+
+      clx82DerivedField('Next Charge Start',v('Next Charge Start Date','Next Charge Start Date'))+
+      clx82DerivedField('Advance / Calculate Till',v('Calculate Till Date','Calculate Till Date','Advance Till Date'))+
+      clx82DerivedField('Empty Return',v('Empty Return','Empty Return','Return Date'))+
+      clx82DerivedField('Previous Advance Days',v('Previous Advance Days','Previous Advance Days'))+
+      clx82DerivedField('Advance Days',v('Advance Days','Advance Days'))+
+      clx82DerivedField('Ongoing Days',v('Ongoing Days','Ongoing Days'))+
+      clx82DerivedField('Actual Chargeable Days',v('Actual Chargeable Days','Actual Chargeable Days'))+
+      clx82DerivedField('Total Chargeable Days',v('Total Chargeable Days','Total Chargeable Days','Chargeable Days'))+
+      clx82DerivedField('Rate Group',v('Rate Group','Rate Group'))+
+      clx82DerivedField('Tariff',v('Tariff','Tariff','Tariff Code'))+
+      clx82DerivedField('Rate',v('Rate','Rate'))+
+      clx82DerivedField('Currency',v('Currency','Currency'))+
+      clx82DerivedField('Advance Detention',detentionMoney(advance,curr))+
+      clx82DerivedField('Ongoing Detention',detentionMoney(detentionSideNum(r,'Ongoing Detention','Ongoing Detention'),curr))+
+      clx82DerivedField('Actual Detention',detentionMoney(actual,curr))+
+      clx82DerivedField('Difference',detentionMoney(difference,curr))+
+    '</div>'+
+    '<div class="formActions">'+
+      '<button class="btn primary" onclick="runDetentionCalculation(\'ADVANCE\')">Calculate Advance</button>'+
+      '<button class="btn" onclick="runDetentionCalculation(\'ONGOING\')">Recalculate Ongoing</button>'+
+      '<button class="btn" onclick="runDetentionCalculation(\'ACTUAL\')">Calculate Actual</button>'+
+      (customer?'<button class="btn primary" onclick="openScreen(\'gl-accounts::invoice\',{domain:\'HO Tasks\',submenu:\'Transaction\',label:\'Detention Draft Invoice\'})">Create Draft Invoice → Finance</button>'+
+      '<button class="btn" onclick="openDetentionMode(\'collection\')">Open Detention Collection</button>'+
+      '<button class="btn" onclick="openScreen(\'gl-accounts::invoice\')">Open Invoice / AR</button>'
+      :'<button class="btn" onclick="openScreen(\'gl-accounts::bills\')">Open Principal Bill / AP</button><button class="btn" onclick="openScreen(\'agent-tasks::soa\')">Open Principal / Agent SOA</button>')+
+    '</div>'+
+    '<div class="equipNote">'+(customer?'Agent → Customer is the REVENUE side.':'Principal → Agent is the COST side.')+' Advance / ongoing periods cannot overlap. EMPTY_RETURN fixes Actual detention.</div>'+
+  '</div></div>'+
+  '<div class="clx82Section"><div class="clx82Head">Advance / Ongoing Period History</div><div class="clx82Body"><div id="detHistoryLive">'+detentionHistoryHtml(detentionCurrentHistory(r))+'</div></div></div>'+
+  '<div id="detChargePanel">'+detentionChargePanelHtml()+'</div>'+
+  '<div id="detFinanceLive">'+detentionFinanceHtml(detentionLiveState.summary||{finance:{}})+'</div>';
+}
+function renderDetentionProcess(){
+  const rows=state.rows||[];
+  const body=rows.length?rows.map((r,i)=>{
+    const common=(...k)=>esc(detentionValue(r,...k)||'');
+    const sv=(k,...fallback)=>esc(detentionSideValue(r,k,...fallback)||'');
+    return '<tr onclick="selectRow('+i+')"><td><button class="rowAction" title="Open">⋮</button></td>'+
+      '<td>'+common('Job Ref','job_ref','Job')+'</td><td>'+common('HBL','HBL No','BL Ref')+'</td><td>'+common('MBL','MBL No')+'</td>'+
+      '<td><b>'+common('Container','Container No')+'</b></td><td>'+common('Size / Type','Size/Type','size_type')+'</td>'+
+      '<td>'+common('Customer','Agent / Customer')+'</td><td>'+common('Principal','Principal Name')+'</td>'+
+      '<td>'+sv('Process Status','Status')+'</td><td>'+sv('Calculation Stage')+'</td>'+
+      '<td>'+sv('Gate-out','Gate-out','Issue Date','Release Date')+'</td><td>'+sv('Detention Start','Detention Start')+'</td>'+
+      '<td>'+sv('Previous Advance Till Date','Previous Advance Till Date')+'</td><td>'+sv('Calculate Till Date','Calculate Till Date','Advance Till Date')+'</td>'+
+      '<td>'+sv('Empty Return','Empty Return','Return Date')+'</td><td>'+sv('Free Days','Free Days','Free')+'</td>'+
+      '<td>'+sv('Total Chargeable Days','Total Chargeable Days','Chargeable Days')+'</td><td>'+sv('Rate Group','Rate Group')+'</td>'+
+      '<td>'+sv('Tariff','Tariff','Tariff Code')+'</td><td>'+sv('Rate','Rate')+'</td><td>'+sv('Currency','Currency')+'</td>'+
+      '<td>'+sv('Advance Detention','Advance Detention','Advance Amount')+'</td><td>'+sv('Ongoing Detention','Ongoing Detention')+'</td><td>'+sv('Actual Detention','Actual Detention','Actual Amount')+'</td></tr>';
+  }).join(''):'<tr><td colspan="24" class="muted">No detention process records in the current authorized scope.</td></tr>';
+  $('gridArea').innerHTML=
+    '<div class="clx78Tabs"><button class="'+(detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?'active':'')+'" onclick="setDetentionCommercialDirection(\'PRINCIPAL_TO_AGENT\')">Principal → Agent · Cost</button>'+
+    '<button class="'+(detentionCommercialDirection==='AGENT_TO_CUSTOMER'?'active':'')+'" onclick="setDetentionCommercialDirection(\'AGENT_TO_CUSTOMER\')">Agent → Customer · Revenue</button></div>'+
+    '<div class="opGridToolbar"><b>Detention Process · '+esc(detentionDirectionLabel())+'</b><input id="detProcessSearch" placeholder="Search agent / B/L / container / customer">'+
+    '<label>Advance / Calculate Till <input id="detProcessDate" type="date"></label><span class="grow"></span>'+
+    '<button class="btn primary" onclick="runDetentionCalculation(\'ADVANCE\')">Calculate Advance</button>'+
+    '<button class="btn" onclick="runDetentionCalculation(\'ONGOING\')">Recalculate Ongoing</button>'+
+    '<button class="btn" onclick="runDetentionCalculation(\'ACTUAL\')">Calculate Actual</button>'+
+    '<button class="btn" onclick="openScreen(state.current.screen_id,state.navContext)">Refresh</button><button class="btn" onclick="exportCsv()">Export</button></div>'+
+    '<div class="equipNote">'+(detentionCommercialDirection==='PRINCIPAL_TO_AGENT'
+      ?'Principal → Agent uses approved COST detention tariffs. It does not create a customer invoice.'
+      :'Agent → Customer uses approved REVENUE detention tariffs and flows to the existing Finance invoice / collection process.')+
+      ' Reefer Plug-in, Port Charges and Other Charges use the same approved MRG/charge-code sources; no parallel tariff engine.</div>'+
+    detentionProcessSummary()+
+    '<div class="opGridWrap"><table><thead><tr><th></th><th>Job #</th><th>HBL #</th><th>MBL #</th><th>Container #</th><th>Size / Type</th><th>Customer</th><th>Principal</th><th>Process</th><th>Stage</th><th>Gate Out</th><th>Detention Start</th><th>Previous Till</th><th>Calc Till</th><th>Empty Return</th><th>Free</th><th>Total Days</th><th>Rate Group</th><th>Tariff</th><th>Rate</th><th>Curr</th><th>Advance</th><th>Ongoing</th><th>Actual</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
+    detentionSelectedProcessDetail();
+  const d=$('detProcessDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);
+  const q=$('detProcessSearch');if(q)q.addEventListener('input',()=>{const term=q.value.toLowerCase();document.querySelectorAll('#gridArea .opGridWrap tbody tr').forEach(tr=>tr.style.display=!term||tr.textContent.toLowerCase().includes(term)?'':'none')});
+  loadDetentionLiveSummary();
+}
+function renderDetentionCollection(){
+  const rows=state.rows||[];
+  const body=rows.length?rows.map((r,i)=>{
+    const v=(...k)=>esc(detentionValue(r,...k)||'');
+    return '<tr onclick="selectRow('+i+')"><td><button class="rowAction" title="Open">⋮</button></td>'+
+      '<td><b>'+v('Reference','external_ref')+'</b></td><td>'+v('Customer','Agent / Customer')+'</td><td>'+v('Job Ref','job_ref')+'</td>'+
+      '<td>'+v('HBL','HBL No','BL Ref')+'</td><td>'+v('MBL','MBL No')+'</td><td>'+v('Container','Container No')+'</td>'+
+      '<td>'+v('Process Status','Calculation Status','Status')+'</td><td>'+v('Invoice','Invoice #')+'</td><td>'+v('Invoice Date')+'</td>'+
+      '<td>'+v('Currency')+'</td><td>'+v('Invoice Amount','Amount')+'</td><td>'+v('Collected Amount','Paid Amount')+'</td><td>'+v('Outstanding','Outstanding Amount')+'</td>'+
+      '<td>'+v('Due Date')+'</td><td>'+v('Days Outstanding')+'</td><td>'+v('Collection Status','Status')+'</td>'+
+      '<td>'+v('Last Follow-up')+'</td><td>'+v('Next Follow-up')+'</td><td>'+v('Collection Owner','Collector')+'</td>'+
+      '<td>'+v('Dispute Status')+'</td><td>'+v('Promise to Pay Date')+'</td><td>'+v('Remarks')+'</td></tr>';
+  }).join(''):'<tr><td colspan="23" class="muted">No detention collection records in the current authorized scope.</td></tr>';
+  $('gridArea').innerHTML=
+    '<div class="opGridToolbar"><b>Detention Collection · Agent → Customer</b><input id="detCollectionSearch" placeholder="Search detention ref / customer / invoice / container"><span class="grow"></span>'+
+    '<button class="btn" onclick="openDetentionMode(\'process\')">Open Detention Process</button>'+
+    '<button class="btn" onclick="openScreen(\'gl-accounts::invoice\')">Invoices / AR</button>'+
+    '<button class="btn" onclick="openScreen(\'gl-accounts::receipt\')">Receipts</button>'+
+    '<button class="btn" onclick="openScreen(\'agent-tasks::soa\')">SOA</button></div>'+
+    '<div class="equipNote">Receivable / follow-up stage for Agent → Customer only. Principal → Agent settlement stays on the cost/AP/SOA side.</div>'+
+    '<div class="opGridWrap"><table><thead><tr><th></th><th>Detention Ref</th><th>Customer</th><th>Job #</th><th>HBL #</th><th>MBL #</th><th>Container #</th><th>Process Status</th><th>Invoice #</th><th>Invoice Date</th><th>Curr</th><th>Invoice Amount</th><th>Paid</th><th>Outstanding</th><th>Due Date</th><th>Days Out</th><th>Collection Status</th><th>Last Follow-up</th><th>Next Follow-up</th><th>Owner</th><th>Dispute</th><th>Promise to Pay</th><th>Remarks</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+  const q=$('detCollectionSearch');if(q)q.addEventListener('input',()=>{const term=q.value.toLowerCase();document.querySelectorAll('#gridArea .opGridWrap tbody tr').forEach(tr=>tr.style.display=!term||tr.textContent.toLowerCase().includes(term)?'':'none')});
+}
+function renderDetentionWorkspace(){if(detentionMode()==='process')renderDetentionProcess();else renderDetentionCollection()}
+
 const CORE_FOLLOWUP=[
   ['agent-tasks::booking','Booking'],['agent-tasks::planning','Job Planning'],['agent-tasks::bl','B/L'],['agent-tasks::cro','CRO'],
   ['agent-tasks::trt','TRT'],['agent-tasks::container-activity','Container'],
@@ -697,6 +1025,15 @@ function flowButtons(xs){
 }
 function renderFlow(){
   if(!state.current){$('flow').innerHTML='';return}
+  if(state.current.key==='detention-collection'){
+    const process=detentionMode()==='process';
+    $('flow').innerHTML='<div class="opFollow"><b>Authoritative Detention Flow</b><button onclick="openScreen(\'agent-tasks::container-activity\')">Container Journey</button><span>→</span>'+
+      '<button class="'+(process?'current':'')+'" onclick="openDetentionMode(\'process\')">Detention Process</button><span>→</span>'+
+      '<button onclick="openScreen(\'gl-accounts::invoice\')">Finance Invoice / AR / GL</button><span>→</span>'+
+      '<button class="'+(!process?'current':'')+'" onclick="openDetentionMode(\'collection\')">Detention Collection</button><span>→</span>'+
+      '<button onclick="openScreen(\'gl-accounts::receipt\')">Receipt</button><span>→</span><button onclick="openScreen(\'agent-tasks::soa\')">SOA / Close</button></div>';
+    $('prevBtn').disabled=true;$('nextBtn').disabled=true;return;
+  }
   const key=state.current.key||'';
   const core=CORE_FOLLOWUP.filter(([id])=>state.byId[id]);
   const inCore=core.some(([id])=>id===state.current.screen_id);
@@ -931,6 +1268,10 @@ async function openScreen(id,navContext=null,historyMode='push'){
       await renderQuickActions();
       $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Finance Master</b><span class="muted">CLX-084 · existing authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';
       await renderClx084FinanceMaster();
+    }else if(s.key==='detention-collection'){
+      if(state.rows.length)state.selected=state.rows[0];
+      await renderQuickActions();
+      renderDetentionWorkspace();
     }else if(s.domain==='Agent Tasks'&&state.rows.length){
       state.selected=state.rows[0];
       await renderQuickActions();
@@ -1155,7 +1496,7 @@ async function renderInlineAgentScreen(){
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
 async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
+async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(state.current?.key==='detention-collection'){renderDetentionWorkspace();return;}if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
 async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
 async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
@@ -1372,7 +1713,7 @@ async function clx49RenderBlTab(tab){
     '</div></div></div>';
     try{
       const e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(w.context.job_ref));
-      html+='<div class="clx82Section"><div class="clx82Head">Authoritative Container Allocation</div><div class="clx82Body">'+clx82Table(['Container','Size/Type','Owner','Seal/Status','Depot','Journey'],(e.allocated_containers||[]).map(z=>'<tr onclick="showContainerDetail(\''+esc(z.container_no)+'\')"><td><b>'+esc(z.container_no)+'</b></td><td>'+esc(z.size_type||'')+'</td><td>'+esc(z.owner_party_type||z.ownership||'')+'</td><td>'+esc(z.equipment_status||'')+'</td><td>'+esc(z.depot_code||'')+'</td><td><button class="btn">Open</button></td></tr>'))+'</div></div>';
+      html+='<div class="clx82Section"><div class="clx82Head">Authoritative Container Allocation</div><div class="clx82Body">'+clx82Table(['Container','Container Size / Type','Owner','Seal/Status','Depot','Journey'],(e.allocated_containers||[]).map(z=>'<tr onclick="showContainerDetail(\''+esc(z.container_no)+'\')"><td><b>'+esc(z.container_no)+'</b></td><td>'+esc(z.size_type||'')+'</td><td>'+esc(z.owner_party_type||z.ownership||'')+'</td><td>'+esc(z.equipment_status||'')+'</td><td>'+esc(z.depot_code||'')+'</td><td><button class="btn">Open</button></td></tr>'))+'</div></div>';
     }catch(e){html+='<div class="equipNote badtext">'+esc(e.message)+'</div>'}
     html+='<div class="clx82Section"><div class="clx82Head">Freight & Commercial Context</div><div class="clx82Body"><div class="clx82Grid">'+
       clx82DerivedField('Prepaid / Collect',bl['Freight Term']||bp['Freight Term']||'')+
@@ -1658,7 +1999,7 @@ async function clx49RenderBooking(tab){
       '<div class="clx81GroupTitle">CARGO / EQUIPMENT</div>'+
       clx78Field(r,'Commodity','Commodity')+clx78Field(r,'Cargo','Cargo Description',{wide:true})+
       clx78Field(r,'Packages','Packages')+clx78Field(r,'Weight','Gross Weight')+
-      clx78Field(r,'Measurement','Measurement / Volume')+clx78Field(r,'Equipment','Equipment Type')+
+      clx78Field(r,'Measurement','Measurement / Volume')+clx78Field(r,'Equipment','Container Size / Type')+
       clx78Field(r,'Quantity','Quantity')+clx78Field(r,'SOC / COC','SOC / COC')+
       clx78Field(r,'SRR','SRR')+
       '</div></div></div>'+
@@ -2562,7 +2903,7 @@ async function showEquipmentWorkspace(view='overview',historyMode='push'){
       if(cf.status)qs.set('status',cf.status);if(cf.port)qs.set('port',cf.port);if(cf.agent_code)qs.set('agent_code',cf.agent_code);if(cf.depot_code)qs.set('depot_code',cf.depot_code);if(cf.owner_party_type)qs.set('owner_party_type',cf.owner_party_type);
       const d=await equipmentApi('/api/clx070/container-control/containers?'+qs.toString());
       $('gridArea').innerHTML=`<div class="toolbar"><input id="eqCmSearch" placeholder="Container / owner / principal / booking"><button class="btn" onclick="searchContainerMaster()">Search</button><button class="btn" onclick="state.clx79ContainerFilter={};showEquipmentWorkspace('containers')">Clear Drill Filter</button><button class="btn" onclick="showEquipmentWorkspace('containers')">Refresh</button><button class="btn primary" onclick="showBulkContainerUpload()">Bulk Container Upload</button><span class="muted">Active drill: ${esc(Object.entries(cf).map(([k,v])=>k+'='+v).join(' · ')||'none')}</span></div>
-      <div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner Type</th><th>Owner Party</th><th>Principal</th><th>Branch</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Verification</th><th>Booking</th></tr></thead><tbody>
+      <div class="tablewrap"><table><thead><tr><th>Container</th><th>Equipment Size & Type</th><th>Owner Type</th><th>Owner Party</th><th>Principal</th><th>Branch</th><th>Port</th><th>Agent</th><th>Depot</th><th>Status</th><th>Verification</th><th>Booking</th></tr></thead><tbody>
       ${(d.records||[]).map(x=>`<tr onclick="showContainerDetail('${esc(x.container_no)}')"><td><b>${esc(x.container_no)}</b></td><td>${esc(x.size_type)}</td><td>${esc(x.owner_party_type||x.ownership)}</td><td>${esc(x.owner_party_code||'')}</td><td>${esc(x.principal_code||'')}</td><td>${esc(x.branch_code||'')}</td><td>${esc(x.current_port||'')}</td><td>${esc(x.agent_code||'')}</td><td>${esc(x.depot_code||'')}</td><td>${esc(x.equipment_status)}</td><td>${esc(x.verification_status||'')}</td><td>${esc(x.booking_ref||'')}</td></tr>`).join('')}</tbody></table></div>`;
     }else if(view==='allocation'){
       let bx=null;
@@ -2738,7 +3079,7 @@ async function showContainerDetail(no){
     $('drawerTitle').textContent='Container Master · '+no;drawerTabs('details');$('drawer').classList.add('open');
     let general='<div class="card"><b>General / Ownership / Custody</b><div class="formGrid">'+
       cmInput('Container #','container_no',x.container_no,'text','disabled')+
-      cmInput('Size / Type','size_type',x.size_type,'text','disabled')+
+      cmInput('Equipment Size & Type','size_type',x.size_type,'text','disabled')+
       cmSelect('Owner / Provider Type','owner_party_type',x.owner_party_type||'PRINCIPAL',['PRINCIPAL','OVERSEAS_PARTNER','LEASING_COMPANY','INVESTOR','AGENT_SUPPLIED','SOC'])+
       cmInput('Owner / Provider Party','owner_party_code',x.owner_party_code)+
       cmInput('Principal','principal_code',x.principal_code)+
@@ -2924,6 +3265,13 @@ async function routeFromLocation(historyMode='none'){
 async function init(){
   let [m,s]=await Promise.all([api('/api/clx011/menu'),api('/api/clx011/screens')]);
   state.menu=m.menu;state.businessNavigation=m.business_navigation||{groups:[]};state.screens=s;state.byId=Object.fromEntries(s.map(x=>[x.screen_id,x]));
+  for(const d of state.menu||[]){
+    if(d.domain!=='HO Tasks')continue;
+    for(const sub of d.submenus||[]){
+      if(sub.name!=='Transaction')continue;
+      for(const it of sub.items||[])if(it.label==='Sale Invoice Detention')it.label='Detention Process';
+    }
+  }
   renderNav();
   await routeFromLocation('replace');
 }

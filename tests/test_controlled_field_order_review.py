@@ -39,7 +39,7 @@ def test_booking_groups_follow_operational_order():
         'Carrier / Shipping Line','Container Owner','Equipment Provider',
         'POL','POT (1)','TS Agent (1)','POD','Vessel','Voyage',
         'Commodity','Cargo Description','Packages','Gross Weight',
-        'Measurement / Volume','Equipment Type','Quantity','SOC / COC'
+        'Measurement / Volume','Container Size / Type','Quantity','SOC / COC'
     ]:
         assert field in b,field
 

@@ -36,5 +36,23 @@ def test_visible_reference_setup_flow_is_navigation_only():
     assert "▾ Setup <span class=count>'+visibleSetup.length+'</span>" in HTML
     assert 'Account Setup' in HTML
     assert "gl-accounts::account-integration" in HTML
-    assert 'Container Coding' in HTML
+    assert 'Container Coding' not in HTML
     assert "showEquipmentWorkspace('containers')" in HTML
+    assert 'Equipment Size & Type' in HTML
+    assert "master-data::equipment-types" in HTML
+
+
+def test_detention_process_and_collection_are_distinct_existing_frontend_stages():
+    assert "function renderDetentionProcess" in HTML
+    assert "function renderDetentionCollection" in HTML
+    assert "Detention Process" in HTML
+    assert "Detention Collection" in HTML
+    assert "Sale Invoice Detention" in HTML  # existing catalog alias is presentation-normalized at init
+    assert "Create Draft Invoice → Finance" in HTML
+    assert "Receivable / follow-up stage for Agent → Customer only." in HTML
+    assert "Principal → Agent uses approved COST detention tariffs." in HTML
+    assert "Agent → Customer uses approved REVENUE detention tariffs" in HTML
+    assert "agent-tasks::detention-collection" in HTML
+    assert "gl-accounts::invoice" in HTML
+    assert "gl-accounts::receipt" in HTML
+    assert "agent-tasks::soa" in HTML
