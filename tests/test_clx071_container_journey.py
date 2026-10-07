@@ -58,3 +58,34 @@ def test_manifest_keeps_production_locked():
 def test_exception_decision_enforces_container_custody_scope():
     src=Path("app/clx071_container_journey.py").read_text()
     assert 'get_container(conn,e["container_no"],a)' in src
+
+
+def test_detention_calculation_endpoint_is_same_clx071_engine():
+    import app.main as main
+    paths=set(main.app.openapi()["paths"])
+    assert "/api/clx071/journey/detention/{record_id}/calculate" in paths
+
+
+def test_detention_amount_reuses_mrg_rate_and_slabs():
+    from app.clx071_container_journey import _detention_amount
+    rule={"rule_ref":"R1","rate_basis":"PER_DAY","unit_rate":12,"minimum_rate":None,"maximum_rate":None,"slab_wise":0,"slabs":[]}
+    amount,rate=_detention_amount(rule,5,"40HC",None)
+    assert amount==60
+    assert rate==12
+    slab={"rule_ref":"R2","slab_wise":1,"slabs":[
+      {"from_day":1,"till_day":3,"rate":10,"size_type":"40HC","container_type":None},
+      {"from_day":4,"till_day":None,"rate":15,"size_type":"40HC","container_type":None},
+    ]}
+    amount,rate=_detention_amount(slab,5,"40HC",None)
+    assert amount==60
+    assert rate==12
+
+
+def test_detention_process_frontend_binds_existing_screen_to_server_engine():
+    html=Path("web/index.html").read_text()
+    assert "function renderDetentionProcess" in html
+    assert "function renderDetentionCollection" in html
+    assert "runDetentionCalculation" in html
+    assert "/api/clx071/journey/detention/" in html
+    assert "Create Draft Invoice → Finance" in html
+    assert "No GL posting occurs here" in html
