@@ -678,6 +678,141 @@ async function renderHoInvestorSetup(){
 function renderBreadcrumb(){let s=state.current,n=state.navContext;if(n){$('breadcrumb').textContent=`M3 NVOCC ERP / ${n.domain} / ${n.submenu} / ${n.label}`;$('topTitle').textContent=n.label;$('pageTitle').textContent=n.label;document.title=`M3 NVOCC ERP — ${n.label}`}else{$('breadcrumb').textContent=`M3 NVOCC ERP / ${s.domain} / ${s.submenu} / ${s.name}`;$('topTitle').textContent=s.name;$('pageTitle').textContent=s.name;document.title=`M3 NVOCC ERP — ${s.name}`}$('favorite').textContent=state.favorites.has(s.screen_id)?'★':'☆';$('favorite').classList.toggle('on',state.favorites.has(s.screen_id))}
 function addRecent(id){state.recent=[id,...state.recent.filter(x=>x!==id)].slice(0,15);saveState()}
 function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.current.domain&&s.submenu===state.current.submenu);let i=same.findIndex(s=>s.screen_id===state.current.screen_id);return same[i+dir]?.screen_id||null}
+
+function detentionMode(){
+  if(state.current?.key!=='detention-collection')return '';
+  return state.navContext?.label==='Detention Process'?'process':'collection';
+}
+function openDetentionMode(mode){
+  const ctx=mode==='process'
+    ?{domain:'HO Tasks',submenu:'Transaction',label:'Detention Process'}
+    :{domain:'HO Tasks',submenu:'Utilities',label:'Detention Collection'};
+  return openScreen('agent-tasks::detention-collection',ctx);
+}
+function detentionValue(r,...keys){
+  const p=rowPayload(r);
+  for(const k of keys){
+    const v=r?.[k]??p?.[k];
+    if(v!==undefined&&v!==null&&String(v)!=='')return v;
+  }
+  return '';
+}
+function detentionNum(r,...keys){
+  const n=Number(String(detentionValue(r,...keys)||0).replaceAll(',',''));
+  return Number.isFinite(n)?n:0;
+}
+function detentionMoney(n,c=''){
+  const x=Number(n||0);
+  return (c?esc(c)+' ':'')+x.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+}
+function detentionProcessRows(){
+  return (state.rows||[]).map(r=>{
+    const currency=detentionValue(r,'Currency','currency');
+    const amount=detentionNum(r,'Amount','amount');
+    const additional=detentionNum(r,'Additional Detention','Additional Amount','additional_amount');
+    const advance=detentionNum(r,'Advance Detention','advance_detention','Advance Amount');
+    const actual=detentionNum(r,'Actual Detention','actual_detention','Actual Amount');
+    const local=detentionNum(r,'Local Amount','local_amount');
+    return {r,currency,amount,additional,advance,actual,local,total:actual||advance||amount};
+  });
+}
+function detentionProcessSummary(){
+  const rows=detentionProcessRows();
+  const sum=k=>rows.reduce((a,x)=>a+Number(x[k]||0),0);
+  return '<div class="equipGrid">'+
+    '<div class="equipKpi">Detention<b>'+detentionMoney(sum('amount'))+'</b></div>'+
+    '<div class="equipKpi">Additional<b>'+detentionMoney(sum('additional'))+'</b></div>'+
+    '<div class="equipKpi">Advance<b>'+detentionMoney(sum('advance'))+'</b></div>'+
+    '<div class="equipKpi">Actual<b>'+detentionMoney(sum('actual'))+'</b></div>'+
+    '<div class="equipKpi">Local Amount<b>'+detentionMoney(sum('local'))+'</b></div>'+
+  '</div>';
+}
+function detentionSelectedProcessDetail(){
+  const r=state.selected;if(!r)return '<div class="card empty">Select a detention process row to view Advance / Actual detail.</div>';
+  const v=(...k)=>esc(detentionValue(r,...k)||'—');
+  const advance=detentionNum(r,'Advance Detention','advance_detention','Advance Amount');
+  const actual=detentionNum(r,'Actual Detention','actual_detention','Actual Amount');
+  const difference=actual-advance;
+  return '<div class="clx82Section"><div class="clx82Head">Advance / Actual Detention Detail · '+v('Reference','external_ref')+'</div><div class="clx82Body">'+
+    '<div class="clx82Grid">'+
+      clx82DerivedField('Job #',v('Job Ref','job_ref'))+
+      clx82DerivedField('Customer',v('Customer','Agent / Customer'))+
+      clx82DerivedField('Principal',v('Principal','Principal Name'))+
+      clx82DerivedField('Container #',v('Container','Container No'))+
+      clx82DerivedField('HBL #',v('HBL','HBL No','BL Ref'))+
+      clx82DerivedField('MBL #',v('MBL','MBL No'))+
+      clx82DerivedField('Start / Gate-out',v('Gate-out','Start Date','Issue Date'))+
+      clx82DerivedField('Calculate Till',v('Calculate Till Date','Calc Till Date','End Date'))+
+      clx82DerivedField('Return Date',v('Empty Return','Return Date'))+
+      clx82DerivedField('Free Days',v('Free Days','Free'))+
+      clx82DerivedField('Rate Group',v('Rate Group'))+
+      clx82DerivedField('Tariff Code',v('Tariff Code','Tariff'))+
+      clx82DerivedField('Currency',v('Currency'))+
+      clx82DerivedField('FX Rate',v('FX Rate','Ex. Rate','Exchange Rate'))+
+      clx82DerivedField('Advance Detention',detentionMoney(advance,detentionValue(r,'Currency'))) +
+      clx82DerivedField('Actual Detention',detentionMoney(actual,detentionValue(r,'Currency'))) +
+      clx82DerivedField('Difference',detentionMoney(difference,detentionValue(r,'Currency'))) +
+      clx82DerivedField('Status',v('Status','status'))+
+    '</div>'+
+    '<div class="formActions">'+
+      '<button class="btn" onclick="openAgentForm(\'edit\')">Edit / Save Calculation</button>'+
+      '<button class="btn" disabled title="No verified server-side detention recalculation endpoint exists on the frozen backend">Recalculate</button>'+
+      '<button class="btn primary" onclick="openScreen(\'gl-accounts::invoice\',{domain:\'HO Tasks\',submenu:\'Transaction\',label:\'Detention Draft Invoice\'})">Create Draft Invoice → Finance</button>'+
+    '</div>'+
+    '<div class="equipNote">Advance / Actual stays linked to this existing detention record. Posted Finance documents are never overwritten; further invoice or credit handling remains in the existing Finance governance.</div>'+
+  '</div></div>';
+}
+function renderDetentionProcess(){
+  const rows=state.rows||[];
+  const body=rows.length?rows.map((r,i)=>{
+    const v=(...k)=>esc(detentionValue(r,...k)||'');
+    return '<tr onclick="selectRow('+i+')"><td><button class="rowAction" title="Open">⋮</button></td>'+
+      '<td>'+v('Job Ref','job_ref','Job')+'</td><td>'+v('HBL','HBL No','BL Ref')+'</td><td>'+v('MBL','MBL No')+'</td>'+
+      '<td><b>'+v('Container','Container No')+'</b></td><td>'+v('Size / Type','Size/Type','size_type')+'</td>'+
+      '<td>'+v('Customer','Agent / Customer')+'</td><td>'+v('Principal','Principal Name')+'</td>'+
+      '<td>'+v('Issue Date','Release Date','Gate-out')+'</td><td>'+v('Empty Return','Return Date')+'</td><td>'+v('Calculate Till Date','Calc Till Date','End Date')+'</td>'+
+      '<td>'+v('Free Days','Free')+'</td><td>'+v('Chargeable Days','Charge Days','Log Days')+'</td><td>'+v('Rate Group')+'</td><td>'+v('Tariff Code','Tariff')+'</td>'+
+      '<td>'+v('Rate')+'</td><td>'+v('Currency')+'</td><td>'+v('FX Rate','Ex. Rate','Exchange Rate')+'</td>'+
+      '<td>'+v('Plug-in Amount','Plugin')+'</td><td>'+v('Amount','Detention Amount')+'</td><td>'+v('Additional Detention','Additional Amount')+'</td>'+
+      '<td>'+v('Advance Detention','Advance Amount')+'</td><td>'+v('Actual Detention','Actual Amount')+'</td><td>'+v('Local Amount')+'</td>'+
+      '<td>'+v('Status','status')+'</td><td>'+v('Remarks')+'</td></tr>';
+  }).join(''):'<tr><td colspan="25" class="muted">No detention process records in the current authorized scope.</td></tr>';
+  $('gridArea').innerHTML=
+    '<div class="opGridToolbar"><b>Detention Process</b><input id="detProcessSearch" placeholder="Search job / B/L / container / customer"><label>Process Date <input id="detProcessDate" type="date"></label><span class="grow"></span>'+
+    '<button class="btn" disabled title="Frozen backend has no verified automatic detention-process endpoint">Start Process</button>'+
+    '<button class="btn" onclick="openScreen(state.current.screen_id,state.navContext)">Refresh</button><button class="btn" onclick="exportCsv()">Export</button></div>'+
+    '<div class="equipNote">Operational calculation stage only · source must remain Container Journey + free days + MRG Detention / Export / Special Detention. No GL posting occurs here.</div>'+
+    detentionProcessSummary()+
+    '<div class="opGridWrap"><table><thead><tr><th></th><th>Job #</th><th>HBL #</th><th>MBL #</th><th>Container #</th><th>Size / Type</th><th>Customer</th><th>Principal</th><th>Issue / Release</th><th>Return</th><th>Calc Till</th><th>Free</th><th>Charge Days</th><th>Rate Group</th><th>Tariff</th><th>Rate</th><th>Curr</th><th>FX</th><th>Plug-in</th><th>Detention</th><th>Additional</th><th>Advance</th><th>Actual</th><th>Local</th><th>Status / Remarks</th></tr></thead><tbody>'+body+'</tbody></table></div>'+
+    detentionSelectedProcessDetail();
+  const d=$('detProcessDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);
+  const q=$('detProcessSearch');if(q)q.addEventListener('input',()=>{const term=q.value.toLowerCase();document.querySelectorAll('#gridArea .opGridWrap tbody tr').forEach(tr=>tr.style.display=!term||tr.textContent.toLowerCase().includes(term)?'':'none')});
+}
+function renderDetentionCollection(){
+  const rows=state.rows||[];
+  const body=rows.length?rows.map((r,i)=>{
+    const v=(...k)=>esc(detentionValue(r,...k)||'');
+    return '<tr onclick="selectRow('+i+')"><td><button class="rowAction" title="Open">⋮</button></td>'+
+      '<td><b>'+v('Reference','external_ref')+'</b></td><td>'+v('Customer','Agent / Customer')+'</td><td>'+v('Job Ref','job_ref')+'</td>'+
+      '<td>'+v('HBL','HBL No','BL Ref')+'</td><td>'+v('MBL','MBL No')+'</td><td>'+v('Container','Container No')+'</td>'+
+      '<td>'+v('Detention Process Status','Calculation Status','Status')+'</td><td>'+v('Invoice','Invoice #')+'</td><td>'+v('Invoice Date')+'</td>'+
+      '<td>'+v('Currency')+'</td><td>'+v('Invoice Amount','Amount')+'</td><td>'+v('Collected Amount','Paid Amount')+'</td><td>'+v('Outstanding','Outstanding Amount')+'</td>'+
+      '<td>'+v('Due Date')+'</td><td>'+v('Days Outstanding')+'</td><td>'+v('Collection Status','Status')+'</td>'+
+      '<td>'+v('Last Follow-up')+'</td><td>'+v('Next Follow-up')+'</td><td>'+v('Collection Owner','Collector')+'</td>'+
+      '<td>'+v('Dispute Status')+'</td><td>'+v('Promise to Pay Date')+'</td><td>'+v('Remarks')+'</td></tr>';
+  }).join(''):'<tr><td colspan="23" class="muted">No detention collection records in the current authorized scope.</td></tr>';
+  $('gridArea').innerHTML=
+    '<div class="opGridToolbar"><b>Detention Collection</b><input id="detCollectionSearch" placeholder="Search detention ref / customer / invoice / container"><span class="grow"></span>'+
+    '<button class="btn" onclick="openDetentionMode(\'process\')">Open Detention Process</button>'+
+    '<button class="btn" onclick="openScreen(\'gl-accounts::invoice\')">Invoices / AR</button>'+
+    '<button class="btn" onclick="openScreen(\'gl-accounts::receipt\')">Receipts</button>'+
+    '<button class="btn" onclick="openScreen(\'agent-tasks::soa\')">SOA</button></div>'+
+    '<div class="equipNote">Receivable / follow-up stage only. This view does not recalculate detention rates; it follows approved/invoiced detention through Finance, receipt allocation and close.</div>'+
+    '<div class="opGridWrap"><table><thead><tr><th></th><th>Detention Ref</th><th>Customer</th><th>Job #</th><th>HBL #</th><th>MBL #</th><th>Container #</th><th>Process Status</th><th>Invoice #</th><th>Invoice Date</th><th>Curr</th><th>Invoice Amount</th><th>Paid</th><th>Outstanding</th><th>Due Date</th><th>Days Out</th><th>Collection Status</th><th>Last Follow-up</th><th>Next Follow-up</th><th>Owner</th><th>Dispute</th><th>Promise to Pay</th><th>Remarks</th></tr></thead><tbody>'+body+'</tbody></table></div>';
+  const q=$('detCollectionSearch');if(q)q.addEventListener('input',()=>{const term=q.value.toLowerCase();document.querySelectorAll('#gridArea .opGridWrap tbody tr').forEach(tr=>tr.style.display=!term||tr.textContent.toLowerCase().includes(term)?'':'none')});
+}
+function renderDetentionWorkspace(){if(detentionMode()==='process')renderDetentionProcess();else renderDetentionCollection()}
+
 const CORE_FOLLOWUP=[
   ['agent-tasks::booking','Booking'],['agent-tasks::planning','Job Planning'],['agent-tasks::bl','B/L'],['agent-tasks::cro','CRO'],
   ['agent-tasks::trt','TRT'],['agent-tasks::container-activity','Container'],
@@ -698,6 +833,15 @@ function flowButtons(xs){
 }
 function renderFlow(){
   if(!state.current){$('flow').innerHTML='';return}
+  if(state.current.key==='detention-collection'){
+    const process=detentionMode()==='process';
+    $('flow').innerHTML='<div class="opFollow"><b>Authoritative Detention Flow</b><button onclick="openScreen(\'agent-tasks::container-activity\')">Container Journey</button><span>→</span>'+
+      '<button class="'+(process?'current':'')+'" onclick="openDetentionMode(\'process\')">Detention Process</button><span>→</span>'+
+      '<button onclick="openScreen(\'gl-accounts::invoice\')">Finance Invoice / AR / GL</button><span>→</span>'+
+      '<button class="'+(!process?'current':'')+'" onclick="openDetentionMode(\'collection\')">Detention Collection</button><span>→</span>'+
+      '<button onclick="openScreen(\'gl-accounts::receipt\')">Receipt</button><span>→</span><button onclick="openScreen(\'agent-tasks::soa\')">SOA / Close</button></div>';
+    $('prevBtn').disabled=true;$('nextBtn').disabled=true;return;
+  }
   const key=state.current.key||'';
   const core=CORE_FOLLOWUP.filter(([id])=>state.byId[id]);
   const inCore=core.some(([id])=>id===state.current.screen_id);
@@ -932,6 +1076,10 @@ async function openScreen(id,navContext=null,historyMode='push'){
       await renderQuickActions();
       $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Finance Master</b><span class="muted">CLX-084 · existing authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';
       await renderClx084FinanceMaster();
+    }else if(s.key==='detention-collection'){
+      if(state.rows.length)state.selected=state.rows[0];
+      await renderQuickActions();
+      renderDetentionWorkspace();
     }else if(s.domain==='Agent Tasks'&&state.rows.length){
       state.selected=state.rows[0];
       await renderQuickActions();
@@ -1156,7 +1304,7 @@ async function renderInlineAgentScreen(){
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
 async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
+async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(state.current?.key==='detention-collection'){renderDetentionWorkspace();return;}if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
 async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
 async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
@@ -2925,6 +3073,13 @@ async function routeFromLocation(historyMode='none'){
 async function init(){
   let [m,s]=await Promise.all([api('/api/clx011/menu'),api('/api/clx011/screens')]);
   state.menu=m.menu;state.businessNavigation=m.business_navigation||{groups:[]};state.screens=s;state.byId=Object.fromEntries(s.map(x=>[x.screen_id,x]));
+  for(const d of state.menu||[]){
+    if(d.domain!=='HO Tasks')continue;
+    for(const sub of d.submenus||[]){
+      if(sub.name!=='Transaction')continue;
+      for(const it of sub.items||[])if(it.label==='Sale Invoice Detention')it.label='Detention Process';
+    }
+  }
   renderNav();
   await routeFromLocation('replace');
 }
