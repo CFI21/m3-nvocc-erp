@@ -856,6 +856,7 @@ function renderDetentionProcess(){
     detentionSelectedProcessDetail();
   const d=$('detProcessDate');if(d&&!d.value)d.value=new Date().toISOString().slice(0,10);
   const q=$('detProcessSearch');if(q)q.addEventListener('input',()=>{const term=q.value.toLowerCase();document.querySelectorAll('#gridArea .opGridWrap tbody tr').forEach(tr=>tr.style.display=!term||tr.textContent.toLowerCase().includes(term)?'':'none')});
+  loadDetentionLiveSummary();
 }
 function renderDetentionCollection(){
   const rows=state.rows||[];
