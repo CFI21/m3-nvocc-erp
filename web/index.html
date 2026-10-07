@@ -134,13 +134,17 @@ window.fetch=(input,init={})=>{
 <aside class="drawer" id="drawer"><div class="drawerHead"><b id="drawerTitle">Quick View</b><span style="flex:1"></span><button class="btn" id="drawerClose">×</button></div><div class="drawerBody"><div class="tabs"><button class="tab active" data-tab="details">Details</button><button class="tab" data-tab="related">Related Records</button><button class="tab" data-tab="audit">Audit</button></div><div id="tab-details"></div><div id="tab-related" style="display:none"></div><div id="tab-audit" style="display:none"></div></div></aside>
 <div class="fabWrap" id="fabWrap"><button class="fab" id="fab" aria-label="Quick actions" aria-haspopup="menu">⋮</button><div class="fabTip">Quick Actions</div><div class="fabMenu" id="fabMenu"></div></div>
 <script>
-const state={menu:[],screens:[],byId:{},current:null,rows:[],filtered:[],selected:null,sortKey:'',sortAsc:true,page:1,pageSize:20,status:'',savedView:'',role:'ADMIN',equipmentView:'',favorites:new Set(JSON.parse(localStorage.getItem('m3clx011-favorites')||'[]')),recent:JSON.parse(localStorage.getItem('m3clx011-recent')||'[]')};
+const state={menu:[],screens:[],byId:{},current:null,rows:[],filtered:[],selected:null,sortKey:'',sortAsc:true,page:1,pageSize:20,status:'',savedView:'',gridSearch:'',viewEpoch:0,role:'ADMIN',equipmentView:'',favorites:new Set(JSON.parse(localStorage.getItem('m3clx011-favorites')||'[]')),recent:JSON.parse(localStorage.getItem('m3clx011-recent')||'[]')};
 const esc=v=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
 const $=id=>document.getElementById(id);const api=async(url,opts={})=>{let r=await fetch(url,opts);if(!r.ok)throw new Error(await r.text());return r.json()};
 function domainSlug(d){return d.toLowerCase().replace(/\s*\/\s*/g,'-').replace(/\s+/g,'-').replace(/&/g,'and')}
 function saveState(){localStorage.setItem('m3clx011-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('m3clx011-recent',JSON.stringify(state.recent.slice(0,15)))}
 function toggleGroup(id){let x=document.querySelector(`[data-content="${CSS.escape(id)}"]`);if(x)x.classList.toggle('collapse')}
+const UI_MUTATIONS=new Set(['create','edit','copy','approve','release','hold','cancel','amend','reissue','reverse','retry','activate','deactivate','change-request','reject','advance']);
 function screenAllowed(s){let r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;return !Array.isArray(s.roles)||!s.roles.length||s.roles.includes(r)}
+function viewerReadOnly(){return state.role==='VIEWER'}
+function writeUi(html){return viewerReadOnly()?'':html}
+function viewCurrent(epoch,screenId,role){return state.viewEpoch===epoch&&state.current?.screen_id===screenId&&state.role===role}
 function screenDisplayName(id){if(id==='master-data::equipment-types')return 'Equipment Size & Type';if(id==='master-data::container-types')return 'Container Category';return state.byId[id]?.name||id}
 function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';
 const businessGroups=state.businessNavigation?.groups||[];
@@ -1099,23 +1103,21 @@ function metaCards(data){
     '<div class="opSectionNav">'+sections.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>';
 }
 function normalizeRows(rows){return (rows||[]).map(r=>{let o={...r};if(o.payload&&typeof o.payload==='object'){for(const [k,v] of Object.entries(o.payload)){if(!(k in o))o[k]=v}delete o.payload}return o})}
-function calcRows(){let q=($('gridSearch')?.value||'').toLowerCase();let st=$('statusFilter')?.value||'';let rows=state.rows.filter(r=>(!q||JSON.stringify(r).toLowerCase().includes(q))&&(!st||String(r.status??r.Status??'')===st));if(state.savedView==='action')rows=rows.filter(r=>/draft|pending|open|review|hold|failed/i.test(String(r.status??r.Status??'')));if(state.savedView==='closed')rows=rows.filter(r=>/released|closed|approved|posted|reconciled|active/i.test(String(r.status??r.Status??'')));if(state.sortKey)rows.sort((a,b)=>String(a[state.sortKey]??'').localeCompare(String(b[state.sortKey]??''))*(state.sortAsc?1:-1));state.filtered=rows;return rows}
+function calcRows(){let q=String(state.gridSearch||'').toLowerCase();let st=state.status||'';let rows=state.rows.filter(r=>(!q||JSON.stringify(r).toLowerCase().includes(q))&&(!st||String(r.status??r.Status??'')===st));if(state.savedView==='action')rows=rows.filter(r=>/draft|pending|open|review|hold|failed/i.test(String(r.status??r.Status??'')));if(state.savedView==='closed')rows=rows.filter(r=>/released|closed|approved|posted|reconciled|active/i.test(String(r.status??r.Status??'')));if(state.sortKey)rows.sort((a,b)=>String(a[state.sortKey]??'').localeCompare(String(b[state.sortKey]??''))*(state.sortAsc?1:-1));state.filtered=rows;return rows}
 function statuses(){return [...new Set(state.rows.map(r=>String(r.status??r.Status??'')).filter(Boolean))].sort()}
+function gridColumnKeys(rows){const preferred=['external_ref','job_ref','booking_ref','status','Status','Customer','Agent','B/L','BL','POL','POD','Date','Amount','Currency'],keys=[],seen=new Set();const add=k=>{const canon=String(k).toLowerCase();if(k==='payload_json'||['id','version'].includes(k)||seen.has(canon))return;seen.add(canon);keys.push(k)};for(const k of preferred){if(rows.some(r=>Object.prototype.hasOwnProperty.call(r,k)))add(k)}for(const r of rows)for(const k of Object.keys(r))add(k);return keys.slice(0,8)}
+function gridColumnLabel(k){return String(k).toLowerCase()==='status'?'Status':k}
 function renderGrid(){
   let rows=calcRows(),total=Math.max(1,Math.ceil(rows.length/state.pageSize));state.page=Math.min(state.page,total);
-  let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=[];
-  const preferred=['external_ref','job_ref','booking_ref','Status','status','Customer','Agent','B/L','BL','POL','POD','Date','Amount','Currency'];
-  for(const k of preferred){if(slice.some(r=>Object.prototype.hasOwnProperty.call(r,k))&&!keys.includes(k))keys.push(k)}
-  for(const r of slice){for(const k of Object.keys(r)){if(!keys.includes(k)&&k!=='payload_json'&&!['id','version'].includes(k))keys.push(k)}}
-  keys=keys.slice(0,8);
-  let html='<div class="opGridToolbar"><input id=gridSearch placeholder="Search reference / party / status..." value="'+esc($('gridSearch')?.value||'')+'" oninput="state.page=1;renderGrid()">'+
+  let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=gridColumnKeys(slice);
+  let html='<div class="opGridToolbar"><input id=gridSearch placeholder="Search reference / party / status..." value="'+esc(state.gridSearch)+'" oninput="state.gridSearch=this.value;state.page=1;renderGrid()">'+
     '<select id=statusFilter onchange="state.status=this.value;state.page=1;renderGrid()"><option value="">All statuses</option>'+statuses().map(s=>'<option '+(state.status===s?'selected':'')+'>'+esc(s)+'</option>').join('')+'</select>'+
     '<select onchange="state.savedView=this.value;state.page=1;renderGrid()"><option value="">Saved views</option><option value=action '+(state.savedView==='action'?'selected':'')+'>Action Required</option><option value=closed '+(state.savedView==='closed'?'selected':'')+'>Released / Closed / Approved</option></select>'+
     '<span class="grow"></span><span class=muted>'+rows.length+' / '+state.rows.length+'</span>'+
     '<button class=btn onclick="state.page=Math.max(1,state.page-1);renderGrid()">‹</button><span class=muted>'+state.page+'/'+total+'</span><button class=btn onclick="state.page=Math.min('+total+',state.page+1);renderGrid()">›</button>'+
     '<button class=btn onclick="exportCsv()">Export</button></div>';
   if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div>';
-  html+='<div class=opGridWrap><table><thead><tr><th>Action</th>'+keys.map(k=>'<th onclick="sortBy(\''+String(k).replaceAll("'","\\'")+'\')">'+esc(k)+(state.sortKey===k?(state.sortAsc?' ▲':' ▼'):'')+'</th>').join('')+'</tr></thead><tbody>'+
+  html+='<div class=opGridWrap><table><thead><tr><th>Action</th>'+keys.map(k=>'<th onclick="sortBy(\''+String(k).replaceAll("'","\\'")+'\')">'+esc(gridColumnLabel(k))+(state.sortKey===k?(state.sortAsc?' ▲':' ▼'):'')+'</th>').join('')+'</tr></thead><tbody>'+
     slice.map((r,i)=>'<tr onclick="selectRow('+((state.page-1)*state.pageSize+i)+')"><td>'+(isGlReport()?'<button class=rowAction title="Drill Down" onclick="event.stopPropagation();drillGlReportRow('+((state.page-1)*state.pageSize+i)+')">↳</button>':'<button class=rowAction title="Quick Actions" onclick="event.stopPropagation();selectRow('+((state.page-1)*state.pageSize+i)+');$(\'fabWrap\').classList.add(\'open\')">⋮</button>')+'</td>'+keys.map(k=>'<td>'+esc(typeof r[k]==='object'?JSON.stringify(r[k]):r[k])+'</td>').join('')+'</tr>').join('')+
     '</tbody></table></div>';
   return html
@@ -1143,18 +1145,20 @@ function glReportQuery(){
   const names=['company','period','date_from','date_to','account','cost_center','currency','status'];
   const q=new URLSearchParams();ids.forEach((id,i)=>{const el=$(id);if(el&&el.value.trim())q.set(names[i],el.value.trim())});return q.toString()
 }
-async function reloadGlReport(){
+async function reloadGlReport(epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role){
   if(!isGlReport())return;
+  const key=state.current?.key,name=state.current?.name;
   try{
-    const q=glReportQuery();const d=await api('/api/clx045/reports/'+encodeURIComponent(state.current.key)+(q?'?'+q:''),{headers:{'X-Role':state.role}});
-    state.rows=normalizeRows(d.rows);state.page=1;state.sortKey='';state.status='';state.savedView='';
-    $('screenMeta').innerHTML='<div class="card"><b>'+esc(state.current.name)+'</b><span class="muted"> · CLX-045 live read-only report · '+d.count+' rows</span></div>'+
+    const q=glReportQuery();const d=await api('/api/clx045/reports/'+encodeURIComponent(key)+(q?'?'+q:''),{headers:{'X-Role':role}});
+    if(!viewCurrent(epoch,screenId,role))return;
+    state.rows=normalizeRows(d.rows);state.page=1;state.sortKey='';state.status='';state.savedView='';state.gridSearch='';
+    $('screenMeta').innerHTML='<div class="card"><b>'+esc(name)+'</b><span class="muted"> · CLX-045 live read-only report · '+d.count+' rows</span></div>'+
       (d.totals?'<div class="card"><b>Control totals</b><span class="muted"> · Debit VC '+esc(d.totals.debit_vc)+' / Credit VC '+esc(d.totals.credit_vc)+' · Debit LC '+esc(d.totals.debit_lc)+' / Credit LC '+esc(d.totals.credit_lc)+' · Balanced VC '+esc(d.balanced_vc)+' · Balanced LC '+esc(d.balanced_lc)+'</span></div>':'');
     const keep={};for(const id of ['glCompany','glPeriod','glDateFrom','glDateTo','glAccount','glCostCenter','glCurrency','glReportStatus']){const el=$(id);if(el)keep[id]=el.value}
     $('gridArea').innerHTML=glReportFilterBar()+renderGrid();
     for(const [id,v] of Object.entries(keep)){const el=$(id);if(el)el.value=v}
-    await renderQuickActions();
-  }catch(e){$('gridArea').innerHTML=glReportFilterBar()+'<div class=card><b class=badtext>Error loading GL report</b><pre class=pre>'+esc(e.message)+'</pre></div>'}
+    await renderQuickActions(epoch);
+  }catch(e){if(viewCurrent(epoch,screenId,role))$('gridArea').innerHTML=glReportFilterBar()+'<div class=card><b class=badtext>Error loading GL report</b><pre class=pre>'+esc(e.message)+'</pre></div>'}
 }
 function clearGlReportFilters(){for(const id of ['glCompany','glPeriod','glDateFrom','glDateTo','glAccount','glCostCenter','glCurrency']){const el=$(id);if(el)el.value=''}const st=$('glReportStatus');if(st)st.value='Posted';reloadGlReport()}
 async function drillGlReportRow(i){
@@ -1181,22 +1185,24 @@ function principalTable(rows,workspace){
     rows.map((r,idx)=>'<tr><td><button class="btn" onclick="principalEdit(\''+workspace+'\','+idx+')">Open</button></td>'+keys.map(k=>'<td>'+esc(r[k]??'')+'</td>').join('')+'</tr>').join('')+
     '</tbody></table></div>';
 }
-function principalFieldHtml(def,val){
-  const [name,type,required]=def,id='pgf-'+name,req=required?' *':'';
-  if(type==='boolean')return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="checkbox" '+(Number(val)||String(val).toLowerCase()==='true'?'checked':'')+'></div>';
-  if(type==='textarea')return '<div class="formField full"><label>'+esc(principalPretty(name))+req+'</label><textarea id="'+esc(id)+'">'+esc(val??'')+'</textarea></div>';
+function principalFieldHtml(def,val,readOnly=false){
+  const [name,type,required]=def,id='pgf-'+name,req=required?' *':'',disabled=readOnly?' disabled':'';
+  if(type==='boolean')return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="checkbox" '+(Number(val)||String(val).toLowerCase()==='true'?'checked':'')+disabled+'></div>';
+  if(type==='textarea')return '<div class="formField full"><label>'+esc(principalPretty(name))+req+'</label><textarea id="'+esc(id)+'"'+disabled+'>'+esc(val??'')+'</textarea></div>';
   const inputType=['number','date','datetime-local'].includes(type)?type:'text';
-  return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="'+inputType+'" value="'+esc(val??'')+'"></div>';
+  return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="'+inputType+'" value="'+esc(val??'')+'"'+disabled+'></div>';
 }
 async function principalEdit(workspace,index=-1){
   const d=state.principalWorkspace;if(!d||d.workspace!==workspace)return;
-  const row=index>=0?d.rows[index]:{};
-  const fields=d.schema.map(x=>principalFieldHtml(x,row?.[x[0]])).join('');
-  $('gridArea').innerHTML='<div class="clx82Section"><div class="clx82Head">'+(index>=0?'Edit':'New')+' '+esc(d.title)+'</div><div class="clx82Body"><div class="formGrid">'+fields+
+  if(viewerReadOnly()&&index<0)return;
+  const row=index>=0?d.rows[index]:{},readOnly=viewerReadOnly();
+  const fields=d.schema.map(x=>principalFieldHtml(x,row?.[x[0]],readOnly)).join('');
+  $('gridArea').innerHTML='<div class="clx82Section"><div class="clx82Head">'+(readOnly?'View':(index>=0?'Edit':'New'))+' '+esc(d.title)+'</div><div class="clx82Body"><div class="formGrid">'+fields+
     '<div class="formActions"><button class="btn" onclick="openPrincipalWorkspace(\''+workspace+'\',\''+String(state.navContext?.label||d.title).replaceAll("'","\\'")+'\',\''+state.current.screen_id.replaceAll("'","\\'")+'\',\''+String(state.navContext?.submenu||'').replaceAll("'","\\'")+'\')">Cancel</button>'+
-    '<button class="btn primary" onclick="principalSave(\''+workspace+'\')">Save</button></div></div></div></div>';
+    writeUi('<button class="btn primary" onclick="principalSave(\''+workspace+'\')">Save</button>')+'</div></div></div></div>';
 }
 async function principalSave(workspace){
+  if(viewerReadOnly())return;
   const d=state.principalWorkspace,data={};
   for(const def of d.schema){
     const [name,type]=def,el=$('pgf-'+name);if(!el)continue;
@@ -1235,6 +1241,7 @@ async function principalReleaseCheck(jobRef){
   }catch(e){alert(e.message)}
 }
 async function principalGovernedRelease(releaseRef,jobRef){
+  if(viewerReadOnly())return;
   const containerNo=prompt('Container number for governed cargo release','');
   if(!containerNo)return;
   try{
@@ -1268,7 +1275,7 @@ async function openPrincipalWorkspace(workspace,label,target,group){
     const d=await api('/api/nvocc-principal/workspaces/'+encodeURIComponent(workspace),{headers:principalHeaders()});
     state.principalWorkspace=d;
     const extra=workspace==='release-control'?'<span class="muted">Release readiness is derived from B/L + Customs + Finance + Surrender/Telex; use Open to maintain POD/depot release data.</span>':'';
-    $('gridArea').innerHTML='<div class="opGridToolbar"><b>'+esc(d.title)+'</b>'+extra+'<span class="grow"></span><button class="btn primary" onclick="principalEdit(\''+workspace+'\',-1)">New</button></div>'+principalTable(d.rows,workspace);
+    $('gridArea').innerHTML='<div class="opGridToolbar"><b>'+esc(d.title)+'</b>'+extra+'<span class="grow"></span>'+writeUi('<button class="btn primary" onclick="principalEdit(\''+workspace+'\',-1)">New</button>')+'</div>'+principalTable(d.rows,workspace);
     if(workspace==='release-control'&&d.rows?.length){
       $('gridArea').insertAdjacentHTML('afterbegin','<div class="card"><b>Release Gate</b><div class="muted">Cargo release authorization is governed here. A Release action does not fabricate the physical container RELEASED event; Delivery Order remains blocked until that real event exists.</div><div class="toolbar">'+d.rows.slice(0,8).map(x=>'<button class="btn" onclick="principalReleaseCheck(\''+String(x.job_ref||'').replaceAll("'","\\'")+'\')">Check '+esc(x.job_ref||x.release_ref)+'</button><button class="btn primary" onclick="principalGovernedRelease(\''+String(x.release_ref||'').replaceAll("'","\\'")+'\',\''+String(x.job_ref||'').replaceAll("'","\\'")+'\')">Authorize Cargo Release</button>').join('')+'</div></div>');
     }
@@ -1277,36 +1284,40 @@ async function openPrincipalWorkspace(workspace,label,target,group){
 
 async function openScreen(id,navContext=null,historyMode='push'){
   let s=state.byId[id];if(!s)return;
-  $('favorite').style.visibility='visible';state.current=s;state.navContext=navContext;state.selected=null;state.page=1;state.sortKey='';state.status='';state.savedView='';
+  const epoch=++state.viewEpoch,role=state.role;
+  $('drawer').classList.remove('open');$('fabWrap').classList.remove('open');
+  $('favorite').style.visibility='visible';state.current=s;state.navContext=navContext;state.selected=null;state.page=1;state.sortKey='';state.status='';state.savedView='';state.gridSearch='';
   addRecent(id);renderNav();renderBreadcrumb();renderFlow();if(historyMode==='push')history.pushState(null,'','#screen='+encodeURIComponent(id));else if(historyMode==='replace')history.replaceState(null,'','#screen='+encodeURIComponent(id));
-  if(GL_REPORT_KEYS.has(s.key)){await reloadGlReport();api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});return}
+  if(GL_REPORT_KEYS.has(s.key)){await reloadGlReport(epoch,id,role);if(!viewCurrent(epoch,id,role))return;api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':role,'X-Actor-Id':'ui-user'}}).catch(()=>{});return}
   $('gridArea').innerHTML='<div class=card>Loading active screen…</div>';
   try{
-    let d=await api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers:{'X-Role':state.role}});
+    let d=await api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers:{'X-Role':role}});
+    if(!viewCurrent(epoch,id,role))return;
     state.rows=normalizeRows(d.rows);$('screenMeta').innerHTML=metaCards(d);
     if(CLX49_KEYS.has(s.key)&&state.rows.length){
       state.selected=state.rows[0];
-      await renderQuickActions();
+      await renderQuickActions(epoch);if(!viewCurrent(epoch,id,role))return;
       await showClx049Workspace();
     }else if(CLX84_FINANCE_KEYS.has(s.key)&&state.rows.length){
       state.selected=state.rows[0];
-      await renderQuickActions();
+      await renderQuickActions(epoch);if(!viewCurrent(epoch,id,role))return;
       $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Finance Master</b><span class="muted">CLX-084 · existing authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';
       await renderClx084FinanceMaster();
     }else if(s.key==='detention-collection'){
       if(state.rows.length)state.selected=state.rows[0];
-      await renderQuickActions();
+      await renderQuickActions(epoch);if(!viewCurrent(epoch,id,role))return;
       renderDetentionWorkspace();
     }else if(s.domain==='Agent Tasks'&&state.rows.length){
       state.selected=state.rows[0];
-      await renderQuickActions();
-      $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Screen</b><span class="muted">Existing CLX-042 functional form · authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button><button class="btn" onclick="openAgentForm(\'create\')">New '+esc(s.name)+'</button></div></div>';
+      await renderQuickActions(epoch);if(!viewCurrent(epoch,id,role))return;
+      $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Screen</b><span class="muted">Existing CLX-042 functional form · authoritative API</span><span class="grow"></span>'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button><button class="btn" onclick="openAgentForm(\'create\')">New '+esc(s.name)+'</button>')+'</div></div>';
       await renderInlineAgentScreen();
     }else{
-      $('gridArea').innerHTML=renderGrid();await renderQuickActions();
+      $('gridArea').innerHTML=renderGrid();await renderQuickActions(epoch);
     }
-    api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});
-  }catch(e){$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
+    if(!viewCurrent(epoch,id,role))return;
+    api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':role,'X-Actor-Id':'ui-user'}}).catch(()=>{});
+  }catch(e){if(viewCurrent(epoch,id,role))$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
 }
 
 const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','import-trt','transshipment-trt','delivery-order']);
@@ -1341,11 +1352,13 @@ function clx83TogglePreview(){
 }
 async function renderClx083OperationalMaster(){
   if(!state.current||!CLX83_OPERATIONAL_KEYS.has(state.current.key)||!state.selected)return false;
+  const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   const base={...rowPayload(state.selected)};
   const jr=selectedJob()||clx83Pick(base,'Job Ref','Job');
   let related=null,equipment=null;
   try{if(jr)related=await api('/api/clx011/related/'+encodeURIComponent(jr))}catch(_){}
   try{if(jr)equipment=await api('/api/clx070/container-control/booking-context/'+encodeURIComponent(jr))}catch(_){}
+  if(!viewCurrent(epoch,screenId,role))return false;
   const ident=related?.identity||{};
   const key=state.current.key;
   const isCro=key==='cro';
@@ -1430,7 +1443,7 @@ async function renderClx083OperationalMaster(){
       clx83RO('Remarks',clx83Pick(base,'Remarks'),{full:true,textarea:true})
     ]));
     out+=clx83Section('POT Conditional Logic',pot?
-      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing CRT/booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-trt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
+      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing TRT / legacy booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-trt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
       '<div class="equipNote">Direct shipment / no POT detected. POT, TS Agent and connecting vessel/voyage controls remain inactive; no transshipment data is forced.</div>');
   }
   if(isDo){
@@ -1486,7 +1499,7 @@ async function renderClx083OperationalMaster(){
     clx83Link('agent-tasks::soa','SOA',jr)+
     clx83Link('integration-security::request-response-audit','Audit',jr)+
     '</div><div class="equipNote">All links preserve the existing job context. No second event history, finance ledger or document record is created.</div>');
-  out+='<div class="card"><div class="formActions"><button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button><button class="btn" onclick="clx83TogglePreview()">Print / Preview</button></div></div></div>';
+  out+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button>')+'<button class="btn" onclick="clx83TogglePreview()">Print / Preview</button></div></div></div>';
   clx83PreviewState={title:state.current.name,base};
   $('gridArea').insertAdjacentHTML('beforeend',out);
   return true;
@@ -1494,9 +1507,12 @@ async function renderClx083OperationalMaster(){
 
 async function renderInlineAgentScreen(){
   if(!state.current||state.current.domain!=='Agent Tasks'||!state.selected)return;
+  const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   if(await renderClx083OperationalMaster())return;
+  if(!viewCurrent(epoch,screenId,role))return;
   try{
-    const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode=edit');
+    const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(screenId)+'&mode=edit');
+    if(!viewCurrent(epoch,screenId,role))return;
     const base={...rowPayload(state.selected)};
     const fields=schema.fields||[];
     let html='<div class="clx78Workspace"><div class="clx78Panel"><div class="clx78PanelHead">'+esc(state.current.name)+' · Active Record</div><div class="clx78PanelBody"><div class="formGrid">';
@@ -1512,16 +1528,26 @@ async function renderInlineAgentScreen(){
       html+='<div class="formField"><label>Record Key</label><input value="'+esc(state.selected.record_key||'')+'" disabled></div>';
       html+='<div class="formField"><label>Name</label><input value="'+esc(state.selected.display_name||base.name||'')+'" disabled></div>';
     }
-    html+='</div><div class="formActions"><button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Active Screen</button><button class="btn" onclick="openAgentForm(\'create\')">Create New</button></div></div></div></div>';
+    html+='</div><div class="formActions">'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Active Screen</button><button class="btn" onclick="openAgentForm(\'create\')">Create New</button>')+'</div></div></div></div>';
     $('gridArea').insertAdjacentHTML('beforeend',html);
   }catch(e){
-    $('gridArea').insertAdjacentHTML('beforeend','<div class="card"><b class="badtext">Active form unavailable</b><div class="muted">'+esc(e.message)+'</div></div>');
+    if(viewCurrent(epoch,screenId,role))$('gridArea').insertAdjacentHTML('beforeend','<div class="card"><b class="badtext">Active form unavailable</b><div class="muted">'+esc(e.message)+'</div></div>');
   }
 }
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
-async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(state.current?.key==='detention-collection'){renderDetentionWorkspace();return;}if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
+async function renderQuickActions(epoch=state.viewEpoch){
+  if(!state.current)return;
+  const screenId=state.current.screen_id,role=state.role,status=selectedStatus(),setup=state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup';
+  let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(screenId)+'&role='+encodeURIComponent(role)+'&status='+encodeURIComponent(status));
+  if(!viewCurrent(epoch,screenId,role))return;
+  let actions=[...a.visible_actions];
+  if(setup&&role!=='VIEWER')actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];
+  if(role==='VIEWER')actions=actions.filter(x=>!UI_MUTATIONS.has(x));
+  actions=[...new Set(actions)];
+  $('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>';
+}
+async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(state.current?.key==='detention-collection'){renderDetentionWorkspace();return;}if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span>'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button>')+'</div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
 async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
 async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
@@ -1808,12 +1834,12 @@ async function clx49RenderBlTab(tab){
     '</div><div style="margin-top:8px"><b>Maker / Checker / Audit</b>'+clx82AuthorizationAudit(w)+'</div></div></div>';
   }
 
-  if(r && tab!=='Booking Info'){
+  if(r && tab!=='Booking Info'&&!viewerReadOnly()){
     html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\''+x.module+'\','+r.id+','+r.version+')">Save '+esc(tab)+'</button>'+
       (tab==='Authorization'?'<button class="btn" onclick="approveClx049Bl('+r.id+','+r.version+')">Approve via Existing B/L Governance</button>':'')+
       '</div></div>';
   }else if(r && tab==='Booking Info'){
-    html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'bl\','+r.id+','+r.version+')">Save B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button></div></div>';
+    html+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'bl\','+r.id+','+r.version+')">Save B/L</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button></div></div>';
   }
   html+='</div>';
   $('gridArea').innerHTML=renderGrid()+html;
@@ -1992,7 +2018,7 @@ async function clx49RenderBooking(tab){
   ]);
   const other=Object.keys(p).filter(k=>!known.has(k));
   let html=clx49ContextHeader(w)+clx49Nav(w);
-  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>FULL FLOW</b><span class="muted">'+esc(w.context.booking_ref||r?.external_ref||'')+' · '+esc(w.context.customer_name||'')+' · '+esc(w.context.pol||'')+' → '+esc(w.context.pod||'')+'</span><span class="grow"></span><button class="btn">Master Data</button><button class="btn" onclick="clx49RenderBooking(\''+tab+'\')">Reset View</button><button class="btn primary" onclick="saveClx049Tab(\'booking\','+(r?.id||0)+','+(r?.version||1)+')">Save Draft</button></div>'+
+  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>FULL FLOW</b><span class="muted">'+esc(w.context.booking_ref||r?.external_ref||'')+' · '+esc(w.context.customer_name||'')+' · '+esc(w.context.pol||'')+' → '+esc(w.context.pod||'')+'</span><span class="grow"></span><button class="btn">Master Data</button><button class="btn" onclick="clx49RenderBooking(\''+tab+'\')">Reset View</button>'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+(r?.id||0)+','+(r?.version||1)+')">Save Draft</button>')+'</div>'+
     '<div class="clx78Hint">CLX-081 Booking Master Field Alignment · approved Booking reference layout · current authoritative Booking/Job APIs · Reference # remains REVIEW_LATER.</div>'+
     '<div class="clx78Tabs">'+[
       ['Booking Info','Basic Info'],['Other Info','Other Info'],['Messages','Messages']
@@ -2052,7 +2078,7 @@ async function clx49RenderBooking(tab){
     html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Messages</div><div class="clx78PanelBody"><div class="equipNote">Operational messages remain linked to the existing job/document/audit context. No duplicate message model is introduced.</div></div></div>';
   }
   html+='</div>';
-  if(r)html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(displayTab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
+  if(r)html+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(displayTab)+'</button>')+'<button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
   $('gridArea').innerHTML=renderGrid()+html;
   if(tab==='Booking Info'){
     for(const n of ['Via Port','Transshipment Port','POT (1)','POT (2)'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
@@ -2064,26 +2090,30 @@ async function clx49RenderBooking(tab){
 function clx49RenderSpecialRate(){
   const w=clx49Workspace,r=w.special_rate_request;
   let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="clx78Workspace"><div class="clx78TopBar"><b>SPECIAL RATE REQUEST</b><span class="muted">Same governed Job/Booking context</span><span class="grow"></span><button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Open Booking</button></div><div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Rate Request</div><div class="clx78PanelBody">'+clx49FieldEditor(r);
-  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'special-rates-request\','+r.id+','+r.version+')">Save Special Rate Request</button></div>';
+  if(r&&!viewerReadOnly())html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'special-rates-request\','+r.id+','+r.version+')">Save Special Rate Request</button></div>';
   html+='</div></div></div>';$('gridArea').innerHTML=renderGrid()+html;
 }
 function clx49RenderSwitchBl(){
   const w=clx49Workspace,r=w.switch_bl;
   let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="clx78Workspace"><div class="clx78TopBar"><b>SWITCH B/L</b><span class="muted">Original B/L → Switch B/L · governed confidentiality / approval / history</span><span class="grow"></span><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Back to Source B/L</button></div><div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Switch B/L Detail</div><div class="clx78PanelBody">'+clx49FieldEditor(r);
-  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'switch-bl\','+r.id+','+r.version+')">Save Switch B/L</button></div>';
+  if(r&&!viewerReadOnly())html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'switch-bl\','+r.id+','+r.version+')">Save Switch B/L</button></div>';
   html+='<div class="clx78Panel" style="margin-top:6px"><div class="clx78PanelHead">Immutable History</div><div class="clx78PanelBody"><pre class="pre">'+esc(JSON.stringify(w.switch_bl_history,null,2))+'</pre></div></div></div></div></div>';$('gridArea').innerHTML=renderGrid()+html;
 }
 async function showClx049Workspace(){
   const jr=selectedJob();if(!jr)return openDrawer('details');
+  const epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role;
   try{
-    clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers({context:{agent_code:state.selected?.agent_code}})});
+    const workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers({context:{agent_code:state.selected?.agent_code}})});
+    if(!viewCurrent(epoch,screenId,role))return;
+    clx49Workspace=workspace;
     if(state.current.key==='bl')await clx49RenderBlTab(CLX49_BL_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
     else if(state.current.key==='booking')await clx49RenderBooking(CLX49_BOOKING_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
     else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
     else if(state.current.key==='switch-bl')clx49RenderSwitchBl();
-  }catch(e){alert(e.message)}
+  }catch(e){if(viewCurrent(epoch,screenId,role))alert(e.message)}
 }
 async function saveClx049Tab(module,id,version){
+  if(viewerReadOnly())return;
   try{
     const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):el.value);
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
@@ -2097,6 +2127,7 @@ async function saveClx049Tab(module,id,version){
   }catch(e){alert(e.message)}
 }
 async function approveClx049Bl(id,version){
+  if(viewerReadOnly())return;
   try{
     if(!confirm('Approve this B/L through the existing governed B/L action?'))return;
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
@@ -2118,8 +2149,11 @@ function fieldValue(name,base){
   return base?.[name]??'';
 }
 async function openAgentForm(mode){
+  if(viewerReadOnly())return;
+  const epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role;
   const setup=state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup';
-  const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode='+mode);
+  const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(screenId)+'&mode='+mode);
+  if(!viewCurrent(epoch,screenId,role))return;
   const base=setup?(state.selected?{...rowPayload(state.selected),Name:state.selected.display_name,'Record Key':state.selected.record_key}:{}):(state.selected?{...rowPayload(state.selected)}:{});
   const fields=schema.fields||[];
   $('drawerTitle').textContent=(mode==='create'?'Create ':'Edit ')+(state.navContext?.label||schema.name||state.current.name);
@@ -2141,10 +2175,11 @@ async function openAgentForm(mode){
     html+='<div class="formField"><label>Effective From</label><input data-clx42-master="effective_from" value="'+esc(base.effective_from||'')+'"></div>';
     html+='<div class="formField"><label>Effective To</label><input data-clx42-master="effective_to" value="'+esc(base.effective_to||'')+'"></div>';
   }
-  html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button><button class="btn primary" onclick="saveAgentForm(\''+mode+'\')">Save</button></div></div>';
+  html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button>'+writeUi('<button class="btn primary" onclick="saveAgentForm(\''+mode+'\')">Save</button>')+'</div></div>';
   $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open');
 }
 async function saveAgentForm(mode){
+  if(viewerReadOnly())return;
   try{
     const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode='+mode);
     if(schema.kind==='AGENT_TRANSACTION'){
@@ -2223,12 +2258,14 @@ function clx84TogglePreview(){
 }
 async function renderClx084FinanceMaster(){
   if(!state.current||!CLX84_FINANCE_KEYS.has(state.current.key)||!state.selected)return false;
+  const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   const base={...rowPayload(state.selected)};
   const jr=selectedJob()||clx84Pick(base,'Job Ref','Job');
   let related=null,gl={links:[],operational_sources:[]},tre={gl_sources:[],treasury_records:[],report_lines:[],operational_sources:[]};
   try{if(jr)related=await api('/api/clx011/related/'+encodeURIComponent(jr))}catch(_){}
   try{if(jr)gl=await api('/api/gl/job/'+encodeURIComponent(jr)+'/links',{headers:{'X-Role':state.role}})}catch(_){}
-  try{if(jr)tre=await api('/api/clx046/job/'+encodeURIComponent(jr)+'/trace',{headers:{'X-Role':state.role}})}catch(_){}
+  try{if(jr)tre=await api('/api/clx046/job/'+encodeURIComponent(jr)+'/trace',{headers:{'X-Role':role}})}catch(_){}
+  if(!viewCurrent(epoch,screenId,role))return false;
   const ident=related?.identity||{}, key=state.current.key, curr=clx84Pick(base,'Currency');
   const gls=tre.gl_sources||[], trs=tre.treasury_records||[], reports=tre.gl_report_lines||tre.report_lines||[], links=gl.links||[];
   const invoiceRows=gls.filter(x=>x.module==='invoice'), billRows=gls.filter(x=>x.module==='bills'), receiptRows=gls.filter(x=>x.module==='receipt'), paymentRows=gls.filter(x=>x.module==='payment');
@@ -2364,7 +2401,7 @@ async function renderClx084FinanceMaster(){
   ])+clx84Rows('Posted GL report context',reports));
   out+=clx84Section('Payment / Receipt & Document Links','<div class="formActions">'+
     clx84Link('agent-tasks::booking','Booking',jr)+clx84Link('agent-tasks::bl','B/L',jr)+clx84Link('agent-tasks::cro','CRO',jr)+
-    clx84Link('agent-tasks::transshipment-trt','CRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
+    clx84Link('agent-tasks::transshipment-trt','TRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
     clx84Link('gl-accounts::invoice','Invoice',jr)+clx84Link('gl-accounts::bills','Bill / AP',jr)+
     clx84Link('gl-accounts::receipt','Receipt',jr)+clx84Link('gl-accounts::payment','Payment',jr)+
     clx84Link('gl-accounts::voucher','GL Voucher',jr)+clx84Link('agent-tasks::soa','SOA',jr)+
@@ -2374,7 +2411,7 @@ async function renderClx084FinanceMaster(){
     '<div class="equipNote"><b>Manual rate / additional cost rule:</b> approved commercial values are not opened for uncontrolled editing. Any post-approval additional accrued cost must use an existing governed change / CRT / adjustment route with reason and audit, and only an authorized ADMIN or assigned finance role where the backend already permits it.</div>'+
     '<div class="equipNote"><b>Four-eyes:</b> create / approve / post / credit / write-off / adjustment / payment release continue through the existing role and action-route controls. No self-approval path is introduced by CLX-084.</div>');
   out+='<div class="card"><div class="formActions">'+
-    (key==='invoice'||key==='bills'?'<button class="btn primary" onclick="openFinanceForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button>':'<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing SOA Record</button>')+
+    writeUi(key==='invoice'||key==='bills'?'<button class="btn primary" onclick="openFinanceForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button>':'<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing SOA Record</button>')+
     '<button class="btn" onclick="clx84TogglePreview()">Print / Preview</button></div></div></div>';
   clx84PreviewState={title:state.current.name,base};
   $('gridArea').insertAdjacentHTML('beforeend',out);
@@ -2388,6 +2425,7 @@ async function financeModuleMeta(kind){
   return xs.find(x=>x.key===state.current.key)||{};
 }
 async function openFinanceForm(mode){
+  if(viewerReadOnly())return;
   const kind=financeDomain();if(!kind)return;
   if(mode==='edit'&&!state.selected)return alert('Select a record to edit');
   try{
@@ -2402,11 +2440,12 @@ async function openFinanceForm(mode){
     for(const name of fields){if(name==='Account Lines'||name==='Budget Lines'||name==='Reconciliation Lines'||name==='Cheque Stock')continue;const full=/remarks|notes|narration|description|instruction|company assignment/i.test(name);const val=base[name]??'';const type=/date/i.test(name)?'date':(/amount|balance|rate|debit|credit|wht|total|difference/i.test(name)?'number':'text');html+='<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+(full?'<textarea data-clx43-field="'+esc(name)+'">'+esc(val)+'</textarea>':'<input type="'+type+'" data-clx43-field="'+esc(name)+'" value="'+esc(val)+'">')+'</div>'}
     if(kind==='gl'&&meta.line_columns?.length){let existing=Array.isArray(base['Account Lines'])?base['Account Lines']:[{}];html+='<div class="formField full"><label>Account Detail</label><div style="overflow:auto"><table><thead><tr>'+meta.line_columns.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+existing.map((row,ri)=>'<tr>'+meta.line_columns.map(col=>'<td><input data-clx44-line-row="'+ri+'" data-clx44-line-col="'+esc(col)+'" value="'+esc(row[col]??'')+'" style="min-width:110px"></td>').join('')+'</tr>').join('')+'</tbody></table></div></div>'}
     if(kind==='gl'&&meta.reference_actions?.length)html+='<div class="formField full"><div class="muted">Reference actions: '+meta.reference_actions.map(esc).join(' · ')+'</div></div>';
-    html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button><button class="btn primary" onclick="saveFinanceForm(\''+mode+'\')">Save</button></div></div>';
+    html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button>'+writeUi('<button class="btn primary" onclick="saveFinanceForm(\''+mode+'\')">Save</button>')+'</div></div>';
     $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open');
   }catch(e){alert(e.message)}
 }
 async function saveFinanceForm(mode){
+  if(viewerReadOnly())return;
   const kind=financeDomain();if(!kind)return;
   try{
     const fields={};document.querySelectorAll('[data-clx43-field]').forEach(el=>fields[el.dataset.clx43Field]=el.value);
@@ -2482,7 +2521,7 @@ async function decideMasterChange(decision){
     await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
 }
-async function runAction(a){$('fabWrap').classList.remove('open');const isAgent=state.current?.domain==='Agent Tasks',fin=financeDomain(),md=currentMasterDomain();if(a==='create'){if(isAgent)await openAgentForm('create');else if(fin)await openFinanceForm('create');return}if(a==='edit'){if(!state.selected)return alert('Select a record to edit');if(isAgent)await openAgentForm('edit');else if(fin)await openFinanceForm('edit');return}if(a==='activate'||a==='deactivate'){if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup')await changeAgentSetupStatus(a);else if(md)await masterStatusChange(a);return}if(a==='change-request'&&md){await openMasterChange();return}if(a==='version-history'&&md){await showMasterVersions();return}if((a==='approve'||a==='reject')&&state.current?.screen_id==='master-data::approval-queue'){await decideMasterChange(a);return}if(a==='quick-view'){openDrawer('details');return}if(a==='related-records'){openDrawer('related');return}if(a==='audit-history'){openDrawer('audit');return}if(a==='print'){window.print();return}if(a==='export'){exportCsv();return}let jr=selectedJob(),ref=state.selected?.external_ref??state.selected?.record_key??state.selected?.user_ref??null;if(a==='email'){try{let r=await api('/api/clx011/simulate-email',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'},body:JSON.stringify({screen_id:state.current.screen_id,record_ref:ref,job_ref:jr,subject:`${state.current.name} update`})});alert('Email action recorded as '+r.delivery+' — no external delivery.');loadAudit()}catch(e){alert(e.message)}return}if(isAgent&&['approve','release','hold','cancel','amend','reissue','reverse','advance'].includes(a)){await executeAgentAction(a);return}if(fin&&['approve','release','reverse'].includes(a)){await executeFinanceAction(a);return}let rid=state.selected?.id,version=state.selected?.version;let route=await api('/api/clx011/action-route?screen_id='+encodeURIComponent(state.current.screen_id)+'&action='+encodeURIComponent(a)+(rid?'&record_id='+rid:'')+(version?'&version='+version:''));$('drawerTitle').textContent='Quick Action · '+a;$('tab-details').innerHTML=`<div class=card><b>${esc(a.replaceAll('-',' '))}</b><p>This screen uses its existing approved workflow. No new business mutation is introduced by CLX-043.</p></div><pre class=pre>${esc(JSON.stringify(route,null,2))}</pre>`;drawerTabs('details');$('drawer').classList.add('open')}
+async function runAction(a){$('fabWrap').classList.remove('open');if(viewerReadOnly()&&UI_MUTATIONS.has(a))return;const isAgent=state.current?.domain==='Agent Tasks',fin=financeDomain(),md=currentMasterDomain();if(a==='create'){if(isAgent)await openAgentForm('create');else if(fin)await openFinanceForm('create');return}if(a==='edit'){if(!state.selected)return alert('Select a record to edit');if(isAgent)await openAgentForm('edit');else if(fin)await openFinanceForm('edit');return}if(a==='activate'||a==='deactivate'){if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup')await changeAgentSetupStatus(a);else if(md)await masterStatusChange(a);return}if(a==='change-request'&&md){await openMasterChange();return}if(a==='version-history'&&md){await showMasterVersions();return}if((a==='approve'||a==='reject')&&state.current?.screen_id==='master-data::approval-queue'){await decideMasterChange(a);return}if(a==='quick-view'){openDrawer('details');return}if(a==='related-records'){openDrawer('related');return}if(a==='audit-history'){openDrawer('audit');return}if(a==='print'){window.print();return}if(a==='export'){exportCsv();return}let jr=selectedJob(),ref=state.selected?.external_ref??state.selected?.record_key??state.selected?.user_ref??null;if(a==='email'){try{let r=await api('/api/clx011/simulate-email',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'},body:JSON.stringify({screen_id:state.current.screen_id,record_ref:ref,job_ref:jr,subject:`${state.current.name} update`})});alert('Email action recorded as '+r.delivery+' — no external delivery.');loadAudit()}catch(e){alert(e.message)}return}if(isAgent&&['approve','release','hold','cancel','amend','reissue','reverse','advance'].includes(a)){await executeAgentAction(a);return}if(fin&&['approve','release','reverse'].includes(a)){await executeFinanceAction(a);return}let rid=state.selected?.id,version=state.selected?.version;let route=await api('/api/clx011/action-route?screen_id='+encodeURIComponent(state.current.screen_id)+'&action='+encodeURIComponent(a)+(rid?'&record_id='+rid:'')+(version?'&version='+version:''));$('drawerTitle').textContent='Quick Action · '+a;$('tab-details').innerHTML=`<div class=card><b>${esc(a.replaceAll('-',' '))}</b><p>This screen uses its existing approved workflow. No new business mutation is introduced by CLX-043.</p></div><pre class=pre>${esc(JSON.stringify(route,null,2))}</pre>`;drawerTabs('details');$('drawer').classList.add('open')}
 async function doGlobalSearch(){let q=$('globalSearch').value.trim();if(q.length<2){$('searchPanel').classList.remove('open');return}let d=await api('/api/clx011/search?q='+encodeURIComponent(q)+'&role='+encodeURIComponent(state.role));let html=d.screen_hits.map(x=>`<div class=searchItem onclick="openScreen('${x.screen_id.replaceAll("'","\'")}');$('searchPanel').classList.remove('open')"><b>${esc(x.name)}</b><div class=muted>${esc(x.domain)} · ${esc(x.submenu)}</div></div>`).join('');html+=d.record_hits.map(x=>`<div class=searchItem><b>${esc(x.external_ref??x.record_key??'Record')}</b><div class=muted>${esc(x.type)} · Job ${esc(x.job_ref??'—')} · ${esc(x.status??'')}</div></div>`).join('');$('searchPanel').innerHTML=html||'<div class="searchItem muted">No matches</div>';$('searchPanel').classList.add('open')}
 function showShortlist(ids,title){let xs=ids.map(id=>state.byId[id]).filter(Boolean);$('searchPanel').innerHTML=`<div class=searchItem><b>${esc(title)}</b></div>`+xs.map(s=>`<div class=searchItem onclick="openScreen('${s.screen_id.replaceAll("'","\'")}');$('searchPanel').classList.remove('open')"><b>${esc(s.name)}</b><div class=muted>${esc(s.domain)} · ${esc(s.submenu)}</div></div>`).join('');$('searchPanel').classList.add('open')}
 
@@ -3307,5 +3346,5 @@ async function init(){
   await routeFromLocation('replace');
 }
 window.addEventListener('popstate',()=>routeFromLocation('none'));
-$('menuSearch').addEventListener('input',renderNav);$('globalSearch').addEventListener('input',()=>{clearTimeout(window.__gs);window.__gs=setTimeout(doGlobalSearch,180)});$('role').addEventListener('change',async e=>{state.role=e.target.value;renderNav();if(state.current&&!screenAllowed(state.current)){let fallback=state.screens.find(screenAllowed);if(fallback)await openScreen(fallback.screen_id);return;}await renderQuickActions()});$('prevBtn').onclick=()=>{let x=neighborId(-1);if(x)openScreen(x)};$('nextBtn').onclick=()=>{let x=neighborId(1);if(x)openScreen(x)};$('favorite').onclick=()=>{let id=state.current.screen_id;if(state.favorites.has(id))state.favorites.delete(id);else state.favorites.add(id);saveState();renderBreadcrumb()};$('notificationsBtn').onclick=()=>showOpsWorkbench('critical');$('moreBtn').onclick=()=>$('moreWrap').classList.toggle('open');$('drawerClose').onclick=()=> $('drawer').classList.remove('open');for(const b of document.querySelectorAll('.tab'))b.onclick=()=>drawerTabs(b.dataset.tab);$('fab').onclick=()=> $('fabWrap').classList.toggle('open');document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('drawer').classList.remove('open');$('searchPanel').classList.remove('open');$('fabWrap').classList.remove('open');$('moreWrap').classList.remove('open')}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('globalSearch').focus()}});init();
+$('menuSearch').addEventListener('input',renderNav);$('globalSearch').addEventListener('input',()=>{clearTimeout(window.__gs);window.__gs=setTimeout(doGlobalSearch,180)});$('role').addEventListener('change',async e=>{state.role=e.target.value;++state.viewEpoch;$('drawer').classList.remove('open');$('fabWrap').classList.remove('open');renderNav();if(state.current&&!screenAllowed(state.current)){let fallback=state.screens.find(screenAllowed);if(fallback)await openScreen(fallback.screen_id,null,'replace');return;}if(state.current){await openScreen(state.current.screen_id,state.navContext,'replace');return;}await renderQuickActions()});$('prevBtn').onclick=()=>{let x=neighborId(-1);if(x)openScreen(x)};$('nextBtn').onclick=()=>{let x=neighborId(1);if(x)openScreen(x)};$('favorite').onclick=()=>{let id=state.current.screen_id;if(state.favorites.has(id))state.favorites.delete(id);else state.favorites.add(id);saveState();renderBreadcrumb()};$('notificationsBtn').onclick=()=>showOpsWorkbench('critical');$('moreBtn').onclick=()=>$('moreWrap').classList.toggle('open');$('drawerClose').onclick=()=> $('drawer').classList.remove('open');for(const b of document.querySelectorAll('.tab'))b.onclick=()=>drawerTabs(b.dataset.tab);$('fab').onclick=()=> $('fabWrap').classList.toggle('open');document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('drawer').classList.remove('open');$('searchPanel').classList.remove('open');$('fabWrap').classList.remove('open');$('moreWrap').classList.remove('open')}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('globalSearch').focus()}});init();
 </script><!-- CLX-070 native Equipment Control integrated in current M3 shell --></body></html>
