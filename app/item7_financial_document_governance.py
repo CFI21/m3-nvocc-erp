@@ -1,5 +1,6 @@
 import os, json
 from fastapi import HTTPException
+from .db import table_exists
 
 
 DOCUMENT_MODULES={'invoice','bills'}
@@ -44,12 +45,77 @@ def find_source_document(conn, ref, preferred=None):
     raise HTTPException(422,{'code':'SOURCE_DOCUMENT_NOT_FOUND','source_ref':ref})
 
 
+def _detention_segment_refs(fields):
+    v=fields.get('Detention Segment Refs')
+    if v in (None,''):v=fields.get('Detention Segment Ref')
+    if isinstance(v,list):return [str(x).strip() for x in v if str(x).strip()]
+    if isinstance(v,str):
+        return [x.strip() for x in v.replace(';',',').split(',') if x.strip()]
+    return []
+
+def _detention_invoice_fx(conn,src,fields):
+    currency=str(fields.get('Currency') or 'USD').upper()
+    if currency=='USD':return 1.0
+    r=conn.execute("""SELECT exchange_rate FROM gl_vouchers WHERE gl_record_id=?
+      AND UPPER(COALESCE(status,'')) NOT IN ('REVERSED','CANCELLED','CANCELED','VOID')
+      ORDER BY id DESC LIMIT 1""",(src['id'],)).fetchone()
+    if r and _num(r['exchange_rate'])>0:return _num(r['exchange_rate'])
+    rate=_num(fields.get('Exchange Rate') or fields.get('FX Rate'))
+    if rate>0:return rate
+    raise HTTPException(409,{'code':'FX_RATE_MISSING_ON_SEGMENT','invoice_ref':src['external_ref'],'currency':currency})
+
+def validate_detention_document_link(conn,module,fields,job_id=None,source_type=None,source_ref=None):
+    if module not in {'invoice','bills'} or str(source_type or '').upper()!='DETENTION_COLLECTION':
+        return {}
+    if not source_ref:raise HTTPException(422,{'code':'DETENTION_REF_REQUIRED'})
+    if not table_exists(conn,'detention_segments'):
+        raise HTTPException(503,{'code':'SEGMENT_TABLE_MISSING'})
+    direction='AGENT_TO_CUSTOMER' if module=='invoice' else 'PRINCIPAL_TO_AGENT'
+    rows=[dict(r) for r in conn.execute("""SELECT * FROM detention_segments
+      WHERE detention_ref=? AND commercial_direction=? ORDER BY sequence,id""",(source_ref,direction)).fetchall()]
+    if not rows:
+        other=conn.execute("SELECT commercial_direction FROM detention_segments WHERE detention_ref=? LIMIT 1",(source_ref,)).fetchone()
+        if other:
+            raise HTTPException(409,{'code':'DETENTION_REF_DIRECTION_COLLISION','detention_ref':source_ref,
+                                     'expected_direction':direction,'actual_direction':other['commercial_direction']})
+        raise HTTPException(422,{'code':'DETENTION_REF_NOT_FOUND','detention_ref':source_ref})
+    if job_id is not None and any(int(r['job_id'])!=int(job_id) for r in rows):
+        raise HTTPException(422,{'code':'DETENTION_FINANCE_JOB_MISMATCH','detention_ref':source_ref})
+
+    already=set()
+    for doc in conn.execute("""SELECT payload_json,status FROM gl_records
+      WHERE module=? AND UPPER(COALESCE(source_type,''))='DETENTION_COLLECTION' AND source_ref=?
+        AND UPPER(COALESCE(status,'')) NOT IN ('CANCELLED','CANCELED','REVERSED','VOID')""",(module,source_ref)):
+        p=_record_fields(doc)
+        already.update(_detention_segment_refs(p))
+    requested=_detention_segment_refs(fields)
+    row_by_ref={r['segment_ref']:r for r in rows}
+    if requested:
+        bad=[x for x in requested if x not in row_by_ref]
+        if bad:raise HTTPException(422,{'code':'DETENTION_SEGMENT_REF_INVALID','segment_refs':bad,'detention_ref':source_ref})
+        dup=[x for x in requested if x in already]
+        if dup:raise HTTPException(409,{'code':'DETENTION_SEGMENT_ALREADY_INVOICED','segment_refs':dup})
+    else:
+        requested=[r['segment_ref'] for r in rows if r['segment_ref'] not in already]
+        if not requested:raise HTTPException(409,{'code':'NO_UNINVOICED_DETENTION_SEGMENTS','detention_ref':source_ref})
+    selected=[row_by_ref[x] for x in requested]
+    fields['Detention Ref']=source_ref
+    fields['Detention Segment Refs']=requested
+    fields['Commercial Direction']=direction
+    fields['Detention Stage']=selected[-1]['stage'] if len({x['stage'] for x in selected})==1 else 'MIXED'
+    fields['Tariff Versions']=[{'segment_ref':x['segment_ref'],'rule_ref':x['rule_ref'],'version':x['tariff_version']} for x in selected]
+    return {'detention_ref':source_ref,'commercial_direction':direction,'segment_refs':requested,
+            'segment_base_amount':round(sum(_num(x['base_amount']) for x in selected),2)}
+
 def validate_correction(conn, module, fields, job_id=None, source_type=None, source_ref=None):
-    if not enabled() or module not in CORRECTION_MODULES:return {}
+    if module not in CORRECTION_MODULES:return {}
     ref=source_ref or fields.get('Invoice Ref') or fields.get('Bill Ref') or fields.get('Source Ref')
     preferred='invoice' if fields.get('Invoice Ref') else ('bills' if fields.get('Bill Ref') else source_type)
     src=find_source_document(conn,ref,preferred)
     src_fields=_record_fields(src)
+    detention_segments=_detention_segment_refs(src_fields)
+    detention_credit=(module=='credit-note' and bool(detention_segments))
+    if not enabled() and not detention_credit:return {}
     if str(src['status']).upper() in {'CANCELLED','REVERSED'}:
         raise HTTPException(422,{'code':'SOURCE_DOCUMENT_NOT_CORRECTABLE','status':src['status']})
     if job_id is not None and src['job_id']!=job_id:
@@ -63,20 +129,51 @@ def validate_correction(conn, module, fields, job_id=None, source_type=None, sou
         raise HTTPException(422,{'code':'CORRECTION_PARTY_MISMATCH'})
     amount=_num(fields.get('Amount'))
     if amount<=0: raise HTTPException(422,{'code':'CORRECTION_AMOUNT_REQUIRED'})
+
+    segment_ref=None
+    if detention_credit:
+        refs=_detention_segment_refs(fields)
+        if len(refs)!=1:
+            raise HTTPException(422,{'code':'DETENTION_CREDIT_SEGMENT_REQUIRED','required':'exactly one Detention Segment Ref'})
+        segment_ref=refs[0]
+        if segment_ref not in detention_segments:
+            raise HTTPException(422,{'code':'DETENTION_CREDIT_SEGMENT_NOT_ON_INVOICE','segment_ref':segment_ref,'invoice_ref':ref})
+        reason_code=str(fields.get('Reason Code') or '').strip()
+        if not reason_code:
+            raise HTTPException(422,{'code':'DETENTION_CREDIT_REASON_CODE_REQUIRED','invoice_ref':ref,'segment_ref':segment_ref})
+        if not table_exists(conn,'detention_segments'):
+            raise HTTPException(503,{'code':'SEGMENT_TABLE_MISSING'})
+        seg=conn.execute("SELECT * FROM detention_segments WHERE segment_ref=?",(segment_ref,)).fetchone()
+        if not seg:raise HTTPException(422,{'code':'DETENTION_SEGMENT_REF_INVALID','segment_ref':segment_ref})
+        src_fx=_detention_invoice_fx(conn,src,src_fields)
+        segment_limit=round(_num(seg['base_amount'])/src_fx,2)
+        existing_segment_credit=0.0
+        for r in conn.execute("""SELECT payload_json,status FROM gl_records
+          WHERE module='credit-note' AND source_ref=? AND UPPER(COALESCE(status,'')) NOT IN ('CANCELLED','CANCELED','REVERSED','VOID')""",(ref,)):
+            p=_record_fields(r)
+            if segment_ref in _detention_segment_refs(p):
+                existing_segment_credit+=_num(p.get('Amount'))
+        if existing_segment_credit+amount>segment_limit+0.005:
+            raise HTTPException(422,{'code':'CREDIT_EXCEEDS_INVOICE','invoice_ref':ref,'segment_ref':segment_ref,
+                                     'segment_invoice_bound':segment_limit,'existing_segment_credits':round(existing_segment_credit,2),
+                                     'requested':amount})
+
     original=_doc_amount(src['module'],src_fields)
     existing=0.0
     for r in conn.execute("""SELECT payload_json,status FROM gl_records
       WHERE module=? AND source_ref=? AND status NOT IN ('Cancelled','Reversed')""",(module,ref)):
         existing+=_num(_record_fields(r).get('Amount'))
     if existing+amount>original+0.005:
-        raise HTTPException(422,{'code':'CORRECTION_EXCEEDS_ORIGINAL','original_amount':original,'existing_corrections':existing,'requested':amount})
+        code='CREDIT_EXCEEDS_INVOICE' if detention_credit else 'CORRECTION_EXCEEDS_ORIGINAL'
+        raise HTTPException(422,{'code':code,'original_amount':original,'existing_corrections':existing,'requested':amount,
+                                 'invoice_ref':ref,'segment_ref':segment_ref})
     dup=conn.execute("""SELECT id,external_ref FROM gl_records WHERE module=? AND source_ref=?
       AND status NOT IN ('Cancelled','Reversed') AND json_extract(payload_json,'$.Amount')=?
       AND COALESCE(json_extract(payload_json,'$.Reason'),'')=COALESCE(?, '') LIMIT 1""",
       (module,ref,str(fields.get('Amount')),fields.get('Reason'))).fetchone()
     if dup: raise HTTPException(409,{'code':'DUPLICATE_FINANCIAL_CORRECTION','existing_ref':dup['external_ref']})
-    return {'source_document_id':src['id'],'source_module':src['module'],'source_ref':ref,'original_amount':original,'party':party}
-
+    return {'source_document_id':src['id'],'source_module':src['module'],'source_ref':ref,'original_amount':original,
+            'party':party,'detention_segment_ref':segment_ref}
 
 def validate_allocation(conn, module, fields, job_id=None):
     if not enabled() or module not in ALLOCATION_MODULES:return {}
