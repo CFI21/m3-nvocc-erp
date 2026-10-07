@@ -29,7 +29,7 @@ from .item10_tax_fx_governance import (
     ensure_period_not_tax_filed,
 )
 from .item8_open_item_governance import ensure_open_item, apply_document_correction
-from .item7_financial_document_governance import validate_correction
+from .item7_financial_document_governance import validate_correction, validate_detention_document_link
 from .item6_financial_governance import (
     enabled as item6_enabled,
     enforce_sensitive_session,
@@ -384,6 +384,7 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
             body.fields.update({'Fiscal Year':str(budget_line['fiscal_year']),'Period':str(budget_line['period']),'Account Code':budget_line['account_code'],'Budget Amount':str(budget_line['amount']),'Scenario':budget_line['scenario'],'Status':'Draft'})
         else:
             ext=body.external_ref or f"CLX-GL-{module.upper()}-{uuid.uuid4().hex[:10].upper()}"; status=str(body.fields.get('Status') or 'Draft')
+        detention_meta=validate_detention_document_link(conn,module,body.fields,jid,body.source_type,body.source_ref)
         correction_meta=validate_correction(conn,module,body.fields,jid,body.source_type,body.source_ref)
         if correction_meta:
             body.source_type=correction_meta['source_module']; body.source_ref=correction_meta['source_ref']
@@ -394,7 +395,7 @@ async def create(module:str,body:CreateBody,request:Request,x_role:str=Header('V
         if final_bulk_enabled() and module=='budget':
             sess=iam_session(conn,x_m3_session);after=serialize_budget_record(conn,gr,sess['user_id'])
         else: after=serialize(gr)
-        audit(conn,role,'CREATE',module,rid,jid,None,after,{'source_type':body.source_type,'source_ref':body.source_ref,'financial_correction':correction_meta})
+        audit(conn,role,'CREATE',module,rid,jid,None,after,{'source_type':body.source_type,'source_ref':body.source_ref,'financial_correction':correction_meta,'detention_segment_link':detention_meta})
         if idempotency_key:conn.execute('INSERT INTO idempotency_keys(actor_role,idem_key,request_hash,response_json,status_code,created_at) VALUES(?,?,?,?,201,?)',(role,'GL:'+idempotency_key,rh,json.dumps(after),now()))
         conn.execute('COMMIT');return JSONResponse(after,status_code=201)
     except HTTPException:conn.execute('ROLLBACK');raise
