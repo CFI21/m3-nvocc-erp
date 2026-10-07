@@ -1,0 +1,86 @@
+{
+  "artifact": "M3_DETENTION_REV2_HARDENING",
+  "baseline_main_sha": "5896823c3dee08db446b508d9b6c53854ce9881a",
+  "scope": {
+    "m3_only": true,
+    "ancline_untouched": true,
+    "screen_count": 196,
+    "new_screen_ids": 0,
+    "new_clx": false,
+    "new_module": false
+  },
+  "resolved_sources": {
+    "tariff_source": {
+      "table": "mrg_rules",
+      "key": "rule_ref",
+      "version_column": "version",
+      "effective_columns": [
+        "effective_from",
+        "effective_to"
+      ],
+      "approval": "status=APPROVED",
+      "history_note": "segment must pin rule_ref + version + immutable tariff snapshot"
+    },
+    "tariff_slabs": {
+      "table": "mrg_slabs",
+      "join": "rule_ref"
+    },
+    "fx_source": {
+      "table": "gl_fx_rates",
+      "base_currency": "USD",
+      "required_blocker": "FX_RATE_MISSING_ON_SEGMENT"
+    },
+    "charge_master_source": {
+      "table": "mrg_rules",
+      "field": "charge_code",
+      "selection_rule": "only APPROVED applicable MRG rows may be picked",
+      "required_blocker": "UNAPPROVED_CHARGE_CODE"
+    },
+    "credit_governance": {
+      "component": "app/item7_financial_document_governance.py",
+      "existing_bound_error": "CORRECTION_EXCEEDS_ORIGINAL",
+      "revision2_error": "CREDIT_EXCEEDS_INVOICE"
+    },
+    "audit_source": {
+      "table": "audit_events",
+      "framework": "existing CLX-071 audit()"
+    },
+    "rollback_config": {
+      "table": "md_config",
+      "key": "DETENTION_CALCULATION_ENABLED",
+      "type": "BOOLEAN",
+      "note": "reuse existing config table; no new feature-flag table"
+    },
+    "journey_source": {
+      "tables": [
+        "container_events",
+        "containers"
+      ],
+      "events": [
+        "GATE_OUT_FULL",
+        "EMPTY_RETURN"
+      ]
+    }
+  },
+  "blockers": [
+    {
+      "code": "SEGMENT_TABLE_MISSING",
+      "severity": "MERGE_BLOCKER",
+      "finding": "No existing detention/transaction child-line table exists in the M3 production schema. Relevant existing tables include transaction_records, container_financial_ledger, gl_voucher_lines, mrg_rules, mrg_slabs and audit_events, but none is an authoritative child table for detention Advance/Ongoing/Actual segments.",
+      "revision2_requirement": "Segment rows MUST live in an EXISTING detention transaction child table; no new DB table is allowed.",
+      "impact": [
+        "Cannot truthfully implement immutable per-segment tariff version pinning",
+        "Cannot persist per-segment FX rate/base currency in the required child storage",
+        "Cannot bind partial credits safely to segment #",
+        "Cannot guarantee segment-level rollback/reversal lineage without violating the storage rule"
+      ],
+      "required_next_action": "Explicitly relax ONLY the no-new-DB-table constraint and authorize one additive detention segment child table linked to transaction_records.id, or name an existing approved child table that must be used."
+    }
+  ],
+  "merge_policy": "DRAFT_ONLY_UNTIL_BLOCKERS_EMPTY",
+  "deployment_policy": {
+    "api_deploy_required": true,
+    "reason": "Revision 2 requires backend endpoint/governance changes once storage is authorized."
+  },
+  "prior_live_main_sha": "5896823c3dee08db446b508d9b6c53854ce9881a"
+}
