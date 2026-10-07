@@ -683,6 +683,7 @@ function neighborId(dir){let same=state.screens.filter(s=>s.domain===state.curre
 let detentionCommercialDirection='PRINCIPAL_TO_AGENT';
 let detentionChargeTab='DETENTION';
 let detentionLiveState={summary:null,options:[],lines:[]};
+let detentionFinanceContext=null;
 
 function detentionMode(){
   if(state.current?.key!=='detention-collection')return '';
@@ -742,6 +743,30 @@ function detentionHistoryHtml(history){
     history.map(x=>'<tr><td>'+esc(x.sequence||'')+'</td><td>'+esc(x.stage||'')+'</td><td>'+esc(x.segment_ref||'')+'</td><td>'+esc(x.covered_from||'')+'</td><td>'+esc(x.covered_till||'')+'</td><td>'+esc(x.segment_days??'')+'</td><td>'+detentionMoney(x.segment_amount||0,x.currency||'')+'</td><td>'+esc(x.currency||'')+'</td><td>'+esc(x.fx_rate||'')+'</td><td>'+detentionMoney(x.base_amount||0,x.base_currency||'USD')+'</td><td>'+esc(x.rule_ref||'')+'</td><td>'+esc(x.tariff_version||'')+'</td></tr>').join('')+
     '</tbody></table></div>';
 }
+async function openDetentionFinanceDocument(){
+  if(!state.selected?.id)return alert('Select a detention process record first.');
+  const s=detentionLiveState.summary||{},side=detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?s.principal:s.customer;
+  if(!side?.detention_ref)return alert('Detention reference is not available yet.');
+  const module=detentionCommercialDirection==='PRINCIPAL_TO_AGENT'?'bills':'invoice';
+  const row=state.selected,job=String(detentionValue(row,'Job Ref','job_ref')||'');
+  const party=detentionCommercialDirection==='PRINCIPAL_TO_AGENT'
+    ?String(detentionValue(row,'Principal','Principal Name')||'')
+    :String(detentionValue(row,'Customer','Agent / Customer')||'');
+  detentionFinanceContext={
+    module,job_ref:job,source_type:'DETENTION_COLLECTION',source_ref:side.detention_ref,
+    fields:{
+      'Date':new Date().toISOString().slice(0,10),
+      'Job Ref':job,
+      'Currency':side.currency||'USD',
+      'Exchange Rate':side.fx_rate||'',
+      'Status':'Draft',
+      ...(module==='invoice'?{'Customer':party}:{'Supplier':party})
+    }
+  };
+  await openScreen('gl-accounts::'+module,{domain:'HO Tasks',submenu:'Transaction',label:module==='invoice'?'Detention Draft Invoice':'Principal Detention Bill'});
+  await openFinanceForm('create');
+}
+
 function detentionFinanceHtml(s){
   if(detentionCommercialDirection==='PRINCIPAL_TO_AGENT'){
     return '<div class="clx82Section"><div class="clx82Head">Principal → Agent Settlement</div><div class="clx82Body">'+
@@ -927,10 +952,10 @@ function detentionSelectedProcessDetail(){
       '<button class="btn primary" onclick="runDetentionCalculation(\'ADVANCE\')">Calculate Advance</button>'+
       '<button class="btn" onclick="runDetentionCalculation(\'ONGOING\')">Recalculate Ongoing</button>'+
       '<button class="btn" onclick="runDetentionCalculation(\'ACTUAL\')">Calculate Actual</button>'+
-      (customer?'<button class="btn primary" onclick="openScreen(\'gl-accounts::invoice\',{domain:\'HO Tasks\',submenu:\'Transaction\',label:\'Detention Draft Invoice\'})">Create Draft Invoice → Finance</button>'+
+      (customer?'<button class="btn primary" onclick="openDetentionFinanceDocument()">Create Draft Invoice → Finance</button>'+
       '<button class="btn" onclick="openDetentionMode(\'collection\')">Open Detention Collection</button>'+
       '<button class="btn" onclick="openScreen(\'gl-accounts::invoice\')">Open Invoice / AR</button>'
-      :'<button class="btn" onclick="openScreen(\'gl-accounts::bills\')">Open Principal Bill / AP</button><button class="btn" onclick="openScreen(\'agent-tasks::soa\')">Open Principal / Agent SOA</button>')+
+      :'<button class="btn primary" onclick="openDetentionFinanceDocument()">Create Principal Bill / AP</button><button class="btn" onclick="openScreen(\'agent-tasks::soa\')">Open Principal / Agent SOA</button>')+
     '</div>'+
     '<div class="equipNote">'+(customer?'Agent → Customer is the REVENUE side.':'Principal → Agent is the COST side.')+' Advance / ongoing periods cannot overlap. EMPTY_RETURN fixes Actual detention.</div>'+
   '</div></div>'+
@@ -2361,12 +2386,13 @@ async function openFinanceForm(mode){
   const kind=financeDomain();if(!kind)return;
   if(mode==='edit'&&!state.selected)return alert('Select a record to edit');
   try{
-    const meta=await financeModuleMeta(kind),base=state.selected?rowPayload(state.selected):{};
+    const prefill=(mode==='create'&&kind==='gl'&&detentionFinanceContext?.module===state.current.key)?detentionFinanceContext:null;
+    const meta=await financeModuleMeta(kind),base=prefill?{...(prefill.fields||{})}:(state.selected?rowPayload(state.selected):{});
     const fields=(meta.fields||Object.keys(base)).filter(x=>!['id','version','job_ref','external_ref','status','module'].includes(String(x).toLowerCase()));
     $('drawerTitle').textContent=(mode==='create'?'Create ':'Edit ')+state.current.name;
     let html='<div class="formGrid"><div class="formNote">Uses the existing '+(kind==='gl'?'GL':'Treasury')+' API. Validation, audit, optimistic locking and approval controls remain server-authoritative.</div>';
     if(kind==='gl'&&meta.tabs?.length)html+='<div class="formField full"><div class="toolbar">'+meta.tabs.map((t,i)=>'<button type="button" class="btn '+(i===0?'primary':'')+'">'+esc(t)+'</button>').join('')+'</div></div>';
-    html+='<div class="formField"><label>Job Ref</label><input id="clx43Job" maxlength="5" value="'+esc(selectedJob()||'')+'" '+(mode==='edit'?'disabled':'')+'></div>';
+    html+='<div class="formField"><label>Job Ref</label><input id="clx43Job" maxlength="5" value="'+esc(prefill?.job_ref||selectedJob()||'')+'" '+(mode==='edit'?'disabled':'')+'></div>';
     html+='<div class="formField"><label>External Ref</label><input id="clx43External" value="'+esc(state.selected?.external_ref||'')+'" '+(mode==='edit'?'disabled':'')+'></div>';
     for(const name of fields){if(name==='Account Lines'||name==='Budget Lines'||name==='Reconciliation Lines'||name==='Cheque Stock')continue;const full=/remarks|notes|narration|description|instruction|company assignment/i.test(name);const val=base[name]??'';const type=/date/i.test(name)?'date':(/amount|balance|rate|debit|credit|wht|total|difference/i.test(name)?'number':'text');html+='<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+(full?'<textarea data-clx43-field="'+esc(name)+'">'+esc(val)+'</textarea>':'<input type="'+type+'" data-clx43-field="'+esc(name)+'" value="'+esc(val)+'">')+'</div>'}
     if(kind==='gl'&&meta.line_columns?.length){let existing=Array.isArray(base['Account Lines'])?base['Account Lines']:[{}];html+='<div class="formField full"><label>Account Detail</label><div style="overflow:auto"><table><thead><tr>'+meta.line_columns.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+existing.map((row,ri)=>'<tr>'+meta.line_columns.map(col=>'<td><input data-clx44-line-row="'+ri+'" data-clx44-line-col="'+esc(col)+'" value="'+esc(row[col]??'')+'" style="min-width:110px"></td>').join('')+'</tr>').join('')+'</tbody></table></div></div>'}
@@ -2385,11 +2411,16 @@ async function saveFinanceForm(mode){
     if(mode==='create'){
       const jr=$('clx43Job').value.trim();if(jr&&!/^\d{5}$/.test(jr))throw new Error('Job Ref must be exactly 5 digits');
       body={job_ref:jr||null,external_ref:$('clx43External').value.trim()||null,fields};
+      if(kind==='gl'&&detentionFinanceContext?.module===state.current.key){
+        body.source_type=detentionFinanceContext.source_type;
+        body.source_ref=detentionFinanceContext.source_ref;
+      }
       headers['Idempotency-Key']='CLX043-'+kind+'-'+state.current.key+'-'+Date.now();
     }else{
       path+='/'+state.selected.id;method='PUT';body={version:state.selected.version,fields};
     }
     await api(path,{method,headers,body:JSON.stringify(body)});
+    if(mode==='create'&&kind==='gl'&&detentionFinanceContext?.module===state.current.key)detentionFinanceContext=null;
     $('drawer').classList.remove('open');await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
 }
