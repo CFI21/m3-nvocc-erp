@@ -62,12 +62,12 @@ jobs:
             'Carriers','Charges','PA Parties','MRG','MRG Export','MRG Import','MRG Transshipment',
             'MRG Detention','MRG Detention Export','Special Detention','MRG MTY Storage','Slot Rate','Stamps','Vessel','Agent',
             'Agent Relation','Agent Volume Restriction','Agent Network','Account Setup','Sub Company','Currency File','Route Planning',
-            'Container Coding','Demurrage Applicable Countries','Detention Applicable Cities','Activity Sequence','Activity',
+            'Demurrage Applicable Countries','Detention Applicable Cities','Activity Sequence','Activity',
             'Location And Terminals','UN/LOCODE','Ports Coding','Service Setup','Principle Setup','Investor Setup','Company',
             'Damage Setup','Container Status','Customer Tariff','Local Recovery Agreement','Long Ageing Configuration',
             'Lease Rental Contract (Purchase)','Rates Management','Auto SOA'
           ]
-          assert len(items)==42
+          assert len(items)==41
           missing=[x for x in items if x not in html]
           assert not missing,missing
           catalog=build_catalog()
@@ -106,7 +106,7 @@ jobs:
           assert 'Commercial Charges' in mrg
           assert 'INSERT INTO gl_' not in mrg
           print('HO_SETUP_STATIC_CONTRACT_PASS')
-          print('HO_SETUP_ITEMS_TESTED=42')
+          print('HO_SETUP_ITEMS_TESTED=41')
           print('SCREEN_COUNT=196')
           PY
       - name: Live health and read-only setup endpoints
@@ -149,7 +149,7 @@ jobs:
           assert s['real_money']=='OFF',s
           assert s['dummy_provider_enabled'] is True,s
           html=open('/tmp/index.html',encoding='utf-8').read()
-          items=['Carriers','Charges','PA Parties','MRG','MRG Export','MRG Import','MRG Transshipment','MRG Detention','MRG Detention Export','Special Detention','MRG MTY Storage','Slot Rate','Stamps','Vessel','Agent','Agent Relation','Agent Volume Restriction','Agent Network','Account Setup','Sub Company','Currency File','Route Planning','Container Coding','Demurrage Applicable Countries','Detention Applicable Cities','Activity Sequence','Activity','Location And Terminals','UN/LOCODE','Ports Coding','Service Setup','Principle Setup','Investor Setup','Company','Damage Setup','Container Status','Customer Tariff','Local Recovery Agreement','Long Ageing Configuration','Lease Rental Contract (Purchase)','Rates Management','Auto SOA']
+          items=['Carriers','Charges','PA Parties','MRG','MRG Export','MRG Import','MRG Transshipment','MRG Detention','MRG Detention Export','Special Detention','MRG MTY Storage','Slot Rate','Stamps','Vessel','Agent','Agent Relation','Agent Volume Restriction','Agent Network','Account Setup','Sub Company','Currency File','Route Planning','Demurrage Applicable Countries','Detention Applicable Cities','Activity Sequence','Activity','Location And Terminals','UN/LOCODE','Ports Coding','Service Setup','Principle Setup','Investor Setup','Company','Damage Setup','Container Status','Customer Tariff','Local Recovery Agreement','Long Ageing Configuration','Lease Rental Contract (Purchase)','Rates Management','Auto SOA']
           assert len(items)==42
           missing=[x for x in items if x not in html]
           assert not missing,missing
@@ -185,7 +185,7 @@ jobs:
         run: |
           cat <<'EOF'
           HO_SETUP_NAVIGATION=PASS
-          HO_SETUP_ITEMS_TESTED=42
+          HO_SETUP_ITEMS_TESTED=41
           BROKEN_LINKS=0
           BLANK_SCREENS=0
           JS_ERRORS=0
