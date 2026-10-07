@@ -36,5 +36,7 @@ def test_visible_reference_setup_flow_is_navigation_only():
     assert "▾ Setup <span class=count>'+visibleSetup.length+'</span>" in HTML
     assert 'Account Setup' in HTML
     assert "gl-accounts::account-integration" in HTML
-    assert 'Container Coding' in HTML
+    assert 'Container Coding' not in HTML
     assert "showEquipmentWorkspace('containers')" in HTML
+    assert 'Equipment Size & Type' in HTML
+    assert "master-data::equipment-types" in HTML
