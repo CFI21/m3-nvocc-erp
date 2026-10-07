@@ -857,8 +857,8 @@ function detentionChargePanelHtml(){
   const lines=(detentionLiveState.lines||[]).filter(x=>x.category===detentionChargeTab);
   const label={PLUGIN:'Plug-in',PORT:'Port Charges',OTHER:'Other Charges'}[detentionChargeTab]||detentionChargeTab;
   const rows=lines.length?lines.map(x=>'<tr><td><button class="rowAction" onclick="removeDetentionCharge(\''+esc(x.line_ref)+'\')">✕</button></td>'+
-    '<td>'+esc(x.charge_code||'')+'</td><td>'+esc(x.party_type||'')+' '+esc(x.party_code||'')+'</td><td>'+esc(x.quantity||'')+'</td><td>'+esc(x.rate||'')+'</td><td>'+esc(x.currency||'')+'</td><td>'+esc(x.amount||'')+'</td><td>'+esc(x.rule_ref||'')+'</td><td>'+esc(x.remarks||'')+'</td></tr>').join('')
-    :'<tr><td colspan="9" class="muted">No '+esc(label)+' lines applied.</td></tr>';
+    '<td>'+esc(x.charge_code||'')+'</td><td>'+esc(x.party_type||'')+' '+esc(x.party_code||'')+'</td><td>'+esc(x.quantity||'')+'</td><td>'+esc(x.rate||'')+'</td><td>'+esc(x.currency||'')+'</td><td>'+esc(x.amount||'')+'</td><td>'+esc(x.fx_rate||'')+'</td><td>'+esc(x.rule_ref||'')+' v'+esc(x.tariff_version||'')+'</td><td>'+esc(x.remarks||'')+'</td></tr>').join('')
+    :'<tr><td colspan="10" class="muted">No '+esc(label)+' lines applied.</td></tr>';
   const optionHtml=options.map(x=>'<option value="'+esc(x.rule_ref)+'">'+esc(x.charge_code)+' · '+esc(x.party_type)+' · '+esc(x.currency)+' '+esc(x.unit_rate)+' / '+esc(x.rate_basis)+' · '+esc(x.rule_ref)+'</option>').join('');
   const blocked=!options.length;
   return detentionChargeTabsHtml()+
@@ -869,7 +869,7 @@ function detentionChargePanelHtml(){
       '<button class="btn" onclick="loadDetentionChargeOptions()">Apply / Refresh Tariff</button>'+
       '<button class="btn primary" '+(blocked?'disabled':'onclick="addDetentionCharge()"')+'>Add Charge</button></div>'+
       (blocked?'<div class="equipNote">No approved applicable '+esc(label)+' tariff exists for this job/container/commercial side. The charge is blocked until an approved MRG rule exists.</div>':'')+
-      '<div class="tablewrap"><table><thead><tr><th></th><th>Charge Code</th><th>Party</th><th>Qty / Days</th><th>Rate</th><th>Curr</th><th>Amount</th><th>Tariff</th><th>Remarks</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
+      '<div class="tablewrap"><table><thead><tr><th></th><th>Charge Code</th><th>Party</th><th>Qty / Days</th><th>Rate</th><th>Curr</th><th>Amount</th><th>FX</th><th>Tariff / Version</th><th>Remarks</th></tr></thead><tbody>'+rows+'</tbody></table></div>'+
     '</div></div>';
 }
 async function loadDetentionLiveSummary(){
@@ -939,10 +939,15 @@ function detentionSelectedProcessDetail(){
       clx82DerivedField('Ongoing Days',v('Ongoing Days','Ongoing Days'))+
       clx82DerivedField('Actual Chargeable Days',v('Actual Chargeable Days','Actual Chargeable Days'))+
       clx82DerivedField('Total Chargeable Days',v('Total Chargeable Days','Total Chargeable Days','Chargeable Days'))+
+      clx82DerivedField('Detention Ref',v('Detention Ref','Customer Detention Ref','Reference'))+
       clx82DerivedField('Rate Group',v('Rate Group','Rate Group'))+
       clx82DerivedField('Tariff',v('Tariff','Tariff','Tariff Code'))+
+      clx82DerivedField('Tariff Version',v('Tariff Version','Tariff Version'))+
       clx82DerivedField('Rate',v('Rate','Rate'))+
       clx82DerivedField('Currency',v('Currency','Currency'))+
+      clx82DerivedField('FX Rate',v('Exchange Rate','Exchange Rate','FX Rate'))+
+      clx82DerivedField('Base Currency',v('Base Currency','Base Currency'))+
+      clx82DerivedField('FX Reconciliation Base',v('FX Reconciliation Base','FX Reconciliation Base'))+
       clx82DerivedField('Advance Detention',detentionMoney(advance,curr))+
       clx82DerivedField('Ongoing Detention',detentionMoney(detentionSideNum(r,'Ongoing Detention','Ongoing Detention'),curr))+
       clx82DerivedField('Actual Detention',detentionMoney(actual,curr))+
