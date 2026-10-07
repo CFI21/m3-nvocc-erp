@@ -633,9 +633,10 @@ def _detention_charge_options(conn,ctx,active_on,commercial_direction):
         cat=_detention_charge_category(r)
         if cat=="DETENTION":continue
         if cat=="PLUGIN" and not _detention_is_reefer(ctx):continue
-        x={k:r.get(k) for k in ("rule_ref","mrg_type","rate_side","party_type","party_code","charge_code","charge_type",
+        x={k:r.get(k) for k in ("rule_ref","version","mrg_type","rate_side","party_type","party_code","charge_code","charge_type",
                                  "currency","rate_basis","unit_rate","minimum_rate","maximum_rate","free_days",
-                                 "pol","pot","pod","depot_code","terminal_code","size_type","container_type","remarks")}
+                                 "effective_from","effective_to","slab_wise","pol","pot","pod","depot_code","terminal_code",
+                                 "size_type","container_type","remarks")}
         x["category"]=cat;x["reefer_required"]=cat=="PLUGIN"
         out.append(x)
     return out
@@ -737,7 +738,8 @@ def detention_charge_options(record_id:int,commercial_direction:str="AGENT_TO_CU
         d=_detention_direction(commercial_direction)
         options=_detention_charge_options(conn,ctx,active_on,d)
         lines=[x for x in _detention_charge_lines(_detention_payload(txr)) if x.get("commercial_direction")==d]
-        return {"record_id":record_id,"detention_ref":txr["external_ref"],"commercial_direction":d,
+        payload=_detention_payload(txr);det_ref=_detention_direction_ref(txr,payload,d)
+        return {"record_id":record_id,"detention_ref":det_ref,"commercial_direction":d,
                 "rate_side":_detention_side(d)["rate_side"],"reefer":_detention_is_reefer(ctx),
                 "options":options,"lines":lines,"screen_count":196}
     finally:conn.close()
@@ -758,22 +760,33 @@ def add_detention_charge(record_id:int,b:DetentionChargeBody,x_role:str=Header("
         gate_out=_detention_event_time(conn,c["id"],"GATE_OUT_FULL") or c["free_time_start"]
         active_on=(parse_dt(gate_out) or utcnow()).date().isoformat()
         options=_detention_charge_options(conn,ctx,active_on,d)
-        rule=next((x for x in options if x["rule_ref"]==b.rule_ref),None)
-        if not rule:raise HTTPException(409,{"code":"DETENTION_CHARGE_RULE_NOT_APPLICABLE","rule_ref":b.rule_ref,"commercial_direction":d})
-        category=rule["category"]
+        option=next((x for x in options if x["rule_ref"]==b.rule_ref),None)
+        if not option:
+            raise HTTPException(409,{"code":"UNAPPROVED_CHARGE_CODE","rule_ref":b.rule_ref,"commercial_direction":d})
+        rule_row=conn.execute("SELECT * FROM mrg_rules WHERE rule_ref=? AND status='APPROVED'",(b.rule_ref,)).fetchone()
+        if not rule_row:
+            raise HTTPException(409,{"code":"UNAPPROVED_CHARGE_CODE","rule_ref":b.rule_ref,"commercial_direction":d})
+        rule=dict(rule_row);rule["slabs"]=[dict(s) for s in conn.execute(
+          "SELECT * FROM mrg_slabs WHERE rule_ref=? ORDER BY from_day,slab_ref",(b.rule_ref,)).fetchall()]
+        category=option["category"]
         if category=="PLUGIN" and not _detention_is_reefer(ctx):
             raise HTTPException(409,{"code":"PLUGIN_REQUIRES_REEFER","container":ctx["container_no"]})
-        payload=_detention_payload(txr);lines=_detention_charge_lines(payload)
+        payload=_detention_payload(txr);det_ref=_detention_direction_ref(txr,payload,d);lines=_detention_charge_lines(payload)
         if any(x.get("rule_ref")==b.rule_ref and x.get("commercial_direction")==d and x.get("status","ACTIVE")=="ACTIVE" for x in lines):
             raise HTTPException(409,{"code":"ANCILLARY_CHARGE_ALREADY_APPLIED","rule_ref":b.rule_ref,"commercial_direction":d})
         amount,rate=_detention_charge_amount(rule,b.quantity)
+        fx=_detention_fx_rate(conn,rule.get("currency") or "USD",now())
         line={
-          "line_ref":"DCH-"+uuid.uuid4().hex[:12].upper(),"commercial_direction":d,
+          "line_ref":"DCH-"+uuid.uuid4().hex[:12].upper(),"detention_ref":det_ref,"commercial_direction":d,
           "rate_side":rule["rate_side"],"category":category,"rule_ref":rule["rule_ref"],
+          "tariff_version":int(rule.get("version") or 1),"tariff_effective_from":rule.get("effective_from"),
+          "tariff_effective_to":rule.get("effective_to"),"tariff_snapshot":_detention_tariff_snapshot(rule),
           "charge_code":rule["charge_code"],"charge_type":rule.get("charge_type"),
           "party_type":rule["party_type"],"party_code":rule.get("party_code"),
           "quantity":round(float(b.quantity),4),"rate":rate,"currency":rule["currency"],"amount":amount,
-          "rate_basis":rule["rate_basis"],"remarks":b.remarks or rule.get("remarks"),"status":"ACTIVE","created_at":now()
+          "fx_rate":fx["rate"],"fx_rate_date":fx["rate_date"],"base_currency":fx["base_currency"],
+          "base_amount":round(amount*fx["rate"],2),"rate_basis":rule["rate_basis"],
+          "remarks":b.remarks or rule.get("remarks"),"status":"ACTIVE","created_at":now()
         }
         lines.append(line);before={**payload};payload["Ancillary Charges"]=lines
         cur=conn.execute("""UPDATE transaction_records SET payload_json=?,version=version+1,updated_at=?
@@ -783,10 +796,11 @@ def add_detention_charge(record_id:int,b:DetentionChargeBody,x_role:str=Header("
         audit(conn,a,"DETENTION_ANCILLARY_ADD",c["id"],ctx["job_id"],before,payload,{
           "record_id":record_id,"line_ref":line["line_ref"],"rule_ref":b.rule_ref,"category":category,
           "commercial_direction":d,"rate_side":rule["rate_side"],"amount":amount,"currency":rule["currency"],
+          "tariff_version":int(rule.get("version") or 1),"fx_rate":fx["rate"],"base_amount":line["base_amount"],
           "gl_posted":False,"payment_posted":False
         })
         conn.execute("COMMIT")
-        return {"ok":True,"record_id":record_id,"detention_ref":txr["external_ref"],"line":line,
+        return {"ok":True,"record_id":record_id,"detention_ref":det_ref,"line":line,
                 "gl_posted":False,"payment_posted":False,"screen_count":196}
     except HTTPException:
         try:conn.execute("ROLLBACK")
