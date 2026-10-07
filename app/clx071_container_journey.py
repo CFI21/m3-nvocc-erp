@@ -243,6 +243,9 @@ def _detention_side(direction):
         return {"rate_side":"REVENUE","party_types":{"CUSTOMER"},"prefix":"","history_key":"Advance History"}
     return {"rate_side":"COST","party_types":{"PRINCIPAL","AGENT"},"prefix":"Principal ","history_key":"Principal Advance History"}
 
+def _detention_rule_rank(rule):
+    return _detention_rule_score(rule)+(1000 if str(rule.get("party_type") or "").upper()=="PRINCIPAL" else 0)
+
 def _detention_select_rule(conn,ctx,active_on,commercial_direction="AGENT_TO_CUSTOMER"):
     ensure_mrg(conn);side=_detention_side(commercial_direction)
     rows=[dict(r) for r in conn.execute("""SELECT * FROM mrg_rules
@@ -254,18 +257,27 @@ def _detention_select_rule(conn,ctx,active_on,commercial_direction="AGENT_TO_CUS
         raise HTTPException(409,{"code":"NO_APPROVED_DETENTION_RULE","rate_side":side["rate_side"],
                                  "commercial_direction":commercial_direction,"job_ref":ctx.get("job_ref"),
                                  "container":ctx.get("container_no"),"active_on":active_on})
-    matches.sort(key=lambda r:(_detention_rule_score(r)+(1000 if str(r.get("party_type") or "").upper()=="PRINCIPAL" else 0)),reverse=True)
-    rule=matches[0]
+    ranked=sorted(matches,key=_detention_rule_rank,reverse=True)
+    top_score=_detention_rule_rank(ranked[0])
+    tied=[r for r in ranked if _detention_rule_rank(r)==top_score]
+    if len(tied)>1:
+        raise HTTPException(409,{"code":"TARIFF_VERSION_AMBIGUOUS","commercial_direction":commercial_direction,
+                                 "active_on":active_on,"candidate_rules":[
+                                   {"rule_ref":r.get("rule_ref"),"version":int(r.get("version") or 1),
+                                    "effective_from":r.get("effective_from"),"effective_to":r.get("effective_to")}
+                                   for r in tied
+                                 ]})
+    rule=ranked[0]
     rule["slabs"]=[dict(s) for s in conn.execute(
       "SELECT * FROM mrg_slabs WHERE rule_ref=? ORDER BY from_day,slab_ref",(rule["rule_ref"],)).fetchall()]
     rule["commercial_direction"]=_detention_direction(commercial_direction)
     return rule
 
-def _detention_amount(rule,charge_days,size_type,container_type):
+def _detention_amount(rule,charge_days,size_type,container_type,start_day=1):
     if charge_days<=0:return 0.0,0.0
     if int(rule.get("slab_wise") or 0):
         total=0.0
-        for day in range(1,charge_days+1):
+        for day in range(int(start_day),int(start_day)+int(charge_days)):
             candidates=[]
             for s in rule.get("slabs") or []:
                 if s.get("size_type") not in (None,"") and str(s["size_type"]).upper()!=str(size_type or "").upper():continue
