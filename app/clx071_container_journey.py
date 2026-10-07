@@ -96,6 +96,13 @@ class EventBody(BaseModel):
 class DetentionCalculationBody(BaseModel):
     calculate_till:Optional[str]=None
     requested_stage:str="AUTO"
+    commercial_direction:str="AGENT_TO_CUSTOMER"
+
+class DetentionChargeBody(BaseModel):
+    rule_ref:str
+    quantity:float=Field(default=1,gt=0)
+    commercial_direction:str="AGENT_TO_CUSTOMER"
+    remarks:Optional[str]=None
 
 class ExceptionDecision(BaseModel):
     action:str
@@ -188,11 +195,14 @@ def _detention_party_code(rule,ctx):
       "AGENT":ctx.get("agent_code"),
       "PRINCIPAL":ctx.get("principal_code") or ctx.get("owner_party_code"),
       "DEPOT":ctx.get("depot_code"),
+      "TERMINAL":ctx.get("terminal_code"),
+      "VENDOR":ctx.get("vendor_code"),
     }.get(pt)
 
-def _detention_rule_matches(rule,ctx,active_on):
+def _detention_rule_matches(rule,ctx,active_on,rate_side='REVENUE',allowed_party_types=None):
     if str(rule.get("status") or "").upper()!="APPROVED":return False
-    if str(rule.get("rate_side") or "").upper()!="REVENUE":return False
+    if str(rule.get("rate_side") or "").upper()!=str(rate_side).upper():return False
+    if allowed_party_types and str(rule.get("party_type") or "").upper() not in set(allowed_party_types):return False
     if str(rule.get("mrg_type") or "").upper() not in {"DETENTION","DETENTION_EXPORT","SPECIAL_DETENTION"}:return False
     if rule.get("effective_from") and str(rule["effective_from"])>active_on:return False
     if rule.get("effective_to") and str(rule["effective_to"])<active_on:return False
@@ -221,20 +231,34 @@ def _detention_rule_score(rule):
     score-=int(rule.get("priority") or 100)
     return score
 
-def _detention_select_rule(conn,ctx,active_on):
-    ensure_mrg(conn)
+def _detention_direction(v):
+    x=str(v or "AGENT_TO_CUSTOMER").upper()
+    if x not in {"AGENT_TO_CUSTOMER","PRINCIPAL_TO_AGENT"}:
+        raise HTTPException(422,{"code":"INVALID_DETENTION_COMMERCIAL_DIRECTION","value":x})
+    return x
+
+def _detention_side(direction):
+    d=_detention_direction(direction)
+    if d=="AGENT_TO_CUSTOMER":
+        return {"rate_side":"REVENUE","party_types":{"CUSTOMER"},"prefix":"","history_key":"Advance History"}
+    return {"rate_side":"COST","party_types":{"PRINCIPAL","AGENT"},"prefix":"Principal ","history_key":"Principal Advance History"}
+
+def _detention_select_rule(conn,ctx,active_on,commercial_direction="AGENT_TO_CUSTOMER"):
+    ensure_mrg(conn);side=_detention_side(commercial_direction)
     rows=[dict(r) for r in conn.execute("""SELECT * FROM mrg_rules
-      WHERE status='APPROVED' AND rate_side='REVENUE'
+      WHERE status='APPROVED' AND rate_side=?
         AND mrg_type IN ('DETENTION','DETENTION_EXPORT','SPECIAL_DETENTION')
-      ORDER BY priority,rule_ref""").fetchall()]
-    matches=[r for r in rows if _detention_rule_matches(r,ctx,active_on)]
+      ORDER BY priority,rule_ref""",(side["rate_side"],)).fetchall()]
+    matches=[r for r in rows if _detention_rule_matches(r,ctx,active_on,side["rate_side"],side["party_types"])]
     if not matches:
-        raise HTTPException(409,{"code":"NO_APPROVED_REVENUE_DETENTION_RULE","job_ref":ctx.get("job_ref"),
+        raise HTTPException(409,{"code":"NO_APPROVED_DETENTION_RULE","rate_side":side["rate_side"],
+                                 "commercial_direction":commercial_direction,"job_ref":ctx.get("job_ref"),
                                  "container":ctx.get("container_no"),"active_on":active_on})
-    matches.sort(key=_detention_rule_score,reverse=True)
+    matches.sort(key=lambda r:(_detention_rule_score(r)+(1000 if str(r.get("party_type") or "").upper()=="PRINCIPAL" else 0)),reverse=True)
     rule=matches[0]
     rule["slabs"]=[dict(s) for s in conn.execute(
       "SELECT * FROM mrg_slabs WHERE rule_ref=? ORDER BY from_day,slab_ref",(rule["rule_ref"],)).fetchall()]
+    rule["commercial_direction"]=_detention_direction(commercial_direction)
     return rule
 
 def _detention_amount(rule,charge_days,size_type,container_type):
@@ -294,8 +318,11 @@ def _detention_context(conn,record_id):
       "agent_code":d.get("agent_code"),"container_id":c["id"],"container_no":c.get("container_no"),
       "size_type":c.get("size_type"),"container_type":payload.get("Container Category"),
       "depot_code":c.get("depot_code"),"owner_party_code":c.get("owner_party_code"),
-      "principal_code":c.get("principal_code"),"custody_agent_code":c.get("agent_code"),
-      "payload":payload,"direction":direction
+      "principal_code":c.get("principal_code") or payload.get("Principal Code") or payload.get("Principal"),
+      "terminal_code":payload.get("Terminal Code") or payload.get("Terminal") or payload.get("Port Terminal"),
+      "vendor_code":payload.get("Vendor Code") or payload.get("Vendor"),
+      "cargo_type":payload.get("Cargo Type") or payload.get("Cargo Category"),
+      "custody_agent_code":c.get("agent_code"),"payload":payload,"direction":direction
     }
     return txr,ctx
 
@@ -371,8 +398,8 @@ def _detention_finance_summary(conn,detention_ref,job_id):
       "last_payment_date":last_payment,"collection_status":collection_status
     }
 
-def _detention_history(payload):
-    h=payload.get("Advance History")
+def _detention_history(payload,commercial_direction="AGENT_TO_CUSTOMER"):
+    h=payload.get(_detention_side(commercial_direction)["history_key"])
     return list(h) if isinstance(h,list) else []
 
 def _detention_history_state(history):
@@ -384,6 +411,71 @@ def _detention_history_state(history):
     parsed=[x for x in parsed if x[0]]
     covered=max(parsed,key=lambda x:x[0])[1] if parsed else None
     return {"total_days":total_days,"cumulative_amount":round(cumulative_amount,2),"covered_till":covered}
+
+
+
+def _detention_is_reefer(ctx):
+    values=[ctx.get("size_type"),ctx.get("container_type"),ctx.get("cargo_type")]
+    x=" ".join(str(v or "").upper() for v in values)
+    return "REEFER" in x or any(t in x for t in ("20RF","40RF","45RF","RF "))
+
+def _detention_charge_category(rule):
+    mt=str(rule.get("mrg_type") or "").upper()
+    cc=str(rule.get("charge_code") or "").upper().replace("-","_").replace(" ","_")
+    ct=str(rule.get("charge_type") or "").upper().replace("-","_").replace(" ","_")
+    pt=str(rule.get("party_type") or "").upper()
+    if mt in {"DETENTION","DETENTION_EXPORT","SPECIAL_DETENTION"}:return "DETENTION"
+    if "PLUG" in cc or "PLUG" in ct:return "PLUGIN"
+    if pt=="TERMINAL" or cc in {"THC","LOLO","PORT","PORT_CHARGE","PORT_CHARGES","TERMINAL","TERMINAL_CHARGE"} or "PORT" in ct or "TERMINAL" in ct:return "PORT"
+    return "OTHER"
+
+def _detention_scope_match(rule,ctx,active_on,side):
+    if str(rule.get("status") or "").upper()!="APPROVED":return False
+    if str(rule.get("rate_side") or "").upper()!=side["rate_side"]:return False
+    if str(rule.get("party_type") or "").upper() not in side["party_types"]|({"TERMINAL","DEPOT","VENDOR"} if side["rate_side"]=="COST" else set()):return False
+    if rule.get("effective_from") and str(rule["effective_from"])>active_on:return False
+    if rule.get("effective_to") and str(rule["effective_to"])<active_on:return False
+    for rk,ck in (("job_ref","job_ref"),("booking_ref","booking_ref"),("pol","pol"),("pod","pod"),
+                  ("depot_code","depot_code"),("terminal_code","terminal_code"),("office_code","office_code"),
+                  ("branch_code","branch_code"),("organization_code","organization_code"),
+                  ("size_type","size_type"),("container_type","container_type"),("cargo_type","cargo_type")):
+        rv=rule.get(rk)
+        if rv not in (None,"") and str(rv).upper()!=str(ctx.get(ck) or "").upper():return False
+    pc=rule.get("party_code")
+    if pc not in (None,""):
+        actual=_detention_party_code(rule,ctx)
+        if not actual or str(pc).upper()!=str(actual).upper():return False
+    return True
+
+def _detention_charge_options(conn,ctx,active_on,commercial_direction):
+    ensure_mrg(conn);side=_detention_side(commercial_direction)
+    rows=[dict(r) for r in conn.execute("""SELECT * FROM mrg_rules
+      WHERE status='APPROVED' AND rate_side=? ORDER BY priority,rule_ref""",(side["rate_side"],)).fetchall()]
+    out=[]
+    for r in rows:
+        if not _detention_scope_match(r,ctx,active_on,side):continue
+        cat=_detention_charge_category(r)
+        if cat=="DETENTION":continue
+        if cat=="PLUGIN" and not _detention_is_reefer(ctx):continue
+        x={k:r.get(k) for k in ("rule_ref","mrg_type","rate_side","party_type","party_code","charge_code","charge_type",
+                                 "currency","rate_basis","unit_rate","minimum_rate","maximum_rate","free_days",
+                                 "pol","pot","pod","depot_code","terminal_code","size_type","container_type","remarks")}
+        x["category"]=cat;x["reefer_required"]=cat=="PLUGIN"
+        out.append(x)
+    return out
+
+def _detention_charge_amount(rule,quantity):
+    q=float(quantity);basis=str(rule.get("rate_basis") or "FLAT").upper();unit=float(rule.get("unit_rate") or 0)
+    if basis not in {"FLAT","FIXED","PER_DAY","DAY","DAILY","PER_UNIT","UNIT","PER_CONTAINER","CONTAINER","PER_MOVE","MOVE"}:
+        raise HTTPException(409,{"code":"UNSUPPORTED_DETENTION_ANCILLARY_RATE_BASIS","rule_ref":rule["rule_ref"],"rate_basis":basis})
+    amount=unit*q
+    if rule.get("minimum_rate") is not None:amount=max(amount,float(rule["minimum_rate"]))
+    if rule.get("maximum_rate") is not None:amount=min(amount,float(rule["maximum_rate"]))
+    return round(amount,2),round(unit,6)
+
+def _detention_charge_lines(payload):
+    x=payload.get("Ancillary Charges")
+    return list(x) if isinstance(x,list) else []
 
 
 def _detention_event_time(conn,container_id,event_type):
