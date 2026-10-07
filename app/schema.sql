@@ -55,6 +55,12 @@ CREATE TABLE IF NOT EXISTS detention_segments(
 CREATE INDEX IF NOT EXISTS idx_detention_segments_tx_direction ON detention_segments(transaction_id,commercial_direction,sequence);
 CREATE INDEX IF NOT EXISTS idx_detention_segments_calculation ON detention_segments(calculation_ref,sequence);
 CREATE INDEX IF NOT EXISTS idx_detention_segments_container ON detention_segments(container_id,commercial_direction,covered_till);
+CREATE TRIGGER IF NOT EXISTS detention_segments_immutable_update
+BEFORE UPDATE ON detention_segments
+BEGIN SELECT RAISE(ABORT,'DETENTION_SEGMENT_IMMUTABLE'); END;
+CREATE TRIGGER IF NOT EXISTS detention_segments_immutable_delete
+BEFORE DELETE ON detention_segments
+BEGIN SELECT RAISE(ABORT,'DETENTION_SEGMENT_IMMUTABLE'); END;
 CREATE TABLE IF NOT EXISTS audit_events(id INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, actor_role TEXT NOT NULL, actor_scope TEXT, action TEXT NOT NULL, module TEXT, transaction_id INTEGER, job_id INTEGER REFERENCES jobs(id), before_json TEXT, after_json TEXT, metadata_json TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS exception_events(id INTEGER PRIMARY KEY, event_id TEXT NOT NULL UNIQUE, ts TEXT NOT NULL, code TEXT NOT NULL, severity TEXT NOT NULL, module TEXT, transaction_id INTEGER, job_id INTEGER REFERENCES jobs(id), detail TEXT NOT NULL, resolved INTEGER NOT NULL DEFAULT 0);
 CREATE TABLE IF NOT EXISTS idempotency_keys(id INTEGER PRIMARY KEY, actor_role TEXT NOT NULL, idem_key TEXT NOT NULL, request_hash TEXT NOT NULL, response_json TEXT NOT NULL, status_code INTEGER NOT NULL, created_at TEXT NOT NULL, UNIQUE(actor_role,idem_key));
