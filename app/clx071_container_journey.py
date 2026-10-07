@@ -7,6 +7,7 @@ import datetime, json, uuid
 
 from .db import connect, tx
 from .clx070_container_master_control import actor, require_action, get_container, audit, scope_clause, now
+from .mrg import ensure as ensure_mrg
 
 router=APIRouter(prefix="/api/clx071/journey",tags=["CLX-071 Full Container Journey"])
 
@@ -92,6 +93,9 @@ class EventBody(BaseModel):
     actor_type:str="HUMAN"
     note:Optional[str]=None
 
+class DetentionCalculationBody(BaseModel):
+    calculate_till:Optional[str]=None
+
 class ExceptionDecision(BaseModel):
     action:str
     resolution_code:Optional[str]=None
@@ -170,6 +174,203 @@ def detention_metrics(c,asof=None):
       "overdue_days":overdue_days,"detention_rate":float(c["detention_rate"] or 0),
       "estimated_exposure":round(exposure,2)
     }
+
+
+def _detention_payload(row):
+    try:return json.loads(row["payload_json"] or "{}")
+    except Exception:return {}
+
+def _detention_party_code(rule,ctx):
+    pt=str(rule.get("party_type") or "").upper()
+    return {
+      "CUSTOMER":ctx.get("customer_code"),
+      "AGENT":ctx.get("agent_code"),
+      "PRINCIPAL":ctx.get("principal_code") or ctx.get("owner_party_code"),
+      "DEPOT":ctx.get("depot_code"),
+    }.get(pt)
+
+def _detention_rule_matches(rule,ctx,active_on):
+    if str(rule.get("status") or "").upper()!="APPROVED":return False
+    if str(rule.get("rate_side") or "").upper()!="REVENUE":return False
+    if str(rule.get("mrg_type") or "").upper() not in {"DETENTION","DETENTION_EXPORT","SPECIAL_DETENTION"}:return False
+    if rule.get("effective_from") and str(rule["effective_from"])>active_on:return False
+    if rule.get("effective_to") and str(rule["effective_to"])<active_on:return False
+    for rk,ck in (("job_ref","job_ref"),("booking_ref","booking_ref"),("pol","pol"),("pod","pod"),
+                  ("depot_code","depot_code"),("office_code","office_code"),("branch_code","branch_code"),
+                  ("organization_code","organization_code"),("size_type","size_type"),("container_type","container_type")):
+        rv=rule.get(rk)
+        if rv not in (None,"") and str(rv).upper()!=str(ctx.get(ck) or "").upper():return False
+    pc=rule.get("party_code")
+    if pc not in (None,""):
+        actual=_detention_party_code(rule,ctx)
+        if not actual or str(pc).upper()!=str(actual).upper():return False
+    mt=str(rule.get("mrg_type") or "").upper()
+    if mt=="SPECIAL_DETENTION" and not (
+      str(rule.get("job_ref") or "")==str(ctx.get("job_ref") or "") or
+      str(rule.get("booking_ref") or "")==str(ctx.get("booking_ref") or "")
+    ):return False
+    if mt=="DETENTION_EXPORT" and str(ctx.get("direction") or "").upper()!="EXPORT":return False
+    return True
+
+def _detention_rule_score(rule):
+    mt=str(rule.get("mrg_type") or "").upper()
+    score={"SPECIAL_DETENTION":10000,"DETENTION_EXPORT":6000,"DETENTION":5000}.get(mt,0)
+    for k in ("job_ref","booking_ref","party_code","pol","pod","depot_code","office_code","branch_code","organization_code","size_type","container_type"):
+        if rule.get(k) not in (None,""):score+=100
+    score-=int(rule.get("priority") or 100)
+    return score
+
+def _detention_select_rule(conn,ctx,active_on):
+    ensure_mrg(conn)
+    rows=[dict(r) for r in conn.execute("""SELECT * FROM mrg_rules
+      WHERE status='APPROVED' AND rate_side='REVENUE'
+        AND mrg_type IN ('DETENTION','DETENTION_EXPORT','SPECIAL_DETENTION')
+      ORDER BY priority,rule_ref""").fetchall()]
+    matches=[r for r in rows if _detention_rule_matches(r,ctx,active_on)]
+    if not matches:
+        raise HTTPException(409,{"code":"NO_APPROVED_REVENUE_DETENTION_RULE","job_ref":ctx.get("job_ref"),
+                                 "container":ctx.get("container_no"),"active_on":active_on})
+    matches.sort(key=_detention_rule_score,reverse=True)
+    rule=matches[0]
+    rule["slabs"]=[dict(s) for s in conn.execute(
+      "SELECT * FROM mrg_slabs WHERE rule_ref=? ORDER BY from_day,slab_ref",(rule["rule_ref"],)).fetchall()]
+    return rule
+
+def _detention_amount(rule,charge_days,size_type,container_type):
+    if charge_days<=0:return 0.0,0.0
+    if int(rule.get("slab_wise") or 0):
+        total=0.0
+        for day in range(1,charge_days+1):
+            candidates=[]
+            for s in rule.get("slabs") or []:
+                if s.get("size_type") not in (None,"") and str(s["size_type"]).upper()!=str(size_type or "").upper():continue
+                if s.get("container_type") not in (None,"") and str(s["container_type"]).upper()!=str(container_type or "").upper():continue
+                lo=int(s.get("from_day") or 0); hi=s.get("till_day")
+                if day<lo or (hi is not None and day>int(hi)):continue
+                candidates.append(s)
+            if not candidates:
+                raise HTTPException(409,{"code":"MRG_DETENTION_SLAB_GAP","rule_ref":rule["rule_ref"],"day":day})
+            candidates.sort(key=lambda s:(0 if s.get("size_type") else 1,0 if s.get("container_type") else 1,int(s.get("from_day") or 0)))
+            total+=float(candidates[0].get("rate") or 0)
+        avg=total/charge_days if charge_days else 0.0
+        amount=total
+        rate=avg
+    else:
+        basis=str(rule.get("rate_basis") or "PER_DAY").upper()
+        unit=float(rule.get("unit_rate") or 0)
+        if basis in {"PER_DAY","DAY","DAILY"}:
+            amount=unit*charge_days;rate=unit
+        elif basis in {"FLAT","FIXED"}:
+            amount=unit;rate=unit
+        else:
+            raise HTTPException(409,{"code":"UNSUPPORTED_DETENTION_RATE_BASIS","rule_ref":rule["rule_ref"],"rate_basis":basis})
+    if rule.get("minimum_rate") is not None:amount=max(amount,float(rule["minimum_rate"]))
+    if rule.get("maximum_rate") is not None:amount=min(amount,float(rule["maximum_rate"]))
+    return round(amount,2),round(rate,6)
+
+def _detention_context(conn,record_id):
+    txr=conn.execute("""SELECT t.*,j.job_ref,j.pol,j.pod,j.office_code,j.branch_code,j.organization_code,
+      b.booking_ref,c.code customer_code,a.code agent_code
+      FROM transaction_records t
+      JOIN jobs j ON j.id=t.job_id JOIN bookings b ON b.id=t.booking_id
+      JOIN customers c ON c.id=t.customer_id JOIN agents a ON a.id=t.agent_id
+      WHERE t.id=? AND t.module='detention-collection'""",(record_id,)).fetchone()
+    if not txr:raise HTTPException(404,{"code":"DETENTION_RECORD_NOT_FOUND"})
+    d=dict(txr);payload=_detention_payload(txr)
+    container=None
+    if d.get("container_id"):
+        container=conn.execute("SELECT * FROM containers WHERE id=?",(d["container_id"],)).fetchone()
+    if not container:
+        no=payload.get("Container") or payload.get("Container No") or payload.get("Container #")
+        if no:container=conn.execute("SELECT * FROM containers WHERE container_no=?",(no,)).fetchone()
+    if not container:raise HTTPException(409,{"code":"DETENTION_CONTAINER_REQUIRED","record_id":record_id})
+    c=dict(container)
+    direction=str(payload.get("Direction") or payload.get("Import / Export") or payload.get("Movement Type") or "").upper()
+    ctx={**d,**c,"payload":payload,"container_no":c.get("container_no"),"direction":direction}
+    return txr,ctx
+
+def _detention_event_time(conn,container_id,event_type):
+    r=conn.execute("""SELECT COALESCE(actual_time,event_time) t FROM container_events
+      WHERE container_id=? AND event_type=? AND COALESCE(actual_time,event_time) IS NOT NULL
+      ORDER BY COALESCE(actual_time,event_time) DESC,id DESC LIMIT 1""",(container_id,event_type)).fetchone()
+    return r["t"] if r else None
+
+@router.post("/detention/{record_id}/calculate")
+def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Header("OPS"),
+                        x_m3_session:Optional[str]=Header(None,alias="X-M3-Session"),
+                        x_agent_scope:Optional[str]=Header(None,alias="X-Agent-Scope"),
+                        x_branch_scope:Optional[str]=Header(None,alias="X-Branch-Scope"),
+                        x_depot_scope:Optional[str]=Header(None,alias="X-Depot-Scope")):
+    conn=connect()
+    try:
+        a=actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope);require_action(a,"write");tx(conn)
+        txr,ctx=_detention_context(conn,record_id)
+        c=get_container(conn,ctx["container_no"],a)
+        if int(c["id"])!=int(ctx["id"]):ctx.update(dict(c))
+        payload=_detention_payload(txr)
+        gate_out=_detention_event_time(conn,c["id"],"GATE_OUT_FULL") or c["free_time_start"]
+        if not gate_out:raise HTTPException(409,{"code":"GATE_OUT_FULL_REQUIRED","container":c["container_no"]})
+        start=parse_dt(gate_out)
+        if not start:raise HTTPException(409,{"code":"INVALID_GATE_OUT_FULL_TIME","container":c["container_no"]})
+        active_on=start.date().isoformat()
+        ctx["free_time_start"]=gate_out
+        rule=_detention_select_rule(conn,ctx,active_on)
+        free_days=int(rule["free_days"] if rule.get("free_days") is not None else (c["free_days"] or 0))
+        due=start+datetime.timedelta(days=free_days)
+        actual_return_raw=_detention_event_time(conn,c["id"],"EMPTY_RETURN")
+        actual_return=parse_dt(actual_return_raw)
+        requested=parse_dt(b.calculate_till) if b.calculate_till else None
+        if b.calculate_till and not requested:raise HTTPException(422,{"code":"INVALID_CALCULATE_TILL"})
+        calc_until=actual_return or requested or utcnow()
+        if calc_until<start:raise HTTPException(422,{"code":"CALCULATE_TILL_BEFORE_GATE_OUT"})
+        delta=(calc_until-due).total_seconds()
+        charge_days=max(0,int((delta+86399)//86400))
+        amount,rate=_detention_amount(rule,charge_days,c.get("size_type"),payload.get("Container Category"))
+        currency=str(rule.get("currency") or payload.get("Currency") or "USD")
+        previous_advance=float(payload.get("Advance Detention") or payload.get("Advance Amount") or 0)
+        is_actual=actual_return is not None
+        advance=previous_advance if is_actual else amount
+        actual=amount if is_actual else float(payload.get("Actual Detention") or payload.get("Actual Amount") or 0)
+        difference=round(actual-advance,2) if is_actual else 0.0
+        status="ACTUAL_CALCULATED" if is_actual else "ADVANCE_CALCULATED"
+        fields={
+          "Reference":txr["external_ref"],"Job Ref":ctx["job_ref"],"Container":c["container_no"],
+          "Gate-out":gate_out,"Empty Return":actual_return_raw or "","Free Days":free_days,
+          "Chargeable Days":charge_days,"Tariff":rule["rule_ref"],"Tariff Code":rule["charge_code"],
+          "Rate Group":rule["mrg_type"],"Rate":rate,"Currency":currency,
+          "Calculate Till Date":dtiso(calc_until),"Amount":amount,
+          "Advance Detention":round(advance,2),"Actual Detention":round(actual,2),
+          "Difference":difference,"Status":status
+        }
+        before={**payload}
+        payload.update(fields)
+        cur=conn.execute("""UPDATE transaction_records SET payload_json=?,status=?,version=version+1,updated_at=?
+          WHERE id=? AND module='detention-collection' AND version=?""",
+          (json.dumps(payload,sort_keys=True),status,now(),record_id,txr["version"]))
+        if cur.rowcount!=1:raise HTTPException(409,{"code":"OPTIMISTIC_LOCK_CONFLICT"})
+        after=dict(conn.execute("SELECT * FROM transaction_records WHERE id=?",(record_id,)).fetchone())
+        audit(conn,a,"DETENTION_CALCULATE",c["id"],ctx["job_id"],before,payload,{
+          "record_id":record_id,"rule_ref":rule["rule_ref"],"mrg_type":rule["mrg_type"],
+          "rate_side":"REVENUE","calculation_stage":"ACTUAL" if is_actual else "ADVANCE",
+          "chargeable_days":charge_days,"amount":amount,"currency":currency,"gl_posted":False
+        })
+        conn.execute("COMMIT")
+        return {"ok":True,"record_id":record_id,"detention_ref":txr["external_ref"],"stage":"ACTUAL" if is_actual else "ADVANCE",
+                "rule_ref":rule["rule_ref"],"mrg_type":rule["mrg_type"],"free_days":free_days,
+                "gate_out":gate_out,"due_date":dtiso(due),"calculate_till":dtiso(calc_until),
+                "empty_return":actual_return_raw,"chargeable_days":charge_days,"rate":rate,"currency":currency,
+                "amount":amount,"advance":round(advance,2),"actual":round(actual,2),"difference":difference,
+                "status":status,"gl_posted":False,"screen_count":196}
+    except HTTPException:
+        try:conn.execute("ROLLBACK")
+        except Exception:pass
+        raise
+    except Exception:
+        try:conn.execute("ROLLBACK")
+        except Exception:pass
+        raise
+    finally:conn.close()
+
 
 def scope_container_query(a):
     sc,args=scope_clause(a,"c")
