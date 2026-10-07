@@ -476,7 +476,8 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
             segment_days=total_days-hs["total_days"]
             segment_amount=round(max(0.0,cumulative_amount-hs["cumulative_amount"]),2)
             stage="ADVANCE" if not history else "ONGOING"
-            segment_from=due if not history else (parse_dt(hs["covered_till"]) or due)
+            prior_till=parse_dt(hs["covered_till"]) if hs["covered_till"] else None
+            segment_from=due if not history else ((prior_till+datetime.timedelta(days=1)) if prior_till else due)
             entry={
               "sequence":len(history)+1,"stage":stage,"rule_ref":rule["rule_ref"],
               "rate_group":rule["mrg_type"],"rate":rate,"currency":str(rule.get("currency") or payload.get("Currency") or "USD"),
@@ -499,7 +500,7 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
             segment_amount=round(max(0.0,cumulative_amount-hs["cumulative_amount"]),2)
             advance_total=hs["cumulative_amount"]
             actual_amount=cumulative_amount
-            prior_invoiced=finance["advance_invoiced"]
+            prior_invoiced=max(0.0,round(finance["advance_invoiced"]-finance["credit_adjustment"],2))
             difference=round(actual_amount-prior_invoiced,2)
             final_due=round(max(0.0,difference),2)
             credit_required=round(max(0.0,-difference),2)
@@ -510,6 +511,7 @@ def calculate_detention(record_id:int,b:DetentionCalculationBody,x_role:str=Head
           "Process Status":process_status,"Calculation Stage":calculation_stage,
           "Gate-out":gate_out,"Detention Start":dtiso(due),"Empty Return":actual_return_raw or "",
           "Free Days":free_days,"Previous Advance Till Date":hs["covered_till"] or "",
+          "Next Charge Start Date":dtiso(due if not hs["covered_till"] else ((parse_dt(hs["covered_till"])+datetime.timedelta(days=1)) if parse_dt(hs["covered_till"]) else due)),
           "Advance Till Date":dtiso(calc_until) if not is_actual else (hs["covered_till"] or ""),
           "Calculate Till Date":dtiso(calc_until),"Previous Advance Days":hs["total_days"],
           "Advance Days":segment_days if not is_actual else hs["total_days"],
