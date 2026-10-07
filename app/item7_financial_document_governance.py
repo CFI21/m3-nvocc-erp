@@ -64,6 +64,20 @@ def _detention_invoice_fx(conn,src,fields):
     if rate>0:return rate
     raise HTTPException(409,{'code':'FX_RATE_MISSING_ON_SEGMENT','invoice_ref':src['external_ref'],'currency':currency})
 
+def _detention_document_fx(conn,fields,currency):
+    cur=str(currency or 'USD').upper()
+    supplied=_num(fields.get('Exchange Rate') or fields.get('FX Rate'))
+    if supplied>0:return supplied
+    if cur=='USD':return 1.0
+    day=str(fields.get('Date') or fields.get('Invoice Date') or '')[:10]
+    if not day:
+        import datetime
+        day=datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+    r=conn.execute("""SELECT rate FROM gl_fx_rates WHERE currency=? AND base_currency='USD'
+      AND date(rate_date)<=date(?) AND status='ACTIVE' ORDER BY date(rate_date) DESC,id DESC LIMIT 1""",(cur,day)).fetchone()
+    if not r:raise HTTPException(409,{'code':'FX_RATE_MISSING_ON_SEGMENT','currency':cur,'date':day})
+    return float(r['rate'])
+
 def validate_detention_document_link(conn,module,fields,job_id=None,source_type=None,source_ref=None):
     if module not in {'invoice','bills'} or str(source_type or '').upper()!='DETENTION_COLLECTION':
         return {}
@@ -99,13 +113,27 @@ def validate_detention_document_link(conn,module,fields,job_id=None,source_type=
         requested=[r['segment_ref'] for r in rows if r['segment_ref'] not in already]
         if not requested:raise HTTPException(409,{'code':'NO_UNINVOICED_DETENTION_SEGMENTS','detention_ref':source_ref})
     selected=[row_by_ref[x] for x in requested]
+    currency=str(fields.get('Currency') or selected[-1]['document_currency'] or 'USD').upper()
+    fx=_detention_document_fx(conn,fields,currency)
+    segment_base=round(sum(_num(x['base_amount']) for x in selected),2)
+    expected_amount=round(segment_base/fx,2)
+    supplied_amount=_num(fields.get('Amount') or fields.get('Invoice Amount'))
+    if supplied_amount>0 and abs(supplied_amount-expected_amount)>0.01:
+        raise HTTPException(422,{'code':'DETENTION_INVOICE_AMOUNT_MISMATCH','detention_ref':source_ref,
+                                 'segment_refs':requested,'expected_amount':expected_amount,
+                                 'requested_amount':supplied_amount,'currency':currency,'fx_rate':fx})
+    fields['Currency']=currency
+    fields['Exchange Rate']=str(fx)
+    fields['Amount']=str(expected_amount)
+    fields['Outstanding']=str(expected_amount)
     fields['Detention Ref']=source_ref
     fields['Detention Segment Refs']=requested
     fields['Commercial Direction']=direction
     fields['Detention Stage']=selected[-1]['stage'] if len({x['stage'] for x in selected})==1 else 'MIXED'
     fields['Tariff Versions']=[{'segment_ref':x['segment_ref'],'rule_ref':x['rule_ref'],'version':x['tariff_version']} for x in selected]
     return {'detention_ref':source_ref,'commercial_direction':direction,'segment_refs':requested,
-            'segment_base_amount':round(sum(_num(x['base_amount']) for x in selected),2)}
+            'segment_base_amount':segment_base,'document_currency':currency,'exchange_rate':fx,
+            'document_amount':expected_amount}
 
 def validate_correction(conn, module, fields, job_id=None, source_type=None, source_ref=None):
     if module not in CORRECTION_MODULES:return {}
