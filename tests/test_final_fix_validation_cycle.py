@@ -101,7 +101,8 @@ def test_authenticated_role_and_data_scope_are_server_authoritative(isolated):
     assert out["role"]=="AUDITOR"
     assert not (set(quick_actions("agent-tasks::booking","VIEWER")["visible_actions"]) & MUTATIONS)
     ops=login(Login(username="ops.rtm",password="Ops123!",mfa_code="123456"))["session_token"]
-    assert related("50001",x_role="SUPER_ADMIN",x_m3_session=ops)["identity"]["job_ref"]=="50001"
+    scope_none={"x_agent_scope":None,"x_customer_scope":None,"x_branch_scope":None,"x_depot_scope":None,"x_office_scope":None}
+    assert related("50001",x_role="SUPER_ADMIN",x_m3_session=ops,**scope_none)["identity"]["job_ref"]=="50001"
     with pytest.raises(HTTPException) as exc:
-        related("50002",x_role="SUPER_ADMIN",x_m3_session=ops)
+        related("50002",x_role="SUPER_ADMIN",x_m3_session=ops,**scope_none)
     assert exc.value.status_code==404
