@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS public.detention_segments(
   cumulative_days integer NOT NULL CHECK(cumulative_days>=0),
   segment_amount numeric NOT NULL CHECK(segment_amount>=0),
   cumulative_amount numeric NOT NULL CHECK(cumulative_amount>=0),
+  cumulative_base_amount numeric NOT NULL CHECK(cumulative_base_amount>=0),
   document_currency text NOT NULL,
   fx_rate numeric NOT NULL CHECK(fx_rate>0),
   fx_rate_date text NOT NULL,
