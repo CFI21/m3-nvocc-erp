@@ -156,6 +156,8 @@
 .clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button{white-space:nowrap;flex-shrink:0}
 @media(max-width:1000px){.clx78Workspace .clx78MainGrid{grid-template-columns:minmax(0,1fr)}.clx78Workspace .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.clx78Workspace .clx78MainGrid{padding:4px;gap:5px}.clx78Workspace .clx78Fields,.clx78Workspace .clx81Additional>.clx78Fields{grid-template-columns:minmax(0,1fr)}.clx78Workspace .clx78Field{grid-template-columns:minmax(82px,34%) minmax(0,1fr)}.clx78Workspace .clx78Field input,.clx78Workspace .clx78Field select{min-height:36px;height:36px}.clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button,.clx78Workspace .clx78MiniActions button{min-height:40px}.clx78Workspace .clx78TopBar{flex-wrap:wrap}.clx78Workspace .clx78PanelBody{padding:4px}}
+
+.clx78Workspace .clx81MasterField input{border-radius:0;width:100%;min-width:0}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
@@ -1976,7 +1978,40 @@ function clx49BookingTogglePot(){
 }
 
 let clx78BookingBottomTab='Agreed Charges';
+const clx81MasterDomains={POL:'port',POD:'port','POT (1)':'port','POT (2)':'port','Booking Party':'common-party','Billing Party':'common-party',Agent:'common-party','POL Agent':'common-party','POT Agent':'common-party','Receiving Agent':'common-party','POD Agent':'common-party','TS Agent (1)':'common-party','TS Agent (2)':'common-party'};
+const clx81MasterCache={};
+function clx81MasterField(record,key,label,opts={}){
+  const p=record?.fields||{},val=String(p[key]??''),disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
+  return '<div class="clx78Field clx81MasterField"><label>'+esc(label||key)+'</label><input data-clx49-field="'+esc(key)+'" data-clx81-master="'+esc(clx81MasterDomains[key])+'" list="clx81-options-'+esc(clx81MasterDomains[key])+'" autocomplete="off" placeholder="Code — Name" value="'+esc(val)+'"'+disabled+'></div>';
+}
+async function clx81LoadMasterOptions(){
+  const fields=[...document.querySelectorAll('.clx78Workspace [data-clx81-master]')];
+  if(!fields.length)return;
+  for(const domain of [...new Set(fields.map(x=>x.dataset.clx81Master))]){
+    try{
+      if(!clx81MasterCache[domain]){
+        const rows=await api('/api/masterdata/records/'+encodeURIComponent(domain));
+        clx81MasterCache[domain]=(Array.isArray(rows)?rows:[]).filter(r=>String(r.status||'').toUpperCase()==='ACTIVE').map(r=>({code:String(r.record_key||''),name:String(r.display_name||r.payload?.name||'')})).filter(r=>r.code);
+      }
+      if(!document.querySelector('.clx78Workspace [data-clx81-master="'+domain+'"]'))continue;
+      const listId='clx81-options-'+domain;
+      let list=document.getElementById(listId);
+      if(!list){list=document.createElement('datalist');list.id=listId;document.querySelector('.clx78Workspace')?.appendChild(list)}
+      list.innerHTML=clx81MasterCache[domain].map(r=>'<option value="'+esc(r.code+' — '+r.name)+'"></option>').join('');
+      for(const input of document.querySelectorAll('.clx78Workspace [data-clx81-master="'+domain+'"]')){
+        const match=clx81MasterCache[domain].find(r=>r.code===input.value);
+        if(match)input.value=match.code+' — '+match.name;
+      }
+    }catch(e){console.warn('Booking master lookup unavailable',domain,e)}
+  }
+}
+function clx81MasterStoredValue(el){
+  const domain=el.dataset.clx81Master,raw=el.value.trim(),rows=clx81MasterCache[domain]||[];
+  const match=rows.find(r=>raw===r.code+' — '+r.name||raw===r.code);
+  return match?match.code:raw;
+}
 function clx78Field(record,key,label,opts={}){
+  if(clx81MasterDomains[key]&&!opts.textarea)return clx81MasterField(record,key,label,opts);
   const p=record?.fields||{}, val=p[key]??'';
   const disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
   const cls=opts.full?' full':(opts.wide?' wide':'');
@@ -2195,6 +2230,7 @@ async function clx49RenderBooking(tab){
   if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab||(tab==='Booking Info'&&clx78BookingBottomTab!==bottomTab))return;
   $('gridArea').innerHTML=renderGrid()+html;
   clx81RestoreBookingDraft(w);
+  if(tab==='Booking Info')clx81LoadMasterOptions();
   if(tab==='Booking Info'){
     for(const n of ['Via Port','Transshipment Port','POT (1)','POT (2)'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
     document.querySelector('[data-clx49-field="Same as Booking Party"]')?.addEventListener('change',clx81SameAsBookingParty);
@@ -2230,8 +2266,8 @@ async function showClx049Workspace(){
 async function saveClx049Tab(module,id,version){
   if(viewerReadOnly())return;
   try{
-    const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):el.value);
-    if(module==='booking'&&clx81BookingDraft?.key===String(clx49Workspace?.context?.job_ref||'')+':'+String(id))Object.assign(fields,Object.fromEntries(Object.entries(clx81BookingDraft.values).map(([k,v])=>[k,typeof v==='boolean'?(v?'true':'false'):v])));
+    const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):(el.dataset.clx81Master?clx81MasterStoredValue(el):el.value));
+    if(module==='booking'&&clx81BookingDraft?.key===String(clx49Workspace?.context?.job_ref||'')+':'+String(id))Object.assign(fields,Object.fromEntries(Object.entries(clx81BookingDraft.values).map(([k,v])=>[k,typeof v==='boolean'?(v?'true':'false'):(clx81MasterDomains[k]?(clx81MasterCache[clx81MasterDomains[k]]||[]).find(r=>v===r.code+' — '+r.name)?.code||v:v)])));
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
     await api('/api/v1/'+module+'/'+id,{method:'PUT',headers,body:JSON.stringify({version,fields})});
     const jr=clx49Workspace.context.job_ref;
