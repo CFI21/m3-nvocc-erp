@@ -1983,7 +1983,25 @@ function clx81Check(record,key,label,opts={}){
   const disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
   return '<label class="clx81Check"><input type="checkbox" data-clx49-field="'+esc(key)+'" '+(checked?'checked ':'')+disabled+'>'+esc(label)+'</label>';
 }
-function clx81SetBottom(tab){clx78BookingBottomTab=tab;clx49RenderBooking('Booking Info')}
+let clx81BookingDraft=null;
+function clx81CaptureBookingDraft(){
+  const w=clx49Workspace,record=w?.booking,fields=document.querySelectorAll('.clx78Workspace [data-clx49-field]');
+  if(!record||!fields.length)return;
+  const key=String(w.context?.job_ref||'')+':'+String(record.id||'');
+  if(clx81BookingDraft?.key!==key)clx81BookingDraft={key,values:{}};
+  for(const el of fields)clx81BookingDraft.values[el.dataset.clx49Field]=el.type==='checkbox'?el.checked:el.value;
+}
+function clx81RestoreBookingDraft(w){
+  const record=w?.booking,key=String(w?.context?.job_ref||'')+':'+String(record?.id||'');
+  if(!record||clx81BookingDraft?.key!==key)return;
+  for(const el of document.querySelectorAll('.clx78Workspace [data-clx49-field]')){
+    const name=el.dataset.clx49Field;
+    if(!Object.prototype.hasOwnProperty.call(clx81BookingDraft.values,name))continue;
+    if(el.type==='checkbox')el.checked=clx81BookingDraft.values[name];else el.value=clx81BookingDraft.values[name];
+  }
+}
+function clx81SwitchBookingTab(tab){clx81CaptureBookingDraft();return clx49RenderBooking(tab)}
+function clx81SetBottom(tab){clx81CaptureBookingDraft();clx78BookingBottomTab=tab;clx49RenderBooking('Booking Info')}
 async function clx81OpenAttachments(){
   try{
     const w=clx49Workspace,e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(w.context.job_ref));
@@ -2019,7 +2037,7 @@ function clx81QuickButtons(){
 }
 function clx78BottomButtons(){
   const tabs=['Equipment','Agreed Charges','Revenue','Cost','Financial Auto','Preview'];
-  return tabs.map(t=>'<button class="'+(clx78BookingBottomTab===t?'active':'')+'" onclick="clx78BookingBottomTab=\''+t+'\';clx49RenderBooking(\'Booking Info\')">'+t+'</button>').join('');
+  return tabs.map(t=>'<button class="'+(clx78BookingBottomTab===t?'active':'')+'" onclick="clx81SetBottom(\''+t+'\')">'+t+'</button>').join('');
 }
 async function clx78BookingBottom(w){
   const jr=w.context.job_ref;
@@ -2106,7 +2124,7 @@ async function clx49RenderBooking(tab){
     '<div class="clx78Hint">CLX-081 Booking Master Field Alignment · approved Booking reference layout · current authoritative Booking/Job APIs · Reference # remains REVIEW_LATER.</div>'+
     '<div class="clx78Tabs">'+[
       ['Booking Info','Basic Info'],['Other Info','Other Info'],['Messages','Messages']
-    ].map(x=>'<button class="'+(displayTab===x[1]?'active':'')+'" onclick="clx49RenderBooking(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>';
+    ].map(x=>'<button class="'+(displayTab===x[1]?'active':'')+'" onclick="clx81SwitchBookingTab(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>';
   if(tab==='Booking Info'){
     html+='<div class="clx78MainGrid"><div class="clx78Panel"><div class="clx78PanelHead">Basic Info</div><div class="clx78PanelBody"><div class="clx78Fields">'+
       '<div class="clx81GroupTitle">BASIC</div>'+
@@ -2165,6 +2183,7 @@ async function clx49RenderBooking(tab){
   if(r)html+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(displayTab)+'</button>')+'<button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
   if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab||(tab==='Booking Info'&&clx78BookingBottomTab!==bottomTab))return;
   $('gridArea').innerHTML=renderGrid()+html;
+  clx81RestoreBookingDraft(w);
   if(tab==='Booking Info'){
     for(const n of ['Via Port','Transshipment Port','POT (1)','POT (2)'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
     document.querySelector('[data-clx49-field="Same as Booking Party"]')?.addEventListener('change',clx81SameAsBookingParty);
@@ -2201,10 +2220,12 @@ async function saveClx049Tab(module,id,version){
   if(viewerReadOnly())return;
   try{
     const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):el.value);
+    if(module==='booking'&&clx81BookingDraft?.key===String(clx49Workspace?.context?.job_ref||'')+':'+String(id))Object.assign(fields,Object.fromEntries(Object.entries(clx81BookingDraft.values).map(([k,v])=>[k,typeof v==='boolean'?(v?'true':'false'):v])));
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
     await api('/api/v1/'+module+'/'+id,{method:'PUT',headers,body:JSON.stringify({version,fields})});
     const jr=clx49Workspace.context.job_ref;
     clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers(clx49Workspace)});
+    if(module==='booking')clx81BookingDraft=null;
     if(state.current.key==='bl')await clx49RenderBlTab(clx49ActiveTab||'Booking Info');
     else if(state.current.key==='booking')await clx49RenderBooking(clx49ActiveTab||'Booking Info');
     else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
