@@ -1982,10 +1982,11 @@ const clx81MasterDomains={POL:'port',POD:'port','POT (1)':'port','POT (2)':'port
 const clx81MasterCache={};
 function clx81MasterField(record,key,label,opts={}){
   const p=record?.fields||{},val=String(p[key]??''),disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
-  return '<div class="clx78Field clx81MasterField"><label>'+esc(label||key)+'</label><input data-clx49-field="'+esc(key)+'" data-clx81-master="'+esc(clx81MasterDomains[key])+'" list="clx81-options-'+esc(clx81MasterDomains[key])+'" autocomplete="off" placeholder="Code — Name" value="'+esc(val)+'"'+disabled+'></div>';
+  return '<div class="clx78Field clx81MasterField"><label>'+esc(label||key)+'</label><input data-clx49-field="'+esc(key)+'" data-clx81-master="'+esc(clx81MasterDomains[key])+'" list="clx81-options-'+esc(clx81MasterDomains[key])+'" autocomplete="off" oninput="this.setCustomValidity(\'\')" placeholder="Code — Name" value="'+esc(val)+'"'+disabled+'></div>';
 }
 async function clx81LoadMasterOptions(){
-  const fields=[...document.querySelectorAll('.clx78Workspace [data-clx81-master]')];
+  const workspace=document.querySelector('.clx78Workspace');
+  const fields=[...workspace?.querySelectorAll('[data-clx81-master]')||[]];
   if(!fields.length)return;
   for(const domain of [...new Set(fields.map(x=>x.dataset.clx81Master))]){
     try{
@@ -1993,14 +1994,16 @@ async function clx81LoadMasterOptions(){
         const rows=await api('/api/masterdata/records/'+encodeURIComponent(domain));
         clx81MasterCache[domain]=(Array.isArray(rows)?rows:[]).filter(r=>String(r.status||'').toUpperCase()==='ACTIVE').map(r=>({code:String(r.record_key||''),name:String(r.display_name||r.payload?.name||'')})).filter(r=>r.code);
       }
-      if(!document.querySelector('.clx78Workspace [data-clx81-master="'+domain+'"]'))continue;
+      if(!workspace.isConnected)return;
+      if(!workspace.querySelector('[data-clx81-master="'+domain+'"]'))continue;
       const listId='clx81-options-'+domain;
       let list=document.getElementById(listId);
-      if(!list){list=document.createElement('datalist');list.id=listId;document.querySelector('.clx78Workspace')?.appendChild(list)}
+      if(!list){list=document.createElement('datalist');list.id=listId;workspace.appendChild(list)}
       list.innerHTML=clx81MasterCache[domain].map(r=>'<option value="'+esc(r.code+' — '+r.name)+'"></option>').join('');
-      for(const input of document.querySelectorAll('.clx78Workspace [data-clx81-master="'+domain+'"]')){
+      for(const input of workspace.querySelectorAll('[data-clx81-master="'+domain+'"]')){
         const match=clx81MasterCache[domain].find(r=>r.code===input.value);
         if(match)input.value=match.code+' — '+match.name;
+        input.dataset.clx81Loaded='true';
       }
     }catch(e){console.warn('Booking master lookup unavailable',domain,e)}
   }
@@ -2010,6 +2013,19 @@ function clx81MasterStoredValue(el){
   const match=rows.find(r=>raw===r.code+' — '+r.name||raw===r.code);
   return match?match.code:raw;
 }
+function clx81ValidateMasterFields(){
+  for(const el of document.querySelectorAll('.clx78Workspace [data-clx81-master]')){
+    if(el.disabled||!el.value.trim()||el.dataset.clx81Loaded!=='true')continue;
+    const rows=clx81MasterCache[el.dataset.clx81Master]||[];
+    if(!rows.some(r=>el.value.trim()===r.code||el.value.trim()===r.code+' — '+r.name)){
+      el.setCustomValidity('Select a valid active master record from the suggestions.');
+      el.reportValidity();el.focus();return false;
+    }
+    el.setCustomValidity('');
+  }
+  return true;
+}
+
 function clx78Field(record,key,label,opts={}){
   if(clx81MasterDomains[key]&&!opts.textarea)return clx81MasterField(record,key,label,opts);
   const p=record?.fields||{}, val=p[key]??'';
@@ -2182,14 +2198,14 @@ async function clx49RenderBooking(tab){
       clx78Field(r,'Booking Party','Customer / Booking Party',{wide:true})+
 
       clx78Field(r,'Billing Party','Billing Party')+clx78Field(r,'Agent','Origin / Sending Agent')+
-      clx78Field(r,'POL Agent','POL Agent')+clx78Field(r,'POT Agent','POT Agent',{disabled:!hasPot1})+
-      clx78Field(r,'Receiving Agent','Destination / Receiving Agent')+clx78Field(r,'POD Agent','POD Agent')+
+      clx78Field(r,'Receiving Agent','Destination / Receiving Agent')+clx78Field(r,'POT Agent','POT Agent',{disabled:!hasPot1})+
 
       '<div class="clx81GroupTitle">ROUTING</div>'+
-      clx78Field(r,'POL','POL')+clx78Field(r,'POT (1)','POT (1)')+
-      clx78Field(r,'TS Agent (1)','TS Agent (1)',{disabled:!hasPot1})+
-      clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','TS Agent (2)',{disabled:!hasPot2})+
-      clx78Field(r,'POD','POD')+clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
+      clx78Field(r,'POL','POL')+clx78Field(r,'POL Agent','Agent (POL)')+
+      clx78Field(r,'POD','POD')+clx78Field(r,'POD Agent','Agent (POD)')+
+      clx78Field(r,'POT (1)','POT (1)')+clx78Field(r,'TS Agent (1)','Agent (1)',{disabled:!hasPot1})+
+      clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','Agent (2)',{disabled:!hasPot2})+
+      clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
 
       '<div class="clx81GroupTitle">CARGO / EQUIPMENT</div>'+
       clx78Field(r,'Commodity','Commodity')+clx78Field(r,'Equipment','Container Size / Type')+clx78Field(r,'Quantity','Quantity')+
@@ -2266,6 +2282,7 @@ async function showClx049Workspace(){
 async function saveClx049Tab(module,id,version){
   if(viewerReadOnly())return;
   try{
+    if(module==='booking'&&!clx81ValidateMasterFields())return;
     const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):(el.dataset.clx81Master?clx81MasterStoredValue(el):el.value));
     if(module==='booking'&&clx81BookingDraft?.key===String(clx49Workspace?.context?.job_ref||'')+':'+String(id))Object.assign(fields,Object.fromEntries(Object.entries(clx81BookingDraft.values).map(([k,v])=>[k,typeof v==='boolean'?(v?'true':'false'):(clx81MasterDomains[k]?(clx81MasterCache[clx81MasterDomains[k]]||[]).find(r=>v===r.code+' — '+r.name)?.code||v:v)])));
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
