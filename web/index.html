@@ -146,6 +146,16 @@
 .clx78Workspace .clx81Additional[open] summary{border-bottom:1px solid #d1d8e1}
 .clx78Workspace .clx81Additional>.clx78Fields{padding:5px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 7px}
 @media(max-width:700px){.clx78Workspace .clx81Additional>.clx78Fields{grid-template-columns:1fr}}
+
+/* M3 Booking responsive workspace: square desktop controls, usable mobile layout */
+.clx78Workspace{width:100%;max-width:none;min-width:0;box-sizing:border-box}
+.clx78Workspace .clx78MainGrid{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);width:100%;box-sizing:border-box}
+.clx78Workspace .clx78Panel,.clx78Workspace .clx78PanelBody,.clx78Workspace .clx78Fields{min-width:0}
+.clx78Workspace .clx78Field input,.clx78Workspace .clx78Field select,.clx78Workspace .clx78Field textarea{width:100%;min-width:0;box-sizing:border-box;border-radius:0}
+.clx78Workspace .clx78Tabs,.clx78Workspace .clx78BottomTabs,.clx78Workspace .clx78OpsTabs{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+.clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button{white-space:nowrap;flex-shrink:0}
+@media(max-width:1000px){.clx78Workspace .clx78MainGrid{grid-template-columns:minmax(0,1fr)}.clx78Workspace .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.clx78Workspace .clx78MainGrid{padding:4px;gap:5px}.clx78Workspace .clx78Fields,.clx78Workspace .clx81Additional>.clx78Fields{grid-template-columns:minmax(0,1fr)}.clx78Workspace .clx78Field{grid-template-columns:minmax(82px,34%) minmax(0,1fr)}.clx78Workspace .clx78Field input,.clx78Workspace .clx78Field select{min-height:36px;height:36px}.clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button,.clx78Workspace .clx78MiniActions button{min-height:40px}.clx78Workspace .clx78TopBar{flex-wrap:wrap}.clx78Workspace .clx78PanelBody{padding:4px}}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
