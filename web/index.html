@@ -2158,11 +2158,12 @@ async function clx49RenderBooking(tab){
       '</div></details></div></div></div>'+
       '<div class="clx78Panel"><div class="clx78PanelHead">Operational Control</div><div class="clx78PanelBody"><div class="clx78OpsTabs"><span>Organizations</span><span>Departure</span><span>Arrival</span><span>Docs</span><span>Pre-Allocation</span><span>Achieved Quantities</span><span>Numbers</span><span>Additional Detail</span></div><div class="clx78Fields" style="grid-template-columns:repeat(2,minmax(140px,1fr))">'+
       clx78Field(r,'Operations Owner','Operations Owner')+clx78Field(r,'Agent Reference','Agent Reference')+
+      '<details class="clx81Additional"><summary>Additional Operational Details</summary><div class="clx78Fields">'+
       clx78Field(r,'Primary Vendor / Carrier','Primary Vendor / Carrier')+clx78Field(r,'SI Cut-off','SI Cut-off',{type:'date'})+
       clx78Field(r,'VGM Cut-off','VGM Cut-off',{type:'date'})+clx78Field(r,'Gate-in Cut-off','Gate-in Cut-off',{type:'date'})+
       clx78Field(r,'Free Days POL','Free Days POL')+clx78Field(r,'Free Days POD','Free Days POD')+
       clx78Field(r,'Detention Tariff','Detention Tariff',{wide:true})+
-      '</div><div class="clx78MiniActions" style="margin-top:7px">'+clx81QuickButtons()+'</div></div></div></div>'+
+      '</div></details></div><div class="clx78MiniActions" style="margin-top:7px">'+clx81QuickButtons()+'</div></div></div></div>'+
       '<div class="clx78Panel clx78Commercial"><div class="clx78PanelHead">Commercial Ownership / Financial Parties</div><div class="clx78PanelBody"><div class="clx78Fields">'+
       clx78Field(r,'Operation','Operation')+clx78Field(r,'Principal','Principal')+clx78Field(r,'Commercial Owner','Commercial Owner')+clx78Field(r,'Finance / Credit Party','Finance / Credit Party')+
       clx78Field(r,'Settlement Agent','Settlement Agent')+clx78Field(r,'Rate Basis','Rate Basis')+clx78Field(r,'Contract / Tariff Ref','Contract / Tariff Ref')+clx78Field(r,'Financial Flow','Financial Flow')+
