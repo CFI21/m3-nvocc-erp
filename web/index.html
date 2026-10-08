@@ -2283,7 +2283,8 @@ async function saveClx049Tab(module,id,version){
   if(viewerReadOnly())return;
   try{
     if(module==='booking'&&!clx81ValidateMasterFields())return;
-    const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):(el.dataset.clx81Master?clx81MasterStoredValue(el):el.value));
+    if(module==='booking')document.querySelectorAll('.clx78Workspace [data-clx81-master]').forEach(el=>{el.value=clx81MasterStoredValue(el)});
+    const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):el.value);
     if(module==='booking'&&clx81BookingDraft?.key===String(clx49Workspace?.context?.job_ref||'')+':'+String(id))Object.assign(fields,Object.fromEntries(Object.entries(clx81BookingDraft.values).map(([k,v])=>[k,typeof v==='boolean'?(v?'true':'false'):(clx81MasterDomains[k]?(clx81MasterCache[clx81MasterDomains[k]]||[]).find(r=>v===r.code+' — '+r.name)?.code||v:v)])));
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
     await api('/api/v1/'+module+'/'+id,{method:'PUT',headers,body:JSON.stringify({version,fields})});
