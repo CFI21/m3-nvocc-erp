@@ -109,6 +109,55 @@
 .clx82Grid{grid-template-columns:repeat(2,minmax(180px,1fr))!important}
 .homeGrid{grid-template-columns:repeat(4,minmax(150px,1fr))}
 @media(max-width:1250px){.clx78Fields,.clx78Commercial .clx78Fields,.clx82Grid{grid-template-columns:1fr!important}.homeGrid{grid-template-columns:repeat(2,minmax(140px,1fr))}}
+/* M3 CLX-056 compact Booking grid pilot: presentation only, no workflow changes */
+.m3BookingCompact .opGridToolbar{padding:3px 5px;gap:4px}
+.m3BookingCompact .opGridToolbar input,.m3BookingCompact .opGridToolbar select{height:24px;padding:2px 5px;border-radius:0;font-size:12px}
+.m3BookingCompact .opGridToolbar .btn{min-height:24px;padding:2px 7px;border-radius:0}
+.m3BookingCompact .opGridWrap th,.m3BookingCompact .opGridWrap td{padding:3px 5px;height:26px;border-right:1px solid #e7ebf0;font-size:12px}
+.m3BookingCompact .opGridWrap th{background:#edf0f3}
+.m3BookingCompact .opGridWrap tr:focus-within td{background:#e6f0fb}
+/* CLX-056 Booking-only compact screen pilot; keep all existing actions and field bindings. */
+.clx78Workspace{font-size:11px}
+.clx78Workspace .clx78MainGrid{grid-template-columns:minmax(0,1.65fr) minmax(350px,1fr);gap:5px;padding:5px;align-items:start}
+.clx78Workspace .clx78PanelHead{padding:4px 6px;min-height:25px}
+.clx78Workspace .clx78PanelBody{padding:5px}
+.clx78Workspace .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 7px}
+.clx78Workspace .clx78Field{grid-template-columns:minmax(90px,108px) minmax(0,1fr);gap:5px;min-width:0;min-height:24px}
+.clx78Workspace .clx78Field label{font-size:10px;line-height:1.2;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.clx78Workspace .clx78Field input,.clx78Workspace .clx78Field select{height:24px;min-height:24px;padding:2px 5px;border-radius:0;font-size:11px}
+.clx78Workspace .clx78Field textarea{border-radius:0}
+.clx78Workspace .clx78Field.wide{grid-column:1/-1}
+.clx78Workspace .clx81GroupTitle{padding:3px 5px;margin-top:3px}
+.clx78Workspace .clx78Commercial{margin:0 5px 5px}
+.clx78Workspace .clx78Commercial .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.clx78Workspace .clx78OpsTabs{gap:3px;margin-bottom:5px}
+.clx78Workspace .clx78OpsTabs span{padding:3px 5px}
+.clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button,.clx78Workspace .clx78MiniActions button{border-radius:0;min-height:25px;padding:3px 7px}
+.clx78Workspace .clx78BottomTabs{padding:3px 5px;gap:3px}
+.clx78Workspace .clx78Flow{gap:3px;padding:4px}
+.clx78Workspace .clx78FlowStep{padding:4px}
+.clx78Workspace .clx78Ledger .tablewrap{overflow:auto}
+@media(max-width:1180px){.clx78Workspace .clx78MainGrid{grid-template-columns:1fr}.clx78Workspace .clx78Fields,.clx78Workspace .clx78Commercial .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.clx78Workspace .clx78Fields,.clx78Workspace .clx78Commercial .clx78Fields{grid-template-columns:1fr}.clx78Workspace .clx78Field.wide{grid-column:auto}}
+
+/* Booking one-workspace progressive disclosure; retain authoritative fields and actions */
+.clx78Workspace .clx81Additional{grid-column:1/-1;border:1px solid #d1d8e1;background:#fafbfc;margin-top:4px;min-width:0}
+.clx78Workspace .clx81Additional summary{cursor:pointer;font-size:11px;font-weight:700;padding:5px 7px;color:#344054}
+.clx78Workspace .clx81Additional[open] summary{border-bottom:1px solid #d1d8e1}
+.clx78Workspace .clx81Additional>.clx78Fields{padding:5px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 7px}
+@media(max-width:700px){.clx78Workspace .clx81Additional>.clx78Fields{grid-template-columns:1fr}}
+
+/* M3 Booking responsive workspace: square desktop controls, usable mobile layout */
+.clx78Workspace{width:100%;max-width:none;min-width:0;box-sizing:border-box}
+.clx78Workspace .clx78MainGrid{grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);width:100%;box-sizing:border-box}
+.clx78Workspace .clx78Panel,.clx78Workspace .clx78PanelBody,.clx78Workspace .clx78Fields{min-width:0}
+.clx78Workspace .clx78Field input,.clx78Workspace .clx78Field select,.clx78Workspace .clx78Field textarea{width:100%;min-width:0;box-sizing:border-box;border-radius:0}
+.clx78Workspace .clx78Tabs,.clx78Workspace .clx78BottomTabs,.clx78Workspace .clx78OpsTabs{max-width:100%;overflow-x:auto;overscroll-behavior-inline:contain}
+.clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button{white-space:nowrap;flex-shrink:0}
+@media(max-width:1000px){.clx78Workspace .clx78MainGrid{grid-template-columns:minmax(0,1fr)}.clx78Workspace .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:620px){.clx78Workspace .clx78MainGrid{padding:4px;gap:5px}.clx78Workspace .clx78Fields,.clx78Workspace .clx81Additional>.clx78Fields{grid-template-columns:minmax(0,1fr)}.clx78Workspace .clx78Field{grid-template-columns:minmax(82px,34%) minmax(0,1fr)}.clx78Workspace .clx78Field input,.clx78Workspace .clx78Field select{min-height:36px;height:36px}.clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button,.clx78Workspace .clx78MiniActions button{min-height:40px}.clx78Workspace .clx78TopBar{flex-wrap:wrap}.clx78Workspace .clx78PanelBody{padding:4px}}
+
+.clx78Workspace .clx81MasterField input{border-radius:0;width:100%;min-width:0}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
@@ -130,17 +179,21 @@ window.fetch=(input,init={})=>{
   return __m3NativeFetch(url,{...init,headers,credentials:'omit'});
 };
 </script><div style="margin:12px 18px;padding:14px;border:1px solid #cbd5e1;border-radius:14px;background:#f8fafc"><b>CLX-018 · Production Web + API Integration</b><div style="margin-top:6px">CLX-077 live review is active on the governed M3 production runtime. <b>Production traffic is ON. Real external providers remain OFF. Real money remains OFF. Dummy Bank simulation is enabled for controlled review/training only.</b></div><button onclick="fetch('/api/clx014/certify',{method:'POST',headers:{'X-Role':'ADMIN'}}).then(r=>r.json()).then(x=>alert('CLX-014 certification: '+x.status))" style="margin-top:10px">Run CLX-014 Certification</button> <button onclick="fetch('/api/clx014/final-gate').then(r=>r.json()).then(x=>alert(x.status+' / '+x.hard_stop))">Final Go-Live Gate</button></div><div class="app"><aside class="side"><div class="logo" onclick="showExecutiveHome()" style="cursor:pointer" title="Executive Home"><b>M3 NVOCC ERP</b><small>CLX-080 · Live Web Hardening · Build <span id="buildSha">__M3_BUILD_SHA_SHORT__</span></small></div><div class="menuSearch"><input id="menuSearch" placeholder="Search menu / submenu..." aria-label="Search menu"></div><div id="nav"></div></aside>
-<main class="main"><div class="top"><b id="topTitle" class="topTitleHome" onclick="showExecutiveHome()">M3 NVOCC ERP</b><span class="grow"></span><input id="globalSearch" placeholder="Global search screens / records..." aria-label="Global search"><select id="role" aria-label="Role / profile"><option>ADMIN</option><option>OPS</option><option>DOCS</option><option>FINANCE</option><option>GL_MANAGER</option><option>GL_ACCOUNTANT</option><option>TREASURY_MANAGER</option><option>TREASURY</option><option>SECURITY_ADMIN</option><option>MASTER_DATA_MANAGER</option><option>MASTER_DATA</option><option>AUDITOR</option><option>AGENT</option><option>VIEWER</option></select><button id="notificationsBtn" class="headerAction" title="Critical exceptions / notifications">⚠ Exceptions</button><div class="moreWrap" id="moreWrap"><button id="moreBtn" class="headerAction">More ▾</button><div class="moreMenu" id="moreMenu"><button onclick="showExecutiveHome()">Executive Home</button><button onclick="showReadiness()">Readiness</button><button onclick="showObservability()">Observability</button><button onclick="showKpiTrends()">KPI Trends</button><button onclick="showControlTower()">Control Tower</button><button onclick="showDummyBankReview()">Dummy Bank Review</button><button onclick="showOpsWorkbench()">Ops Workbench</button><button onclick="showBusinessDay()">Business Day</button><button onclick="showActionQueue()">Action Queue</button><button onclick="showEquipmentWorkspace('overview')">Equipment Control</button><button onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-030_FINANCE_ENTITLEMENTS_20260926.html','_blank')">Finance Access</button><button onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-032_FINANCE_CONTROLS_20260926.html','_blank')">Finance Controls</button><button onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')">Finance Approvals</button><button onclick="showShortlist(state.recent,'Recent Screens')">Recent Screens</button><button onclick="showShortlist([...state.favorites],'Favorite Screens')">Favorite Screens</button></div></div></div><div id="searchPanel" class="searchPanel"></div><div class="content"><div class="card" id="clx013Banner" style="margin-bottom:10px"><b>CLX-086 Final Bulk-to-Live Candidate</b> · Final build marker · CLX-080 cache/version controls preserved · <b>CLX-078 UI Consolidation Review</b> · M3 production core ON · 196 canonical screens preserved · CLX-056 master-template pattern · Global Equipment Tower · Dummy Bank preserved · external providers OFF · real money OFF</div><div class="card" id="clx012Banner" style="margin-bottom:10px"><b>CLX-012 Business Day preserved</b> · Parent CLX-011 Screen Integration · 5 canonical jobs · Action Queue · SLA / Due-Date · Exception Priority · Next-Best-Action · synthetic only</div><div class="crumb" id="breadcrumb"></div><div class="heading"><span id="favorite" class="favorite" title="Favorite screen">☆</span><h1 id="pageTitle">Loading…</h1><span id="statusPill" class="pill">Integrated</span><span class="muted" title="Current deployed web build">CLX-080 · <span id="buildShaTop">__M3_BUILD_SHA_SHORT__</span></span><span class="grow"></span><button class="btn" id="prevBtn">← Previous</button><button class="btn" id="nextBtn">Next →</button></div><div id="flow" class="flow"></div><div id="screenMeta"></div><div id="gridArea"></div></div></main></div>
+<main class="main"><div class="top"><b id="topTitle" class="topTitleHome" onclick="showExecutiveHome()">M3 NVOCC ERP</b><span class="grow"></span><input id="globalSearch" placeholder="Global search screens / records..." aria-label="Global search"><select id="role" aria-label="Role / profile"><option>ADMIN</option><option>OPS</option><option>DOCS</option><option>FINANCE</option><option>GL_MANAGER</option><option>GL_ACCOUNTANT</option><option>TREASURY_MANAGER</option><option>TREASURY</option><option>SECURITY_ADMIN</option><option>MASTER_DATA_MANAGER</option><option>MASTER_DATA</option><option>AUDITOR</option><option>AGENT</option><option>VIEWER</option></select><button id="notificationsBtn" class="headerAction" title="Critical exceptions / notifications">⚠ Exceptions</button><div class="moreWrap" id="moreWrap"><button id="moreBtn" class="headerAction">More ▾</button><div class="moreMenu" id="moreMenu"><button onclick="showExecutiveHome()">Executive Home</button><button onclick="showReadiness()">Readiness</button><button onclick="showObservability()">Observability</button><button onclick="showKpiTrends()">KPI Trends</button><button onclick="showControlTower()">Control Tower</button><button onclick="showDummyBankReview()">Dummy Bank Review</button><button onclick="showOpsWorkbench()">Ops Workbench</button><button onclick="showBusinessDay()">Business Day</button><button onclick="showActionQueue()">Action Queue</button><button onclick="showEquipmentWorkspace('overview')">Equipment Control</button><button onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-030_FINANCE_ENTITLEMENTS_20260926.html','_blank')">Finance Access</button><button onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-032_FINANCE_CONTROLS_20260926.html','_blank')">Finance Controls</button><button onclick="window.open(M3_API_BASE+'/static/M3_NVOCC_ERP_CLX-033_FINANCE_APPROVAL_WORKBENCH_20260926.html','_blank')">Finance Approvals</button><button onclick="showShortlist(state.recent,'Recent Screens')">Recent Screens</button><button onclick="showShortlist([...state.favorites],'Favorite Screens')">Favorite Screens</button></div></div></div><div id="searchPanel" class="searchPanel"></div><div class="content"><div class="card" id="clx013Banner" style="display:none" aria-hidden="true"><b>CLX-086 Final Bulk-to-Live Candidate</b> · Final build marker · CLX-080 cache/version controls preserved · <b>CLX-078 UI Consolidation Review</b> · M3 production core ON · 196 canonical screens preserved · CLX-056 master-template pattern · Global Equipment Tower · Dummy Bank preserved · external providers OFF · real money OFF</div><div class="card" id="clx012Banner" style="display:none" aria-hidden="true"><b>CLX-012 Business Day preserved</b> · Parent CLX-011 Screen Integration · 5 canonical jobs · Action Queue · SLA / Due-Date · Exception Priority · Next-Best-Action · synthetic only</div><div class="crumb" id="breadcrumb"></div><div class="heading"><span id="favorite" class="favorite" title="Favorite screen">☆</span><h1 id="pageTitle">Loading…</h1><span id="statusPill" class="pill">Integrated</span><span class="muted" title="Current deployed web build">CLX-080 · <span id="buildShaTop">__M3_BUILD_SHA_SHORT__</span></span><span class="grow"></span><button class="btn" id="prevBtn">← Previous</button><button class="btn" id="nextBtn">Next →</button></div><div id="flow" class="flow"></div><div id="screenMeta"></div><div id="gridArea"></div></div></main></div>
 <aside class="drawer" id="drawer"><div class="drawerHead"><b id="drawerTitle">Quick View</b><span style="flex:1"></span><button class="btn" id="drawerClose">×</button></div><div class="drawerBody"><div class="tabs"><button class="tab active" data-tab="details">Details</button><button class="tab" data-tab="related">Related Records</button><button class="tab" data-tab="audit">Audit</button></div><div id="tab-details"></div><div id="tab-related" style="display:none"></div><div id="tab-audit" style="display:none"></div></div></aside>
 <div class="fabWrap" id="fabWrap"><button class="fab" id="fab" aria-label="Quick actions" aria-haspopup="menu">⋮</button><div class="fabTip">Quick Actions</div><div class="fabMenu" id="fabMenu"></div></div>
 <script>
-const state={menu:[],screens:[],byId:{},current:null,rows:[],filtered:[],selected:null,sortKey:'',sortAsc:true,page:1,pageSize:20,status:'',savedView:'',role:'ADMIN',equipmentView:'',favorites:new Set(JSON.parse(localStorage.getItem('m3clx011-favorites')||'[]')),recent:JSON.parse(localStorage.getItem('m3clx011-recent')||'[]')};
+const state={menu:[],screens:[],byId:{},current:null,rows:[],filtered:[],selected:null,sortKey:'',sortAsc:true,page:1,pageSize:20,status:'',savedView:'',gridSearch:'',viewEpoch:0,role:'ADMIN',equipmentView:'',favorites:new Set(JSON.parse(localStorage.getItem('m3clx011-favorites')||'[]')),recent:JSON.parse(localStorage.getItem('m3clx011-recent')||'[]')};
 const esc=v=>String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
 const $=id=>document.getElementById(id);const api=async(url,opts={})=>{let r=await fetch(url,opts);if(!r.ok)throw new Error(await r.text());return r.json()};
 function domainSlug(d){return d.toLowerCase().replace(/\s*\/\s*/g,'-').replace(/\s+/g,'-').replace(/&/g,'and')}
 function saveState(){localStorage.setItem('m3clx011-favorites',JSON.stringify([...state.favorites]));localStorage.setItem('m3clx011-recent',JSON.stringify(state.recent.slice(0,15)))}
 function toggleGroup(id){let x=document.querySelector(`[data-content="${CSS.escape(id)}"]`);if(x)x.classList.toggle('collapse')}
+const UI_MUTATIONS=new Set(['create','edit','copy','approve','release','hold','cancel','amend','reissue','reverse','retry','activate','deactivate','change-request','reject','advance']);
 function screenAllowed(s){let r=state.role==='SUPER_ADMIN'?'ADMIN':state.role;return !Array.isArray(s.roles)||!s.roles.length||s.roles.includes(r)}
+function viewerReadOnly(){return state.role==='VIEWER'}
+function writeUi(html){return viewerReadOnly()?'':html}
+function viewCurrent(epoch,screenId,role){return state.viewEpoch===epoch&&state.current?.screen_id===screenId&&state.role===role}
 function screenDisplayName(id){if(id==='master-data::equipment-types')return 'Equipment Size & Type';if(id==='master-data::container-types')return 'Container Category';return state.byId[id]?.name||id}
 function renderNav(){const q=$('menuSearch').value.toLowerCase().trim();let html='';
 const businessGroups=state.businessNavigation?.groups||[];
@@ -482,7 +535,7 @@ async function renderHoPaParties(){
     $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>PA Parties</b><span class="muted">Filtered Common Party view. “PA” is retained as the legacy label only; no new business meaning or persistence is invented.</span><span class="grow"></span><button class="btn primary" onclick="openScreen(\'master-data::common-partys\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'PA Parties · Common Parties\'})">Manage Common Parties</button></div></div>'+
       '<div class="tablewrap"><table><thead><tr><th>Party Code</th><th>Name</th><th>Party Type</th><th>Status</th><th>Version</th><th>Effective From</th><th>Effective To</th></tr></thead><tbody>'+
       (rows.length?rows.map(r=>'<tr><td><b>'+esc(r.code)+'</b></td><td>'+esc(r.name)+'</td><td>'+esc(r.party_type)+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.version)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to)+'</td></tr>').join(''):'<tr><td colspan="7" class="muted">No Common Party records available.</td></tr>')+
-      '</tbody></table></div>';
+      '</tbody></table></div></div>';
   }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>PA Parties load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
 async function renderHoStamps(){
@@ -1099,24 +1152,23 @@ function metaCards(data){
     '<div class="opSectionNav">'+sections.map(x=>'<span>'+esc(x)+'</span>').join('')+'</div>';
 }
 function normalizeRows(rows){return (rows||[]).map(r=>{let o={...r};if(o.payload&&typeof o.payload==='object'){for(const [k,v] of Object.entries(o.payload)){if(!(k in o))o[k]=v}delete o.payload}return o})}
-function calcRows(){let q=($('gridSearch')?.value||'').toLowerCase();let st=$('statusFilter')?.value||'';let rows=state.rows.filter(r=>(!q||JSON.stringify(r).toLowerCase().includes(q))&&(!st||String(r.status??r.Status??'')===st));if(state.savedView==='action')rows=rows.filter(r=>/draft|pending|open|review|hold|failed/i.test(String(r.status??r.Status??'')));if(state.savedView==='closed')rows=rows.filter(r=>/released|closed|approved|posted|reconciled|active/i.test(String(r.status??r.Status??'')));if(state.sortKey)rows.sort((a,b)=>String(a[state.sortKey]??'').localeCompare(String(b[state.sortKey]??''))*(state.sortAsc?1:-1));state.filtered=rows;return rows}
+function calcRows(){let q=String(state.gridSearch||'').toLowerCase();let st=state.status||'';let rows=state.rows.filter(r=>(!q||JSON.stringify(r).toLowerCase().includes(q))&&(!st||String(r.status??r.Status??'')===st));if(state.savedView==='action')rows=rows.filter(r=>/draft|pending|open|review|hold|failed/i.test(String(r.status??r.Status??'')));if(state.savedView==='closed')rows=rows.filter(r=>/released|closed|approved|posted|reconciled|active/i.test(String(r.status??r.Status??'')));if(state.sortKey)rows.sort((a,b)=>String(a[state.sortKey]??'').localeCompare(String(b[state.sortKey]??''))*(state.sortAsc?1:-1));state.filtered=rows;return rows}
 function statuses(){return [...new Set(state.rows.map(r=>String(r.status??r.Status??'')).filter(Boolean))].sort()}
+function gridColumnKeys(rows){const preferred=['external_ref','job_ref','booking_ref','status','Status','Customer','Agent','B/L','BL','POL','POD','Date','Amount','Currency'],keys=[],seen=new Set();const add=k=>{const canon=String(k).toLowerCase();if(k==='payload_json'||['id','version'].includes(k)||seen.has(canon))return;seen.add(canon);keys.push(k)};for(const k of preferred){if(rows.some(r=>Object.prototype.hasOwnProperty.call(r,k)))add(k)}for(const r of rows)for(const k of Object.keys(r))add(k);keys=keys.slice(0,8);return keys}
+function gridColumnLabel(k){const booking=state.current?.screen_id==='agent-tasks::booking';const labels={job_ref:'Job No.',booking_ref:'Booking No.',status:'Status',customer:'Customer',agent:'Agent'};if(booking)labels.external_ref='Booking No.';return labels[String(k).toLowerCase()]||String(k).replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}
+function gridCellDisplay(v){if(v===null||v===undefined||v==='')return '—';if(typeof v==='object')return JSON.stringify(v);return String(v)}
 function renderGrid(){
   let rows=calcRows(),total=Math.max(1,Math.ceil(rows.length/state.pageSize));state.page=Math.min(state.page,total);
-  let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=[];
-  const preferred=['external_ref','job_ref','booking_ref','Status','status','Customer','Agent','B/L','BL','POL','POD','Date','Amount','Currency'];
-  for(const k of preferred){if(slice.some(r=>Object.prototype.hasOwnProperty.call(r,k))&&!keys.includes(k))keys.push(k)}
-  for(const r of slice){for(const k of Object.keys(r)){if(!keys.includes(k)&&k!=='payload_json'&&!['id','version'].includes(k))keys.push(k)}}
-  keys=keys.slice(0,8);
-  let html='<div class="opGridToolbar"><input id=gridSearch placeholder="Search reference / party / status..." value="'+esc($('gridSearch')?.value||'')+'" oninput="state.page=1;renderGrid()">'+
+  let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=gridColumnKeys(slice);
+  let html='<div class="'+(state.current?.screen_id==='agent-tasks::booking'?'m3BookingCompact':'')+'"><div class="opGridToolbar"><input id=gridSearch placeholder="Search reference / party / status..." value="'+esc(state.gridSearch)+'" oninput="state.gridSearch=this.value;state.page=1;renderGrid()">'+
     '<select id=statusFilter onchange="state.status=this.value;state.page=1;renderGrid()"><option value="">All statuses</option>'+statuses().map(s=>'<option '+(state.status===s?'selected':'')+'>'+esc(s)+'</option>').join('')+'</select>'+
     '<select onchange="state.savedView=this.value;state.page=1;renderGrid()"><option value="">Saved views</option><option value=action '+(state.savedView==='action'?'selected':'')+'>Action Required</option><option value=closed '+(state.savedView==='closed'?'selected':'')+'>Released / Closed / Approved</option></select>'+
     '<span class="grow"></span><span class=muted>'+rows.length+' / '+state.rows.length+'</span>'+
     '<button class=btn onclick="state.page=Math.max(1,state.page-1);renderGrid()">‹</button><span class=muted>'+state.page+'/'+total+'</span><button class=btn onclick="state.page=Math.min('+total+',state.page+1);renderGrid()">›</button>'+
     '<button class=btn onclick="exportCsv()">Export</button></div>';
-  if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div>';
-  html+='<div class=opGridWrap><table><thead><tr><th>Action</th>'+keys.map(k=>'<th onclick="sortBy(\''+String(k).replaceAll("'","\\'")+'\')">'+esc(k)+(state.sortKey===k?(state.sortAsc?' ▲':' ▼'):'')+'</th>').join('')+'</tr></thead><tbody>'+
-    slice.map((r,i)=>'<tr onclick="selectRow('+((state.page-1)*state.pageSize+i)+')"><td>'+(isGlReport()?'<button class=rowAction title="Drill Down" onclick="event.stopPropagation();drillGlReportRow('+((state.page-1)*state.pageSize+i)+')">↳</button>':'<button class=rowAction title="Quick Actions" onclick="event.stopPropagation();selectRow('+((state.page-1)*state.pageSize+i)+');$(\'fabWrap\').classList.add(\'open\')">⋮</button>')+'</td>'+keys.map(k=>'<td>'+esc(typeof r[k]==='object'?JSON.stringify(r[k]):r[k])+'</td>').join('')+'</tr>').join('')+
+  if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div></div>';
+  html+='<div class=opGridWrap><table><thead><tr><th>Action</th>'+keys.map(k=>'<th onclick="sortBy(\''+String(k).replaceAll("'","\\'")+'\')">'+esc(gridColumnLabel(k))+(state.sortKey===k?(state.sortAsc?' ▲':' ▼'):'')+'</th>').join('')+'</tr></thead><tbody>'+
+    slice.map((r,i)=>'<tr onclick="selectRow('+((state.page-1)*state.pageSize+i)+')"><td>'+(isGlReport()?'<button class=rowAction title="Drill Down" onclick="event.stopPropagation();drillGlReportRow('+((state.page-1)*state.pageSize+i)+')">↳</button>':'<button class=rowAction title="Quick Actions" onclick="event.stopPropagation();selectRow('+((state.page-1)*state.pageSize+i)+');$(\'fabWrap\').classList.add(\'open\')">⋮</button>')+'</td>'+keys.map(k=>'<td>'+esc(gridCellDisplay(r[k]))+'</td>').join('')+'</tr>').join('')+
     '</tbody></table></div>';
   return html
 }
@@ -1143,18 +1195,20 @@ function glReportQuery(){
   const names=['company','period','date_from','date_to','account','cost_center','currency','status'];
   const q=new URLSearchParams();ids.forEach((id,i)=>{const el=$(id);if(el&&el.value.trim())q.set(names[i],el.value.trim())});return q.toString()
 }
-async function reloadGlReport(){
+async function reloadGlReport(epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role){
   if(!isGlReport())return;
+  const key=state.current?.key,name=state.current?.name;
   try{
-    const q=glReportQuery();const d=await api('/api/clx045/reports/'+encodeURIComponent(state.current.key)+(q?'?'+q:''),{headers:{'X-Role':state.role}});
-    state.rows=normalizeRows(d.rows);state.page=1;state.sortKey='';state.status='';state.savedView='';
-    $('screenMeta').innerHTML='<div class="card"><b>'+esc(state.current.name)+'</b><span class="muted"> · CLX-045 live read-only report · '+d.count+' rows</span></div>'+
+    const q=glReportQuery();const d=await api('/api/clx045/reports/'+encodeURIComponent(key)+(q?'?'+q:''),{headers:{'X-Role':role}});
+    if(!viewCurrent(epoch,screenId,role))return;
+    state.rows=normalizeRows(d.rows);state.page=1;state.sortKey='';state.status='';state.savedView='';state.gridSearch='';
+    $('screenMeta').innerHTML='<div class="card"><b>'+esc(name)+'</b><span class="muted"> · CLX-045 live read-only report · '+d.count+' rows</span></div>'+
       (d.totals?'<div class="card"><b>Control totals</b><span class="muted"> · Debit VC '+esc(d.totals.debit_vc)+' / Credit VC '+esc(d.totals.credit_vc)+' · Debit LC '+esc(d.totals.debit_lc)+' / Credit LC '+esc(d.totals.credit_lc)+' · Balanced VC '+esc(d.balanced_vc)+' · Balanced LC '+esc(d.balanced_lc)+'</span></div>':'');
     const keep={};for(const id of ['glCompany','glPeriod','glDateFrom','glDateTo','glAccount','glCostCenter','glCurrency','glReportStatus']){const el=$(id);if(el)keep[id]=el.value}
     $('gridArea').innerHTML=glReportFilterBar()+renderGrid();
     for(const [id,v] of Object.entries(keep)){const el=$(id);if(el)el.value=v}
-    await renderQuickActions();
-  }catch(e){$('gridArea').innerHTML=glReportFilterBar()+'<div class=card><b class=badtext>Error loading GL report</b><pre class=pre>'+esc(e.message)+'</pre></div>'}
+    await renderQuickActions(epoch);
+  }catch(e){if(viewCurrent(epoch,screenId,role))$('gridArea').innerHTML=glReportFilterBar()+'<div class=card><b class=badtext>Error loading GL report</b><pre class=pre>'+esc(e.message)+'</pre></div>'}
 }
 function clearGlReportFilters(){for(const id of ['glCompany','glPeriod','glDateFrom','glDateTo','glAccount','glCostCenter','glCurrency']){const el=$(id);if(el)el.value=''}const st=$('glReportStatus');if(st)st.value='Posted';reloadGlReport()}
 async function drillGlReportRow(i){
@@ -1181,22 +1235,24 @@ function principalTable(rows,workspace){
     rows.map((r,idx)=>'<tr><td><button class="btn" onclick="principalEdit(\''+workspace+'\','+idx+')">Open</button></td>'+keys.map(k=>'<td>'+esc(r[k]??'')+'</td>').join('')+'</tr>').join('')+
     '</tbody></table></div>';
 }
-function principalFieldHtml(def,val){
-  const [name,type,required]=def,id='pgf-'+name,req=required?' *':'';
-  if(type==='boolean')return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="checkbox" '+(Number(val)||String(val).toLowerCase()==='true'?'checked':'')+'></div>';
-  if(type==='textarea')return '<div class="formField full"><label>'+esc(principalPretty(name))+req+'</label><textarea id="'+esc(id)+'">'+esc(val??'')+'</textarea></div>';
+function principalFieldHtml(def,val,readOnly=false){
+  const [name,type,required]=def,id='pgf-'+name,req=required?' *':'',disabled=readOnly?' disabled':'';
+  if(type==='boolean')return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="checkbox" '+(Number(val)||String(val).toLowerCase()==='true'?'checked':'')+disabled+'></div>';
+  if(type==='textarea')return '<div class="formField full"><label>'+esc(principalPretty(name))+req+'</label><textarea id="'+esc(id)+'"'+disabled+'>'+esc(val??'')+'</textarea></div>';
   const inputType=['number','date','datetime-local'].includes(type)?type:'text';
-  return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="'+inputType+'" value="'+esc(val??'')+'"></div>';
+  return '<div class="formField"><label>'+esc(principalPretty(name))+req+'</label><input id="'+esc(id)+'" type="'+inputType+'" value="'+esc(val??'')+'"'+disabled+'></div>';
 }
 async function principalEdit(workspace,index=-1){
   const d=state.principalWorkspace;if(!d||d.workspace!==workspace)return;
-  const row=index>=0?d.rows[index]:{};
-  const fields=d.schema.map(x=>principalFieldHtml(x,row?.[x[0]])).join('');
-  $('gridArea').innerHTML='<div class="clx82Section"><div class="clx82Head">'+(index>=0?'Edit':'New')+' '+esc(d.title)+'</div><div class="clx82Body"><div class="formGrid">'+fields+
+  if(viewerReadOnly()&&index<0)return;
+  const row=index>=0?d.rows[index]:{},readOnly=viewerReadOnly();
+  const fields=d.schema.map(x=>principalFieldHtml(x,row?.[x[0]],readOnly)).join('');
+  $('gridArea').innerHTML='<div class="clx82Section"><div class="clx82Head">'+(readOnly?'View':(index>=0?'Edit':'New'))+' '+esc(d.title)+'</div><div class="clx82Body"><div class="formGrid">'+fields+
     '<div class="formActions"><button class="btn" onclick="openPrincipalWorkspace(\''+workspace+'\',\''+String(state.navContext?.label||d.title).replaceAll("'","\\'")+'\',\''+state.current.screen_id.replaceAll("'","\\'")+'\',\''+String(state.navContext?.submenu||'').replaceAll("'","\\'")+'\')">Cancel</button>'+
-    '<button class="btn primary" onclick="principalSave(\''+workspace+'\')">Save</button></div></div></div></div>';
+    writeUi('<button class="btn primary" onclick="principalSave(\''+workspace+'\')">Save</button>')+'</div></div></div></div>';
 }
 async function principalSave(workspace){
+  if(viewerReadOnly())return;
   const d=state.principalWorkspace,data={};
   for(const def of d.schema){
     const [name,type]=def,el=$('pgf-'+name);if(!el)continue;
@@ -1235,6 +1291,7 @@ async function principalReleaseCheck(jobRef){
   }catch(e){alert(e.message)}
 }
 async function principalGovernedRelease(releaseRef,jobRef){
+  if(viewerReadOnly())return;
   const containerNo=prompt('Container number for governed cargo release','');
   if(!containerNo)return;
   try{
@@ -1268,7 +1325,7 @@ async function openPrincipalWorkspace(workspace,label,target,group){
     const d=await api('/api/nvocc-principal/workspaces/'+encodeURIComponent(workspace),{headers:principalHeaders()});
     state.principalWorkspace=d;
     const extra=workspace==='release-control'?'<span class="muted">Release readiness is derived from B/L + Customs + Finance + Surrender/Telex; use Open to maintain POD/depot release data.</span>':'';
-    $('gridArea').innerHTML='<div class="opGridToolbar"><b>'+esc(d.title)+'</b>'+extra+'<span class="grow"></span><button class="btn primary" onclick="principalEdit(\''+workspace+'\',-1)">New</button></div>'+principalTable(d.rows,workspace);
+    $('gridArea').innerHTML='<div class="opGridToolbar"><b>'+esc(d.title)+'</b>'+extra+'<span class="grow"></span>'+writeUi('<button class="btn primary" onclick="principalEdit(\''+workspace+'\',-1)">New</button>')+'</div>'+principalTable(d.rows,workspace);
     if(workspace==='release-control'&&d.rows?.length){
       $('gridArea').insertAdjacentHTML('afterbegin','<div class="card"><b>Release Gate</b><div class="muted">Cargo release authorization is governed here. A Release action does not fabricate the physical container RELEASED event; Delivery Order remains blocked until that real event exists.</div><div class="toolbar">'+d.rows.slice(0,8).map(x=>'<button class="btn" onclick="principalReleaseCheck(\''+String(x.job_ref||'').replaceAll("'","\\'")+'\')">Check '+esc(x.job_ref||x.release_ref)+'</button><button class="btn primary" onclick="principalGovernedRelease(\''+String(x.release_ref||'').replaceAll("'","\\'")+'\',\''+String(x.job_ref||'').replaceAll("'","\\'")+'\')">Authorize Cargo Release</button>').join('')+'</div></div>');
     }
@@ -1277,36 +1334,40 @@ async function openPrincipalWorkspace(workspace,label,target,group){
 
 async function openScreen(id,navContext=null,historyMode='push'){
   let s=state.byId[id];if(!s)return;
-  $('favorite').style.visibility='visible';state.current=s;state.navContext=navContext;state.selected=null;state.page=1;state.sortKey='';state.status='';state.savedView='';
+  const epoch=++state.viewEpoch,role=state.role;
+  $('drawer').classList.remove('open');$('fabWrap').classList.remove('open');
+  $('favorite').style.visibility='visible';state.current=s;state.navContext=navContext;state.selected=null;state.page=1;state.sortKey='';state.status='';state.savedView='';state.gridSearch='';
   addRecent(id);renderNav();renderBreadcrumb();renderFlow();if(historyMode==='push')history.pushState(null,'','#screen='+encodeURIComponent(id));else if(historyMode==='replace')history.replaceState(null,'','#screen='+encodeURIComponent(id));
-  if(GL_REPORT_KEYS.has(s.key)){await reloadGlReport();api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});return}
+  if(GL_REPORT_KEYS.has(s.key)){await reloadGlReport(epoch,id,role);if(!viewCurrent(epoch,id,role))return;api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':role,'X-Actor-Id':'ui-user'}}).catch(()=>{});return}
   $('gridArea').innerHTML='<div class=card>Loading active screen…</div>';
   try{
-    let d=await api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers:{'X-Role':state.role}});
+    let d=await api('/api/clx011/screen-data?screen_id='+encodeURIComponent(id),{headers:{'X-Role':role}});
+    if(!viewCurrent(epoch,id,role))return;
     state.rows=normalizeRows(d.rows);$('screenMeta').innerHTML=metaCards(d);
     if(CLX49_KEYS.has(s.key)&&state.rows.length){
       state.selected=state.rows[0];
-      await renderQuickActions();
+      await renderQuickActions(epoch);if(!viewCurrent(epoch,id,role))return;
       await showClx049Workspace();
     }else if(CLX84_FINANCE_KEYS.has(s.key)&&state.rows.length){
       state.selected=state.rows[0];
-      await renderQuickActions();
+      await renderQuickActions(epoch);if(!viewCurrent(epoch,id,role))return;
       $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Finance Master</b><span class="muted">CLX-084 · existing authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';
       await renderClx084FinanceMaster();
     }else if(s.key==='detention-collection'){
       if(state.rows.length)state.selected=state.rows[0];
-      await renderQuickActions();
+      await renderQuickActions(epoch);if(!viewCurrent(epoch,id,role))return;
       renderDetentionWorkspace();
     }else if(s.domain==='Agent Tasks'&&state.rows.length){
       state.selected=state.rows[0];
-      await renderQuickActions();
-      $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Screen</b><span class="muted">Existing CLX-042 functional form · authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button><button class="btn" onclick="openAgentForm(\'create\')">New '+esc(s.name)+'</button></div></div>';
+      await renderQuickActions(epoch);if(!viewCurrent(epoch,id,role))return;
+      $('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(s.name)+' Screen</b><span class="muted">Existing CLX-042 functional form · authoritative API</span><span class="grow"></span>'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button><button class="btn" onclick="openAgentForm(\'create\')">New '+esc(s.name)+'</button>')+'</div></div>';
       await renderInlineAgentScreen();
     }else{
-      $('gridArea').innerHTML=renderGrid();await renderQuickActions();
+      $('gridArea').innerHTML=renderGrid();await renderQuickActions(epoch);
     }
-    api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':state.role,'X-Actor-Id':'ui-user'}}).catch(()=>{});
-  }catch(e){$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
+    if(!viewCurrent(epoch,id,role))return;
+    api('/api/clx011/navigation-event?screen_id='+encodeURIComponent(id),{method:'POST',headers:{'X-Role':role,'X-Actor-Id':'ui-user'}}).catch(()=>{});
+  }catch(e){if(viewCurrent(epoch,id,role))$('gridArea').innerHTML=`<div class=card><b class=badtext>Error loading screen</b><pre class=pre>${esc(e.message)}</pre></div>`}
 }
 
 const CLX83_OPERATIONAL_KEYS=new Set(['cro','trt','export-trt','import-trt','transshipment-trt','delivery-order']);
@@ -1341,11 +1402,13 @@ function clx83TogglePreview(){
 }
 async function renderClx083OperationalMaster(){
   if(!state.current||!CLX83_OPERATIONAL_KEYS.has(state.current.key)||!state.selected)return false;
+  const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   const base={...rowPayload(state.selected)};
   const jr=selectedJob()||clx83Pick(base,'Job Ref','Job');
   let related=null,equipment=null;
   try{if(jr)related=await api('/api/clx011/related/'+encodeURIComponent(jr))}catch(_){}
   try{if(jr)equipment=await api('/api/clx070/container-control/booking-context/'+encodeURIComponent(jr))}catch(_){}
+  if(!viewCurrent(epoch,screenId,role))return false;
   const ident=related?.identity||{};
   const key=state.current.key;
   const isCro=key==='cro';
@@ -1430,7 +1493,7 @@ async function renderClx083OperationalMaster(){
       clx83RO('Remarks',clx83Pick(base,'Remarks'),{full:true,textarea:true})
     ]));
     out+=clx83Section('POT Conditional Logic',pot?
-      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing CRT/booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-trt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
+      '<div class="equipNote">Transshipment leg detected. POT, TS Agent and connecting vessel/voyage context are active from the existing TRT / legacy booking record.</div><div class="formActions"><button class="btn primary" onclick="openPrincipalWorkspace(\'ts-branch-ops\',\'TS Branch Operations\',\'agent-tasks::transshipment-trt\',\'Transaction / Operations\')">Open TS Branch Operations</button></div>':
       '<div class="equipNote">Direct shipment / no POT detected. POT, TS Agent and connecting vessel/voyage controls remain inactive; no transshipment data is forced.</div>');
   }
   if(isDo){
@@ -1486,7 +1549,7 @@ async function renderClx083OperationalMaster(){
     clx83Link('agent-tasks::soa','SOA',jr)+
     clx83Link('integration-security::request-response-audit','Audit',jr)+
     '</div><div class="equipNote">All links preserve the existing job context. No second event history, finance ledger or document record is created.</div>');
-  out+='<div class="card"><div class="formActions"><button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button><button class="btn" onclick="clx83TogglePreview()">Print / Preview</button></div></div></div>';
+  out+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button>')+'<button class="btn" onclick="clx83TogglePreview()">Print / Preview</button></div></div></div>';
   clx83PreviewState={title:state.current.name,base};
   $('gridArea').insertAdjacentHTML('beforeend',out);
   return true;
@@ -1494,9 +1557,12 @@ async function renderClx083OperationalMaster(){
 
 async function renderInlineAgentScreen(){
   if(!state.current||state.current.domain!=='Agent Tasks'||!state.selected)return;
+  const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   if(await renderClx083OperationalMaster())return;
+  if(!viewCurrent(epoch,screenId,role))return;
   try{
-    const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode=edit');
+    const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(screenId)+'&mode=edit');
+    if(!viewCurrent(epoch,screenId,role))return;
     const base={...rowPayload(state.selected)};
     const fields=schema.fields||[];
     let html='<div class="clx78Workspace"><div class="clx78Panel"><div class="clx78PanelHead">'+esc(state.current.name)+' · Active Record</div><div class="clx78PanelBody"><div class="formGrid">';
@@ -1512,32 +1578,86 @@ async function renderInlineAgentScreen(){
       html+='<div class="formField"><label>Record Key</label><input value="'+esc(state.selected.record_key||'')+'" disabled></div>';
       html+='<div class="formField"><label>Name</label><input value="'+esc(state.selected.display_name||base.name||'')+'" disabled></div>';
     }
-    html+='</div><div class="formActions"><button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Active Screen</button><button class="btn" onclick="openAgentForm(\'create\')">Create New</button></div></div></div></div>';
+    html+='</div><div class="formActions">'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Active Screen</button><button class="btn" onclick="openAgentForm(\'create\')">Create New</button>')+'</div></div></div></div>';
     $('gridArea').insertAdjacentHTML('beforeend',html);
   }catch(e){
-    $('gridArea').insertAdjacentHTML('beforeend','<div class="card"><b class="badtext">Active form unavailable</b><div class="muted">'+esc(e.message)+'</div></div>');
+    if(viewCurrent(epoch,screenId,role))$('gridArea').insertAdjacentHTML('beforeend','<div class="card"><b class="badtext">Active form unavailable</b><div class="muted">'+esc(e.message)+'</div></div>');
   }
 }
 function selectedJob(){let r=state.selected||{};return String(r.job_ref??r['Job Ref']??r.job??'').match(/^\d{5}$/)?.[0]||null}
 function selectedStatus(){let r=state.selected||{};return r.status??r.Status??''}
-async function renderQuickActions(){if(!state.current)return;let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(state.current.screen_id)+'&role='+encodeURIComponent(state.role)+'&status='+encodeURIComponent(selectedStatus()));let actions=[...a.visible_actions];if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup'){actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];}actions=[...new Set(actions)];$('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>'}
-async function selectRow(index){let rows=calcRows();state.selected=rows[index]||null;await renderQuickActions();if(state.current?.key==='detention-collection'){renderDetentionWorkspace();return;}if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span><button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button></div></div>';await renderInlineAgentScreen();return}if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}openDrawer('details')}
+async function renderQuickActions(epoch=state.viewEpoch){
+  if(!state.current)return;
+  const screenId=state.current.screen_id,role=state.role,status=selectedStatus(),setup=state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup';
+  let a=await api('/api/clx011/quick-actions?screen_id='+encodeURIComponent(screenId)+'&role='+encodeURIComponent(role)+'&status='+encodeURIComponent(status));
+  if(!viewCurrent(epoch,screenId,role))return;
+  let actions=[...a.visible_actions];
+  if(setup&&role!=='VIEWER')actions=['create',...(state.selected?['edit',String(state.selected.status||'').toUpperCase()==='INACTIVE'?'activate':'deactivate']:[]),'quick-view','audit-history'];
+  if(role==='VIEWER')actions=actions.filter(x=>!UI_MUTATIONS.has(x));
+  actions=[...new Set(actions)];
+  $('fabMenu').innerHTML=actions.map(x=>`<button onclick="runAction('${x}')">${esc(x.replaceAll('-',' ').replace(/\b\w/g,c=>c.toUpperCase()))}</button>`).join('')||'<div class=muted>No actions available</div>';
+}
+async function selectRow(index){
+  const epoch=++state.viewEpoch,screenId=state.current?.screen_id,role=state.role;
+  let rows=calcRows();state.selected=rows[index]||null;
+  await renderQuickActions(epoch);
+  if(!viewCurrent(epoch,screenId,role))return;
+  if(state.current?.key==='detention-collection'){renderDetentionWorkspace();return;}
+  if(CLX49_KEYS.has(state.current?.key)){await showClx049Workspace();return}
+  if(CLX84_FINANCE_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Finance Master</b><span class="muted">CLX-084 · authoritative GL/Treasury/SOA sources</span><span class="grow"></span></div></div>';await renderClx084FinanceMaster();return}
+  if(CLX83_OPERATIONAL_KEYS.has(state.current?.key)){$('gridArea').innerHTML=renderGrid()+'<div class="card"><div class="toolbar"><b>Active '+esc(state.current.name)+' Screen</b><span class="muted">CLX-083 operational master · existing authoritative API</span><span class="grow"></span>'+writeUi('<button class="btn primary" onclick="openAgentForm(\'edit\')">Open / Edit Selected</button>')+'</div></div>';await renderInlineAgentScreen();return}
+  if(['agent','agents'].includes(state.current?.key)){$('gridArea').innerHTML=renderGrid();await renderAgentUsersChild();return}
+  openDrawer('details');
+}
 function drawerTabs(tab){for(const b of document.querySelectorAll('.tab'))b.classList.toggle('active',b.dataset.tab===tab);for(const id of ['details','related','audit'])$('tab-'+id).style.display=id===tab?'block':'none'}
-async function openDrawer(tab='details'){if(!state.selected&&state.rows.length)state.selected=state.rows[0];$('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;drawerTabs(tab);$('drawer').classList.add('open');$('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;await loadRelated();await loadAudit()}
-async function loadRelated(){let jr=selectedJob();if(!jr){$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}try{let d=await api('/api/clx011/related/'+jr);let lr=d.linked_records;$('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`}catch(e){$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
-async function loadAudit(){let jr=selectedJob();try{let x=await api('/api/clx011/events?limit=40');let html=`<div class=card><b>CLX-011 screen/action audit</b></div><pre class=pre>${esc(JSON.stringify(x.slice(0,20),null,2))}</pre>`;if(jr){let y=await api('/api/v1/system/events/audit?job_ref='+jr+'&limit=30');html+=`<div class=card><b>Job ${jr} domain audit</b></div><pre class=pre>${esc(JSON.stringify(y,null,2))}</pre>`}$('tab-audit').innerHTML=html}catch(e){$('tab-audit').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}}
+async function openDrawer(tab='details'){
+  const epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role;
+  if(!state.selected&&state.rows.length)state.selected=state.rows[0];
+  $('drawerTitle').textContent=state.selected?`${state.current.name} · Quick View`:state.current.name;
+  drawerTabs(tab);$('drawer').classList.add('open');
+  $('tab-details').innerHTML=`<div class=card><b>Screen context</b><p>${esc(state.current.purpose)}</p><div class=muted>${esc(state.current.domain)} → ${esc(state.current.submenu)}</div></div><pre class=pre>${esc(JSON.stringify(state.selected||{},null,2))}</pre>`;
+  await loadRelated(epoch,screenId,role);
+  if(!viewCurrent(epoch,screenId,role))return;
+  await loadAudit(epoch,screenId,role);
+}
+async function loadRelated(epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role){
+  const jr=selectedJob();
+  if(!jr){if(viewCurrent(epoch,screenId,role))$('tab-related').innerHTML='<div class="card empty">Select a record carrying a 5-digit Job Ref to view related records.</div>';return}
+  try{
+    const d=await api('/api/clx011/related/'+jr);
+    if(!viewCurrent(epoch,screenId,role)||selectedJob()!==jr)return;
+    const lr=d.linked_records;
+    $('tab-related').innerHTML=`<div class=card><b>Job ${jr}</b><div class=muted>${esc(d.identity.customer_name)} · ${esc(d.identity.agent_code)} · ${esc(d.identity.pol)} → ${esc(d.identity.pod)}</div></div><div class=relatedGrid>${Object.entries(lr).map(([k,v])=>`<div class=relatedCard onclick="showJson('${esc(k)}',${JSON.stringify(JSON.stringify(v))})"><b>${esc(k.replaceAll('_',' '))}</b><div class=muted>${Array.isArray(v)?v.length:(v?1:0)} record(s)</div></div>`).join('')}</div>`;
+  }catch(e){if(viewCurrent(epoch,screenId,role)&&selectedJob()===jr)$('tab-related').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}
+}
+async function loadAudit(epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role){
+  const jr=selectedJob();
+  try{
+    const x=await api('/api/clx011/events?limit=40');
+    if(!viewCurrent(epoch,screenId,role)||selectedJob()!==jr)return;
+    let html=`<div class=card><b>CLX-011 screen/action audit</b></div><pre class=pre>${esc(JSON.stringify(x.slice(0,20),null,2))}</pre>`;
+    if(jr){
+      const y=await api('/api/v1/system/events/audit?job_ref='+jr+'&limit=30');
+      if(!viewCurrent(epoch,screenId,role)||selectedJob()!==jr)return;
+      html+=`<div class=card><b>Job ${jr} domain audit</b></div><pre class=pre>${esc(JSON.stringify(y,null,2))}</pre>`;
+    }
+    $('tab-audit').innerHTML=html;
+  }catch(e){if(viewCurrent(epoch,screenId,role)&&selectedJob()===jr)$('tab-audit').innerHTML='<pre class=pre>'+esc(e.message)+'</pre>'}
+}
 function showJson(title,obj){$('drawerTitle').textContent=title;$('tab-details').innerHTML='<pre class=pre>'+esc(JSON.stringify(JSON.parse(obj),null,2))+'</pre>';drawerTabs('details')}
 
 
 
 async function renderAgentUsersChild(){
   if(!state.current||!state.selected)return;
+  const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   const key=state.current.key||'';
   if(!['agent','agents'].includes(key))return;
   const code=state.selected.record_key||state.selected.code||state.selected.AgentCode||state.selected.agent_code;
   if(!code)return;
   try{
     const d=await api('/api/admin/agents/'+encodeURIComponent(code)+'/users');
+    if(!viewCurrent(epoch,screenId,role))return;
     const rows=d.users||[];
     const pending=d.pending_requests||[];
     const party=d.party_match?esc(d.party_match.record_key+' · '+d.party_match.display_name):'<span class="warntext">No exact Common Party link</span>';
@@ -1581,18 +1701,19 @@ function clx49Headers(w){
 }
 async function openClx49Link(screenId,jr){
   await openScreen(screenId);
+  if(state.current?.screen_id!==screenId)return;
   const i=state.rows.findIndex(r=>String(r.job_ref??r['Job Ref']??'')===String(jr));
   if(i>=0)await selectRow(i);
 }
 function clx49FieldEditor(record,fields){
   if(!record)return '<div class="card empty">No existing authoritative record for this job.</div>';
-  const p=record.fields||{};
+  const p=record.fields||{},disabled=viewerReadOnly()?' disabled':'';
   const names=(fields&&fields.length?fields:Object.keys(p)).filter(x=>x!=='Job Ref');
   return '<div class="formGrid">'+names.map(name=>{
     const full=/instruction|remarks|description|reason|authorization|notify/i.test(name);
     const val=p[name]??'';
     return '<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+
-      (full?'<textarea data-clx49-field="'+esc(name)+'">'+esc(val)+'</textarea>':'<input data-clx49-field="'+esc(name)+'" value="'+esc(val)+'">')+'</div>';
+      (full?'<textarea data-clx49-field="'+esc(name)+'"'+disabled+'>'+esc(val)+'</textarea>':'<input data-clx49-field="'+esc(name)+'" value="'+esc(val)+'"'+disabled+'>')+'</div>';
   }).join('')+'</div>';
 }
 function clx49ContextHeader(w){
@@ -1611,9 +1732,9 @@ function clx49Nav(w){
 function clx82NativeField(record,key,label,opts={}){
   const p=record?.fields||{},v=p[key]??'';
   const cls=opts.full?' full':(opts.wide?' wide':'');
-  const type=opts.type||'text';
+  const type=opts.type||'text',disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
   return '<div class="clx82Field'+cls+'"><label>'+esc(label||key)+'</label>'+
-    (opts.textarea?'<textarea data-clx49-field="'+esc(key)+'">'+esc(v)+'</textarea>':'<input type="'+esc(type)+'" data-clx49-field="'+esc(key)+'" value="'+esc(v)+'">')+
+    (opts.textarea?'<textarea data-clx49-field="'+esc(key)+'"'+disabled+'>'+esc(v)+'</textarea>':'<input type="'+esc(type)+'" data-clx49-field="'+esc(key)+'" value="'+esc(v)+'"'+disabled+'>')+
     '</div>';
 }
 function clx82DerivedField(label,value,opts={}){
@@ -1677,7 +1798,7 @@ function clx49RecordForTab(w,tab){
   return {module:null,record:null};
 }
 async function clx49RenderBlTab(tab){
-  const w=clx49Workspace;clx49ActiveTab=tab;
+  const w=clx49Workspace,epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role;clx49ActiveTab=tab;
   const x=clx49RecordForTab(w,tab),r=x.record;
   const bp=w.booking?.fields||{},bl=w.bl?.fields||{},doF=w.delivery_order?.fields||{};
   let html=clx49ContextHeader(w)+clx49Nav(w);
@@ -1808,17 +1929,18 @@ async function clx49RenderBlTab(tab){
     '</div><div style="margin-top:8px"><b>Maker / Checker / Audit</b>'+clx82AuthorizationAudit(w)+'</div></div></div>';
   }
 
-  if(r && tab!=='Booking Info'){
+  if(r && tab!=='Booking Info'&&!viewerReadOnly()){
     html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\''+x.module+'\','+r.id+','+r.version+')">Save '+esc(tab)+'</button>'+
       (tab==='Authorization'?'<button class="btn" onclick="approveClx049Bl('+r.id+','+r.version+')">Approve via Existing B/L Governance</button>':'')+
       '</div></div>';
   }else if(r && tab==='Booking Info'){
-    html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'bl\','+r.id+','+r.version+')">Save B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button></div></div>';
+    html+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'bl\','+r.id+','+r.version+')">Save B/L</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::switch-bl\')">Switch B/L</button><button class="btn" onclick="openScreen(\'agent-tasks::split-bl\')">Split B/L</button></div></div>';
   }
   html+='</div>';
+  if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab)return;
   $('gridArea').innerHTML=renderGrid()+html;
   if(tab==='Booking Info'){
-    clx82FinanceSummary(w).then(x=>{const el=$('clx82FinanceArea');if(el)el.innerHTML=x});
+    clx82FinanceSummary(w).then(x=>{if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab)return;const el=$('clx82FinanceArea');if(el)el.innerHTML=x});
   }
 }
 function clx82ShowPreview(){
@@ -1856,9 +1978,58 @@ function clx49BookingTogglePot(){
 }
 
 let clx78BookingBottomTab='Agreed Charges';
+const clx81MasterDomains={POL:'port',POD:'port','POT (1)':'port','POT (2)':'port','Booking Party':'common-party','Billing Party':'common-party',Agent:'common-party','POL Agent':'common-party','POT Agent':'common-party','Receiving Agent':'common-party','POD Agent':'common-party','TS Agent (1)':'common-party','TS Agent (2)':'common-party'};
+const clx81MasterCache={};
+function clx81MasterField(record,key,label,opts={}){
+  const p=record?.fields||{},val=String(p[key]??''),disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
+  return '<div class="clx78Field clx81MasterField"><label>'+esc(label||key)+'</label><input data-clx49-field="'+esc(key)+'" data-clx81-master="'+esc(clx81MasterDomains[key])+'" list="clx81-options-'+esc(clx81MasterDomains[key])+'" autocomplete="off" oninput="this.setCustomValidity(\'\')" placeholder="Code — Name" value="'+esc(val)+'"'+disabled+'></div>';
+}
+async function clx81LoadMasterOptions(){
+  const workspace=document.querySelector('.clx78Workspace');
+  const fields=[...workspace?.querySelectorAll('[data-clx81-master]')||[]];
+  if(!fields.length)return;
+  for(const domain of [...new Set(fields.map(x=>x.dataset.clx81Master))]){
+    try{
+      if(!clx81MasterCache[domain]){
+        const rows=await api('/api/masterdata/records/'+encodeURIComponent(domain));
+        clx81MasterCache[domain]=(Array.isArray(rows)?rows:[]).filter(r=>String(r.status||'').toUpperCase()==='ACTIVE').map(r=>({code:String(r.record_key||''),name:String(r.display_name||r.payload?.name||'')})).filter(r=>r.code);
+      }
+      if(!workspace.isConnected)return;
+      if(!workspace.querySelector('[data-clx81-master="'+domain+'"]'))continue;
+      const listId='clx81-options-'+domain;
+      let list=document.getElementById(listId);
+      if(!list){list=document.createElement('datalist');list.id=listId;workspace.appendChild(list)}
+      list.innerHTML=clx81MasterCache[domain].map(r=>'<option value="'+esc(r.code+' — '+r.name)+'"></option>').join('');
+      for(const input of workspace.querySelectorAll('[data-clx81-master="'+domain+'"]')){
+        const match=clx81MasterCache[domain].find(r=>r.code===input.value);
+        if(match)input.value=match.code+' — '+match.name;
+        input.dataset.clx81Loaded='true';
+      }
+    }catch(e){console.warn('Booking master lookup unavailable',domain,e)}
+  }
+}
+function clx81MasterStoredValue(el){
+  const domain=el.dataset.clx81Master,raw=el.value.trim(),rows=clx81MasterCache[domain]||[];
+  const match=rows.find(r=>raw===r.code+' — '+r.name||raw===r.code);
+  return match?match.code:raw;
+}
+function clx81ValidateMasterFields(){
+  for(const el of document.querySelectorAll('.clx78Workspace [data-clx81-master]')){
+    if(el.disabled||!el.value.trim()||el.dataset.clx81Loaded!=='true')continue;
+    const rows=clx81MasterCache[el.dataset.clx81Master]||[];
+    if(!rows.some(r=>el.value.trim()===r.code||el.value.trim()===r.code+' — '+r.name)){
+      el.setCustomValidity('Select a valid active master record from the suggestions.');
+      el.reportValidity();el.focus();return false;
+    }
+    el.setCustomValidity('');
+  }
+  return true;
+}
+
 function clx78Field(record,key,label,opts={}){
+  if(clx81MasterDomains[key]&&!opts.textarea)return clx81MasterField(record,key,label,opts);
   const p=record?.fields||{}, val=p[key]??'';
-  const disabled=opts.disabled?' disabled':'';
+  const disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
   const cls=opts.full?' full':(opts.wide?' wide':'');
   const type=opts.type||'text';
   const note=opts.review?'<span class="clx81Review">REVIEW LATER</span>':'';
@@ -1870,10 +2041,28 @@ function clx78Field(record,key,label,opts={}){
 function clx81Bool(v){return ['1','true','yes','y','on'].includes(String(v??'').toLowerCase())}
 function clx81Check(record,key,label,opts={}){
   const p=record?.fields||{},checked=clx81Bool(p[key]);
-  const disabled=opts.disabled?' disabled':'';
+  const disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
   return '<label class="clx81Check"><input type="checkbox" data-clx49-field="'+esc(key)+'" '+(checked?'checked ':'')+disabled+'>'+esc(label)+'</label>';
 }
-function clx81SetBottom(tab){clx78BookingBottomTab=tab;clx49RenderBooking('Booking Info')}
+let clx81BookingDraft=null;
+function clx81CaptureBookingDraft(){
+  const w=clx49Workspace,record=w?.booking,fields=document.querySelectorAll('.clx78Workspace [data-clx49-field]');
+  if(!record||!fields.length)return;
+  const key=String(w.context?.job_ref||'')+':'+String(record.id||'');
+  if(clx81BookingDraft?.key!==key)clx81BookingDraft={key,values:{}};
+  for(const el of fields)clx81BookingDraft.values[el.dataset.clx49Field]=el.type==='checkbox'?el.checked:el.value;
+}
+function clx81RestoreBookingDraft(w){
+  const record=w?.booking,key=String(w?.context?.job_ref||'')+':'+String(record?.id||'');
+  if(!record||clx81BookingDraft?.key!==key)return;
+  for(const el of document.querySelectorAll('.clx78Workspace [data-clx49-field]')){
+    const name=el.dataset.clx49Field;
+    if(!Object.prototype.hasOwnProperty.call(clx81BookingDraft.values,name))continue;
+    if(el.type==='checkbox')el.checked=clx81BookingDraft.values[name];else el.value=clx81BookingDraft.values[name];
+  }
+}
+function clx81SwitchBookingTab(tab){clx81CaptureBookingDraft();return clx49RenderBooking(tab)}
+function clx81SetBottom(tab){clx81CaptureBookingDraft();clx78BookingBottomTab=tab;clx49RenderBooking('Booking Info')}
 async function clx81OpenAttachments(){
   try{
     const w=clx49Workspace,e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(w.context.job_ref));
@@ -1909,7 +2098,7 @@ function clx81QuickButtons(){
 }
 function clx78BottomButtons(){
   const tabs=['Equipment','Agreed Charges','Revenue','Cost','Financial Auto','Preview'];
-  return tabs.map(t=>'<button class="'+(clx78BookingBottomTab===t?'active':'')+'" onclick="clx78BookingBottomTab=\''+t+'\';clx49RenderBooking(\'Booking Info\')">'+t+'</button>').join('');
+  return tabs.map(t=>'<button class="'+(clx78BookingBottomTab===t?'active':'')+'" onclick="clx81SetBottom(\''+t+'\')">'+t+'</button>').join('');
 }
 async function clx78BookingBottom(w){
   const jr=w.context.job_ref;
@@ -1960,7 +2149,7 @@ async function clx78BookingBottom(w){
         ['Principal Net',['Principal Net','principal_net']],
         ['Customer AR',['Customer AR','customer_ar']]
       ];
-      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · Booking commercial payload + linked operational / GL sources · no parallel Booking model.</div><div class="toolbar"><button class="btn primary" onclick="openMrgImportForBooking()">Import MRG</button><button class="btn" onclick="openAgentForm(\'edit\')">Add Manual Charge</button><button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button><span class="muted">MRG import is optional.</span></div>'+
+      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · Booking commercial payload + linked operational / GL sources · no parallel Booking model.</div><div class="toolbar">'+writeUi('<button class="btn primary" onclick="openMrgImportForBooking()">Import MRG</button><button class="btn" onclick="openAgentForm(\'edit\')">Add Manual Charge</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button><span class="muted">MRG import is optional.</span></div>'+
         '<div class="tablewrap"><table><thead><tr>'+cols.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'</tr></thead><tbody>'+
         (rows.length?rows.map(r=>'<tr>'+cols.map(x=>'<td>'+esc(pick(r,...x[1]))+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="16">No linked agreed-charge records yet.</td></tr>')+
         '</tbody></table></div></div>';
@@ -1977,7 +2166,7 @@ async function clx78BookingBottom(w){
   }catch(e){return '<div class="clx78Ledger"><div class="equipNote">'+esc(e.message)+'</div></div>'}
 }
 async function clx49RenderBooking(tab){
-  const w=clx49Workspace,r=w.booking;clx49ActiveTab=tab;
+  const w=clx49Workspace,epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role,bottomTab=clx78BookingBottomTab,r=w.booking;clx49ActiveTab=tab;
   const p=r?.fields||{};
   const displayTab=tab==='Booking Info'?'Basic Info':tab;
   const hasPot1=!!String(p['POT (1)']||p['Via Port']||p['Transshipment Port']||'').trim();
@@ -1992,49 +2181,50 @@ async function clx49RenderBooking(tab){
   ]);
   const other=Object.keys(p).filter(k=>!known.has(k));
   let html=clx49ContextHeader(w)+clx49Nav(w);
-  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>FULL FLOW</b><span class="muted">'+esc(w.context.booking_ref||r?.external_ref||'')+' · '+esc(w.context.customer_name||'')+' · '+esc(w.context.pol||'')+' → '+esc(w.context.pod||'')+'</span><span class="grow"></span><button class="btn">Master Data</button><button class="btn" onclick="clx49RenderBooking(\''+tab+'\')">Reset View</button><button class="btn primary" onclick="saveClx049Tab(\'booking\','+(r?.id||0)+','+(r?.version||1)+')">Save Draft</button></div>'+
+  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>FULL FLOW</b><span class="muted">'+esc(w.context.booking_ref||r?.external_ref||'')+' · '+esc(w.context.customer_name||'')+' · '+esc(w.context.pol||'')+' → '+esc(w.context.pod||'')+'</span><span class="grow"></span><button class="btn">Master Data</button><button class="btn" onclick="clx49RenderBooking(\''+tab+'\')">Reset View</button>'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+(r?.id||0)+','+(r?.version||1)+')">Save Draft</button>')+'</div>'+
     '<div class="clx78Hint">CLX-081 Booking Master Field Alignment · approved Booking reference layout · current authoritative Booking/Job APIs · Reference # remains REVIEW_LATER.</div>'+
     '<div class="clx78Tabs">'+[
       ['Booking Info','Basic Info'],['Other Info','Other Info'],['Messages','Messages']
-    ].map(x=>'<button class="'+(displayTab===x[1]?'active':'')+'" onclick="clx49RenderBooking(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>';
+    ].map(x=>'<button class="'+(displayTab===x[1]?'active':'')+'" onclick="clx81SwitchBookingTab(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>';
   if(tab==='Booking Info'){
     html+='<div class="clx78MainGrid"><div class="clx78Panel"><div class="clx78PanelHead">Basic Info</div><div class="clx78PanelBody"><div class="clx78Fields">'+
       '<div class="clx81GroupTitle">BASIC</div>'+
       clx78Field(r,'Booking No.','Booking No.')+clx78Field(r,'Booking Date','Booking Date',{type:'date'})+
-      clx78Field(r,'Status','Booking Status')+clx78Field(r,'Approval #','Approval #')+
-      clx78Field(r,'Reference #','Reference #',{review:true})+clx78Field(r,'Sales Person','Sales Person')+
+
       clx78Field(r,'Freight Type','Shipment / Freight Type')+clx78Field(r,'Freight Term','Freight Term')+
-      clx78Field(r,'Carrier Booking Ref','Carrier Booking Ref')+'<div class="clx78Field"><label>Thru B/L</label>'+clx81Check(r,'Thru B/L','Enabled')+'</div>'+
+
       clx78Field(r,'Sailing Date','Sailing Date',{type:'date'})+
       '<div class="clx81GroupTitle">PARTIES</div>'+
       clx78Field(r,'Booking Party','Customer / Booking Party',{wide:true})+
-      clx78Field(r,'Shipper','Shipper',{wide:true})+clx78Field(r,'Actual Shipper','Actual Shipper',{wide:true})+
-      clx78Field(r,'Consignee','Consignee',{wide:true})+clx78Field(r,'Notify Party','Notify Party',{wide:true})+
+
       clx78Field(r,'Billing Party','Billing Party')+clx78Field(r,'Agent','Origin / Sending Agent')+
-      clx78Field(r,'POL Agent','POL Agent')+clx78Field(r,'POT Agent','POT Agent',{disabled:!hasPot1})+
-      clx78Field(r,'Receiving Agent','Destination / Receiving Agent')+clx78Field(r,'POD Agent','POD Agent')+
-      clx78Field(r,'Carrier','Carrier / Shipping Line')+clx78Field(r,'Container Owner','Container Owner')+
-      clx78Field(r,'Equipment Provider','Equipment Provider')+
+      clx78Field(r,'Receiving Agent','Destination / Receiving Agent')+clx78Field(r,'POT Agent','POT Agent',{disabled:!hasPot1})+
+
       '<div class="clx81GroupTitle">ROUTING</div>'+
-      clx78Field(r,'POL','POL')+clx78Field(r,'POT (1)','POT (1)')+
-      clx78Field(r,'TS Agent (1)','TS Agent (1)',{disabled:!hasPot1})+
-      clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','TS Agent (2)',{disabled:!hasPot2})+
-      clx78Field(r,'POD','POD')+clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
-      clx78Field(r,'Origin Branch','Origin Branch')+clx78Field(r,'TS Branch','TS Branch',{disabled:!hasPot1})+clx78Field(r,'Destination Branch','Destination Branch')+
+      clx78Field(r,'POL','POL')+clx78Field(r,'POL Agent','Agent (POL)')+
+      clx78Field(r,'POD','POD')+clx78Field(r,'POD Agent','Agent (POD)')+
+      clx78Field(r,'POT (1)','POT (1)')+clx78Field(r,'TS Agent (1)','Agent (1)',{disabled:!hasPot1})+
+      clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','Agent (2)',{disabled:!hasPot2})+
+      clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
+
       '<div class="clx81GroupTitle">CARGO / EQUIPMENT</div>'+
-      clx78Field(r,'Commodity','Commodity')+clx78Field(r,'Cargo','Cargo Description',{wide:true})+
-      clx78Field(r,'Packages','Packages')+clx78Field(r,'Weight','Gross Weight')+
-      clx78Field(r,'Measurement','Measurement / Volume')+clx78Field(r,'Equipment','Container Size / Type')+
-      clx78Field(r,'Quantity','Quantity')+clx78Field(r,'SOC / COC','SOC / COC')+
-      clx78Field(r,'SRR','SRR')+
-      '</div></div></div>'+
+      clx78Field(r,'Commodity','Commodity')+clx78Field(r,'Equipment','Container Size / Type')+clx78Field(r,'Quantity','Quantity')+
+      '<details class="clx81Additional"><summary>Additional Booking Details</summary><div class="clx78Fields">'+
+      clx78Field(r,'Status','Booking Status')+clx78Field(r,'Approval #','Approval #')+clx78Field(r,'Reference #','Reference #',{review:true})+clx78Field(r,'Sales Person','Sales Person')+
+      clx78Field(r,'Carrier Booking Ref','Carrier Booking Ref')+'<div class="clx78Field"><label>Thru B/L</label>'+clx81Check(r,'Thru B/L','Enabled')+'</div>'+
+      clx78Field(r,'Shipper','Shipper',{wide:true})+clx78Field(r,'Actual Shipper','Actual Shipper',{wide:true})+clx78Field(r,'Consignee','Consignee',{wide:true})+clx78Field(r,'Notify Party','Notify Party',{wide:true})+
+      clx78Field(r,'Carrier','Carrier / Shipping Line')+clx78Field(r,'Container Owner','Container Owner')+clx78Field(r,'Equipment Provider','Equipment Provider')+
+      clx78Field(r,'Origin Branch','Origin Branch')+clx78Field(r,'TS Branch','TS Branch',{disabled:!hasPot1})+clx78Field(r,'Destination Branch','Destination Branch')+
+      clx78Field(r,'Cargo','Cargo Description',{wide:true})+clx78Field(r,'Packages','Packages')+clx78Field(r,'Weight','Gross Weight')+clx78Field(r,'Measurement','Measurement / Volume')+clx78Field(r,'SOC / COC','SOC / COC')+clx78Field(r,'SRR','SRR')+
+      '</div></details></div></div></div>'+
       '<div class="clx78Panel"><div class="clx78PanelHead">Operational Control</div><div class="clx78PanelBody"><div class="clx78OpsTabs"><span>Organizations</span><span>Departure</span><span>Arrival</span><span>Docs</span><span>Pre-Allocation</span><span>Achieved Quantities</span><span>Numbers</span><span>Additional Detail</span></div><div class="clx78Fields" style="grid-template-columns:repeat(2,minmax(140px,1fr))">'+
       clx78Field(r,'Operations Owner','Operations Owner')+clx78Field(r,'Agent Reference','Agent Reference')+
+      '<details class="clx81Additional"><summary>Additional Operational Details</summary><div class="clx78Fields">'+
       clx78Field(r,'Primary Vendor / Carrier','Primary Vendor / Carrier')+clx78Field(r,'SI Cut-off','SI Cut-off',{type:'date'})+
       clx78Field(r,'VGM Cut-off','VGM Cut-off',{type:'date'})+clx78Field(r,'Gate-in Cut-off','Gate-in Cut-off',{type:'date'})+
       clx78Field(r,'Free Days POL','Free Days POL')+clx78Field(r,'Free Days POD','Free Days POD')+
       clx78Field(r,'Detention Tariff','Detention Tariff',{wide:true})+
-      '</div><div class="clx78MiniActions" style="margin-top:7px">'+clx81QuickButtons()+'</div></div></div></div>'+
+      '</div></details></div><div class="clx78MiniActions" style="margin-top:7px">'+clx81QuickButtons()+'</div></div></div></div>'+
       '<div class="clx78Panel clx78Commercial"><div class="clx78PanelHead">Commercial Ownership / Financial Parties</div><div class="clx78PanelBody"><div class="clx78Fields">'+
       clx78Field(r,'Operation','Operation')+clx78Field(r,'Principal','Principal')+clx78Field(r,'Commercial Owner','Commercial Owner')+clx78Field(r,'Finance / Credit Party','Finance / Credit Party')+
       clx78Field(r,'Settlement Agent','Settlement Agent')+clx78Field(r,'Rate Basis','Rate Basis')+clx78Field(r,'Contract / Tariff Ref','Contract / Tariff Ref')+clx78Field(r,'Financial Flow','Financial Flow')+
@@ -2052,8 +2242,11 @@ async function clx49RenderBooking(tab){
     html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Messages</div><div class="clx78PanelBody"><div class="equipNote">Operational messages remain linked to the existing job/document/audit context. No duplicate message model is introduced.</div></div></div>';
   }
   html+='</div>';
-  if(r)html+='<div class="card"><div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(displayTab)+'</button><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
+  if(r)html+='<div class="card"><div class="formActions">'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save '+esc(displayTab)+'</button>')+'<button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Open Related B/L</button></div></div>';
+  if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab||(tab==='Booking Info'&&clx78BookingBottomTab!==bottomTab))return;
   $('gridArea').innerHTML=renderGrid()+html;
+  clx81RestoreBookingDraft(w);
+  if(tab==='Booking Info')clx81LoadMasterOptions();
   if(tab==='Booking Info'){
     for(const n of ['Via Port','Transshipment Port','POT (1)','POT (2)'])document.querySelector('[data-clx49-field="'+n+'"]')?.addEventListener('input',clx49BookingTogglePot);
     document.querySelector('[data-clx49-field="Same as Booking Party"]')?.addEventListener('change',clx81SameAsBookingParty);
@@ -2064,32 +2257,40 @@ async function clx49RenderBooking(tab){
 function clx49RenderSpecialRate(){
   const w=clx49Workspace,r=w.special_rate_request;
   let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="clx78Workspace"><div class="clx78TopBar"><b>SPECIAL RATE REQUEST</b><span class="muted">Same governed Job/Booking context</span><span class="grow"></span><button class="btn" onclick="openClx49Link(\''+w.deep_links.booking+'\',\''+w.context.job_ref+'\')">Open Booking</button></div><div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Rate Request</div><div class="clx78PanelBody">'+clx49FieldEditor(r);
-  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'special-rates-request\','+r.id+','+r.version+')">Save Special Rate Request</button></div>';
+  if(r&&!viewerReadOnly())html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'special-rates-request\','+r.id+','+r.version+')">Save Special Rate Request</button></div>';
   html+='</div></div></div>';$('gridArea').innerHTML=renderGrid()+html;
 }
 function clx49RenderSwitchBl(){
   const w=clx49Workspace,r=w.switch_bl;
   let html=clx49ContextHeader(w)+clx49Nav(w)+'<div class="clx78Workspace"><div class="clx78TopBar"><b>SWITCH B/L</b><span class="muted">Original B/L → Switch B/L · governed confidentiality / approval / history</span><span class="grow"></span><button class="btn" onclick="openClx49Link(\''+w.deep_links.bl+'\',\''+w.context.job_ref+'\')">Back to Source B/L</button></div><div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Switch B/L Detail</div><div class="clx78PanelBody">'+clx49FieldEditor(r);
-  if(r)html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'switch-bl\','+r.id+','+r.version+')">Save Switch B/L</button></div>';
+  if(r&&!viewerReadOnly())html+='<div class="formActions"><button class="btn primary" onclick="saveClx049Tab(\'switch-bl\','+r.id+','+r.version+')">Save Switch B/L</button></div>';
   html+='<div class="clx78Panel" style="margin-top:6px"><div class="clx78PanelHead">Immutable History</div><div class="clx78PanelBody"><pre class="pre">'+esc(JSON.stringify(w.switch_bl_history,null,2))+'</pre></div></div></div></div></div>';$('gridArea').innerHTML=renderGrid()+html;
 }
 async function showClx049Workspace(){
   const jr=selectedJob();if(!jr)return openDrawer('details');
+  const epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role;
   try{
-    clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers({context:{agent_code:state.selected?.agent_code}})});
+    const workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers({context:{agent_code:state.selected?.agent_code}})});
+    if(!viewCurrent(epoch,screenId,role))return;
+    clx49Workspace=workspace;
     if(state.current.key==='bl')await clx49RenderBlTab(CLX49_BL_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
     else if(state.current.key==='booking')await clx49RenderBooking(CLX49_BOOKING_TABS.includes(clx49ActiveTab)?clx49ActiveTab:'Booking Info');
     else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
     else if(state.current.key==='switch-bl')clx49RenderSwitchBl();
-  }catch(e){alert(e.message)}
+  }catch(e){if(viewCurrent(epoch,screenId,role))alert(e.message)}
 }
 async function saveClx049Tab(module,id,version){
+  if(viewerReadOnly())return;
   try{
+    if(module==='booking'&&!clx81ValidateMasterFields())return;
+    if(module==='booking')document.querySelectorAll('.clx78Workspace [data-clx81-master]').forEach(el=>{el.value=clx81MasterStoredValue(el)});
     const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):el.value);
+    if(module==='booking'&&clx81BookingDraft?.key===String(clx49Workspace?.context?.job_ref||'')+':'+String(id))Object.assign(fields,Object.fromEntries(Object.entries(clx81BookingDraft.values).map(([k,v])=>[k,typeof v==='boolean'?(v?'true':'false'):(clx81MasterDomains[k]?(clx81MasterCache[clx81MasterDomains[k]]||[]).find(r=>v===r.code+' — '+r.name)?.code||v:v)])));
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
     await api('/api/v1/'+module+'/'+id,{method:'PUT',headers,body:JSON.stringify({version,fields})});
     const jr=clx49Workspace.context.job_ref;
     clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(jr),{headers:clx49Headers(clx49Workspace)});
+    if(module==='booking')clx81BookingDraft=null;
     if(state.current.key==='bl')await clx49RenderBlTab(clx49ActiveTab||'Booking Info');
     else if(state.current.key==='booking')await clx49RenderBooking(clx49ActiveTab||'Booking Info');
     else if(state.current.key==='special-rates-request')clx49RenderSpecialRate();
@@ -2097,6 +2298,7 @@ async function saveClx049Tab(module,id,version){
   }catch(e){alert(e.message)}
 }
 async function approveClx049Bl(id,version){
+  if(viewerReadOnly())return;
   try{
     if(!confirm('Approve this B/L through the existing governed B/L action?'))return;
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
@@ -2118,8 +2320,11 @@ function fieldValue(name,base){
   return base?.[name]??'';
 }
 async function openAgentForm(mode){
+  if(viewerReadOnly())return;
+  const epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role;
   const setup=state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup';
-  const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode='+mode);
+  const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(screenId)+'&mode='+mode);
+  if(!viewCurrent(epoch,screenId,role))return;
   const base=setup?(state.selected?{...rowPayload(state.selected),Name:state.selected.display_name,'Record Key':state.selected.record_key}:{}):(state.selected?{...rowPayload(state.selected)}:{});
   const fields=schema.fields||[];
   $('drawerTitle').textContent=(mode==='create'?'Create ':'Edit ')+(state.navContext?.label||schema.name||state.current.name);
@@ -2141,10 +2346,11 @@ async function openAgentForm(mode){
     html+='<div class="formField"><label>Effective From</label><input data-clx42-master="effective_from" value="'+esc(base.effective_from||'')+'"></div>';
     html+='<div class="formField"><label>Effective To</label><input data-clx42-master="effective_to" value="'+esc(base.effective_to||'')+'"></div>';
   }
-  html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button><button class="btn primary" onclick="saveAgentForm(\''+mode+'\')">Save</button></div></div>';
+  html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button>'+writeUi('<button class="btn primary" onclick="saveAgentForm(\''+mode+'\')">Save</button>')+'</div></div>';
   $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open');
 }
 async function saveAgentForm(mode){
+  if(viewerReadOnly())return;
   try{
     const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode='+mode);
     if(schema.kind==='AGENT_TRANSACTION'){
@@ -2223,12 +2429,14 @@ function clx84TogglePreview(){
 }
 async function renderClx084FinanceMaster(){
   if(!state.current||!CLX84_FINANCE_KEYS.has(state.current.key)||!state.selected)return false;
+  const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   const base={...rowPayload(state.selected)};
   const jr=selectedJob()||clx84Pick(base,'Job Ref','Job');
   let related=null,gl={links:[],operational_sources:[]},tre={gl_sources:[],treasury_records:[],report_lines:[],operational_sources:[]};
   try{if(jr)related=await api('/api/clx011/related/'+encodeURIComponent(jr))}catch(_){}
   try{if(jr)gl=await api('/api/gl/job/'+encodeURIComponent(jr)+'/links',{headers:{'X-Role':state.role}})}catch(_){}
-  try{if(jr)tre=await api('/api/clx046/job/'+encodeURIComponent(jr)+'/trace',{headers:{'X-Role':state.role}})}catch(_){}
+  try{if(jr)tre=await api('/api/clx046/job/'+encodeURIComponent(jr)+'/trace',{headers:{'X-Role':role}})}catch(_){}
+  if(!viewCurrent(epoch,screenId,role))return false;
   const ident=related?.identity||{}, key=state.current.key, curr=clx84Pick(base,'Currency');
   const gls=tre.gl_sources||[], trs=tre.treasury_records||[], reports=tre.gl_report_lines||tre.report_lines||[], links=gl.links||[];
   const invoiceRows=gls.filter(x=>x.module==='invoice'), billRows=gls.filter(x=>x.module==='bills'), receiptRows=gls.filter(x=>x.module==='receipt'), paymentRows=gls.filter(x=>x.module==='payment');
@@ -2364,7 +2572,7 @@ async function renderClx084FinanceMaster(){
   ])+clx84Rows('Posted GL report context',reports));
   out+=clx84Section('Payment / Receipt & Document Links','<div class="formActions">'+
     clx84Link('agent-tasks::booking','Booking',jr)+clx84Link('agent-tasks::bl','B/L',jr)+clx84Link('agent-tasks::cro','CRO',jr)+
-    clx84Link('agent-tasks::transshipment-trt','CRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
+    clx84Link('agent-tasks::transshipment-trt','TRT',jr)+clx84Link('agent-tasks::delivery-order','Delivery Order',jr)+
     clx84Link('gl-accounts::invoice','Invoice',jr)+clx84Link('gl-accounts::bills','Bill / AP',jr)+
     clx84Link('gl-accounts::receipt','Receipt',jr)+clx84Link('gl-accounts::payment','Payment',jr)+
     clx84Link('gl-accounts::voucher','GL Voucher',jr)+clx84Link('agent-tasks::soa','SOA',jr)+
@@ -2374,7 +2582,7 @@ async function renderClx084FinanceMaster(){
     '<div class="equipNote"><b>Manual rate / additional cost rule:</b> approved commercial values are not opened for uncontrolled editing. Any post-approval additional accrued cost must use an existing governed change / CRT / adjustment route with reason and audit, and only an authorized ADMIN or assigned finance role where the backend already permits it.</div>'+
     '<div class="equipNote"><b>Four-eyes:</b> create / approve / post / credit / write-off / adjustment / payment release continue through the existing role and action-route controls. No self-approval path is introduced by CLX-084.</div>');
   out+='<div class="card"><div class="formActions">'+
-    (key==='invoice'||key==='bills'?'<button class="btn primary" onclick="openFinanceForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button>':'<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing SOA Record</button>')+
+    writeUi(key==='invoice'||key==='bills'?'<button class="btn primary" onclick="openFinanceForm(\'edit\')">Edit Existing '+esc(state.current.name)+' Record</button>':'<button class="btn primary" onclick="openAgentForm(\'edit\')">Edit Existing SOA Record</button>')+
     '<button class="btn" onclick="clx84TogglePreview()">Print / Preview</button></div></div></div>';
   clx84PreviewState={title:state.current.name,base};
   $('gridArea').insertAdjacentHTML('beforeend',out);
@@ -2388,6 +2596,7 @@ async function financeModuleMeta(kind){
   return xs.find(x=>x.key===state.current.key)||{};
 }
 async function openFinanceForm(mode){
+  if(viewerReadOnly())return;
   const kind=financeDomain();if(!kind)return;
   if(mode==='edit'&&!state.selected)return alert('Select a record to edit');
   try{
@@ -2402,11 +2611,12 @@ async function openFinanceForm(mode){
     for(const name of fields){if(name==='Account Lines'||name==='Budget Lines'||name==='Reconciliation Lines'||name==='Cheque Stock')continue;const full=/remarks|notes|narration|description|instruction|company assignment/i.test(name);const val=base[name]??'';const type=/date/i.test(name)?'date':(/amount|balance|rate|debit|credit|wht|total|difference/i.test(name)?'number':'text');html+='<div class="formField '+(full?'full':'')+'"><label>'+esc(name)+'</label>'+(full?'<textarea data-clx43-field="'+esc(name)+'">'+esc(val)+'</textarea>':'<input type="'+type+'" data-clx43-field="'+esc(name)+'" value="'+esc(val)+'">')+'</div>'}
     if(kind==='gl'&&meta.line_columns?.length){let existing=Array.isArray(base['Account Lines'])?base['Account Lines']:[{}];html+='<div class="formField full"><label>Account Detail</label><div style="overflow:auto"><table><thead><tr>'+meta.line_columns.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr></thead><tbody>'+existing.map((row,ri)=>'<tr>'+meta.line_columns.map(col=>'<td><input data-clx44-line-row="'+ri+'" data-clx44-line-col="'+esc(col)+'" value="'+esc(row[col]??'')+'" style="min-width:110px"></td>').join('')+'</tr>').join('')+'</tbody></table></div></div>'}
     if(kind==='gl'&&meta.reference_actions?.length)html+='<div class="formField full"><div class="muted">Reference actions: '+meta.reference_actions.map(esc).join(' · ')+'</div></div>';
-    html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button><button class="btn primary" onclick="saveFinanceForm(\''+mode+'\')">Save</button></div></div>';
+    html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button>'+writeUi('<button class="btn primary" onclick="saveFinanceForm(\''+mode+'\')">Save</button>')+'</div></div>';
     $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open');
   }catch(e){alert(e.message)}
 }
 async function saveFinanceForm(mode){
+  if(viewerReadOnly())return;
   const kind=financeDomain();if(!kind)return;
   try{
     const fields={};document.querySelectorAll('[data-clx43-field]').forEach(el=>fields[el.dataset.clx43Field]=el.value);
@@ -2482,7 +2692,7 @@ async function decideMasterChange(decision){
     await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
 }
-async function runAction(a){$('fabWrap').classList.remove('open');const isAgent=state.current?.domain==='Agent Tasks',fin=financeDomain(),md=currentMasterDomain();if(a==='create'){if(isAgent)await openAgentForm('create');else if(fin)await openFinanceForm('create');return}if(a==='edit'){if(!state.selected)return alert('Select a record to edit');if(isAgent)await openAgentForm('edit');else if(fin)await openFinanceForm('edit');return}if(a==='activate'||a==='deactivate'){if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup')await changeAgentSetupStatus(a);else if(md)await masterStatusChange(a);return}if(a==='change-request'&&md){await openMasterChange();return}if(a==='version-history'&&md){await showMasterVersions();return}if((a==='approve'||a==='reject')&&state.current?.screen_id==='master-data::approval-queue'){await decideMasterChange(a);return}if(a==='quick-view'){openDrawer('details');return}if(a==='related-records'){openDrawer('related');return}if(a==='audit-history'){openDrawer('audit');return}if(a==='print'){window.print();return}if(a==='export'){exportCsv();return}let jr=selectedJob(),ref=state.selected?.external_ref??state.selected?.record_key??state.selected?.user_ref??null;if(a==='email'){try{let r=await api('/api/clx011/simulate-email',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'},body:JSON.stringify({screen_id:state.current.screen_id,record_ref:ref,job_ref:jr,subject:`${state.current.name} update`})});alert('Email action recorded as '+r.delivery+' — no external delivery.');loadAudit()}catch(e){alert(e.message)}return}if(isAgent&&['approve','release','hold','cancel','amend','reissue','reverse','advance'].includes(a)){await executeAgentAction(a);return}if(fin&&['approve','release','reverse'].includes(a)){await executeFinanceAction(a);return}let rid=state.selected?.id,version=state.selected?.version;let route=await api('/api/clx011/action-route?screen_id='+encodeURIComponent(state.current.screen_id)+'&action='+encodeURIComponent(a)+(rid?'&record_id='+rid:'')+(version?'&version='+version:''));$('drawerTitle').textContent='Quick Action · '+a;$('tab-details').innerHTML=`<div class=card><b>${esc(a.replaceAll('-',' '))}</b><p>This screen uses its existing approved workflow. No new business mutation is introduced by CLX-043.</p></div><pre class=pre>${esc(JSON.stringify(route,null,2))}</pre>`;drawerTabs('details');$('drawer').classList.add('open')}
+async function runAction(a){$('fabWrap').classList.remove('open');if(viewerReadOnly()&&UI_MUTATIONS.has(a))return;const isAgent=state.current?.domain==='Agent Tasks',fin=financeDomain(),md=currentMasterDomain();if(a==='create'){if(isAgent)await openAgentForm('create');else if(fin)await openFinanceForm('create');return}if(a==='edit'){if(!state.selected)return alert('Select a record to edit');if(isAgent)await openAgentForm('edit');else if(fin)await openFinanceForm('edit');return}if(a==='activate'||a==='deactivate'){if(state.navContext?.domain==='Agent Tasks'&&state.navContext?.submenu==='Setup')await changeAgentSetupStatus(a);else if(md)await masterStatusChange(a);return}if(a==='change-request'&&md){await openMasterChange();return}if(a==='version-history'&&md){await showMasterVersions();return}if((a==='approve'||a==='reject')&&state.current?.screen_id==='master-data::approval-queue'){await decideMasterChange(a);return}if(a==='quick-view'){openDrawer('details');return}if(a==='related-records'){openDrawer('related');return}if(a==='audit-history'){openDrawer('audit');return}if(a==='print'){window.print();return}if(a==='export'){exportCsv();return}let jr=selectedJob(),ref=state.selected?.external_ref??state.selected?.record_key??state.selected?.user_ref??null;if(a==='email'){try{let r=await api('/api/clx011/simulate-email',{method:'POST',headers:{'Content-Type':'application/json','X-Role':state.role,'X-Actor-Id':'ui-user'},body:JSON.stringify({screen_id:state.current.screen_id,record_ref:ref,job_ref:jr,subject:`${state.current.name} update`})});alert('Email action recorded as '+r.delivery+' — no external delivery.');loadAudit()}catch(e){alert(e.message)}return}if(isAgent&&['approve','release','hold','cancel','amend','reissue','reverse','advance'].includes(a)){await executeAgentAction(a);return}if(fin&&['approve','release','reverse'].includes(a)){await executeFinanceAction(a);return}let rid=state.selected?.id,version=state.selected?.version;let route=await api('/api/clx011/action-route?screen_id='+encodeURIComponent(state.current.screen_id)+'&action='+encodeURIComponent(a)+(rid?'&record_id='+rid:'')+(version?'&version='+version:''));$('drawerTitle').textContent='Quick Action · '+a;$('tab-details').innerHTML=`<div class=card><b>${esc(a.replaceAll('-',' '))}</b><p>This screen uses its existing approved workflow. No new business mutation is introduced by CLX-043.</p></div><pre class=pre>${esc(JSON.stringify(route,null,2))}</pre>`;drawerTabs('details');$('drawer').classList.add('open')}
 async function doGlobalSearch(){let q=$('globalSearch').value.trim();if(q.length<2){$('searchPanel').classList.remove('open');return}let d=await api('/api/clx011/search?q='+encodeURIComponent(q)+'&role='+encodeURIComponent(state.role));let html=d.screen_hits.map(x=>`<div class=searchItem onclick="openScreen('${x.screen_id.replaceAll("'","\'")}');$('searchPanel').classList.remove('open')"><b>${esc(x.name)}</b><div class=muted>${esc(x.domain)} · ${esc(x.submenu)}</div></div>`).join('');html+=d.record_hits.map(x=>`<div class=searchItem><b>${esc(x.external_ref??x.record_key??'Record')}</b><div class=muted>${esc(x.type)} · Job ${esc(x.job_ref??'—')} · ${esc(x.status??'')}</div></div>`).join('');$('searchPanel').innerHTML=html||'<div class="searchItem muted">No matches</div>';$('searchPanel').classList.add('open')}
 function showShortlist(ids,title){let xs=ids.map(id=>state.byId[id]).filter(Boolean);$('searchPanel').innerHTML=`<div class=searchItem><b>${esc(title)}</b></div>`+xs.map(s=>`<div class=searchItem onclick="openScreen('${s.screen_id.replaceAll("'","\'")}');$('searchPanel').classList.remove('open')"><b>${esc(s.name)}</b><div class=muted>${esc(s.domain)} · ${esc(s.submenu)}</div></div>`).join('');$('searchPanel').classList.add('open')}
 
@@ -3307,5 +3517,5 @@ async function init(){
   await routeFromLocation('replace');
 }
 window.addEventListener('popstate',()=>routeFromLocation('none'));
-$('menuSearch').addEventListener('input',renderNav);$('globalSearch').addEventListener('input',()=>{clearTimeout(window.__gs);window.__gs=setTimeout(doGlobalSearch,180)});$('role').addEventListener('change',async e=>{state.role=e.target.value;renderNav();if(state.current&&!screenAllowed(state.current)){let fallback=state.screens.find(screenAllowed);if(fallback)await openScreen(fallback.screen_id);return;}await renderQuickActions()});$('prevBtn').onclick=()=>{let x=neighborId(-1);if(x)openScreen(x)};$('nextBtn').onclick=()=>{let x=neighborId(1);if(x)openScreen(x)};$('favorite').onclick=()=>{let id=state.current.screen_id;if(state.favorites.has(id))state.favorites.delete(id);else state.favorites.add(id);saveState();renderBreadcrumb()};$('notificationsBtn').onclick=()=>showOpsWorkbench('critical');$('moreBtn').onclick=()=>$('moreWrap').classList.toggle('open');$('drawerClose').onclick=()=> $('drawer').classList.remove('open');for(const b of document.querySelectorAll('.tab'))b.onclick=()=>drawerTabs(b.dataset.tab);$('fab').onclick=()=> $('fabWrap').classList.toggle('open');document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('drawer').classList.remove('open');$('searchPanel').classList.remove('open');$('fabWrap').classList.remove('open');$('moreWrap').classList.remove('open')}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('globalSearch').focus()}});init();
+$('menuSearch').addEventListener('input',renderNav);$('globalSearch').addEventListener('input',()=>{clearTimeout(window.__gs);window.__gs=setTimeout(doGlobalSearch,180)});$('role').addEventListener('change',async e=>{state.role=e.target.value;++state.viewEpoch;$('drawer').classList.remove('open');$('fabWrap').classList.remove('open');renderNav();if(state.current&&!screenAllowed(state.current)){let fallback=state.screens.find(screenAllowed);if(fallback)await openScreen(fallback.screen_id,null,'replace');return;}if(state.current){await openScreen(state.current.screen_id,state.navContext,'replace');return;}await renderQuickActions()});$('prevBtn').onclick=()=>{let x=neighborId(-1);if(x)openScreen(x)};$('nextBtn').onclick=()=>{let x=neighborId(1);if(x)openScreen(x)};$('favorite').onclick=()=>{let id=state.current.screen_id;if(state.favorites.has(id))state.favorites.delete(id);else state.favorites.add(id);saveState();renderBreadcrumb()};$('notificationsBtn').onclick=()=>showOpsWorkbench('critical');$('moreBtn').onclick=()=>$('moreWrap').classList.toggle('open');$('drawerClose').onclick=()=> $('drawer').classList.remove('open');for(const b of document.querySelectorAll('.tab'))b.onclick=()=>drawerTabs(b.dataset.tab);$('fab').onclick=()=> $('fabWrap').classList.toggle('open');document.addEventListener('keydown',e=>{if(e.key==='Escape'){$('drawer').classList.remove('open');$('searchPanel').classList.remove('open');$('fabWrap').classList.remove('open');$('moreWrap').classList.remove('open')}if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('globalSearch').focus()}});init();
 </script><!-- CLX-070 native Equipment Control integrated in current M3 shell --></body></html>
