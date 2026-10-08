@@ -71,7 +71,7 @@ CLX086_FINAL_BUILD_BASELINE='cc4963e73dcad8d584218b0a5aab445318a61885'
 app=FastAPI(title='M3 NVOCC ERP CLX-018 Production Web/API Integration',version='0.86.0',description='Dedicated M3 production web/API integration. Production traffic, live providers and real money remain blocked.')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://m3-nvocc-web-latest.onrender.com'],
+    allow_origins=['https://m3-pr124-booking-ui-preview.onrender.com'],
     allow_credentials=False,
     allow_methods=['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
     allow_headers=['*'],
