@@ -109,6 +109,13 @@
 .clx82Grid{grid-template-columns:repeat(2,minmax(180px,1fr))!important}
 .homeGrid{grid-template-columns:repeat(4,minmax(150px,1fr))}
 @media(max-width:1250px){.clx78Fields,.clx78Commercial .clx78Fields,.clx82Grid{grid-template-columns:1fr!important}.homeGrid{grid-template-columns:repeat(2,minmax(140px,1fr))}}
+/* M3 CLX-056 compact Booking grid pilot: presentation only, no workflow changes */
+.m3BookingCompact .opGridToolbar{padding:3px 5px;gap:4px}
+.m3BookingCompact .opGridToolbar input,.m3BookingCompact .opGridToolbar select{height:24px;padding:2px 5px;border-radius:0;font-size:12px}
+.m3BookingCompact .opGridToolbar .btn{min-height:24px;padding:2px 7px;border-radius:0}
+.m3BookingCompact .opGridWrap th,.m3BookingCompact .opGridWrap td{padding:3px 5px;height:26px;border-right:1px solid #e7ebf0;font-size:12px}
+.m3BookingCompact .opGridWrap th{background:#edf0f3}
+.m3BookingCompact .opGridWrap tr:focus-within td{background:#e6f0fb}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
@@ -486,7 +493,7 @@ async function renderHoPaParties(){
     $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>PA Parties</b><span class="muted">Filtered Common Party view. “PA” is retained as the legacy label only; no new business meaning or persistence is invented.</span><span class="grow"></span><button class="btn primary" onclick="openScreen(\'master-data::common-partys\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'PA Parties · Common Parties\'})">Manage Common Parties</button></div></div>'+
       '<div class="tablewrap"><table><thead><tr><th>Party Code</th><th>Name</th><th>Party Type</th><th>Status</th><th>Version</th><th>Effective From</th><th>Effective To</th></tr></thead><tbody>'+
       (rows.length?rows.map(r=>'<tr><td><b>'+esc(r.code)+'</b></td><td>'+esc(r.name)+'</td><td>'+esc(r.party_type)+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.version)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to)+'</td></tr>').join(''):'<tr><td colspan="7" class="muted">No Common Party records available.</td></tr>')+
-      '</tbody></table></div>';
+      '</tbody></table></div></div>';
   }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>PA Parties load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
 async function renderHoStamps(){
@@ -1111,13 +1118,13 @@ function gridCellDisplay(v){if(v===null||v===undefined||v==='')return '—';if(t
 function renderGrid(){
   let rows=calcRows(),total=Math.max(1,Math.ceil(rows.length/state.pageSize));state.page=Math.min(state.page,total);
   let slice=rows.slice((state.page-1)*state.pageSize,state.page*state.pageSize),keys=gridColumnKeys(slice);
-  let html='<div class="opGridToolbar"><input id=gridSearch placeholder="Search reference / party / status..." value="'+esc(state.gridSearch)+'" oninput="state.gridSearch=this.value;state.page=1;renderGrid()">'+
+  let html='<div class="'+(state.current?.screen_id==='agent-tasks::booking'?'m3BookingCompact':'')+'"><div class="opGridToolbar"><input id=gridSearch placeholder="Search reference / party / status..." value="'+esc(state.gridSearch)+'" oninput="state.gridSearch=this.value;state.page=1;renderGrid()">'+
     '<select id=statusFilter onchange="state.status=this.value;state.page=1;renderGrid()"><option value="">All statuses</option>'+statuses().map(s=>'<option '+(state.status===s?'selected':'')+'>'+esc(s)+'</option>').join('')+'</select>'+
     '<select onchange="state.savedView=this.value;state.page=1;renderGrid()"><option value="">Saved views</option><option value=action '+(state.savedView==='action'?'selected':'')+'>Action Required</option><option value=closed '+(state.savedView==='closed'?'selected':'')+'>Released / Closed / Approved</option></select>'+
     '<span class="grow"></span><span class=muted>'+rows.length+' / '+state.rows.length+'</span>'+
     '<button class=btn onclick="state.page=Math.max(1,state.page-1);renderGrid()">‹</button><span class=muted>'+state.page+'/'+total+'</span><button class=btn onclick="state.page=Math.min('+total+',state.page+1);renderGrid()">›</button>'+
     '<button class=btn onclick="exportCsv()">Export</button></div>';
-  if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div>';
+  if(!slice.length)return html+'<div class="card empty">No records for this screen / filter.</div></div>';
   html+='<div class=opGridWrap><table><thead><tr><th>Action</th>'+keys.map(k=>'<th onclick="sortBy(\''+String(k).replaceAll("'","\\'")+'\')">'+esc(gridColumnLabel(k))+(state.sortKey===k?(state.sortAsc?' ▲':' ▼'):'')+'</th>').join('')+'</tr></thead><tbody>'+
     slice.map((r,i)=>'<tr onclick="selectRow('+((state.page-1)*state.pageSize+i)+')"><td>'+(isGlReport()?'<button class=rowAction title="Drill Down" onclick="event.stopPropagation();drillGlReportRow('+((state.page-1)*state.pageSize+i)+')">↳</button>':'<button class=rowAction title="Quick Actions" onclick="event.stopPropagation();selectRow('+((state.page-1)*state.pageSize+i)+');$(\'fabWrap\').classList.add(\'open\')">⋮</button>')+'</td>'+keys.map(k=>'<td>'+esc(gridCellDisplay(r[k]))+'</td>').join('')+'</tr>').join('')+
     '</tbody></table></div>';
