@@ -116,6 +116,29 @@
 .m3BookingCompact .opGridWrap th,.m3BookingCompact .opGridWrap td{padding:3px 5px;height:26px;border-right:1px solid #e7ebf0;font-size:12px}
 .m3BookingCompact .opGridWrap th{background:#edf0f3}
 .m3BookingCompact .opGridWrap tr:focus-within td{background:#e6f0fb}
+/* CLX-056 Booking-only compact screen pilot; keep all existing actions and field bindings. */
+.clx78Workspace{font-size:11px}
+.clx78Workspace .clx78MainGrid{grid-template-columns:minmax(0,1.65fr) minmax(350px,1fr);gap:5px;padding:5px;align-items:start}
+.clx78Workspace .clx78PanelHead{padding:4px 6px;min-height:25px}
+.clx78Workspace .clx78PanelBody{padding:5px}
+.clx78Workspace .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 7px}
+.clx78Workspace .clx78Field{grid-template-columns:minmax(90px,108px) minmax(0,1fr);gap:5px;min-width:0;min-height:24px}
+.clx78Workspace .clx78Field label{font-size:10px;line-height:1.2;white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere}
+.clx78Workspace .clx78Field input,.clx78Workspace .clx78Field select{height:24px;min-height:24px;padding:2px 5px;border-radius:0;font-size:11px}
+.clx78Workspace .clx78Field textarea{border-radius:0}
+.clx78Workspace .clx78Field.wide{grid-column:1/-1}
+.clx78Workspace .clx81GroupTitle{padding:3px 5px;margin-top:3px}
+.clx78Workspace .clx78Commercial{margin:0 5px 5px}
+.clx78Workspace .clx78Commercial .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr))}
+.clx78Workspace .clx78OpsTabs{gap:3px;margin-bottom:5px}
+.clx78Workspace .clx78OpsTabs span{padding:3px 5px}
+.clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button,.clx78Workspace .clx78MiniActions button{border-radius:0;min-height:25px;padding:3px 7px}
+.clx78Workspace .clx78BottomTabs{padding:3px 5px;gap:3px}
+.clx78Workspace .clx78Flow{gap:3px;padding:4px}
+.clx78Workspace .clx78FlowStep{padding:4px}
+.clx78Workspace .clx78Ledger .tablewrap{overflow:auto}
+@media(max-width:1180px){.clx78Workspace .clx78MainGrid{grid-template-columns:1fr}.clx78Workspace .clx78Fields,.clx78Workspace .clx78Commercial .clx78Fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:700px){.clx78Workspace .clx78Fields,.clx78Workspace .clx78Commercial .clx78Fields{grid-template-columns:1fr}.clx78Workspace .clx78Field.wide{grid-column:auto}}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-nvocc-api-latest-1.onrender.com';
