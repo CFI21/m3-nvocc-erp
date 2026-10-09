@@ -1978,7 +1978,7 @@ function clx49BookingTogglePot(){
 }
 
 let clx78BookingBottomTab='Agreed Charges';
-const clx81MasterDomains={POL:'port',POD:'port','POT (1)':'port','POT (2)':'port','Booking Party':'common-party','Billing Party':'common-party',Agent:'common-party','POL Agent':'common-party','POT Agent':'common-party','Receiving Agent':'common-party','POD Agent':'common-party','TS Agent (1)':'common-party','TS Agent (2)':'common-party'};
+const clx81MasterDomains={POL:'port',POD:'port','POT (1)':'port','POT (2)':'port','Booking Party':'common-party','Billing Party':'common-party',Agent:'common-party-agent','POL Agent':'common-party-agent','POT Agent':'common-party-agent','Receiving Agent':'common-party-agent','POD Agent':'common-party-agent','TS Agent (1)':'common-party-agent','TS Agent (2)':'common-party-agent'};
 const clx81MasterCache={};
 function clx81MasterField(record,key,label,opts={}){
   const p=record?.fields||{},val=String(p[key]??''),disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
@@ -1991,8 +1991,8 @@ async function clx81LoadMasterOptions(){
   for(const domain of [...new Set(fields.map(x=>x.dataset.clx81Master))]){
     try{
       if(!clx81MasterCache[domain]){
-        const rows=await api('/api/masterdata/records/'+encodeURIComponent(domain));
-        clx81MasterCache[domain]=(Array.isArray(rows)?rows:[]).filter(r=>String(r.status||'').toUpperCase()==='ACTIVE').map(r=>({code:String(r.record_key||''),name:String(r.display_name||r.payload?.name||'')})).filter(r=>r.code);
+        const rows=await api('/api/masterdata/records/'+encodeURIComponent(domain==='common-party-agent'?'common-party':domain));
+        clx81MasterCache[domain]=(Array.isArray(rows)?rows:[]).filter(r=>String(r.status||'').toUpperCase()==='ACTIVE'&&(domain!=='common-party-agent'||String(r.payload?.party_type||'').toUpperCase()==='AGENT')).map(r=>({code:String(r.record_key||''),name:String(r.display_name||r.payload?.name||'')})).filter(r=>r.code);
       }
       if(!workspace.isConnected)return;
       if(!workspace.querySelector('[data-clx81-master="'+domain+'"]'))continue;
