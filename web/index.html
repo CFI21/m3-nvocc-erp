@@ -2197,12 +2197,11 @@ async function clx49RenderBooking(tab){
       '<div class="clx81GroupTitle">PARTIES</div>'+
       clx78Field(r,'Booking Party','Customer / Booking Party',{wide:true})+
 
-      clx78Field(r,'Billing Party','Billing Party')+clx78Field(r,'Agent','Origin / Sending Agent')+
-      clx78Field(r,'Receiving Agent','Destination / Receiving Agent')+
+      clx78Field(r,'Billing Party','Billing Party')+
 
       '<div class="clx81GroupTitle">ROUTING</div>'+
-      clx78Field(r,'POL','POL')+
-      clx78Field(r,'POD','POD')+
+      clx78Field(r,'POL','POL')+clx78Field(r,'POL Agent','Origin / Sending Agent')+
+      clx78Field(r,'POD','POD')+clx78Field(r,'POD Agent','Destination / Receiving Agent')+
       clx78Field(r,'POT (1)','POT (1)')+clx78Field(r,'TS Agent (1)','Agent (1)',{disabled:!hasPot1})+
       clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','Agent (2)',{disabled:!hasPot2})+
       clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
