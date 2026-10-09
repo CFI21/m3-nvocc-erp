@@ -158,6 +158,7 @@
 @media(max-width:620px){.clx78Workspace .clx78MainGrid{padding:4px;gap:5px}.clx78Workspace .clx78Fields,.clx78Workspace .clx81Additional>.clx78Fields{grid-template-columns:minmax(0,1fr)}.clx78Workspace .clx78Field{grid-template-columns:minmax(82px,34%) minmax(0,1fr)}.clx78Workspace .clx78Field input,.clx78Workspace .clx78Field select{min-height:36px;height:36px}.clx78Workspace .clx78Tabs button,.clx78Workspace .clx78BottomTabs button,.clx78Workspace .clx78MiniActions button{min-height:40px}.clx78Workspace .clx78TopBar{flex-wrap:wrap}.clx78Workspace .clx78PanelBody{padding:4px}}
 
 .clx78Workspace .clx81MasterField input{border-radius:0;width:100%;min-width:0}
+.clx81RoutingPair{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:8px;align-items:center;min-width:0}.clx81RoutingPair .clx78Field{min-width:0;grid-template-columns:125px minmax(0,1fr)}@media(max-width:760px){.clx81RoutingPair{grid-template-columns:minmax(0,1fr)}}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
@@ -2200,10 +2201,10 @@ async function clx49RenderBooking(tab){
       clx78Field(r,'Billing Party','Billing Party')+
 
       '<div class="clx81GroupTitle">ROUTING</div>'+
-      clx78Field(r,'POL','POL')+clx78Field(r,'POL Agent','Origin / Sending Agent')+
-      clx78Field(r,'POD','POD')+clx78Field(r,'POD Agent','Destination / Receiving Agent')+
-      clx78Field(r,'POT (1)','POT (1)')+clx78Field(r,'TS Agent (1)','Agent (1)',{disabled:!hasPot1})+
-      clx78Field(r,'POT (2)','POT (2)')+clx78Field(r,'TS Agent (2)','Agent (2)',{disabled:!hasPot2})+
+      '<div class="clx81RoutingPair">'+clx78Field(r,'POL','POL Code / Name')+clx78Field(r,'POL Agent','POL Agent')+'</div>'+
+      '<div class="clx81RoutingPair">'+clx78Field(r,'POD','POD Code / Name')+clx78Field(r,'POD Agent','POD Agent')+'</div>'+
+      '<div class="clx81RoutingPair">'+clx78Field(r,'POT (1)','POT (1) / Via Port')+clx78Field(r,'TS Agent (1)','Via Agent (1)',{disabled:!hasPot1})+'</div>'+
+      '<div class="clx81RoutingPair">'+clx78Field(r,'POT (2)','POT (2) / Via Port')+clx78Field(r,'TS Agent (2)','Via Agent (2)',{disabled:!hasPot2})+'</div>'+
       clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
 
       '<div class="clx81GroupTitle">CARGO / EQUIPMENT</div>'+
