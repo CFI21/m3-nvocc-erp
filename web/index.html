@@ -165,7 +165,22 @@
 .clx81RefToolbar{flex-wrap:wrap}.clx81RefToolbar button{font-size:11px;padding:4px 8px;border-radius:0}.clx81RefToolbar button.active{background:#dfe9f5;border-color:#7995b8;font-weight:700}.clx81GridTabContent{min-height:110px;overflow-x:auto;border-top:1px solid #c3cad4}.clx81GridTabContent .clx78Ledger{margin:0}.clx81RefLeft{min-width:0}
 .clx81RoutingPair[hidden]{display:none}
 .clx81RoutingPair{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:8px;align-items:center;min-width:0}.clx81RoutingPair .clx78Field{min-width:0;grid-template-columns:125px minmax(0,1fr)}@media(max-width:760px){.clx81RoutingPair{grid-template-columns:minmax(0,1fr)}}
-.clx81TopLayout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-bottom:1px solid #b8c2cf}.clx81TopGroup{min-width:0;border-right:1px solid #b8c2cf}.clx81TopCells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 4px;padding:3px}.clx81TopCell{min-width:0;display:flex;align-items:center;gap:3px;font-size:10px;white-space:nowrap}.clx81TopCell span{flex:0 0 auto}.clx81TopCell input{width:100%;min-width:0;height:24px;box-sizing:border-box;border:1px solid #c5ced9;border-radius:0;background:#f9fafb;font-size:10px;padding:1px 3px}@media(max-width:900px){.clx81TopLayout{grid-template-columns:1fr}}</style></head>
+.clx81TopLayout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-bottom:1px solid #b8c2cf}.clx81TopGroup{min-width:0;border-right:1px solid #b8c2cf}.clx81TopCells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 4px;padding:3px}.clx81TopCell{min-width:0;display:flex;align-items:center;gap:3px;font-size:10px;white-space:nowrap}.clx81TopCell span{flex:0 0 auto}.clx81TopCell input{width:100%;min-width:0;height:24px;box-sizing:border-box;border:1px solid #c5ced9;border-radius:0;background:#f9fafb;font-size:10px;padding:1px 3px}@media(max-width:900px){.clx81TopLayout{grid-template-columns:1fr}}</style><style>
+.clx81ThreeColumnLayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);border:1px solid #b8c2cf;align-items:stretch}
+.clx81BookingColumn,.clx81CommercialColumn{min-width:0;border-right:1px solid #b8c2cf}
+.clx81ThreeColumnLayout .clx81TopGroup{border-bottom:1px solid #b8c2cf}
+.clx81ThreeColumnLayout .clx81TopCells{grid-template-columns:repeat(3,minmax(0,1fr))}
+.clx81DetailsGroup{min-width:0}
+.clx81DetailRow{display:flex;gap:3px;padding:2px 4px;min-height:26px;box-sizing:border-box;align-items:center;border-bottom:1px solid #eef0f3}
+.clx81DetailRow .clx81TopCell{flex:1 1 0;min-width:0}
+.clx81DetailRow .clx81TopCell span{font-size:10px;white-space:normal;max-width:52%}
+.clx81CommercialColumn{border-right:0}
+.clx81CommercialSubgrid{padding:5px;border-bottom:1px solid #b8c2cf;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.clx81CommercialSubgrid strong{grid-column:1/-1;font-size:11px}
+.clx81CommercialSubgrid small{grid-column:1/-1;color:#667085}
+.clx81CommercialSubgrid .clx81TopCell{min-width:0}
+@media(max-width:900px){.clx81ThreeColumnLayout{grid-template-columns:minmax(0,1fr)}.clx81BookingColumn,.clx81CommercialColumn{border-right:0;border-bottom:1px solid #b8c2cf}}
+</style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
 const __m3NativeFetch=window.fetch.bind(window);
@@ -2203,13 +2218,47 @@ function clx81BookingReferenceGrid(w,r){
   const topGroup=(title,items)=>'<div class="clx81TopGroup"><div class="clx81RefSubhead">'+title+'</div><div class="clx81TopCells">'+items.map(x=>topCell(x[0],x[1])).join('')+'</div></div>';
   const topLeft=[['BK Date',val('BK Date',val('Booking Date'))],['BK #',val('BK #',ref)],['Approval #',val('Approval #')],['Job #',val('Job #',val('Job Ref'))],['Currency',val('Currency')],['Inv Type',val('Inv Type')]];
   const topRight=[['Reference',val('Reference',val('Reference #'))],['Job Category',val('Job Category')],['Inv Type',val('Inv Type')],['SOA #',val('SOA #')],['Status',val('Status',r?.status)],['Settled / Un-Settled',val('Settlement Status')]];
-  return '<section class="clx81RefPanel"><div class="clx81TopLayout">'+
-    topGroup('GRID 1',topLeft)+topGroup('GRID 2',topRight)+
-    '</div><div class="clx81RefLower"><div class="clx81RefLeft"><div class="clx81RefSubhead">Booking Reference Grid <span>Existing Booking · '+esc(ref)+'</span></div>'+
+  const detailRow=(items)=>'<div class="clx81DetailRow">'+items.map(x=>topCell(x[0],x[1])).join('')+'</div>';
+  const detailGroup=(title,rows)=>'<div class="clx81DetailsGroup"><div class="clx81RefSubhead">'+title+'</div>'+rows.map(detailRow).join('')+'</div>';
+  const detailsLeft=[
+    [['Commodity',val('Commodity')],['Cargo Type',val('Cargo Type')]],
+    [['Client Name - Code',val('Customer',w.context?.customer_name)]],
+    [['Principal',val('Principal')]],
+    [['Terminal',val('Terminal')]],
+    [['Empty Depot',val('Empty Depot')]],
+    [['Billing Party',val('Billing Party')],['HBL',val('HBL')],['MBL',val('MBL')]],
+    [['Detention Start',val('Detention Start')],['Fee Detention Days',val('Fee Detention Days')],['Edit Exrate',val('Edit Exrate')]],
+    [['Container Issue Date',val('Container Issue Date')],['Fee Demurrage Days',val('Fee Demurrage Days')],['HBL Issue Date',val('HBL Issue Date')]],
+    [['Container Return Date',val('Container Return Date')],['Free Plugging Days',val('Free Plugging Days')],['HBL Issue Date',val('HBL Issue Date')]],
+    [['Approval Status',val('Approval Status')],['Approved By',val('Approved By')]]
+  ];
+  const detailsRight=[
+    [['Route',val('Route Type')]],
+    [['Cost Center',val('Cost Center')]],
+    [['Shipper',val('Shipper')]],
+    [['Consignee',val('Consignee')]],
+    [['POL Code + Name',val('POL',w.context?.pol)],['POL Agent Code + Name',val('POL Agent')]],
+    [['POD Code + Name',val('POD',w.context?.pod)],['POD Agent Code + Name',val('POD Agent')]],
+    [['FPOD Code + Name',val('FPOD')],['FPOD Agent Code + Name',val('FPOD Agent')]],
+    [['POT Code + Name',val('POT (1)')],['POT Agent Code + Name',val('POT Agent')]],
+    [['Vessel',val('Vessel')],['Voyage',val('Voyage')]],
+    [['Unapprove',val('Unapprove')],['Apply Discount',val('Apply Discount')]]
+  ];
+  const commercial=[
+    ['Commercial Ownership / Financial Parties',['Operation','Principal','Billing Party','Booking Party','Settlement Agent','Rate Basis','Contract / Tariff Ref','Financial Flow']],
+    ['Service Providers / Vendors',[]],
+    ['Detention — Total Amount & Collections',[]],
+    ['Related Communication',[]]
+  ];
+  const commercialHtml='<aside class="clx81CommercialColumn"><div class="clx81RefSubhead"><button type="button" class="btn" disabled>Commercial</button> <small>Existing fields · unbuilt functions frozen</small></div>'+commercial.map(x=>'<section class="clx81CommercialSubgrid"><strong>'+esc(x[0])+'</strong>'+x[1].map(k=>topCell(k,val(k))).join('')+(x[1].length?'':'<small>Reserved — no new records or fields</small>')+'</section>').join('')+'</aside>';
+  return '<section class="clx81RefPanel"><div class="clx81ThreeColumnLayout"><div class="clx81BookingColumn">'+
+    topGroup('TOP GRID 1',topLeft)+detailGroup('DETAILS GRID 1',detailsLeft)+
+    '</div><div class="clx81BookingColumn">'+topGroup('TOP GRID 2',topRight)+detailGroup('DETAILS GRID 2',detailsRight)+
+    '</div>'+commercialHtml+'</div><div class="clx81RefLower"><div class="clx81RefLeft"><div class="clx81RefSubhead">Booking Reference Grid <span>Existing Booking · '+esc(ref)+'</span></div>'+
     '<div class="clx81RefToolbar">'+clx78BottomButtons()+'<button type="button" class="btn" onclick="clx81ToggleBookingNotes()">Notes</button><span>Save changes with Booking Save Draft</span></div>'+
     '<div class="clx81RefScroll"><table class="clx81RefTable"><thead><tr>'+headings.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr><tr>'+headings.map((x,i)=>'<th><input type="search" aria-label="Filter '+esc(x)+'" data-clx81-grid-filter="'+i+'" oninput="clx81FilterBookingGrid()" placeholder="Filter"></th>').join('')+'</tr></thead><tbody><tr class="clx81BookingRefRow" tabindex="0">'+cells.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr></tbody></table></div><div class="clx81GridTabContent" id="clx81GridTabContent">__M3_BOOKING_GRID_CONTENT__</div>'+
     '<div id="clx81BookingNotes" class="clx81NotesPanel" hidden><div class="clx81NotesHead">Booking Notes <span>'+esc(ref)+'</span></div><div class="clx81NotesTabs"><button type="button" onclick="clx81SelectNotesTab(&#39;internal&#39;)">Internal</button><button type="button" onclick="clx81SelectNotesTab(&#39;customer&#39;)">Customer Visible</button></div><div data-clx81-note-tab="internal"><label>Internal Notes</label><textarea data-clx49-field="Internal Notes"'+(viewerReadOnly()?' disabled':'')+'>'+esc(p['Internal Notes']||'')+'</textarea></div><div data-clx81-note-tab="customer" hidden><label>Customer Visible Note</label><textarea data-clx49-field="Customer Visible Note"'+(viewerReadOnly()?' disabled':'')+'>'+esc(p['Customer Visible Note']||'')+'</textarea><small>Stored separately; not automatically sent.</small></div></div></div>'+
-    '<div class="clx81RefRight"><div class="clx81RefSubhead">Additional Grid <span>Awaiting your next grid specification</span></div><div class="clx81RefEmpty">Reserved for the next approved M3 grid. No new data model.</div></div></div></section>';
+    '<div class="clx81RefRight"><div class="clx81RefSubhead">Existing Booking Related Area</div><div class="clx81RefEmpty">Existing booking functions preserved; no new data model.</div></div></div></section>';
 }
 function clx81FilterBookingGrid(){const filters=[...document.querySelectorAll('[data-clx81-grid-filter]')].map(el=>el.value.trim().toLowerCase());document.querySelectorAll('.clx81BookingRefRow').forEach(row=>{const values=[...row.cells].map(c=>c.textContent.toLowerCase());row.hidden=filters.some((v,i)=>v&&!values[i].includes(v));});}
 function clx81ToggleBookingNotes(){const el=document.getElementById('clx81BookingNotes');if(el)el.hidden=!el.hidden;}
