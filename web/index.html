@@ -2083,6 +2083,11 @@ function clx81RestoreBookingDraft(w){
     if(el.type==='checkbox')el.checked=clx81BookingDraft.values[name];else el.value=clx81BookingDraft.values[name];
   }
 }
+function clx81MainBookingTab(tab){
+  if(tab==='Equipments'){clx81SetBottom('Equipment');return;}
+  if(tab==='Charges'){clx81SetBottom('Agreed Charges');return;}
+  return clx81SwitchBookingTab(tab);
+}
 function clx81SwitchBookingTab(tab){clx81CaptureBookingDraft();return clx49RenderBooking(tab)}
 function clx81SetBottom(tab){clx81CaptureBookingDraft();clx78BookingBottomTab=tab;clx49RenderBooking('Booking Info')}
 async function clx81OpenAttachments(){
@@ -2228,8 +2233,8 @@ async function clx49RenderBooking(tab){
   html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>FULL FLOW</b><span class="muted">'+esc(w.context.booking_ref||r?.external_ref||'')+' · '+esc(w.context.customer_name||'')+' · '+esc(w.context.pol||'')+' → '+esc(w.context.pod||'')+'</span><span class="grow"></span><button class="btn">Master Data</button><button class="btn" onclick="clx49RenderBooking(\''+tab+'\')">Reset View</button>'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+(r?.id||0)+','+(r?.version||1)+')">Save Draft</button>')+'</div>'+
     '<div class="clx78Hint">CLX-081 Booking Master Field Alignment · approved Booking reference layout · current authoritative Booking/Job APIs · Reference # remains REVIEW_LATER.</div>'+
     '<div class="clx78Tabs">'+[
-      ['Booking Info','Basic Info'],['Other Info','Other Info'],['Messages','Messages']
-    ].map(x=>'<button class="'+(displayTab===x[1]?'active':'')+'" onclick="clx81SwitchBookingTab(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>';
+      ['Booking Info','Booking Info'],['Equipments','Equipments'],['Charges','Charges'],['Routing','Routing'],['Other Info','Other Info'],['BL','BL']
+    ].map(x=>'<button class="'+(tab===x[0]?'active':'')+'" onclick="clx81MainBookingTab(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>';
   if(tab==='Booking Info'){
     html+=clx81BookingReferenceGrid(w,r);
     html+='<div class="clx78MainGrid"><div class="clx78Panel"><div class="clx78PanelHead">Basic Info</div><div class="clx78PanelBody"><div class="clx78Fields">'+
@@ -2282,6 +2287,9 @@ async function clx49RenderBooking(tab){
       '<span class="grow"></span><button onclick="openScreen(\'agent-tasks::split-bl\')">Split Booking</button><button onclick="openClx49Link(\''+esc(w.deep_links.bl)+'\',\''+esc(w.context.job_ref)+'\')">B/L</button><button onclick="openScreen(\'agent-tasks::cro\')">CRO</button></div>'+
       '<div class="clx78Flow"><div class="clx78FlowStep">1 Approved Rate Sources<b>READY</b></div><div class="clx78FlowStep">2 Booking Context<b>READY</b></div><div class="clx78FlowStep">3 Charge Ledger<b>LINKED</b></div><div class="clx78FlowStep">4 Party Allocation<b>LINKED</b></div><div class="clx78FlowStep">5 Principal / Agent SOA<b>LINKED</b></div><div class="clx78FlowStep">6 Receipt / Settlement<b>LINKED</b></div></div>';
     html=html.replace('__M3_BOOKING_GRID_CONTENT__',await clx78BookingBottom(w));
+  }else if(tab==='Routing'||tab==='BL'){
+    const names=tab==='Routing'?['Route Type','POL','POL Agent','POD','POD Agent','FPOD','FPOD Agent','POT (1)','POT (2)','Vessel','Voyage']:['Booking No.','HBL','MBL','Shipper','Consignee','Notify Party','Thru B/L'];
+    html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">'+esc(tab)+' — existing Booking fields (read-only preview)</div><div class="clx78PanelBody"><div class="clx78Fields">'+names.map(k=>'<label>'+esc(k)+'<input readonly value="'+esc(String(p[k]||''))+'"></label>').join('')+'</div><small>No separate record or new field is created.</small></div></div>';
   }else if(tab==='Other Info'){
     html+='<div class="clx78Panel" style="margin:6px"><div class="clx78PanelHead">Other Info</div><div class="clx78PanelBody">'+clx49FieldEditor(r,other)+'</div></div>';
   }else{
