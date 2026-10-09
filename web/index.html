@@ -165,7 +165,7 @@
 .clx81RefToolbar{flex-wrap:wrap}.clx81RefToolbar button{font-size:11px;padding:4px 8px;border-radius:0}.clx81RefToolbar button.active{background:#dfe9f5;border-color:#7995b8;font-weight:700}.clx81GridTabContent{min-height:110px;overflow-x:auto;border-top:1px solid #c3cad4}.clx81GridTabContent .clx78Ledger{margin:0}.clx81RefLeft{min-width:0}
 .clx81RoutingPair[hidden]{display:none}
 .clx81RoutingPair{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:8px;align-items:center;min-width:0}.clx81RoutingPair .clx78Field{min-width:0;grid-template-columns:125px minmax(0,1fr)}@media(max-width:760px){.clx81RoutingPair{grid-template-columns:minmax(0,1fr)}}
-</style></head>
+.clx81TopLayout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-bottom:1px solid #b8c2cf}.clx81TopGroup{min-width:0;border-right:1px solid #b8c2cf}.clx81TopCells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 4px;padding:3px}.clx81TopCell{min-width:0;display:flex;align-items:center;gap:3px;font-size:10px;white-space:nowrap}.clx81TopCell span{flex:0 0 auto}.clx81TopCell input{width:100%;min-width:0;height:24px;box-sizing:border-box;border:1px solid #c5ced9;border-radius:0;background:#f9fafb;font-size:10px;padding:1px 3px}@media(max-width:900px){.clx81TopLayout{grid-template-columns:1fr}}</style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
 const __m3NativeFetch=window.fetch.bind(window);
@@ -2194,10 +2194,12 @@ function clx81BookingReferenceGrid(w,r){
   const cells=[ref,String(w.context?.customer_name||''),val('POL',w.context?.pol),val('POD',w.context?.pod),val('Route Type'),val('Cargo Type'),String(r?.status||p.Status||'')];
   const headings=['Booking Ref','Customer','POL','POD','Route Type','Cargo Type','Status'];
   const panel=(title,body)=>'<div class="clx81RefSummary"><div class="clx81RefSubhead">'+title+'</div><div class="clx81RefSummaryFields">'+body+'</div></div>';
-  return '<section class="clx81RefPanel"><div class="clx81RefLayout">'+
-    panel('Booking',field('Booking Ref',ref)+field('Customer',w.context?.customer_name||'')+field('Billing Party',val('Billing Party'))+field('Booking Date',val('Booking Date')))+
-    panel('Routing',field('POL',val('POL',w.context?.pol))+field('POD',val('POD',w.context?.pod))+field('Route Type',val('Route Type'))+field('Cargo Type',val('Cargo Type')))+
-    panel('Details',field('Status',r?.status||p.Status||'')+field('Vessel',val('Vessel'))+field('Voyage',val('Voyage'))+field('Quantity',val('Quantity')))+
+  const topCell=(label,value)=>'<label class="clx81TopCell"><span>'+esc(label)+'</span><input readonly value="'+esc(String(value||''))+'"></label>';
+  const topGroup=(title,items)=>'<div class="clx81TopGroup"><div class="clx81RefSubhead">'+title+'</div><div class="clx81TopCells">'+items.map(x=>topCell(x[0],x[1])).join('')+'</div></div>';
+  const topLeft=[['BK Date',val('BK Date',val('Booking Date'))],['BK #',val('BK #',ref)],['Approval #',val('Approval #')],['Job #',val('Job #',val('Job Ref'))],['Currency',val('Currency')],['Inv Type',val('Inv Type')]];
+  const topRight=[['Reference',val('Reference',val('Reference #'))],['Job Category',val('Job Category')],['Inv Type',val('Inv Type')],['SOA #',val('SOA #')],['Status',val('Status',r?.status)],['Settled / Un-Settled',val('Settlement Status')]];
+  return '<section class="clx81RefPanel"><div class="clx81TopLayout">'+
+    topGroup('GRID 1',topLeft)+topGroup('GRID 2',topRight)+
     '</div><div class="clx81RefLower"><div class="clx81RefLeft"><div class="clx81RefSubhead">Booking Reference Grid <span>Existing Booking · '+esc(ref)+'</span></div>'+
     '<div class="clx81RefToolbar">'+clx78BottomButtons()+'<button type="button" class="btn" onclick="clx81ToggleBookingNotes()">Notes</button><span>Save changes with Booking Save Draft</span></div>'+
     '<div class="clx81RefScroll"><table class="clx81RefTable"><thead><tr>'+headings.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr><tr>'+headings.map((x,i)=>'<th><input type="search" aria-label="Filter '+esc(x)+'" data-clx81-grid-filter="'+i+'" oninput="clx81FilterBookingGrid()" placeholder="Filter"></th>').join('')+'</tr></thead><tbody><tr class="clx81BookingRefRow" tabindex="0">'+cells.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr></tbody></table></div><div class="clx81GridTabContent" id="clx81GridTabContent">__M3_BOOKING_GRID_CONTENT__</div>'+
