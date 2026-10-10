@@ -2338,7 +2338,7 @@ function clx81OpenCargoDetails(){
   const cargo=String(liveCargo||read('Cargo Type')).toUpperCase();
   const input=(key,label,type='text')=>'<label class="clx81CargoField"><span>'+esc(label)+'</span><input type="'+type+'" data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"'+(viewerReadOnly()?' disabled':'')+'></label>';
   const groups=[
-    ['OOG', [['OOG Length (mm)','Length (mm)'],['OOG Width (mm)','Width (mm)'],['OOG Height (mm)','Height (mm)'],['OOG Overlength (mm)','Overlength (mm)'],['OOG Overwidth (mm)','Overwidth (mm)'],['OOG Overheight (mm)','Overheight (mm)']]],
+    ['OOG', [['OOG Length (mm)','Length (mm)'],['OOG Width (mm)','Width (mm)'],['OOG Height (mm)','Height (mm)'],['OOG Overlength (mm)','Overlength (mm)'],['OOG Overwidth (mm)','Overwidth (mm)'],['OOG Overheight (mm)','Overheight (mm)'],['OOG Units','OOG units'],['OOG Equipment Type','Equipment type (20 OT / 20 FR / 40 FR)'],['OOG Stowage','Stowage (ON DECK / UNDER DECK)'],['OOG Kill Slot Factor','Approved kill factor (TEU/unit)'],['OOG Killed Slots (TEU)','Total killed TEU'],['OOG Kill Factor Source','Factor approval / carrier quotation']]],
     ['REEFER',[['Reefer Temperature (C)','Set temperature (°C)'],['Reefer Ventilation','Ventilation'],['Reefer Humidity (%)','Humidity (%)'],['Reefer Commodity','Commodity / product'],['Reefer Monitoring','Monitoring requirements']]],
     ['DG',[['DG UN Number','UN number'],['DG IMO Class','IMO / IMDG class'],['DG Subsidiary Risk','Subsidiary risk class'],['DG Proper Shipping Name','Proper shipping name'],['DG Packing Group','Packing group'],['DG Flash Point (C)','Flash point (°C)'],['DG Marine Pollutant','Marine pollutant'],['DG Limited Quantity','Limited quantity'],['DG Net Quantity','Net dangerous goods quantity'],['DG Emergency Contact','Emergency contact'],['DG Emergency Phone','Emergency telephone'],['DG Technical Name','Technical name (if required)'],['DG Segregation Requirements','Segregation / stowage instructions']]]
   ];
@@ -2348,8 +2348,29 @@ function clx81OpenCargoDetails(){
     OOG:'OOG: record dimensions in millimetres; verify equipment limits, over-dimensions, weight, lashing and carrier acceptance.'
   };
   const conditionNotice='<div class="equipNote">'+esc(conditions[cargo]||'Select DG, REEFER or OOG in Cargo Type first. Commodity must be selected from the active Commodity Master.')+'</div>';
+  const killWidget=cargo==='OOG'?'<div class="toolbar"><button type="button" class="btn" onclick="clx81CalculateOogKillSlots()">Calculate Kill Slots (Reference Only)</button><span class="muted" id="clx81KillSlotMessage">Carrier approval required for any final slot or charge allocation.</span></div>':'';
   const panel=groups.map(([kind,rows])=>'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>input(key,label)).join('')+'</div></section>').join('');
-  clx81PrincipalOverlay('Booking Cargo Details — '+(cargo||'Select Cargo Type'),'<p class="muted">Cargo details are attached to the existing Booking Draft. Use Save Draft on Booking to persist. Verify operational acceptance before using in production.</p>'+conditionNotice+panel+'<div class="toolbar"><button type="button" class="btn primary" onclick="clx81CaptureCargoDetails()">Apply to Booking Draft</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\')?.remove()">Cancel</button></div>');
+  clx81PrincipalOverlay('Booking Cargo Details — '+(cargo||'Select Cargo Type'),'<p class="muted">Cargo details are attached to the existing Booking Draft. Use Save Draft on Booking to persist. Verify operational acceptance before using in production.</p>'+conditionNotice+panel+killWidget+'<div class="toolbar"><button type="button" class="btn primary" onclick="clx81CaptureCargoDetails()">Apply to Booking Draft</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\')?.remove()">Cancel</button></div>');
+}
+function clx81CalculateOogKillSlots(){
+ const get=k=>document.querySelector('[data-clx81-cargo="'+k+'"]');
+ const value=k=>String(get(k)?.value||'').trim().toUpperCase();
+ const qty=Number(value('OOG Units')),kind=value('OOG Equipment Type'),deck=value('OOG Stowage');
+ const overW=Number(value('OOG Overwidth (mm)')),overH=Number(value('OOG Overheight (mm)')),overL=Number(value('OOG Overlength (mm)'));
+ const msg=document.getElementById('clx81KillSlotMessage');
+ const say=t=>{if(msg)msg.textContent=t;};
+ const table={'UNDER DECK':{'20 OT':{OH:2},'20 FR':{OH:3,OW:6},'40 FR':{OH:6,OW:12,FV:4}},'ON DECK':{'20 OT':{OH:3},'20 FR':{OH:3,OW:6},'40 FR':{OH:6,OW:12,FV:22}}};
+ if(!Number.isInteger(qty)||qty<1)return say('Enter a valid positive whole number of OOG units.');
+ if(!get('OOG Equipment Type')?.value||!get('OOG Stowage')?.value)return say('Enter equipment type and stowage first.');
+ const types=[overL>0,overW>0,overH>0].filter(Boolean).length;
+ if(types!==1)return say('Combined over-dimensions or full void require approved carrier factor; do not automatically apply an OH-only or OW-only row.');
+ const dimension=overH>0?'OH':overW>0?'OW':'OL';
+ const factor=table[deck]?.[kind]?.[dimension];
+ if(!factor)return say('No reference factor for this configuration. Obtain carrier-approved stowage quotation.');
+ get('OOG Kill Slot Factor').value=String(factor);
+ get('OOG Killed Slots (TEU)').value=String(qty*factor);
+ get('OOG Kill Factor Source').value='REFERENCE ONLY — CARRIER APPROVAL REQUIRED';
+ say('Reference estimate: '+(qty*factor)+' killed TEUs ('+qty+' × '+factor+'). Not approved for pricing or allocation.');
 }
 function clx81CaptureCargoDetails(){
   if(viewerReadOnly())return;
