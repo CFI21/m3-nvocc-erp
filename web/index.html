@@ -191,6 +191,15 @@
 .clx81BookingDropPanel button{text-align:left;white-space:nowrap;background:white;border:0;padding:6px 9px;cursor:pointer;font-size:11px}
 .clx81BookingDropPanel button:hover,.clx81BookingDropPanel button:focus-visible{background:#e8f3ed}
 @media(max-width:900px){.clx81BookingMenu{display:flex;overflow-x:auto;padding-bottom:5px}.clx81BookingMenuItem{flex:0 0 135px}}
+.clx81PrincipalRow{display:flex;gap:3px;flex-wrap:nowrap;align-items:center}
+.clx81PrincipalRow .clx81TopCell{flex:1 1 auto;min-width:0;overflow:hidden}
+.clx81PrincipalRow .clx81TopCell input{min-width:0;width:100%}
+.clx81PrincipalBtn{flex:0 0 auto;border:1px solid #aab6c5;background:#f8fafc;padding:3px 5px;white-space:nowrap;font-size:10px;cursor:pointer;min-height:24px}
+.clx81PrincipalOverlay{position:fixed;inset:0;background:#1724328a;z-index:10000;display:flex;justify-content:center;align-items:center;padding:22px}
+.clx81PrincipalDialog{background:#fff;color:#1d2939;width:min(960px,96vw);max-height:90vh;overflow:auto;border:1px solid #8493a7;box-shadow:0 12px 30px #0004}
+.clx81PrincipalDialog.full{width:100vw;height:100vh;max-height:100vh}
+.clx81PrincipalDialogHead{display:flex;align-items:center;gap:8px;background:#eef2f5;border-bottom:1px solid #bac5d1;padding:8px}
+.clx81PrincipalDialogBody{padding:12px;overflow:auto}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
@@ -2244,6 +2253,40 @@ async function clx78BookingBottom(w){
       '</tbody></table></div></div>';
   }catch(e){return '<div class="clx78Ledger"><div class="equipNote">'+esc(e.message)+'</div></div>'}
 }
+function clx81PrincipalOverlay(title,content,wide=false){
+  const previous=document.getElementById('clx81PrincipalOverlay');if(previous)previous.remove();
+  const container=document.createElement('div');
+  container.id='clx81PrincipalOverlay';container.className='clx81PrincipalOverlay';
+  container.innerHTML='<div class="clx81PrincipalDialog'+(wide?' full':'')+'" role="dialog" aria-modal="true" aria-label="'+esc(title)+'"><div class="clx81PrincipalDialogHead"><b>'+esc(title)+'</b><span class="grow"></span><button type="button" class="btn" onclick="clx81PrincipalExpand()">Full Screen</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\').remove()">Close</button></div><div class="clx81PrincipalDialogBody">'+content+'</div></div>';
+  document.body.appendChild(container);
+}
+function clx81PrincipalExpand(){
+  document.querySelector('#clx81PrincipalOverlay .clx81PrincipalDialog')?.classList.toggle('full');
+}
+function clx81ShowMergeJobInfo(){
+  clx81PrincipalOverlay('Merge Job — Controlled Review','<p>Job merging is not enabled in this Booking preview because an approved existing merge workflow, eligibility rules, and audit-safe API have not been verified.</p><p>No records will be merged or modified.</p>');
+}
+async function clx81ShowPrincipalInventory(){
+  const w=clx49Workspace,job=String(w?.context?.job_ref||''),principal=String(w?.booking?.fields?.Principal||'').trim().split(/\\s*[|—]\\s*/)[0];
+  if(!job){clx81PrincipalOverlay('Principal Inventory','<p>No current Job reference is available.</p>');return;}
+  clx81PrincipalOverlay('Principal Inventory','<p>Loading existing equipment records…</p>');
+  try{
+    const e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(job));
+    const all=e.allocated_containers||[];
+    const matches=principal?all.filter(r=>String(r.principal_code||'').trim()===principal):[];
+    const table='<p><b>Principal:</b> '+esc(principal||'Not selected')+' &nbsp; <b>Job:</b> '+esc(job)+' &nbsp; <b>Matched containers:</b> '+matches.length+'</p>'+
+      (principal?'<div class="tablewrap"><table><thead><tr><th>Container #</th><th>Size/Type</th><th>Principal</th><th>Depot</th><th>Agent</th><th>Status</th></tr></thead><tbody>'+matches.map(r=>'<tr><td>'+esc(r.container_no||'')+'</td><td>'+esc(r.size_type||'')+'</td><td>'+esc(r.principal_code||'')+'</td><td>'+esc(r.depot_code||'')+'</td><td>'+esc(r.agent_code||'')+'</td><td>'+esc(r.equipment_status||'')+'</td></tr>').join('')+'</tbody></table></div>':'<p>Select a registered Principal in Booking before reviewing its inventory.</p>')+
+      '<p class="muted">Read-only equipment linked to this Job, filtered by Principal. This is not a complete global Principal stock balance.</p>'+
+      '<button type="button" class="btn" onclick="clx81PrincipalOpenEquipment()">Open Existing Equipment Screen</button>';
+    if(document.getElementById('clx81PrincipalOverlay'))document.querySelector('#clx81PrincipalOverlay .clx81PrincipalDialogBody').innerHTML=table;
+  }catch(err){
+    if(document.getElementById('clx81PrincipalOverlay'))document.querySelector('#clx81PrincipalOverlay .clx81PrincipalDialogBody').textContent='Inventory lookup unavailable: '+String(err.message||err);
+  }
+}
+function clx81PrincipalOpenEquipment(){
+  document.getElementById('clx81PrincipalOverlay')?.remove();
+  clx81SetBottom('Equipment');
+}
 function clx81BookingReferenceGrid(w,r){
   const p=r?.fields||{},ref=String(w.context?.booking_ref||r?.external_ref||p['Booking No.']||'—');
   const val=(k,fallback='')=>String(p[k]||fallback||'');
@@ -2255,7 +2298,7 @@ function clx81BookingReferenceGrid(w,r){
   const topGroup=(title,items)=>'<div class="clx81TopGroup"><div class="clx81RefSubhead">'+title+'</div><div class="clx81TopCells">'+items.map(x=>topCell(x[0],x[1])).join('')+'</div></div>';
   const topLeft=[['BK Date',val('BK Date',val('Booking Date'))],['BK #',val('BK #',ref)],['Approval #',val('Approval #')],['Job #',val('Job #',val('Job Ref'))],['Currency',val('Currency')],['Inv Type',val('Inv Type')]];
   const topRight=[['Reference',val('Reference',val('Reference #'))],['Job Category',val('Job Category')],['Inv Type',val('Inv Type')],['SOA #',val('SOA #')],['Status',val('Status',r?.status)],['Settled / Un-Settled',val('Settlement Status')]];
-  const detailRow=(items)=>'<div class="clx81DetailRow">'+items.map(x=>topCell(x[0],x[1])).join('')+'</div>';
+  const detailRow=(items)=>'<div class="clx81DetailRow'+(items.length===1&&items[0][0]==='Principal'?' clx81PrincipalRow':'')+'">'+items.map(x=>topCell(x[0],x[1])).join('')+(items.length===1&&items[0][0]==='Principal'?'<button type="button" class="clx81PrincipalBtn" onclick="clx81ShowPrincipalInventory()">Inventory</button><button type="button" class="clx81PrincipalBtn" onclick="clx81ShowMergeJobInfo()">Merge Job</button>':'')+'</div>';
   const detailGroup=(title,rows)=>'<div class="clx81DetailsGroup"><div class="clx81RefSubhead">'+title+'</div>'+rows.map(detailRow).join('')+'</div>';
   const detailsLeft=[
     [['Commodity',val('Commodity')],['Cargo Type',val('Cargo Type')]],
