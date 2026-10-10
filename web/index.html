@@ -2267,7 +2267,7 @@ function clx81ShowMergeJobInfo(){
   clx81PrincipalOverlay('Merge Job — Controlled Review','<p>Job merging is not enabled in this Booking preview because an approved existing merge workflow, eligibility rules, and audit-safe API have not been verified.</p><p>No records will be merged or modified.</p>');
 }
 async function clx81ShowPrincipalInventory(){
-  const w=clx49Workspace,job=String(w?.context?.job_ref||''),principal=String(w?.booking?.fields?.Principal||'').trim().split(/\\s*[|—]\\s*/)[0];
+  const w=clx49Workspace,job=String(w?.context?.job_ref||''),principal=String(w?.booking?.fields?.Principal||'').trim().split(/\s*[|—]\s*/)[0];
   if(!job){clx81PrincipalOverlay('Principal Inventory','<p>No current Job reference is available.</p>');return;}
   clx81PrincipalOverlay('Principal Inventory','<p>Loading existing equipment records…</p>');
   try{
