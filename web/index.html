@@ -2371,8 +2371,8 @@ function clx81OpenCargoDetails(){
   }
 }
 function clx81OogSpec(raw){
- const normalized=String(raw||'').toUpperCase().replace(/['’"]/g,'').replace(/[-_]/g,' ').replace(/FLAT\\s*RACK/g,'FR').replace(/OPEN\\s*TOP/g,'OT').replace(/HIGH\\s*CUBE/g,'HC').replace(/GENERAL\\s*PURPOSE/g,'GP').replace(/PLATFORM/g,'PF').replace(/REEFER/g,'RF').trim();
- const match=normalized.match(/^(20|40|45)\\s*(?:FT|FEET)?\\s*(GP|DV|ST|DC|HC|HQ|OT|FR|PF|PL|TK|RF)$/);
+ const normalized=String(raw||'').toUpperCase().replace(/['’"]/g,'').replace(/[-_]/g,' ').replace(/FLAT\s*RACK/g,'FR').replace(/OPEN\s*TOP/g,'OT').replace(/HIGH\s*CUBE/g,'HC').replace(/GENERAL\s*PURPOSE/g,'GP').replace(/PLATFORM/g,'PF').replace(/REEFER/g,'RF').trim();
+ const match=normalized.match(/^(20|40|45)\s*(?:FT|FEET)?\s*(GP|DV|ST|DC|HC|HQ|OT|FR|PF|PL|TK|RF)$/);
  const size=match?.[1]||'',code=match?.[2]||'';
  const types={DV:'GP',ST:'GP',DC:'GP',HQ:'HC',PL:'PF'};
  const type=types[code]||code;
@@ -2404,9 +2404,10 @@ function clx81CalculateOogKillSlots(){
  const value=k=>String(get(k)?.value||'').trim().toUpperCase();
  const qty=Number(value('OOG Units')),spec=clx81OogSpec(value('OOG Equipment Type'));
  const msg=document.getElementById('clx81KillSlotMessage'),out=document.getElementById('clx81KillSlotResults');
- const say=t=>{if(msg)msg.textContent=t;};
- if(!clx81RecalculateOverDimensions())return;
+ const say=t=>{if(msg)msg.textContent=t;if(out)out.textContent=t;};
+ if(!clx81RecalculateOverDimensions()){if(out)out.textContent='Check container type and all three cargo dimensions to calculate killed TEUs.';return;}
  if(!Number.isSafeInteger(qty)||qty<1)return say('Enter a positive whole number of units.');
+ const stowage=value('OOG Stowage');if(stowage&&!['ON DECK','UNDER DECK'].includes(stowage))return say('Select ON DECK or UNDER DECK, or leave Stowage blank for both.');
  const oh=Number(value('OOG Overheight (mm)'))/1000,ow=Number(value('OOG Overwidth (mm)'))/1000,ol=Number(value('OOG Overlength (mm)'))/1000;
  const dimensions=['Length','Width','Height'].map(x=>(Number(value('OOG '+x+' (mm)'))/1000).toFixed(2)).join(' × ');
  const full=value('OOG Full Void');
