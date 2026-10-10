@@ -2206,6 +2206,9 @@ function clx81QuickButtons(){
       '<button onclick="openScreen(\'agent-tasks::delivery-order\')">Delivery Planning</button></div>'+
   '</div>';
 }
+function clx81ManualChargeNotice(){
+ alert('Manual charge creation is not available from this Booking view yet. Use an approved MRG rate or Special Rate Request. An audited manual revenue/cost entry must be connected to the existing Booking commercial payload before activation. No finance records were changed.');
+}
 function clx78BottomButtons(){
   const tabs=['Equipment','Agreed Charges','Revenue','Cost','Financial Auto','Preview'];
   return tabs.map(t=>'<button class="'+(clx78BookingBottomTab===t?'active':'')+'" onclick="clx81SetBottom(\''+t+'\')">'+t+'</button>').join('');
@@ -2224,7 +2227,7 @@ async function clx78BookingBottom(w){
         '<div class="equipKpi">Margin<b>'+Number(fin.margin||0).toLocaleString()+'</b></div></div>'+
         '<div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner</th><th>Principal</th><th>Agent</th><th>Depot</th><th>Status</th><th></th></tr></thead><tbody>'+
         rows.map(x=>'<tr><td><b>'+esc(x.container_no)+'</b></td><td>'+esc(x.size_type)+'</td><td>'+esc(x.owner_party_type||x.ownership)+'</td><td>'+esc(x.principal_code||'')+'</td><td>'+esc(x.agent_code||'')+'</td><td>'+esc(x.depot_code||'')+'</td><td>'+esc(x.equipment_status)+'</td><td><button class="btn" onclick="showContainerDetail(\''+esc(x.container_no)+'\')">Open</button></td></tr>').join('')+
-        '</tbody></table></div><div class="toolbar"><button class="btn" onclick="state.equipmentJobRef=\''+esc(jr)+'\';showEquipmentWorkspace(\'allocation\')">Allocation / Shortage</button><button class="btn" onclick="showEquipmentWorkspace(\'tower\')">Open Global Equipment Tower</button></div></div>';
+        '</tbody></table></div><div class="toolbar"><button class="btn" onclick="state.equipmentJobRef=\''+esc(jr)+'\';showEquipmentWorkspace(\'allocation\')">Allocation / Shortage</button><button class="btn" onclick="showEquipmentWorkspace(\'tower\')">Open Global Equipment Tower</button><button class="btn" onclick="clx81SetBottom(\'Equipment\');document.querySelector(\'[data-clx49-field=\\\"Equipment\\\"]\')?.focus()">Booking Equipment Size / Type</button></div></div>';
     }catch(e){return '<div class="clx78Ledger"><div class="equipNote badtext">'+esc(e.message)+'</div></div>'}
   }
   if(clx78BookingBottomTab==='Preview'){
@@ -2259,7 +2262,7 @@ async function clx78BookingBottom(w){
         ['Principal Net',['Principal Net','principal_net']],
         ['Customer AR',['Customer AR','customer_ar']]
       ];
-      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · Booking commercial payload + linked operational / GL sources · no parallel Booking model.</div><div class="toolbar">'+writeUi('<button class="btn primary" onclick="openMrgImportForBooking()">Import MRG</button><button class="btn" onclick="openAgentForm(\'edit\')">Add Manual Charge</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button><span class="muted">MRG import is optional.</span></div>'+
+      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · Booking commercial payload + linked operational / GL sources · no parallel Booking model.</div><div class="toolbar">'+writeUi('<button class="btn primary" onclick="openMrgImportForBooking()">Import MRG</button><button class="btn" onclick="clx81ManualChargeNotice()">Add Manual Charge (Review)</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button><span class="muted">MRG import is optional.</span></div>'+
         '<div class="tablewrap"><table><thead><tr>'+cols.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'</tr></thead><tbody>'+
         (rows.length?rows.map(r=>'<tr>'+cols.map(x=>'<td>'+esc(pick(r,...x[1]))+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="16">No linked agreed-charge records yet.</td></tr>')+
         '</tbody></table></div></div>';
