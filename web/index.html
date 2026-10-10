@@ -2349,13 +2349,35 @@ function clx81OpenCargoDetails(){
   };
   const conditionNotice='<div class="equipNote">'+esc(conditions[cargo]||'Select DG, REEFER or OOG in Cargo Type first. Commodity must be selected from the active Commodity Master.')+'</div>';
   const killWidget=cargo==='OOG'?'<div class="toolbar"><button type="button" class="btn" onclick="clx81CalculateOogKillSlots()">Calculate Kill Slots (Reference Only)</button><span class="muted" id="clx81KillSlotMessage">Carrier approval required for any final slot or charge allocation.</span></div>':'';
-  const panel=groups.map(([kind,rows])=>'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>input(key,label)).join('')+'</div></section>').join('');
+  const calculatedKeys=['OOG Overlength (mm)','OOG Overwidth (mm)','OOG Overheight (mm)'];
+  const panel=groups.map(([kind,rows])=>'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>calculatedKeys.includes(key)?'<label class="clx81CargoField"><span>'+esc(label)+' — auto</span><input readonly data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"></label>':input(key,label)).join('')+'</div></section>').join('');
   clx81PrincipalOverlay('Booking Cargo Details — '+(cargo||'Select Cargo Type'),'<p class="muted">Cargo details are attached to the existing Booking Draft. Use Save Draft on Booking to persist. Verify operational acceptance before using in production.</p>'+conditionNotice+panel+killWidget+'<div class="toolbar"><button type="button" class="btn primary" onclick="clx81CaptureCargoDetails()">Apply to Booking Draft</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\')?.remove()">Cancel</button></div>');
+  if(cargo==='OOG'){
+    document.querySelectorAll('[data-clx81-cargo="OOG Length (mm)"],[data-clx81-cargo="OOG Width (mm)"],[data-clx81-cargo="OOG Height (mm)"],[data-clx81-cargo="OOG Equipment Type"]').forEach(el=>el.addEventListener('input',clx81RecalculateOverDimensions));
+    clx81RecalculateOverDimensions();
+  }
+}
+function clx81RecalculateOverDimensions(){
+ const get=k=>document.querySelector('[data-clx81-cargo="'+k+'"]');
+ const kind=String(get('OOG Equipment Type')?.value||'').trim().toUpperCase();
+ // Provisional 20-foot TEU slot envelope from supplied reference; 40-foot requires an approved per-equipment envelope.
+ const reference=kind==='20 OT'||kind==='20 FR'?[6000,2400,2400]:null;
+ const msg=document.getElementById('clx81KillSlotMessage');
+ for(const [i,axis] of ['Length','Width','Height'].entries()){
+  const result=get('OOG Over'+axis.toLowerCase()+' (mm)');
+  if(!result)continue;
+  const raw=String(get('OOG '+axis+' (mm)')?.value||'').trim();
+  const n=Number(raw);
+  result.value=reference&&raw!==''&&Number.isFinite(n)&&n>=0?String(Math.max(0,n-reference[i])):'';
+ }
+ for(const k of ['OOG Kill Slot Factor','OOG Killed Slots (TEU)','OOG Kill Factor Source']){const el=get(k);if(el)el.value='';}
+ if(msg)msg.textContent=reference?'Over-dimensions calculated against provisional 6000 × 2400 × 2400 mm 20-foot reference. Confirm equipment limits.':'Select an approved 20-foot reference. For 40-foot or other equipment, approved dimensional limits are required.';
 }
 function clx81CalculateOogKillSlots(){
  const get=k=>document.querySelector('[data-clx81-cargo="'+k+'"]');
  const value=k=>String(get(k)?.value||'').trim().toUpperCase();
  const qty=Number(value('OOG Units')),kind=value('OOG Equipment Type'),deck=value('OOG Stowage');
+ clx81RecalculateOverDimensions();
  const overW=Number(value('OOG Overwidth (mm)')),overH=Number(value('OOG Overheight (mm)')),overL=Number(value('OOG Overlength (mm)'));
  const msg=document.getElementById('clx81KillSlotMessage');
  const say=t=>{if(msg)msg.textContent=t;};
