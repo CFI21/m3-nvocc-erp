@@ -2358,10 +2358,10 @@ function clx81OpenCargoDetails(){
   }
 }
 function clx81OogSpec(raw){
- const normalized=String(raw||'').toUpperCase().replace(/['’]/g,'').replace(/\\bFT\\b/g,'').replace(/[-_]/g,' ').trim();
- const size=normalized.match(/^(20|40|45)\\s*/)?.[1];
- const code=normalized.replace(/^(20|40|45)\\s*/,'').trim();
- const types={DV:'GP',ST:'GP',HQ:'HC'};
+ const normalized=String(raw||'').toUpperCase().replace(/['’"]/g,'').replace(/[-_]/g,' ').replace(/FLAT\\s*RACK/g,'FR').replace(/OPEN\\s*TOP/g,'OT').replace(/HIGH\\s*CUBE/g,'HC').replace(/GENERAL\\s*PURPOSE/g,'GP').replace(/PLATFORM/g,'PF').replace(/REEFER/g,'RF').trim();
+ const match=normalized.match(/^(20|40|45)\\s*(?:FT|FEET)?\\s*(GP|DV|ST|DC|HC|HQ|OT|FR|PF|PL|TK|RF)$/);
+ const size=match?.[1]||'',code=match?.[2]||'';
+ const types={DV:'GP',ST:'GP',DC:'GP',HQ:'HC',PL:'PF'};
  const type=types[code]||code;
  const specs={'20':{GP:[6.06,2.44,2.59],HC:[6.06,2.44,2.90],OT:[6.06,2.44,2.59],FR:[6.06,2.44,2.59],PF:[6.06,2.44,.60]},
  '40':{GP:[12.19,2.44,2.59],HC:[12.19,2.44,2.90],OT:[12.19,2.44,2.59],FR:[12.19,2.44,2.59],PF:[12.19,2.44,.60]},
