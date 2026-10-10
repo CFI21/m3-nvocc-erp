@@ -2390,7 +2390,12 @@ function clx81OpenCargoDetails(){
       });
       clx81CalculateOogKillSlots();
     };
-    [...metreInputs,...document.querySelectorAll('[data-clx81-oog-base], [data-clx81-cargo="OOG Units"], [data-clx81-cargo="OOG Equipment Type"], [data-clx81-cargo="OOG Stowage"]')].forEach(el=>el.addEventListener('input',calculateFromForm));
+    [...metreInputs,...document.querySelectorAll('[data-clx81-oog-base], [data-clx81-cargo="OOG Units"], [data-clx81-cargo="OOG Stowage"]')].forEach(el=>el.addEventListener('input',calculateFromForm));
+    document.querySelector('[data-clx81-cargo="OOG Equipment Type"]')?.addEventListener('change',()=>{
+      const chosen=clx81OogSpec(document.querySelector('[data-clx81-cargo="OOG Equipment Type"]')?.value);
+      ['Length','Width','Height'].forEach((axis,i)=>{const el=document.querySelector('[data-clx81-oog-base="'+axis+'"]');if(el)el.value=chosen.dimensions?String(chosen.dimensions[i]):'';});
+      calculateFromForm();
+    });
     const spec=clx81OogSpec(document.querySelector('[data-clx81-cargo="OOG Equipment Type"]')?.value);
     ['Length','Width','Height'].forEach((axis,i)=>{const el=document.querySelector('[data-clx81-oog-base="'+axis+'"]');if(el&&!el.value&&spec.dimensions)el.value=String(spec.dimensions[i])});
     calculateFromForm();
