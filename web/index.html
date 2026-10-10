@@ -2036,7 +2036,7 @@ function clx49BookingTogglePot(){
 }
 
 let clx78BookingBottomTab='Agreed Charges';
-const clx81MasterDomains={POL:'port',POD:'port','POT (1)':'port','POT (2)':'port','Booking Party':'common-party','Billing Party':'common-party',Agent:'common-party-agent','POL Agent':'common-party-agent','POT Agent':'common-party-agent','Receiving Agent':'common-party-agent','POD Agent':'common-party-agent','TS Agent (1)':'common-party-agent','TS Agent (2)':'common-party-agent'};
+const clx81MasterDomains={POL:'port',POD:'port','POT (1)':'port','POT (2)':'port','Booking Party':'common-party','Billing Party':'common-party',Shipper:'common-party',Consignee:'common-party',Principal:'common-party',Customer:'customer',Agent:'common-party-agent','POL Agent':'common-party-agent','POT Agent':'common-party-agent','Receiving Agent':'common-party-agent','POD Agent':'common-party-agent','TS Agent (1)':'common-party-agent','TS Agent (2)':'common-party-agent',Commodity:'commodity',Vessel:'vessel',Voyage:'voyage','Cost Center':'cost-center',Currency:'currency',Carrier:'carrier','Sales Person':'sales-person'};
 const clx81MasterCache={};
 function clx81MasterField(record,key,label,opts={}){
   const p=record?.fields||{},val=String(p[key]??''),disabled=(opts.disabled||viewerReadOnly())?' disabled':'';
