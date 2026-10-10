@@ -200,6 +200,7 @@
 .clx81PrincipalDialog.full{width:100vw;height:100vh;max-height:100vh}
 .clx81PrincipalDialogHead{display:flex;align-items:center;gap:8px;background:#eef2f5;border-bottom:1px solid #bac5d1;padding:8px}
 .clx81PrincipalDialogBody{padding:12px;overflow:auto}
+.clx81CommercialFocus{outline:2px solid #2f6b55;outline-offset:-2px;scroll-margin-top:80px}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
@@ -2120,7 +2121,7 @@ function clx81RestoreBookingDraft(w){
 }
 function clx81BookingDropdownNav(activeTab){
   const menus=[
-    ['Booking Info',[['Booking Info','main','Booking Info'],['Booking Notes','notes','']]],
+    ['Booking Info',[['Booking Info','main','Booking Info'],['Commercial Ownership / Financial Parties','commercial',''],['Booking Notes','notes','']]],
     ['Equipments',[['Equipment Overview','bottom','Equipment']]],
     ['Charges',[['Agreed Charges','bottom','Agreed Charges'],['Revenue','bottom','Revenue'],['Cost','bottom','Cost'],['Financial Auto','bottom','Financial Auto'],['Preview','bottom','Preview']]],
     ['Routing',[['Routing Information','main','Routing']]],
@@ -2136,6 +2137,12 @@ function clx81BookingDropdownNav(activeTab){
 async function clx81BookingMenuAction(kind,target){
   document.querySelectorAll('.clx81BookingDrop[open]').forEach(el=>el.open=false);
   if(kind==='bottom'){clx81SetBottom(target);return;}
+  if(kind==='commercial'){
+    await clx81SwitchBookingTab('Booking Info');
+    const section=document.getElementById('clx81CommercialOwnership');
+    if(section){section.scrollIntoView({behavior:'smooth',block:'center'});section.classList.add('clx81CommercialFocus');}
+    return;
+  }
   if(kind==='notes'){
     await clx81SwitchBookingTab('Booking Info');
     const notes=document.getElementById('clx81BookingNotes');
@@ -2330,7 +2337,7 @@ function clx81BookingReferenceGrid(w,r){
     ['Detention — Total Amount & Collections',[]],
     ['Related Communication',[]]
   ];
-  const commercialHtml='<aside class="clx81CommercialColumn"><div class="clx81RefSubhead"><button type="button" class="btn" disabled>Commercial</button> <small>Existing fields · unbuilt functions frozen</small></div>'+commercial.map(x=>'<section class="clx81CommercialSubgrid"><strong>'+esc(x[0])+'</strong>'+x[1].map(k=>topCell(k,val(k))).join('')+(x[1].length?'':'<small>Reserved — no new records or fields</small>')+'</section>').join('')+'</aside>';
+  const commercialHtml='<aside class="clx81CommercialColumn"><div class="clx81RefSubhead"><button type="button" class="btn" disabled>Commercial</button> <small>Existing fields · unbuilt functions frozen</small></div>'+commercial.map(x=>'<section class="clx81CommercialSubgrid"'+(x[0]==='Commercial Ownership / Financial Parties'?' id="clx81CommercialOwnership"':'')+'><strong>'+esc(x[0])+'</strong>'+x[1].map(k=>topCell(k,val(k))).join('')+(x[1].length?'':'<small>Reserved — no new records or fields</small>')+'</section>').join('')+'</aside>';
   return '<section class="clx81RefPanel"><div class="clx81ThreeColumnLayout"><div class="clx81BookingColumn">'+
     topGroup('TOP GRID 1',topLeft)+detailGroup('DETAILS GRID 1',detailsLeft)+
     '</div><div class="clx81BookingColumn">'+topGroup('TOP GRID 2',topRight)+detailGroup('DETAILS GRID 2',detailsRight)+
