@@ -2362,11 +2362,11 @@ function clx81OpenCargoDetails(){
   if(cargo==='OOG'){
     document.querySelectorAll('[data-clx81-oog-metres]').forEach(el=>el.addEventListener('input',()=>{
       const axis=el.dataset.clx81OogMetres,other=document.querySelector('[data-clx81-cargo="OOG '+axis+' (mm)"]');
-      if(other)other.value=el.value?String(Number(el.value.trim().replace(',', '.'))*1000):'';
+      if(other)other.value=el.value.trim()&&Number.isFinite(Number(el.value.trim().replace(',', '.')))?String(Number(el.value.trim().replace(',', '.'))*1000):'';
       clx81RecalculateOverDimensions();
     }));
     document.querySelector('[data-clx81-cargo="OOG Equipment Type"]')?.addEventListener('input',clx81RecalculateOverDimensions);
-    document.querySelectorAll('[data-clx81-oog-metres]').forEach(el=>{const other=document.createElement('input');other.type='hidden';other.dataset.clx81Cargo='OOG '+el.dataset.clx81OogMetres+' (mm)';other.value=el.value?String(Number(el.value.trim().replace(',', '.'))*1000):'';el.insertAdjacentElement('afterend',other)});
+    document.querySelectorAll('[data-clx81-oog-metres]').forEach(el=>{const other=document.createElement('input');other.type='hidden';other.dataset.clx81Cargo='OOG '+el.dataset.clx81OogMetres+' (mm)';other.value=el.value.trim()&&Number.isFinite(Number(el.value.trim().replace(',', '.')))?String(Number(el.value.trim().replace(',', '.'))*1000):'';el.insertAdjacentElement('afterend',other)});
     clx81RecalculateOverDimensions();
   }
 }
