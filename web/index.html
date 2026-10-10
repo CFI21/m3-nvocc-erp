@@ -2369,14 +2369,28 @@ function clx81OpenCargoDetails(){
   const panel=groups.map(([kind,rows])=>kind==='OOG'?oogCompact():'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>calculatedKeys.includes(key)?'<label class="clx81CargoField"><span>'+esc(label)+' — auto</span><input readonly data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"></label>':input(key,label)).join('')+'</div></section>').join('');
   clx81PrincipalOverlay('Booking Cargo Details — '+(cargo||'Select Cargo Type'),'<p class="muted">Cargo details are attached to the existing Booking Draft. Use Save Draft on Booking to persist. Verify operational acceptance before using in production.</p>'+conditionNotice+panel+killWidget+'<div class="toolbar"><button type="button" class="btn primary" onclick="clx81CaptureCargoDetails()">Apply to Booking Draft</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\')?.remove()">Cancel</button></div>');
   if(cargo==='OOG'){
-    document.querySelectorAll('[data-clx81-oog-metres]').forEach(el=>el.addEventListener('input',()=>{
-      const axis=el.dataset.clx81OogMetres,other=document.querySelector('[data-clx81-cargo="OOG '+axis+' (mm)"]');
-      if(other)other.value=el.value.trim()&&Number.isFinite(Number(el.value.trim().replace(',', '.')))?String(Number(el.value.trim().replace(',', '.'))*1000):'';
-      clx81RecalculateOverDimensions();
-    }));
-    document.querySelector('[data-clx81-cargo="OOG Equipment Type"]')?.addEventListener('input',clx81RecalculateOverDimensions);
-    document.querySelectorAll('[data-clx81-oog-metres]').forEach(el=>{const other=document.createElement('input');other.type='hidden';other.dataset.clx81Cargo='OOG '+el.dataset.clx81OogMetres+' (mm)';other.value=el.value.trim()&&Number.isFinite(Number(el.value.trim().replace(',', '.')))?String(Number(el.value.trim().replace(',', '.'))*1000):'';el.insertAdjacentElement('afterend',other)});
-    clx81RecalculateOverDimensions();
+    const metreInputs=[...document.querySelectorAll('[data-clx81-oog-metres]')];
+    const toMm=raw=>{
+      const value=String(raw||'').trim().replace(',', '.');
+      const n=Number(value);
+      return value!==''&&Number.isFinite(n)&&n>0?String(n*1000):'';
+    };
+    // Create the three hidden millimetre inputs first, so every calculation
+    // reads the current user-visible metre values from the same Booking draft.
+    metreInputs.forEach(el=>{
+      const other=document.createElement('input');
+      other.type='hidden';other.dataset.clx81Cargo='OOG '+el.dataset.clx81OogMetres+' (mm)';
+      other.value=toMm(el.value);el.insertAdjacentElement('afterend',other);
+    });
+    const calculateFromForm=()=>{
+      metreInputs.forEach(el=>{
+        const other=document.querySelector('[data-clx81-cargo="OOG '+el.dataset.clx81OogMetres+' (mm)"]');
+        if(other)other.value=toMm(el.value);
+      });
+      clx81CalculateOogKillSlots();
+    };
+    [...metreInputs,...document.querySelectorAll('[data-clx81-cargo="OOG Units"],[data-clx81-cargo="OOG Equipment Type"],[data-clx81-cargo="OOG Stowage"]')].forEach(el=>el.addEventListener('input',calculateFromForm));
+    calculateFromForm();
   }
 }
 function clx81OogSpec(raw){
