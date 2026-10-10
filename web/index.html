@@ -201,6 +201,10 @@
 .clx81PrincipalDialogHead{display:flex;align-items:center;gap:8px;background:#eef2f5;border-bottom:1px solid #bac5d1;padding:8px}
 .clx81PrincipalDialogBody{padding:12px;overflow:auto}
 .clx81CommercialFocus{outline:2px solid #2f6b55;outline-offset:-2px;scroll-margin-top:80px}
+.clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)){display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:2px}
+.clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell{min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:1px}
+.clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell span{font-size:9px;max-width:none}
+.clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell input{min-width:0;width:100%}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
@@ -2320,16 +2324,15 @@ function clx81BookingReferenceGrid(w,r){
     [['Approval Status',val('Approval Status')],['Approved By',val('Approved By')]]
   ];
   const detailsRight=[
-    [['Route',val('Route Type')]],
-    [['Cost Center',val('Cost Center')]],
+    [['Route',val('Route Type')],['Cost Center',val('Cost Center')]],
     [['Shipper',val('Shipper')]],
     [['Consignee',val('Consignee')]],
     [['POL Code + Name',val('POL',w.context?.pol)],['POL Agent Code + Name',val('POL Agent')]],
     [['POD Code + Name',val('POD',w.context?.pod)],['POD Agent Code + Name',val('POD Agent')]],
     [['FPOD Code + Name',val('FPOD')],['FPOD Agent Code + Name',val('FPOD Agent')]],
     [['POT Code + Name',val('POT (1)')],['POT Agent Code + Name',val('POT Agent')]],
-    [['Vessel',val('Vessel')],['Voyage',val('Voyage')]],
-    [['Unapprove',val('Unapprove')],['Apply Discount',val('Apply Discount')]]
+    [['Vessel',val('Vessel')],['Voyage',val('Voyage')],['ETD',val('ETD',val('Sailing Date'))],['Cutoff',val('Cutoff',val('SI Cut-off'))]],
+    [['Approval Action',/approved/i.test(val('Approval Status'))&&!/unapproved|not approved/i.test(val('Approval Status'))?'Unapprove':'Approve'],['Apply Discount',val('Apply Discount')]]
   ];
   const commercial=[
     ['Commercial Ownership / Financial Parties',['Operation','Principal','Billing Party','Booking Party','Settlement Agent','Rate Basis','Contract / Tariff Ref','Financial Flow']],
