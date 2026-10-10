@@ -2374,7 +2374,7 @@ function clx81OpenCargoDetails(){
     const hiddenFields=hidden.map(k=>'<input type="hidden" data-clx81-cargo="'+esc(k)+'" value="'+esc(read(k))+'">').join('');
     const dims=['Length','Width','Height'].map(axis=>'<label class="clx81CargoField"><span>'+axis+' (m)</span><input type="text" inputmode="decimal" data-clx81-oog-metres="'+axis+'" value="'+esc(read('OOG '+axis+' (mm)')?String(Number(read('OOG '+axis+' (mm)'))/1000):'')+'"'+(viewerReadOnly()?' disabled':'')+'></label>').join('');
     const base=['Length','Width','Height'].map(axis=>'<label class="clx81CargoField"><span>Base '+axis+' (m)</span><input type="text" inputmode="decimal" data-clx81-oog-base="'+axis+'" value="'+esc(read('OOG Base '+axis+' (m)'))+'"'+(viewerReadOnly()?' disabled':'')+'></label>').join('');
-    return '<section class="clx81CargoSection"><h4>Slot Kill Calculator</h4><div class="clx81CargoFields">'+input('OOG Units','Units')+input('OOG Equipment Type','Container (e.g. 40 FR)')+dims+input('OOG Stowage','Stowage (optional: ON DECK / UNDER DECK)')+'</div><h4>Equipment reference dimensions (m) — verified ISO/manufacturer basis; overrides require carrier approval</h4><div class="clx81CargoFields">'+base+'</div>'+hiddenFields+'<p class="muted">Enter secured cargo dimensions in metres. Blank stowage calculates both. Full Void or collapsed end walls require carrier review.</p></section>';
+    return '<section class="clx81CargoSection"><h4>Slot Kill Calculator</h4><div class="clx81CargoFields">'+input('OOG Units','Units')+input('OOG Equipment Type','Container (e.g. 40 FR)')+dims+input('OOG Stowage','Stowage (optional: ON DECK / UNDER DECK)')+'</div><h4>Equipment Size & Type reference (m) — supplied dimensions, pending master-data approval</h4><div class="clx81CargoFields">'+base+'</div>'+hiddenFields+'<p class="muted">Enter secured cargo dimensions in metres. Blank stowage calculates both. Full Void or collapsed end walls require carrier review.</p></section>';
   };
   const panel=groups.map(([kind,rows])=>kind==='OOG'?oogCompact():'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>calculatedKeys.includes(key)?'<label class="clx81CargoField"><span>'+esc(label)+' — auto</span><input readonly data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"></label>':input(key,label)).join('')+'</div></section>').join('');
   clx81PrincipalOverlay('Booking Cargo Details — '+(cargo||'Select Cargo Type'),'<p class="muted">Cargo details are attached to the existing Booking Draft. Use Save Draft on Booking to persist. Verify operational acceptance before using in production.</p>'+conditionNotice+panel+killWidget+'<div class="toolbar"><button type="button" class="btn primary" onclick="clx81CaptureCargoDetails()">Apply to Booking Draft</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\')?.remove()">Cancel</button></div>');
@@ -2410,15 +2410,23 @@ function clx81OpenCargoDetails(){
     calculateFromForm();
   }
 }
+// Requested nine external envelopes (metres), as supplied for Equipment Size & Type
+// master data review. Flat Rack/Open Top physical details require manufacturer
+// specification verification; do not represent these values as vessel clearances.
+const CLX81_EQUIPMENT_DIMENSION_REFERENCE=Object.freeze({
+ '20':Object.freeze({GP:[6.058,2.438,2.591],HC:[6.058,2.438,2.896],FR:[6.058,2.438,2.591],OT:[6.058,2.438,2.591]}),
+ '40':Object.freeze({GP:[12.192,2.438,2.591],HC:[12.192,2.438,2.896],FR:[12.192,2.438,2.591],OT:[12.192,2.438,2.591]}),
+ '45':Object.freeze({HC:[13.716,2.438,2.896]})
+});
 function clx81OogSpec(raw){
  const normalized=String(raw||'').toUpperCase().replace(/['’"]/g,'').replace(/[-_]/g,' ').replace(/FLAT\s*RACK/g,'FR').replace(/OPEN\s*TOP/g,'OT').replace(/HIGH\s*CUBE/g,'HC').replace(/GENERAL\s*PURPOSE/g,'GP').replace(/PLATFORM/g,'PF').replace(/REEFER/g,'RF').trim();
  const match=normalized.match(/^(20|40|45)\s*(?:FT|FEET)?\s*(GP|DV|ST|DC|HC|HQ|OT|FR|PF|PL|TK|RF)$/);
  const size=match?.[1]||'',code=match?.[2]||'';
  const types={DV:'GP',ST:'GP',DC:'GP',HQ:'HC',PL:'PF'};
  const type=types[code]||code;
- const specs={'20':{GP:[6.06,2.44,2.59],HC:[6.06,2.44,2.90],OT:[6.06,2.44,2.59],FR:[6.06,2.44,2.59],PF:[6.06,2.44,.60]},
- '40':{GP:[12.19,2.44,2.59],HC:[12.19,2.44,2.90],OT:[12.19,2.44,2.59],FR:[12.19,2.44,2.59],PF:[12.19,2.44,.60]},
- '45':{HC:[13.56,2.44,2.90]}};
+ // Controlled reference fallback only. The authoritative Equipment Size & Type
+ // master must supply approved effective-dated measurements before production use.
+ const specs=CLX81_EQUIPMENT_DIMENSION_REFERENCE;
  return {size,type,dimensions:specs[size]?.[type]||null};
 }
 function clx81RecalculateOverDimensions(){
