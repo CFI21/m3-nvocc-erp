@@ -2234,7 +2234,15 @@ async function clx78BookingBottom(w){
     }catch(e){return '<div class="clx78Ledger"><div class="equipNote badtext">'+esc(e.message)+'</div></div>'}
   }
   if(clx78BookingBottomTab==='Preview'){
-    return '<div class="clx78Ledger"><div class="card"><b>Booking Preview</b><pre class="pre">'+esc(JSON.stringify({context:w.context,booking:w.booking?.fields||{},status:w.booking?.status},null,2))+'</pre></div></div>';
+    const p=w.booking?.fields||{},draft=clx81BookingDraft?.key===String(jr)+':'+String(w.booking?.id||'')?clx81BookingDraft.values:{};
+    const v=k=>draft[k]!==undefined?draft[k]:p[k];
+    const killed=Number(v('OOG Killed Slots (TEU)'));
+    const example=(String(v('Cargo Type')||'').toUpperCase()==='OOG'||Number.isFinite(killed)&&killed>0);
+    const rates=Array.isArray(p['Commercial Charges'])?p['Commercial Charges']:[];
+    const approvedRates=rates.filter(x=>String(x.source_type||'').toUpperCase().includes('APPROVED')||String(x.approval_status||'').toUpperCase()==='APPROVED');
+    const rateNote=approvedRates.length?'Approved charge entries detected; final confirmation must reconcile source, side, currency and customer approval.':'No verified approved ocean-freight and OOG slot tariff pair linked to this Booking.';
+    const illustration=example?'<div class="card"><h3>OOG Slot Surcharge — Confirmation Breakdown</h3><p class="muted">ILLUSTRATION ONLY — not a customer quote, invoice, approved charge, or posting. Example rates $2,000 per unit and $50 per killed TEU are not imported into this Booking.</p><div class="tablewrap"><table><thead><tr><th>Description</th><th>Quantity</th><th>Rate</th><th>Total</th></tr></thead><tbody><tr><td>Base Ocean Freight (2 x 40 FR)</td><td>2</td><td>$2,000</td><td>$4,000</td></tr><tr><td>OOG Surcharge (24 Killed TEUs)</td><td>24</td><td>$50</td><td>$1,200</td></tr><tr><th>Total</th><td></td><td></td><th>$5,200</th></tr></tbody></table></div><p class="muted">'+esc(rateNote)+'</p></div>':'';
+    return '<div class="clx78Ledger">'+illustration+'<div class="card"><b>Booking Preview (Authoritative Record)</b><pre class="pre">'+esc(JSON.stringify({context:w.context,booking:p,status:w.booking?.status},null,2))+'</pre></div></div>';
   }
   try{
     const [gl,tre]=await Promise.all([
