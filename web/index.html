@@ -206,7 +206,7 @@
 .clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell span{font-size:9px;max-width:none}
 .clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell input{min-width:0;width:100%}
 .clx81LiveCell{min-width:0}.clx81LiveCell input{background:#fff;border-color:#91b49d}.clx81LiveCell input:focus{outline:1px solid #2f6b55}.clx81LiveCell span{font-weight:600}
-</style></head>
+.clx81CargoSection{margin:10px 0;border:1px solid #d4dae2;padding:10px}.clx81CargoSection h4{margin:0 0 8px}.clx81CargoFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.clx81CargoField{display:flex;flex-direction:column;gap:3px;font-size:11px}.clx81CargoField input{height:27px;min-width:0;border:1px solid #c1cad5;padding:3px 6px}@media(max-width:650px){.clx81CargoFields{grid-template-columns:repeat(2,minmax(0,1fr))}}</style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
 const __m3NativeFetch=window.fetch.bind(window);
@@ -2327,6 +2327,30 @@ function clx81GridChange(el){
     if(other.dataset.clx81GridField===key&&other!==el)other.value=el.value;
   }
 }
+function clx81OpenCargoDetails(){
+  const w=clx49Workspace,r=w?.booking;
+  if(!r)return alert('Open a Booking first.');
+  const dkey=String(w.context?.job_ref||'')+':'+String(r.id||'');
+  const read=k=>String(clx81BookingDraft?.key===dkey&&clx81BookingDraft.values[k]!==undefined?clx81BookingDraft.values[k]:(r.fields||{})[k]||'');
+  const cargo=read('Cargo Type').toUpperCase();
+  const input=(key,label,type='text')=>'<label class="clx81CargoField"><span>'+esc(label)+'</span><input type="'+type+'" data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"'+(viewerReadOnly()?' disabled':'')+'></label>';
+  const groups=[
+    ['OOG', [['OOG Length (mm)','Length (mm)'],['OOG Width (mm)','Width (mm)'],['OOG Height (mm)','Height (mm)'],['OOG Overlength (mm)','Overlength (mm)'],['OOG Overwidth (mm)','Overwidth (mm)'],['OOG Overheight (mm)','Overheight (mm)']]],
+    ['REEFER',[['Reefer Temperature (C)','Set temperature (°C)'],['Reefer Ventilation','Ventilation'],['Reefer Humidity (%)','Humidity (%)'],['Reefer Commodity','Commodity / product'],['Reefer Monitoring','Monitoring requirements']]],
+    ['DG',[['DG UN Number','UN number'],['DG IMO Class','IMO class'],['DG Proper Shipping Name','Proper shipping name'],['DG Packing Group','Packing group'],['DG Flash Point (C)','Flash point (°C)'],['DG Marine Pollutant','Marine pollutant'],['DG Emergency Contact','Emergency contact']]]
+  ];
+  const panel=groups.map(([kind,rows])=>'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>input(key,label)).join('')+'</div></section>').join('');
+  clx81PrincipalOverlay('Booking Cargo Details — '+(cargo||'Select Cargo Type'),'<p class="muted">Cargo details are attached to the existing Booking Draft. Use Save Draft on Booking to persist. Verify operational acceptance before using in production.</p>'+panel+'<div class="toolbar"><button type="button" class="btn primary" onclick="clx81CaptureCargoDetails()">Apply to Booking Draft</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\')?.remove()">Cancel</button></div>');
+}
+function clx81CaptureCargoDetails(){
+  if(viewerReadOnly())return;
+  const w=clx49Workspace,r=w?.booking;if(!r)return;
+  const key=String(w.context?.job_ref||'')+':'+String(r.id||'');
+  if(clx81BookingDraft?.key!==key)clx81BookingDraft={key,values:{}};
+  document.querySelectorAll('[data-clx81-cargo]').forEach(el=>{clx81BookingDraft.values[el.dataset.clx81Cargo]=el.value;});
+  document.getElementById('clx81PrincipalOverlay')?.remove();
+  alert('Cargo details added to Booking Draft. Click Save Draft in the Booking toolbar to save.');
+}
 function clx81BookingReferenceGrid(w,r){
   const p=r?.fields||{},ref=String(w.context?.booking_ref||r?.external_ref||p['Booking No.']||'—');
   const val=(k,fallback='')=>String(p[k]||fallback||'');
@@ -2334,11 +2358,12 @@ function clx81BookingReferenceGrid(w,r){
   const cells=[ref,String(w.context?.customer_name||''),val('POL',w.context?.pol),val('POD',w.context?.pod),val('Route Type'),val('Cargo Type'),String(r?.status||p.Status||'')];
   const headings=['Booking Ref','Customer','POL','POD','Route Type','Cargo Type','Status'];
   const panel=(title,body)=>'<div class="clx81RefSummary"><div class="clx81RefSubhead">'+title+'</div><div class="clx81RefSummaryFields">'+body+'</div></div>';
-  const liveKeys={'Route':'Route Type','Cost Center':'Cost Center','Shipper':'Shipper','Consignee':'Consignee','POL Code + Name':'POL','POL Agent Code + Name':'POL Agent','POD Code + Name':'POD','POD Agent Code + Name':'POD Agent','POT Code + Name':'POT (1)','POT Agent Code + Name':'POT Agent','Vessel':'Vessel','Voyage':'Voyage','ETD':'Sailing Date','Cutoff':'SI Cut-off','Commodity':'Commodity','Cargo Type':'Cargo Type','Principal':'Principal','Billing Party':'Billing Party','Currency':'Currency'};
+  const liveKeys={'Route':'Route Type','Cargo Type':'Cargo Type','Cost Center':'Cost Center','Shipper':'Shipper','Consignee':'Consignee','POL Code + Name':'POL','POL Agent Code + Name':'POL Agent','POD Code + Name':'POD','POD Agent Code + Name':'POD Agent','POT Code + Name':'POT (1)','POT Agent Code + Name':'POT Agent','Vessel':'Vessel','Voyage':'Voyage','ETD':'Sailing Date','Cutoff':'SI Cut-off','Commodity':'Commodity','Cargo Type':'Cargo Type','Principal':'Principal','Billing Party':'Billing Party','Currency':'Currency'};
   const topCell=(label,value)=>{
     const key=liveKeys[label],locked=viewerReadOnly();
     if(!key)return '<label class="clx81TopCell"><span>'+esc(label)+'</span><input readonly value="'+esc(String(value||''))+'"></label>';
     const domain=clx81MasterDomains[key]||'',type=(label==='ETD'||label==='Cutoff')?'date':'text',max=label==='Vessel'?7:label==='Voyage'?8:undefined;
+    if(label==='Route')return '<label class="clx81TopCell clx81LiveCell"><span>Route:</span><select data-clx81-grid-field="Route Type" onchange="clx81GridChange(this)"'+(locked?' disabled':'')+'>'+['','DIRECT','VIA','THROUGH BL'].map(v=>'<option value="'+esc(v)+'"'+(value===v?' selected':'')+'>'+esc(v||'Select route')+'</option>').join('')+'</select></label>';
     return '<label class="clx81TopCell clx81LiveCell"><span>'+esc(label)+':</span><input type="'+type+'" data-clx81-grid-field="'+esc(key)+'"'+(domain?' data-clx81-master="'+esc(domain)+'" list="clx81-options-'+esc(domain)+'"':'')+(max?' maxlength="'+max+'"':'')+(locked?' disabled':'')+' value="'+esc(String(value||''))+'" oninput="clx81GridChange(this)" autocomplete="off"></label>';
   };
   const topGroup=(title,items)=>'<div class="clx81TopGroup"><div class="clx81RefSubhead">'+title+'</div><div class="clx81TopCells">'+items.map(x=>topCell(x[0],x[1])).join('')+'</div></div>';
@@ -2430,7 +2455,7 @@ async function clx49RenderBooking(tab){
       clx78Field(r,'Vessel','Vessel')+clx78Field(r,'Voyage','Voyage')+
 
       '<div class="clx81GroupTitle">CARGO / EQUIPMENT</div>'+
-      clx81BookingSelect(r,'Cargo Type','Cargo Type',['DG','NON DG','OOG','EMPTY','FLEXI'])+
+      clx81BookingSelect(r,'Cargo Type','Cargo Type',['DG','NON DG','OOG','REEFER','EMPTY','FLEXI'])+'<div class="clx78Field"><button type="button" class="btn" onclick="clx81OpenCargoDetails()">Cargo Details (OOG / Reefer / DG)</button></div>'+
       clx78Field(r,'Commodity','Commodity')+clx78Field(r,'Equipment','Container Size / Type')+clx78Field(r,'Quantity','Quantity')+
       '<details class="clx81Additional"><summary>Additional Booking Details</summary><div class="clx78Fields">'+
       clx78Field(r,'Status','Booking Status')+clx78Field(r,'Approval #','Approval #')+clx78Field(r,'Reference #','Reference #',{review:true})+clx78Field(r,'Sales Person','Sales Person')+
