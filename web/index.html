@@ -180,6 +180,17 @@
 .clx81CommercialSubgrid small{grid-column:1/-1;color:#667085}
 .clx81CommercialSubgrid .clx81TopCell{min-width:0}
 @media(max-width:900px){.clx81ThreeColumnLayout{grid-template-columns:minmax(0,1fr)}.clx81BookingColumn,.clx81CommercialColumn{border-right:0;border-bottom:1px solid #b8c2cf}}
+.clx81BookingMenu{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:3px;padding:4px 0;margin:0 0 4px;position:relative;z-index:8}
+.clx81BookingMenuItem{min-width:0;display:flex;position:relative;border:1px solid #adb8c4;background:#fff}
+.clx81BookingMain{flex:1;min-width:0;padding:5px 3px;border:0;background:transparent;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-size:11px}
+.clx81BookingMain.active{background:#2f6b55;color:white;font-weight:700}
+.clx81BookingDrop{flex:0 0 23px;border-left:1px solid #cbd2da;position:relative}
+.clx81BookingDrop summary{cursor:pointer;list-style:none;text-align:center;padding:4px 0;font-size:13px;line-height:18px}
+.clx81BookingDrop summary::-webkit-details-marker{display:none}
+.clx81BookingDropPanel{position:absolute;right:0;top:100%;z-index:80;min-width:175px;background:white;border:1px solid #aab6c5;box-shadow:0 5px 12px #0002;padding:3px;display:grid;gap:2px}
+.clx81BookingDropPanel button{text-align:left;white-space:nowrap;background:white;border:0;padding:6px 9px;cursor:pointer;font-size:11px}
+.clx81BookingDropPanel button:hover,.clx81BookingDropPanel button:focus-visible{background:#e8f3ed}
+@media(max-width:900px){.clx81BookingMenu{display:flex;overflow-x:auto;padding-bottom:5px}.clx81BookingMenuItem{flex:0 0 135px}}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
@@ -2098,6 +2109,32 @@ function clx81RestoreBookingDraft(w){
     if(el.type==='checkbox')el.checked=clx81BookingDraft.values[name];else el.value=clx81BookingDraft.values[name];
   }
 }
+function clx81BookingDropdownNav(activeTab){
+  const menus=[
+    ['Booking Info',[['Booking Info','main','Booking Info'],['Booking Notes','notes','']]],
+    ['Equipments',[['Equipment Overview','bottom','Equipment']]],
+    ['Charges',[['Agreed Charges','bottom','Agreed Charges'],['Revenue','bottom','Revenue'],['Cost','bottom','Cost'],['Financial Auto','bottom','Financial Auto'],['Preview','bottom','Preview']]],
+    ['Routing',[['Routing Information','main','Routing']]],
+    ['Other Info',[['Other Information','main','Other Info']]],
+    ['BL',[['BL Information','main','BL']]]
+  ];
+  return '<nav class="clx81BookingMenu" aria-label="Booking sections">'+menus.map(([name,items])=>
+    '<div class="clx81BookingMenuItem"><button type="button" class="clx81BookingMain '+(activeTab===name?'active':'')+'" onclick="clx81MainBookingTab(\''+name+'\')">'+name+'</button>'+
+    '<details class="clx81BookingDrop"><summary aria-label="More '+name+' options" title="More '+name+' options">▾</summary><div class="clx81BookingDropPanel">'+
+    items.map(([label,kind,target])=>'<button type="button" onclick="clx81BookingMenuAction(\''+kind+'\',\''+target+'\')">'+label+'</button>').join('')+
+    '</div></details></div>').join('')+'</nav>';
+}
+async function clx81BookingMenuAction(kind,target){
+  document.querySelectorAll('.clx81BookingDrop[open]').forEach(el=>el.open=false);
+  if(kind==='bottom'){clx81SetBottom(target);return;}
+  if(kind==='notes'){
+    await clx81SwitchBookingTab('Booking Info');
+    const notes=document.getElementById('clx81BookingNotes');
+    if(notes){notes.hidden=false;notes.scrollIntoView({block:'nearest'});}
+    return;
+  }
+  await clx81MainBookingTab(target);
+}
 function clx81MainBookingTab(tab){
   if(tab==='Equipments'){clx81SetBottom('Equipment');return;}
   if(tab==='Charges'){clx81SetBottom('Agreed Charges');return;}
@@ -2281,9 +2318,7 @@ async function clx49RenderBooking(tab){
   let html=clx49ContextHeader(w)+clx49Nav(w);
   html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>FULL FLOW</b><span class="muted">'+esc(w.context.booking_ref||r?.external_ref||'')+' · '+esc(w.context.customer_name||'')+' · '+esc(w.context.pol||'')+' → '+esc(w.context.pod||'')+'</span><span class="grow"></span><button class="btn">Master Data</button><button class="btn" onclick="clx49RenderBooking(\''+tab+'\')">Reset View</button>'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+(r?.id||0)+','+(r?.version||1)+')">Save Draft</button>')+'</div>'+
     '<div class="clx78Hint">CLX-081 Booking Master Field Alignment · approved Booking reference layout · current authoritative Booking/Job APIs · Reference # remains REVIEW_LATER.</div>'+
-    '<div class="clx78Tabs">'+[
-      ['Booking Info','Booking Info'],['Equipments','Equipments'],['Charges','Charges'],['Routing','Routing'],['Other Info','Other Info'],['BL','BL']
-    ].map(x=>'<button class="'+(tab===x[0]?'active':'')+'" onclick="clx81MainBookingTab(\''+x[0]+'\')">'+x[1]+'</button>').join('')+'</div>';
+    clx81BookingDropdownNav(tab);
   if(tab==='Booking Info'){
     html+=clx81BookingReferenceGrid(w,r);
     html+='<div class="clx78MainGrid"><div class="clx78Panel"><div class="clx78PanelHead">Basic Info</div><div class="clx78PanelBody"><div class="clx78Fields">'+
