@@ -2438,13 +2438,15 @@ function clx81CalculateOogKillSlots(){
   return {deck,factor:chosen.factor,source:chosen.source,row:chosen.dim+' via '+chosen.row,unresolved:kinds.filter(dim=>!factors.some(x=>x.dim===dim))};
  });
  const totals=results.map(r=>r.factor===null?r.deck+': factor unavailable':r.deck+': '+(qty*r.factor)+' TEUs');
- const breakdown='<div class="clx81KillBreakdown"><b>Calculation Breakdown — '+esc(String(qty))+' × '+esc(spec.size+"' "+spec.type)+'</b>'+
- '<div><strong>Nominal envelope:</strong> '+spec.dimensions.map(n=>esc(n.toFixed(2))).join(' × ')+' m (L × W × H)</div>'+
- '<div><strong>Over-dimensions:</strong> OH '+esc(oh.toFixed(2))+' m · OW '+esc(ow.toFixed(2))+' m · OL '+esc(ol.toFixed(2))+' m</div>'+
- '<div><strong>Applicable:</strong> '+esc(kinds.join(' + ')||'IN GAUGE')+'</div></div>';
- const summary='<div class="clx81KillResultHeadline"><b>Total Slot Kills</b><strong>'+totals.map(t=>esc(t)).join(' &nbsp; | &nbsp; ')+'</strong></div>';
+ const dominant=results.find(r=>r.factor!==null)?.row?.split(' via ')[0]||kinds[0]||'None (In-Gauge)';
+ const breakdown='<div class="clx81KillBreakdown"><h3>Calculation Breakdown for '+esc(String(qty))+' x '+esc(spec.size+"' "+spec.type)+'</h3>'+
+ '<div><strong>Base Envelope Used for '+esc(spec.size+"' "+spec.type)+':</strong> '+spec.dimensions.map((n,i)=>esc(n.toFixed(2))+'m ('+['L','W','H'][i]+')').join(' × ')+'</div>'+
+ '<div><strong>Calculated Over-Dimensions:</strong> OH = '+esc(oh.toFixed(2))+'m, OW = '+esc(ow.toFixed(2))+'m, OL = '+esc(ol.toFixed(2))+'m</div>'+
+ '<div><strong>Dominant Over-Dimension:</strong> '+esc(dominant)+'</div></div>';
  const cols=(x)=>'<td>'+esc(String(x))+'</td>';
- if(out)out.innerHTML=breakdown+summary+'<div class="tablewrap"><table><thead><tr>'+['Units','Container','Stowage','L×W×H (m)','OH (m)','OW (m)','OL (m)','Over-Dimension','Kill/Unit','Killed TEUs','Source'].map(k=>'<th>'+esc(k)+'</th>').join('')+'</tr></thead><tbody>'+results.map(r=>'<tr>'+[qty,spec.size+' '+spec.type,r.deck,dimensions,oh.toFixed(2),ow.toFixed(2),ol.toFixed(2),kinds.join(' + ')||'IN GAUGE',r.factor??'N/A',r.factor===null?'N/A':qty*r.factor,r.source].map(cols).join('')+'</tr>').join('')+'</tbody></table></div><p class="muted">'+esc(results.map(r=>r.deck+': '+(r.factor===null?'No supported factor':qty+' × '+r.factor+' = '+qty*r.factor+' TEU')+' ('+r.row+')'+(r.unresolved?.length?' · Unmapped: '+r.unresolved.join(', '):'')).join(' | '))+'</p>';
+ const rowHtml=r=>'<tr>'+[qty,spec.size+"' "+spec.type,r.deck,dimensions,oh.toFixed(2),ow.toFixed(2),ol.toFixed(2),kinds.join(' + ')||'None',r.factor===null?'N/A':r.factor+' ('+r.source+')',r.factor===null?'N/A':qty*r.factor].map(cols).join('')+'</tr>';
+ if(out)out.innerHTML=breakdown+'<h3>Total Slot Kills:</h3><div class="tablewrap"><table><thead><tr>'+['Units','Container','Stowage','Dimensions (L×W×H)','OH (m)','OW (m)','OL (m)','Over-Dimension','Kill/Unit','Killed TEUs'].map(k=>'<th>'+esc(k)+'</th>').join('')+'</tr></thead><tbody>'+results.map(rowHtml).join('')+'</tbody></table></div><p class="muted">* Reference calculation only. Confirm factor and stowage with carrier before billing or allocation.</p>'+
+ (results.some(r=>r.source==='DERIVED'||r.unresolved?.length)?'<p class="badtext">DERIVED or unmatched dimensions — carrier verification required. '+esc(results.map(r=>r.deck+': '+r.row+(r.unresolved?.length?' · Unmapped: '+r.unresolved.join(', '):'')).join('; '))+'</p>':'');
  const conclusive=results.length===1&&results[0].factor!==null&&!results[0].unresolved?.length;
  if(conclusive){get('OOG Kill Slot Factor').value=String(results[0].factor);get('OOG Killed Slots (TEU)').value=String(qty*results[0].factor);get('OOG Kill Factor Source').value=results[0].source+' — '+results[0].row+(results[0].source==='DERIVED'?' — VERIFY WITH CARRIER':' — CARRIER APPROVAL REQUIRED');}
  if(msg)msg.textContent=results.some(r=>r.source==='DERIVED')?'DERIVED — verify with carrier. Reference calculation only.':'Reference calculation only; confirm factor and stowage with carrier before billing or allocation.';
