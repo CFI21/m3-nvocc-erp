@@ -2443,7 +2443,7 @@ function clx81CalculateOogKillSlots(){
  if(out)out.innerHTML=summary+'<div class="tablewrap"><table><thead><tr>'+['Units','Container','Stowage','L×W×H (m)','OH (m)','OW (m)','OL (m)','Over-Dimension','Kill/Unit','Killed TEUs','Source'].map(k=>'<th>'+esc(k)+'</th>').join('')+'</tr></thead><tbody>'+results.map(r=>'<tr>'+[qty,spec.size+' '+spec.type,r.deck,dimensions,oh.toFixed(2),ow.toFixed(2),ol.toFixed(2),kinds.join(' + ')||'IN GAUGE',r.factor??'N/A',r.factor===null?'N/A':qty*r.factor,r.source].map(cols).join('')+'</tr>').join('')+'</tbody></table></div><p class="muted">'+esc(results.map(r=>r.deck+': '+(r.factor===null?'No supported factor':qty+' × '+r.factor+' = '+qty*r.factor+' TEU')+' ('+r.row+')'+(r.unresolved?.length?' · Unmapped: '+r.unresolved.join(', '):'')).join(' | '))+'</p>';
  const conclusive=results.length===1&&results[0].factor!==null&&!results[0].unresolved?.length;
  if(conclusive){get('OOG Kill Slot Factor').value=String(results[0].factor);get('OOG Killed Slots (TEU)').value=String(qty*results[0].factor);get('OOG Kill Factor Source').value=results[0].source+' — '+results[0].row+(results[0].source==='DERIVED'?' — VERIFY WITH CARRIER':' — CARRIER APPROVAL REQUIRED');}
- say(results.some(r=>r.source==='DERIVED')?'DERIVED — verify with carrier. Reference calculation only.':'Reference calculation only; confirm factor and stowage with carrier before billing or allocation.');
+ if(msg)msg.textContent=results.some(r=>r.source==='DERIVED')?'DERIVED — verify with carrier. Reference calculation only.':'Reference calculation only; confirm factor and stowage with carrier before billing or allocation.';
 }
 function clx81CaptureCargoDetails(){
   if(viewerReadOnly())return;
