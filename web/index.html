@@ -207,7 +207,7 @@
 .clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell input{min-width:0;width:100%}
 .clx81LiveCell{min-width:0}.clx81LiveCell input{background:#fff;border-color:#91b49d}.clx81LiveCell input:focus{outline:1px solid #2f6b55}.clx81LiveCell span{font-weight:600}
 .clx81CargoSection{margin:10px 0;border:1px solid #d4dae2;padding:10px}.clx81CargoSection h4{margin:0 0 8px}.clx81CargoFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.clx81CargoField{display:flex;flex-direction:column;gap:3px;font-size:11px}.clx81CargoField input{height:27px;min-width:0;border:1px solid #c1cad5;padding:3px 6px}@media(max-width:650px){.clx81CargoFields{grid-template-columns:repeat(2,minmax(0,1fr))}}.clx81KillResult{margin-top:10px;padding:10px;border:1px solid #9fbba5;background:#f1f8f2;color:#245337;font-weight:600}.clx81KillResultHeadline{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:8px}.clx81KillResultHeadline strong{font-size:17px}
-</style></head>
+.clx81KillBreakdown{padding:8px 10px;background:#fff;border-left:3px solid #719684;margin-bottom:10px;font-size:12px;line-height:1.8}.clx81KillResult{overflow:auto}.clx81KillResult table{min-width:790px}\n</style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
 const __m3NativeFetch=window.fetch.bind(window);
@@ -2438,9 +2438,13 @@ function clx81CalculateOogKillSlots(){
   return {deck,factor:chosen.factor,source:chosen.source,row:chosen.dim+' via '+chosen.row,unresolved:kinds.filter(dim=>!factors.some(x=>x.dim===dim))};
  });
  const totals=results.map(r=>r.factor===null?r.deck+': factor unavailable':r.deck+': '+(qty*r.factor)+' TEUs');
+ const breakdown='<div class="clx81KillBreakdown"><b>Calculation Breakdown — '+esc(String(qty))+' × '+esc(spec.size+"' "+spec.type)+'</b>'+
+ '<div><strong>Nominal envelope:</strong> '+spec.dimensions.map(n=>esc(n.toFixed(2))).join(' × ')+' m (L × W × H)</div>'+
+ '<div><strong>Over-dimensions:</strong> OH '+esc(oh.toFixed(2))+' m · OW '+esc(ow.toFixed(2))+' m · OL '+esc(ol.toFixed(2))+' m</div>'+
+ '<div><strong>Applicable:</strong> '+esc(kinds.join(' + ')||'IN GAUGE')+'</div></div>';
  const summary='<div class="clx81KillResultHeadline"><b>Total Slot Kills</b><strong>'+totals.map(t=>esc(t)).join(' &nbsp; | &nbsp; ')+'</strong></div>';
  const cols=(x)=>'<td>'+esc(String(x))+'</td>';
- if(out)out.innerHTML=summary+'<div class="tablewrap"><table><thead><tr>'+['Units','Container','Stowage','L×W×H (m)','OH (m)','OW (m)','OL (m)','Over-Dimension','Kill/Unit','Killed TEUs','Source'].map(k=>'<th>'+esc(k)+'</th>').join('')+'</tr></thead><tbody>'+results.map(r=>'<tr>'+[qty,spec.size+' '+spec.type,r.deck,dimensions,oh.toFixed(2),ow.toFixed(2),ol.toFixed(2),kinds.join(' + ')||'IN GAUGE',r.factor??'N/A',r.factor===null?'N/A':qty*r.factor,r.source].map(cols).join('')+'</tr>').join('')+'</tbody></table></div><p class="muted">'+esc(results.map(r=>r.deck+': '+(r.factor===null?'No supported factor':qty+' × '+r.factor+' = '+qty*r.factor+' TEU')+' ('+r.row+')'+(r.unresolved?.length?' · Unmapped: '+r.unresolved.join(', '):'')).join(' | '))+'</p>';
+ if(out)out.innerHTML=breakdown+summary+'<div class="tablewrap"><table><thead><tr>'+['Units','Container','Stowage','L×W×H (m)','OH (m)','OW (m)','OL (m)','Over-Dimension','Kill/Unit','Killed TEUs','Source'].map(k=>'<th>'+esc(k)+'</th>').join('')+'</tr></thead><tbody>'+results.map(r=>'<tr>'+[qty,spec.size+' '+spec.type,r.deck,dimensions,oh.toFixed(2),ow.toFixed(2),ol.toFixed(2),kinds.join(' + ')||'IN GAUGE',r.factor??'N/A',r.factor===null?'N/A':qty*r.factor,r.source].map(cols).join('')+'</tr>').join('')+'</tbody></table></div><p class="muted">'+esc(results.map(r=>r.deck+': '+(r.factor===null?'No supported factor':qty+' × '+r.factor+' = '+qty*r.factor+' TEU')+' ('+r.row+')'+(r.unresolved?.length?' · Unmapped: '+r.unresolved.join(', '):'')).join(' | '))+'</p>';
  const conclusive=results.length===1&&results[0].factor!==null&&!results[0].unresolved?.length;
  if(conclusive){get('OOG Kill Slot Factor').value=String(results[0].factor);get('OOG Killed Slots (TEU)').value=String(qty*results[0].factor);get('OOG Kill Factor Source').value=results[0].source+' — '+results[0].row+(results[0].source==='DERIVED'?' — VERIFY WITH CARRIER':' — CARRIER APPROVAL REQUIRED');}
  if(msg)msg.textContent=results.some(r=>r.source==='DERIVED')?'DERIVED — verify with carrier. Reference calculation only.':'Reference calculation only; confirm factor and stowage with carrier before billing or allocation.';
