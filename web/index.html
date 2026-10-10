@@ -2350,10 +2350,22 @@ function clx81OpenCargoDetails(){
   const conditionNotice='<div class="equipNote">'+esc(conditions[cargo]||'Select DG, REEFER or OOG in Cargo Type first. Commodity must be selected from the active Commodity Master.')+'</div>';
   const killWidget=cargo==='OOG'?'<div id="clx81KillSlotResults"></div><div class="toolbar"><button type="button" class="btn" onclick="clx81CalculateOogKillSlots()">Calculate Kill Slots (Reference Only)</button><span class="muted" id="clx81KillSlotMessage">Carrier approval required for any final slot or charge allocation.</span></div>':'';
   const calculatedKeys=['OOG Overlength (mm)','OOG Overwidth (mm)','OOG Overheight (mm)'];
-  const panel=groups.map(([kind,rows])=>'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>calculatedKeys.includes(key)?'<label class="clx81CargoField"><span>'+esc(label)+' — auto</span><input readonly data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"></label>':input(key,label)).join('')+'</div></section>').join('');
+  const oogCompact=()=>{
+    const hidden=['OOG Overlength (mm)','OOG Overwidth (mm)','OOG Overheight (mm)','OOG Kill Slot Factor','OOG Killed Slots (TEU)','OOG Kill Factor Source','OOG Full Void'];
+    const hiddenFields=hidden.map(k=>'<input type="hidden" data-clx81-cargo="'+esc(k)+'" value="'+esc(read(k))+'">').join('');
+    const dims=['Length','Width','Height'].map(axis=>'<label class="clx81CargoField"><span>'+axis+' (m)</span><input type="number" min="0.01" step="0.01" data-clx81-oog-metres="'+axis+'" value="'+esc(read('OOG '+axis+' (mm)')?String(Number(read('OOG '+axis+' (mm)'))/1000):'')+'"'+(viewerReadOnly()?' disabled':'')+'></label>').join('');
+    return '<section class="clx81CargoSection"><h4>Slot Kill Calculator</h4><div class="clx81CargoFields">'+input('OOG Units','Units')+input('OOG Equipment Type','Container (e.g. 40 FR)')+dims+input('OOG Stowage','Stowage (optional: ON DECK / UNDER DECK)')+'</div>'+hiddenFields+'<p class="muted">Enter secured cargo dimensions in metres. Blank stowage calculates both. Full Void or collapsed end walls require carrier review.</p></section>';
+  };
+  const panel=groups.map(([kind,rows])=>kind==='OOG'?oogCompact():'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>calculatedKeys.includes(key)?'<label class="clx81CargoField"><span>'+esc(label)+' — auto</span><input readonly data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"></label>':input(key,label)).join('')+'</div></section>').join('');
   clx81PrincipalOverlay('Booking Cargo Details — '+(cargo||'Select Cargo Type'),'<p class="muted">Cargo details are attached to the existing Booking Draft. Use Save Draft on Booking to persist. Verify operational acceptance before using in production.</p>'+conditionNotice+panel+killWidget+'<div class="toolbar"><button type="button" class="btn primary" onclick="clx81CaptureCargoDetails()">Apply to Booking Draft</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\')?.remove()">Cancel</button></div>');
   if(cargo==='OOG'){
-    document.querySelectorAll('[data-clx81-cargo="OOG Length (mm)"],[data-clx81-cargo="OOG Width (mm)"],[data-clx81-cargo="OOG Height (mm)"],[data-clx81-cargo="OOG Equipment Type"]').forEach(el=>el.addEventListener('input',clx81RecalculateOverDimensions));
+    document.querySelectorAll('[data-clx81-oog-metres]').forEach(el=>el.addEventListener('input',()=>{
+      const axis=el.dataset.clx81OogMetres,other=document.querySelector('[data-clx81-cargo="OOG '+axis+' (mm)"]');
+      if(other)other.value=el.value?String(Number(el.value)*1000):'';
+      clx81RecalculateOverDimensions();
+    }));
+    document.querySelector('[data-clx81-cargo="OOG Equipment Type"]')?.addEventListener('input',clx81RecalculateOverDimensions);
+    document.querySelectorAll('[data-clx81-oog-metres]').forEach(el=>{const other=document.createElement('input');other.type='hidden';other.dataset.clx81Cargo='OOG '+el.dataset.clx81OogMetres+' (mm)';other.value=el.value?String(Number(el.value)*1000):'';el.insertAdjacentElement('afterend',other)});
     clx81RecalculateOverDimensions();
   }
 }
@@ -2397,7 +2409,7 @@ function clx81CalculateOogKillSlots(){
  const oh=Number(value('OOG Overheight (mm)'))/1000,ow=Number(value('OOG Overwidth (mm)'))/1000,ol=Number(value('OOG Overlength (mm)'))/1000;
  const dimensions=['Length','Width','Height'].map(x=>(Number(value('OOG '+x+' (mm)'))/1000).toFixed(2)).join(' × ');
  const full=value('OOG Full Void');
- if(full!=='YES'&&full!=='NO')return say('Confirm whether Full Void or collapsed end walls apply (YES / NO).');
+ if(full==='YES')say('Full Void indicated: carrier verification required.');
  const table={'UNDER DECK':{'20 OT':{OH:2},'20 FR':{OH:3,OW:6},'40 FR':{OH:6,OW:12,FV:4}},'ON DECK':{'20 OT':{OH:3},'20 FR':{OH:3,OW:6},'40 FR':{OH:6,OW:12,FV:22}}};
  const kinds=[...(oh>0?['OH']:[]),...(ow>0?['OW']:[]),...(ol>0?['OL']:[]),...(full==='YES'?['FV']:[])];
  const positions=value('OOG Stowage')==='ON DECK'?['ON DECK']:value('OOG Stowage')==='UNDER DECK'?['UNDER DECK']:['ON DECK','UNDER DECK'];
