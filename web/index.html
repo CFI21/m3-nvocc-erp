@@ -205,6 +205,7 @@
 .clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell{min-width:0;display:flex;flex-direction:column;align-items:stretch;gap:1px}
 .clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell span{font-size:9px;max-width:none}
 .clx81DetailsGroup .clx81DetailRow:has(.clx81TopCell:nth-child(4)) .clx81TopCell input{min-width:0;width:100%}
+.clx81LiveCell{min-width:0}.clx81LiveCell input{background:#fff;border-color:#91b49d}.clx81LiveCell input:focus{outline:1px solid #2f6b55}.clx81LiveCell span{font-weight:600}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
@@ -2112,7 +2113,8 @@ function clx81CaptureBookingDraft(){
   if(!record||!fields.length)return;
   const key=String(w.context?.job_ref||'')+':'+String(record.id||'');
   if(clx81BookingDraft?.key!==key)clx81BookingDraft={key,values:{}};
-  for(const el of fields)clx81BookingDraft.values[el.dataset.clx49Field]=el.type==='checkbox'?el.checked:el.value;
+  for(const el of fields){const k=el.dataset.clx49Field;if(!Object.prototype.hasOwnProperty.call(clx81BookingDraft.values,k))clx81BookingDraft.values[k]=el.type==='checkbox'?el.checked:el.value;}
+  for(const el of document.querySelectorAll('.clx78Workspace [data-clx81-grid-field]'))clx81BookingDraft.values[el.dataset.clx81GridField]=el.value;
 }
 function clx81RestoreBookingDraft(w){
   const record=w?.booking,key=String(w?.context?.job_ref||'')+':'+String(record?.id||'');
@@ -2298,6 +2300,21 @@ function clx81PrincipalOpenEquipment(){
   document.getElementById('clx81PrincipalOverlay')?.remove();
   clx81SetBottom('Equipment');
 }
+function clx81GridChange(el){
+  if(viewerReadOnly())return;
+  const key=el.dataset.clx81GridField;
+  const w=clx49Workspace,r=w?.booking;
+  if(!key||!r)return;
+  const draftKey=String(w.context?.job_ref||'')+':'+String(r.id||'');
+  if(clx81BookingDraft?.key!==draftKey)clx81BookingDraft={key:draftKey,values:{}};
+  clx81BookingDraft.values[key]=el.value;
+  for(const other of document.querySelectorAll('.clx78Workspace [data-clx49-field]')){
+    if(other.dataset.clx49Field===key&&other!==el){other.value=el.value;}
+  }
+  for(const other of document.querySelectorAll('.clx78Workspace [data-clx81-grid-field]')){
+    if(other.dataset.clx81GridField===key&&other!==el)other.value=el.value;
+  }
+}
 function clx81BookingReferenceGrid(w,r){
   const p=r?.fields||{},ref=String(w.context?.booking_ref||r?.external_ref||p['Booking No.']||'—');
   const val=(k,fallback='')=>String(p[k]||fallback||'');
@@ -2305,7 +2322,13 @@ function clx81BookingReferenceGrid(w,r){
   const cells=[ref,String(w.context?.customer_name||''),val('POL',w.context?.pol),val('POD',w.context?.pod),val('Route Type'),val('Cargo Type'),String(r?.status||p.Status||'')];
   const headings=['Booking Ref','Customer','POL','POD','Route Type','Cargo Type','Status'];
   const panel=(title,body)=>'<div class="clx81RefSummary"><div class="clx81RefSubhead">'+title+'</div><div class="clx81RefSummaryFields">'+body+'</div></div>';
-  const topCell=(label,value)=>'<label class="clx81TopCell"><span>'+esc(label)+'</span><input readonly value="'+esc(String(value||''))+'"></label>';
+  const liveKeys={'Route':'Route Type','Cost Center':'Cost Center','Shipper':'Shipper','Consignee':'Consignee','POL Code + Name':'POL','POL Agent Code + Name':'POL Agent','POD Code + Name':'POD','POD Agent Code + Name':'POD Agent','POT Code + Name':'POT (1)','POT Agent Code + Name':'POT Agent','Vessel':'Vessel','Voyage':'Voyage','ETD':'Sailing Date','Cutoff':'SI Cut-off','Commodity':'Commodity','Cargo Type':'Cargo Type','Principal':'Principal','Billing Party':'Billing Party','Currency':'Currency'};
+  const topCell=(label,value)=>{
+    const key=liveKeys[label],locked=viewerReadOnly();
+    if(!key)return '<label class="clx81TopCell"><span>'+esc(label)+'</span><input readonly value="'+esc(String(value||''))+'"></label>';
+    const domain=clx81MasterDomains[key]||'',type=(label==='ETD'||label==='Cutoff')?'date':'text',max=label==='Vessel'?7:label==='Voyage'?8:undefined;
+    return '<label class="clx81TopCell clx81LiveCell"><span>'+esc(label)+':</span><input type="'+type+'" data-clx81-grid-field="'+esc(key)+'"'+(domain?' data-clx81-master="'+esc(domain)+'" list="clx81-options-'+esc(domain)+'"':'')+(max?' maxlength="'+max+'"':'')+(locked?' disabled':'')+' value="'+esc(String(value||''))+'" oninput="clx81GridChange(this)" autocomplete="off"></label>';
+  };
   const topGroup=(title,items)=>'<div class="clx81TopGroup"><div class="clx81RefSubhead">'+title+'</div><div class="clx81TopCells">'+items.map(x=>topCell(x[0],x[1])).join('')+'</div></div>';
   const topLeft=[['BK Date',val('BK Date',val('Booking Date'))],['BK #',val('BK #',ref)],['Approval #',val('Approval #')],['Job #',val('Job #',val('Job Ref'))],['Currency',val('Currency')],['Inv Type',val('Inv Type')]];
   const topRight=[['Reference',val('Reference',val('Reference #'))],['Job Category',val('Job Category')],['Inv Type',val('Inv Type')],['SOA #',val('SOA #')],['Status',val('Status',r?.status)],['Settled / Un-Settled',val('Settlement Status')]];
@@ -2476,6 +2499,7 @@ async function saveClx049Tab(module,id,version){
   try{
     if(module==='booking'&&!clx81ValidateMasterFields())return;
     if(module==='booking')document.querySelectorAll('.clx78Workspace [data-clx81-master]').forEach(el=>{el.value=clx81MasterStoredValue(el)});
+    if(module==='booking')clx81CaptureBookingDraft();
     const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):el.value);
     if(module==='booking'&&clx81BookingDraft?.key===String(clx49Workspace?.context?.job_ref||'')+':'+String(id))Object.assign(fields,Object.fromEntries(Object.entries(clx81BookingDraft.values).map(([k,v])=>[k,typeof v==='boolean'?(v?'true':'false'):(clx81MasterDomains[k]?(clx81MasterCache[clx81MasterDomains[k]]||[]).find(r=>v===r.code+' — '+r.name)?.code||v:v)])));
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
