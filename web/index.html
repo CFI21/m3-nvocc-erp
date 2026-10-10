@@ -2338,7 +2338,7 @@ function clx81OpenCargoDetails(){
   const cargo=String(liveCargo||read('Cargo Type')).toUpperCase();
   const input=(key,label,type='text')=>'<label class="clx81CargoField"><span>'+esc(label)+'</span><input type="'+type+'" data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"'+(viewerReadOnly()?' disabled':'')+'></label>';
   const groups=[
-    ['OOG', [['OOG Length (mm)','Length (mm)'],['OOG Width (mm)','Width (mm)'],['OOG Height (mm)','Height (mm)'],['OOG Overlength (mm)','Overlength (mm)'],['OOG Overwidth (mm)','Overwidth (mm)'],['OOG Overheight (mm)','Overheight (mm)'],['OOG Units','OOG units'],['OOG Equipment Type','Equipment type (20 OT / 20 FR / 40 FR)'],['OOG Stowage','Stowage (ON DECK / UNDER DECK)'],['OOG Kill Slot Factor','Approved kill factor (TEU/unit)'],['OOG Killed Slots (TEU)','Total killed TEU'],['OOG Kill Factor Source','Factor approval / carrier quotation']]],
+    ['OOG', [['OOG Length (mm)','Length (mm)'],['OOG Width (mm)','Width (mm)'],['OOG Height (mm)','Height (mm)'],['OOG Overlength (mm)','Overlength (mm)'],['OOG Overwidth (mm)','Overwidth (mm)'],['OOG Overheight (mm)','Overheight (mm)'],['OOG Units','OOG units'],['OOG Equipment Type','Equipment type (20 OT / 20 FR / 40 FR)'],['OOG Stowage','Stowage (ON DECK / UNDER DECK)'],['OOG Kill Slot Factor','Approved kill factor (TEU/unit)'],['OOG Killed Slots (TEU)','Total killed TEU'],['OOG Kill Factor Source','Factor approval / carrier quotation'],['OOG Full Void','Full Void / collapsed end walls (YES / NO)']]],
     ['REEFER',[['Reefer Temperature (C)','Set temperature (°C)'],['Reefer Ventilation','Ventilation'],['Reefer Humidity (%)','Humidity (%)'],['Reefer Commodity','Commodity / product'],['Reefer Monitoring','Monitoring requirements']]],
     ['DG',[['DG UN Number','UN number'],['DG IMO Class','IMO / IMDG class'],['DG Subsidiary Risk','Subsidiary risk class'],['DG Proper Shipping Name','Proper shipping name'],['DG Packing Group','Packing group'],['DG Flash Point (C)','Flash point (°C)'],['DG Marine Pollutant','Marine pollutant'],['DG Limited Quantity','Limited quantity'],['DG Net Quantity','Net dangerous goods quantity'],['DG Emergency Contact','Emergency contact'],['DG Emergency Phone','Emergency telephone'],['DG Technical Name','Technical name (if required)'],['DG Segregation Requirements','Segregation / stowage instructions']]]
   ];
@@ -2348,7 +2348,7 @@ function clx81OpenCargoDetails(){
     OOG:'OOG: record dimensions in millimetres; verify equipment limits, over-dimensions, weight, lashing and carrier acceptance.'
   };
   const conditionNotice='<div class="equipNote">'+esc(conditions[cargo]||'Select DG, REEFER or OOG in Cargo Type first. Commodity must be selected from the active Commodity Master.')+'</div>';
-  const killWidget=cargo==='OOG'?'<div class="toolbar"><button type="button" class="btn" onclick="clx81CalculateOogKillSlots()">Calculate Kill Slots (Reference Only)</button><span class="muted" id="clx81KillSlotMessage">Carrier approval required for any final slot or charge allocation.</span></div>':'';
+  const killWidget=cargo==='OOG'?'<div id="clx81KillSlotResults"></div><div class="toolbar"><button type="button" class="btn" onclick="clx81CalculateOogKillSlots()">Calculate Kill Slots (Reference Only)</button><span class="muted" id="clx81KillSlotMessage">Carrier approval required for any final slot or charge allocation.</span></div>':'';
   const calculatedKeys=['OOG Overlength (mm)','OOG Overwidth (mm)','OOG Overheight (mm)'];
   const panel=groups.map(([kind,rows])=>'<section class="clx81CargoSection" '+(cargo&&(kind!==cargo)?'hidden':'')+'><h4>'+esc(kind==='DG'?'Dangerous Goods':kind==='REEFER'?'Reefer Cargo':'OOG / Oversized Cargo')+'</h4><div class="clx81CargoFields">'+rows.map(([key,label])=>calculatedKeys.includes(key)?'<label class="clx81CargoField"><span>'+esc(label)+' — auto</span><input readonly data-clx81-cargo="'+esc(key)+'" value="'+esc(read(key))+'"></label>':input(key,label)).join('')+'</div></section>').join('');
   clx81PrincipalOverlay('Booking Cargo Details — '+(cargo||'Select Cargo Type'),'<p class="muted">Cargo details are attached to the existing Booking Draft. Use Save Draft on Booking to persist. Verify operational acceptance before using in production.</p>'+conditionNotice+panel+killWidget+'<div class="toolbar"><button type="button" class="btn primary" onclick="clx81CaptureCargoDetails()">Apply to Booking Draft</button><button type="button" class="btn" onclick="document.getElementById(\'clx81PrincipalOverlay\')?.remove()">Cancel</button></div>');
@@ -2357,42 +2357,77 @@ function clx81OpenCargoDetails(){
     clx81RecalculateOverDimensions();
   }
 }
+function clx81OogSpec(raw){
+ const normalized=String(raw||'').toUpperCase().replace(/['’]/g,'').replace(/\\bFT\\b/g,'').replace(/[-_]/g,' ').trim();
+ const size=normalized.match(/^(20|40|45)\\s*/)?.[1];
+ const code=normalized.replace(/^(20|40|45)\\s*/,'').trim();
+ const types={DV:'GP',ST:'GP',HQ:'HC'};
+ const type=types[code]||code;
+ const specs={'20':{GP:[6.06,2.44,2.59],HC:[6.06,2.44,2.90],OT:[6.06,2.44,2.59],FR:[6.06,2.44,2.59],PF:[6.06,2.44,.60]},
+ '40':{GP:[12.19,2.44,2.59],HC:[12.19,2.44,2.90],OT:[12.19,2.44,2.59],FR:[12.19,2.44,2.59],PF:[12.19,2.44,.60]},
+ '45':{HC:[13.56,2.44,2.90]}};
+ return {size,type,dimensions:specs[size]?.[type]||null};
+}
 function clx81RecalculateOverDimensions(){
  const get=k=>document.querySelector('[data-clx81-cargo="'+k+'"]');
- const kind=String(get('OOG Equipment Type')?.value||'').trim().toUpperCase();
- // Provisional 20-foot TEU slot envelope from supplied reference; 40-foot requires an approved per-equipment envelope.
- const reference=kind==='20 OT'||kind==='20 FR'?[6000,2400,2400]:null;
+ const spec=clx81OogSpec(get('OOG Equipment Type')?.value);
  const msg=document.getElementById('clx81KillSlotMessage');
- for(const [i,axis] of ['Length','Width','Height'].entries()){
+ let valid=!!spec.dimensions;
+ ['Length','Width','Height'].forEach((axis,i)=>{
   const result=get('OOG Over'+axis.toLowerCase()+' (mm)');
-  if(!result)continue;
   const raw=String(get('OOG '+axis+' (mm)')?.value||'').trim();
   const n=Number(raw);
-  result.value=reference&&raw!==''&&Number.isFinite(n)&&n>=0?String(Math.max(0,n-reference[i])):'';
- }
- for(const k of ['OOG Kill Slot Factor','OOG Killed Slots (TEU)','OOG Kill Factor Source']){const el=get(k);if(el)el.value='';}
- if(msg)msg.textContent=reference?'Over-dimensions calculated against provisional 6000 × 2400 × 2400 mm 20-foot reference. Confirm equipment limits.':'Select an approved 20-foot reference. For 40-foot or other equipment, approved dimensional limits are required.';
+  if(!result)return;
+  if(!spec.dimensions||!raw||!Number.isFinite(n)||n<=0){result.value='';valid=false;return;}
+  result.value=String(Math.round(Math.max(0,n-spec.dimensions[i]*1000)*10)/10);
+ });
+ ['OOG Kill Slot Factor','OOG Killed Slots (TEU)','OOG Kill Factor Source'].forEach(k=>{if(get(k))get(k).value='';});
+ const out=document.getElementById('clx81KillSlotResults');if(out)out.innerHTML='';
+ if(msg)msg.textContent=!spec.dimensions?'Enter a supported size and type (e.g. 20 FR, 40 FR, 20 OT, 40 HC).':valid?'Over-dimensions auto-calculated from '+spec.size+' '+spec.type+' nominal envelope. Click Calculate Kill Slots.':'Enter positive secured cargo dimensions (mm) for all three axes.';
+ return valid;
 }
 function clx81CalculateOogKillSlots(){
  const get=k=>document.querySelector('[data-clx81-cargo="'+k+'"]');
  const value=k=>String(get(k)?.value||'').trim().toUpperCase();
- const qty=Number(value('OOG Units')),kind=value('OOG Equipment Type'),deck=value('OOG Stowage');
- clx81RecalculateOverDimensions();
- const overW=Number(value('OOG Overwidth (mm)')),overH=Number(value('OOG Overheight (mm)')),overL=Number(value('OOG Overlength (mm)'));
- const msg=document.getElementById('clx81KillSlotMessage');
+ const qty=Number(value('OOG Units')),spec=clx81OogSpec(value('OOG Equipment Type'));
+ const msg=document.getElementById('clx81KillSlotMessage'),out=document.getElementById('clx81KillSlotResults');
  const say=t=>{if(msg)msg.textContent=t;};
+ if(!clx81RecalculateOverDimensions())return;
+ if(!Number.isSafeInteger(qty)||qty<1)return say('Enter a positive whole number of units.');
+ const oh=Number(value('OOG Overheight (mm)'))/1000,ow=Number(value('OOG Overwidth (mm)'))/1000,ol=Number(value('OOG Overlength (mm)'))/1000;
+ const dimensions=['Length','Width','Height'].map(x=>(Number(value('OOG '+x+' (mm)'))/1000).toFixed(2)).join(' × ');
+ const full=value('OOG Full Void');
+ if(full!=='YES'&&full!=='NO')return say('Confirm whether Full Void or collapsed end walls apply (YES / NO).');
  const table={'UNDER DECK':{'20 OT':{OH:2},'20 FR':{OH:3,OW:6},'40 FR':{OH:6,OW:12,FV:4}},'ON DECK':{'20 OT':{OH:3},'20 FR':{OH:3,OW:6},'40 FR':{OH:6,OW:12,FV:22}}};
- if(!Number.isInteger(qty)||qty<1)return say('Enter a valid positive whole number of OOG units.');
- if(!get('OOG Equipment Type')?.value||!get('OOG Stowage')?.value)return say('Enter equipment type and stowage first.');
- const types=[overL>0,overW>0,overH>0].filter(Boolean).length;
- if(types!==1)return say('Combined over-dimensions or full void require approved carrier factor; do not automatically apply an OH-only or OW-only row.');
- const dimension=overH>0?'OH':overW>0?'OW':'OL';
- const factor=table[deck]?.[kind]?.[dimension];
- if(!factor)return say('No reference factor for this configuration. Obtain carrier-approved stowage quotation.');
- get('OOG Kill Slot Factor').value=String(factor);
- get('OOG Killed Slots (TEU)').value=String(qty*factor);
- get('OOG Kill Factor Source').value='REFERENCE ONLY — CARRIER APPROVAL REQUIRED';
- say('Reference estimate: '+(qty*factor)+' killed TEUs ('+qty+' × '+factor+'). Not approved for pricing or allocation.');
+ const kinds=[...(oh>0?['OH']:[]),...(ow>0?['OW']:[]),...(ol>0?['OL']:[]),...(full==='YES'?['FV']:[])];
+ const positions=value('OOG Stowage')==='ON DECK'?['ON DECK']:value('OOG Stowage')==='UNDER DECK'?['UNDER DECK']:['ON DECK','UNDER DECK'];
+ const find=(deck,dim)=>{
+  const same=table[deck]?.[spec.size+' '+spec.type]?.[dim];
+  if(same!==undefined)return {factor:same,source:'TABLE',row:spec.size+' '+spec.type};
+  const priorities={FR:['OT','GP'],OT:['FR','GP'],GP:['OT','FR'],HC:['GP','OT','FR'],PF:['FR','OT','GP'],RF:['GP','OT','FR'],TK:['GP','OT','FR']};
+  for(const t of priorities[spec.type]||['FR','OT','GP']){
+   const v=table[deck]?.[spec.size+' '+t]?.[dim];
+   if(v!==undefined)return {factor:v,source:'DERIVED',row:spec.size+' '+t};
+  }
+  for(const z of (spec.size==='20'?['40']:['20'])){
+   const v=table[deck]?.[z+' '+spec.type]?.[dim];
+   if(v!==undefined)return {factor:v,source:'DERIVED',row:z+' '+spec.type};
+  }
+  return null;
+ };
+ const results=positions.map(deck=>{
+  if(!kinds.length)return {deck,factor:0,source:'TABLE',row:'IN GAUGE'};
+  const factors=kinds.map(dim=>({dim,...find(deck,dim)})).filter(x=>Number.isFinite(x.factor));
+  if(!factors.length)return {deck,factor:null,source:'UNAVAILABLE',row:'No factor for '+kinds.join(' + ')};
+  factors.sort((a,b)=>b.factor-a.factor);
+  const chosen=factors[0];
+  return {deck,factor:chosen.factor,source:chosen.source,row:chosen.dim+' via '+chosen.row,unresolved:kinds.filter(dim=>!factors.some(x=>x.dim===dim))};
+ });
+ const cols=(x)=>'<td>'+esc(String(x))+'</td>';
+ if(out)out.innerHTML='<div class="tablewrap"><table><thead><tr>'+['Units','Container','Stowage','L×W×H (m)','OH (m)','OW (m)','OL (m)','Over-Dimension','Kill/Unit','Killed TEUs','Source'].map(k=>'<th>'+esc(k)+'</th>').join('')+'</tr></thead><tbody>'+results.map(r=>'<tr>'+[qty,spec.size+' '+spec.type,r.deck,dimensions,oh.toFixed(2),ow.toFixed(2),ol.toFixed(2),kinds.join(' + ')||'IN GAUGE',r.factor??'N/A',r.factor===null?'N/A':qty*r.factor,r.source].map(cols).join('')+'</tr>').join('')+'</tbody></table></div><p class="muted">'+esc(results.map(r=>r.deck+': '+(r.factor===null?'No supported factor':qty+' × '+r.factor+' = '+qty*r.factor+' TEU')+' ('+r.row+')'+(r.unresolved?.length?' · Unmapped: '+r.unresolved.join(', '):'')).join(' | '))+'</p>';
+ const conclusive=results.length===1&&results[0].factor!==null&&!results[0].unresolved?.length;
+ if(conclusive){get('OOG Kill Slot Factor').value=String(results[0].factor);get('OOG Killed Slots (TEU)').value=String(qty*results[0].factor);get('OOG Kill Factor Source').value=results[0].source+' — '+results[0].row+(results[0].source==='DERIVED'?' — VERIFY WITH CARRIER':' — CARRIER APPROVAL REQUIRED');}
+ say(results.some(r=>r.source==='DERIVED')?'DERIVED — verify with carrier. Reference calculation only.':'Reference calculation only; confirm factor and stowage with carrier before billing or allocation.');
 }
 function clx81CaptureCargoDetails(){
   if(viewerReadOnly())return;
