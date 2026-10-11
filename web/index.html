@@ -851,13 +851,22 @@ async function renderHoPrincipalSetup(){
       const a=agg.get(code);a.containers++;
       if(x.branch_code)a.branches.add(x.branch_code);if(x.office_code)a.offices.add(x.office_code);if(x.agent_code)a.agents.add(x.agent_code);if(x.equipment_status)a.statuses.add(x.equipment_status);
     }
+    // Include approved Principal parties even when they have no container assignments yet.
+    // This is a master directory, not only an equipment-count report.
+    for(const p of (parties||[])){
+      const role=String(p.payload?.party_type||'').toUpperCase();
+      const roles=Array.isArray(p.payload?.party_roles)?p.payload.party_roles.map(x=>String(x).toUpperCase()):[];
+      if(role!=='PRINCIPAL'&&!roles.includes('PRINCIPAL'))continue;
+      const code=String(p.record_key||'').trim();if(!code||agg.has(code))continue;
+      agg.set(code,{principal_code:code,containers:0,branches:new Set(),offices:new Set(),agents:new Set(),statuses:new Set()});
+    }
     const rows=[...agg.values()].map(a=>{const p=byCode.get(a.principal_code),payload=p?.payload||{};return {
       code:a.principal_code,name:p?.display_name||payload.name||'—',party_status:p?.status||'UNMATCHED',
       containers:a.containers,branches:[...a.branches].join(', '),offices:[...a.offices].join(', '),agents:[...a.agents].join(', '),container_status:[...a.statuses].join(', ')
     }});
     $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Principle Setup</b><span class="muted">Authoritative Common Parties + scoped Container Master principal_code. Changes remain on the existing Master Data maker-checker path.</span><span class="grow"></span><button class="btn primary" onclick="openScreen(\'master-data::common-partys\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Principle Setup · Common Parties\'})">Manage Common Parties</button></div></div>'+
       '<div class="tablewrap"><table><thead><tr><th>Principal Code</th><th>Name</th><th>Party Status</th><th>Containers</th><th>Branches</th><th>Offices</th><th>Agents</th><th>Container Status</th></tr></thead><tbody>'+
-      (rows.length?rows.map(r=>'<tr><td><b>'+esc(r.code)+'</b></td><td>'+esc(r.name)+'</td><td>'+esc(r.party_status)+'</td><td>'+esc(r.containers)+'</td><td>'+esc(r.branches)+'</td><td>'+esc(r.offices)+'</td><td>'+esc(r.agents)+'</td><td>'+esc(r.container_status)+'</td></tr>').join(''):'<tr><td colspan="8" class="muted">No principal-linked containers are visible in the current authorized scope.</td></tr>')+
+      (rows.length?rows.map(r=>'<tr><td><b>'+esc(r.code)+'</b></td><td>'+esc(r.name)+'</td><td>'+esc(r.party_status)+'</td><td>'+esc(r.containers)+'</td><td>'+esc(r.branches)+'</td><td>'+esc(r.offices)+'</td><td>'+esc(r.agents)+'</td><td>'+esc(r.container_status)+'</td></tr>').join(''):'<tr><td colspan="8" class="muted">No Principal party or principal-linked containers are visible in the current authorized scope.</td></tr>')+
       '</tbody></table></div>';
   }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Principle Setup load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
