@@ -2430,8 +2430,8 @@ function clx81EquipmentSelectionPanel(req){
  '<label>Size'+sel('clx81EqSize',sizes,size)+'</label><label>Type'+sel('clx81EqType',types,type)+'</label>'+
  '<label>Quantity<input id="clx81EqQty" type="number" min="1" max="9999" step="1" maxlength="4" value="'+esc(String(req?.quantity||1))+'" oninput="if(this.value.length>4)this.value=this.value.slice(0,4);clx81UpdateEquipmentMetrics()"></label>'+
  '<label>Shipment Type'+sel('clx81ShipmentType',[['FCL','FCL'],['LCL','LCL']],'FCL')+'</label>'+
- inp('clx81EqGross','Gross Weight','')+
- inp('clx81EqPackages','Package','')+
+ '<label>Gross Weight<input id="clx81EqGross" type="text" inputmode="decimal" autocomplete="off" value="" oninput="clx81UpdateEquipmentMetrics()"></label>'+
+ '<label>Package<input id="clx81EqPackages" type="text" inputmode="numeric" autocomplete="off" value="" oninput="clx81UpdateEquipmentMetrics()"></label>'+
  '<label>Unit'+sel('clx81EqPackageUnit',[['CARTON','Carton'],['PALLET','Pallet'],['CRATE','Crate'],['BAG','Bag'],['DRUM','Drum']],'CARTON')+'</label>'+
  '<label>TEUs<input id="clx81EqTEU" readonly></label></div>'+
  '<details class="clx81EquipmentMore" id="clx81LclCargoDetails" hidden><summary>Additional Cargo / W-M Calculations</summary><div class="clx81CargoFields">'+
@@ -2456,6 +2456,7 @@ function clx81UpdateEquipmentMetrics(){
  const notes=[];
  if(!good)notes.push('Enter positive whole-number equipment quantity.');
  if(v('clx81EqGross')&&(!Number.isFinite(weightKg)||weightKg<0))notes.push('Enter valid gross weight.');
+ if(v('clx81EqPackages').trim()&&(!Number.isSafeInteger(n('clx81EqPackages'))||n('clx81EqPackages')<0))notes.push('Package must be a non-negative whole number.');
  if(lcl&&cbm===null)notes.push('Enter positive cargo L/W/H and item quantity to calculate CBM.');
  if(v('clx81EqGross'))notes.push('Maximum gross mass / VGM must be checked against approved equipment type and unit plate before release.');
  if(size==='10'||size==='53')notes.push('Non-standard TEU factor is indicative; verify tariff/operational rule.');
