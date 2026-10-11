@@ -291,6 +291,7 @@ for(const d of state.menu){let subHtml='';let dcount=0;for(const sub of d.submen
     {label:'Special Detention',mrg:'SPECIAL_DETENTION',target:'master-data::charge-codes'},
     {label:'MRG MTY Storage',mrg:'MTY_STORAGE',target:'master-data::charge-codes'},
     {label:'Slot Rate',slot:true,target:'master-data::charge-codes'},
+    {label:'Invoice Titles',workspace:'invoice-titles',target:'master-data::document-types'},
     {label:'Stamps',workspace:'stamps',target:'master-data::configurations'},
     {label:'Vessel',target:'master-data::vessels'},
     {label:'Agent',target:'master-data::agents'},
@@ -586,6 +587,7 @@ async function openHoGovernedSetup(workspace,label,target){
   if(workspace==='principal-setup')await renderHoPrincipalSetup();
   else if(workspace==='investor-setup')await renderHoInvestorSetup();
   else if(workspace==='pa-parties')await renderHoPaParties();
+  else if(workspace==='invoice-titles')await renderHoInvoiceTitles();
   else if(workspace==='stamps')await renderHoStamps();
   else if(workspace==='agent-relation')await renderHoAgentRelation();
   else if(workspace==='agent-volume-restriction')await renderHoAgentVolumeRestriction();
@@ -641,6 +643,44 @@ async function renderHoPaParties(){
   if(rows.length){clxPaSelected=0;clxPaTab='Details';clxPaRenderDetails();}
  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>PA Parties load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
+
+const clxInvoiceTitlesReference=['Invoice','Debit Note','Supplementary Bill','Revised Invoice','Duplicate Invoice','Detention Invoice','Transportation Invoice','Financial Demand','Final Invoice','Commercial Invoice','Sindh Sales Tax Invoice','Punjab Sales Tax Invoice','Balochistan Sales Tax Invoice','Khyber Pakhtunkhwa Sales Tax Invoice'];
+async function renderHoInvoiceTitles(){
+  try{
+    const rows=await api('/api/masterdata/records/document-type');
+    const existing=(Array.isArray(rows)?rows:[]).filter(r=>r.payload?.document_category==='INVOICE_TITLE'||String(r.record_key||'').startsWith('INV-TITLE-'));
+    const options=clxInvoiceTitlesReference.map(x=>'<option value="'+esc(x)+'">'+esc(x)+'</option>').join('');
+    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Invoice Titles</b><span class="muted">Existing Document Type Master · approval required · no separate invoice ledger</span><span class="grow"></span><button class="btn" onclick="openScreen(\'master-data::document-types\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'Document Types\'})">Document Type Master</button></div>'+
+      '<div class="clxPaFields">'+
+      '<label class="clxPaField">Invoice Title<select id="clxInvTitle"><option value="">Select title</option>'+options+'</select></label>'+
+      '<label class="clxPaField">Document Code<input id="clxInvCode" maxlength="48" placeholder="Unique document-type code"></label>'+
+      '<label class="clxPaField">Operation<select id="clxInvOperation"><option value="">All approved operations</option><option>SEA_EXPORT</option><option>SEA_IMPORT</option><option>AIR_EXPORT</option><option>AIR_IMPORT</option><option>TRANSSHIPMENT</option><option>DEPOT</option><option>WAREHOUSE</option></select></label>'+
+      '<label class="clxPaField">Sub Company<input id="clxInvCompany" placeholder="Existing company code (optional)"></label>'+
+      '<label class="clxPaField">Tax Jurisdiction<input id="clxInvJurisdiction" placeholder="Country / region (optional)"></label>'+
+      '<label class="clxPaField">Effective From<input id="clxInvFrom" type="date"></label>'+
+      '<label class="clxPaField">Effective To<input id="clxInvTo" type="date"></label>'+
+      '<label class="clxPaField">Posting Behavior<select id="clxInvPosting"><option value="UNCONFIGURED">Unconfigured — no posting</option><option value="DOCUMENT_ONLY">Document only</option><option value="EXISTING_AR">Existing A/R workflow (requires finance approval)</option></select></label>'+
+      '<label class="clxPaField">Reason<input id="clxInvReason" maxlength="240" placeholder="Required approval reason"></label></div>'+
+      '<div class="toolbar"><button class="btn primary" onclick="clxInvoiceSubmit()">Submit for Approval</button><span class="muted">Creates a pending Document Type master request; does not issue or post an invoice.</span></div></div>'+
+      '<div class="card"><b>Configured Invoice Titles</b><div class="tablewrap"><table><thead><tr><th>Code</th><th>Invoice Title</th><th>Operation</th><th>Company</th><th>Jurisdiction</th><th>Posting</th><th>Status</th></tr></thead><tbody>'+
+      (existing.length?existing.map(r=>{const p=r.payload||{};return '<tr>'+[r.record_key,r.display_name||p.name,p.operation||'',p.sub_company||'',p.tax_jurisdiction||'',p.posting_behavior||'',r.status].map(v=>'<td>'+esc(String(v||''))+'</td>').join('')+'</tr>'}).join(''):'<tr><td colspan="7">No approved Invoice Title configurations found. Reference titles above are suggestions, not active records.</td></tr>')+
+      '</tbody></table></div></div>';
+  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>Invoice Title Master load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+}
+async function clxInvoiceSubmit(){
+ const val=id=>String($(id)?.value||'').trim();
+ const name=val('clxInvTitle'),code=val('clxInvCode').toUpperCase(),reason=val('clxInvReason');
+ if(!name||!code||!reason)return alert('Invoice Title, Document Code and Reason are required.');
+ if(!/^[A-Z0-9][A-Z0-9_-]{1,47}$/.test(code))return alert('Document Code must be 2–48 characters: letters, digits, underscore or hyphen.');
+ if(val('clxInvFrom')&&val('clxInvTo')&&val('clxInvTo')<val('clxInvFrom'))return alert('Effective To cannot be earlier than Effective From.');
+ const payload={name,document_category:'INVOICE_TITLE',operation:val('clxInvOperation'),sub_company:val('clxInvCompany'),tax_jurisdiction:val('clxInvJurisdiction'),posting_behavior:val('clxInvPosting'),effective_from:val('clxInvFrom'),effective_to:val('clxInvTo')};
+ try{
+  await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'document-type',record_key:code,operation:'CREATE',payload,reason})});
+  alert('Invoice Title submitted to existing Master Data approval queue. No financial posting was created.');
+  await renderHoInvoiceTitles();
+ }catch(e){alert('Invoice Title submission failed: '+e.message)}
+}
+
 async function renderHoStamps(){
   try{
     const cfg=await api('/api/masterdata/records/configuration');
