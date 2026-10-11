@@ -2422,7 +2422,7 @@ const CLX81_EQUIPMENT_DIMENSION_REFERENCE=Object.freeze({
 function clx81EquipmentSelectionPanel(req){
  const eq=String(req?.equipment||'').toUpperCase(),match=eq.match(/(20|40|45)/),size=match?.[1]||'40';
  const type=/FR|FLAT/.test(eq)?'FR':/OT|OPEN/.test(eq)?'OT':/RF|REEFER/.test(eq)?'RF':/HC|HIGH/.test(eq)?'HC':'GP';
- const sel=(id,options,val)=>'<select id="'+id+'" onchange="clx81UpdateEquipmentMetrics()">'+options.map(x=>'<option value="'+esc(x[0])+'"'+(x[0]===val?' selected':'')+'>'+esc(x[1])+'</option>').join('')+'</select>';
+ const sel=(id,options,val)=>'<select id="'+id+'" onchange="'+(id==='clx81EqSize'?'clx81SetTypesForSize()':'clx81UpdateEquipmentMetrics()')+'">'+options.map(x=>'<option value="'+esc(x[0])+'"'+(x[0]===val?' selected':'')+'>'+esc(x[1])+'</option>').join('')+'</select>';
  const inp=(id,label,value,kind='number')=>'<label>'+esc(label)+'<input id="'+id+'" type="'+kind+'" value="'+esc(String(value??''))+'" oninput="clx81UpdateEquipmentMetrics()"></label>';
  const sizes=['20','40','45'].map(x=>[x,x+"'"]);
  const types=[['GP','General Purpose'],['HC','High Cube'],['RF','Reefer'],['FR','Flat Rack'],['OT','Open Top']];
@@ -2434,7 +2434,7 @@ function clx81EquipmentSelectionPanel(req){
  '<label>Gross Weight<input id="clx81EqGross" type="text" inputmode="decimal" autocomplete="off" value="" oninput="clx81UpdateEquipmentMetrics()"></label>'+
  '<label>Package<input id="clx81EqPackages" type="text" inputmode="numeric" autocomplete="off" value="" oninput="clx81UpdateEquipmentMetrics()"></label>'+
  '<label>Unit'+sel('clx81EqPackageUnit',[['CARTON','Carton'],['PALLET','Pallet'],['CRATE','Crate'],['BAG','Bag'],['DRUM','Drum']],'CARTON')+'</label>'+
- '<label>TEUs<input id="clx81EqTEU" readonly></label><button class="btn clx81EqAdd" type="button" onclick="clx81AddEquipmentRow()" aria-label="Add selected equipment" title="Add selected equipment">+</button></div><div id="clx81EqSelectedRows"></div>'+
+ '<label>Tues<input id="clx81EqTEU" readonly></label><button class="btn clx81EqAdd" type="button" onclick="clx81AddEquipmentRow()" aria-label="Add selected equipment" title="Add selected equipment">+</button></div><div id="clx81EqSelectedRows"></div>'+
  '<details class="clx81EquipmentMore" id="clx81LclCargoDetails" hidden><summary>Additional Cargo / W-M Calculations</summary><div class="clx81CargoFields">'+
  '<label>Weight Unit'+sel('clx81EqWeightUnit',[['KG','KG'],['MT','MT'],['LB','LB']],'KG')+'</label>'+
  inp('clx81CargoL','Cargo Length (m)','')+inp('clx81CargoW','Cargo Width (m)','')+inp('clx81CargoH','Cargo Height (m)','')+inp('clx81CargoItems','Cargo Item Quantity',1)+
@@ -2443,21 +2443,38 @@ function clx81EquipmentSelectionPanel(req){
 }
 // Existing Booking Equipment entry rows; preview presentation only, no second booking or equipment model.
 let clx81EqSelectedRows=[];
+let clx81EquipmentMasterRows=[];
 async function clx81FetchEquipmentTypes(){
- const select=document.getElementById('clx81EqType');if(!select)return;
+ const size=document.getElementById('clx81EqSize'),type=document.getElementById('clx81EqType'),unit=document.getElementById('clx81EqPackageUnit');
+ if(!size||!type)return;
  try{
-  const response=await api('/api/masterdata/records/equipment-type');
-  const rows=Array.isArray(response)?response:(response.records||response.items||[]);
-  const types=[...new Set(rows.filter(x=>String(x.status||'ACTIVE').toUpperCase()==='ACTIVE')
-   .map(x=>String(x.record_key||'').toUpperCase().replace(/^(20|40|45)/,'').trim()).filter(Boolean))];
-  if(!types.length)return;
-  const selected=select.value;select.innerHTML=types.map(x=>'<option value="'+esc(x)+'"'+(x===selected?' selected':'')+'>'+esc(x)+'</option>').join('');
- }catch(e){/* Do not display extra diagnostic text in Booking entry. */}
+  const [equipment,packages]=await Promise.all([
+   api('/api/masterdata/records/equipment-type'),api('/api/masterdata/records/package')
+  ]);
+  const unpack=d=>Array.isArray(d)?d:(d.records||d.items||[]);
+  clx81EquipmentMasterRows=unpack(equipment).filter(r=>String(r.status||'ACTIVE').toUpperCase()==='ACTIVE')
+   .map(r=>({key:String(r.record_key||'').toUpperCase(),label:String(r.display_name||r.record_key||'')}));
+  const sizes=[...new Set(clx81EquipmentMasterRows.map(r=>r.key.match(/^(20|40|45)/)?.[1]).filter(Boolean))];
+  if(sizes.length){
+   const current=size.value;size.innerHTML=sizes.map(v=>'<option value="'+esc(v)+'"'+(v===current?' selected':'')+'>'+v+"'</option>").join('');
+  }
+  clx81SetTypesForSize();
+  if(unit){
+   const records=unpack(packages).filter(r=>String(r.status||'ACTIVE').toUpperCase()==='ACTIVE');
+   if(records.length){const current=unit.value;unit.innerHTML=records.map(r=>{const key=String(r.record_key||'');return '<option value="'+esc(key)+'"'+(key===current?' selected':'')+'>'+esc(String(r.display_name||key))+'</option>'}).join('');}
+  }
+ }catch(e){/* Preserve current controls if master-data API unavailable; no extra Booking notice. */}
+}
+function clx81SetTypesForSize(){
+ const size=document.getElementById('clx81EqSize'),type=document.getElementById('clx81EqType');if(!size||!type)return;
+ const options=[...new Set(clx81EquipmentMasterRows.filter(r=>r.key.startsWith(size.value)).map(r=>r.key.slice(size.value.length)).filter(Boolean))];
+ if(options.length){const current=type.value;type.innerHTML=options.map(v=>'<option value="'+esc(v)+'"'+(v===current?' selected':'')+'>'+esc(v)+'</option>').join('');}
+ clx81UpdateEquipmentMetrics();
 }
 function clx81RenderEquipmentRows(){
  const target=document.getElementById('clx81EqSelectedRows');if(!target)return;
  if(!clx81EqSelectedRows.length){target.innerHTML='';return;}
- const names=['Size','Type','Quantity','Shipment Type','Gross Weight','Package','Unit','TEUs'];
+ const names=['Size','Type','Quantity','Shipment Type','Gross Weight','Package','Unit','Tues'];
  target.innerHTML='<div class="tablewrap"><table><thead><tr>'+names.map(n=>'<th>'+n+'</th>').join('')+'<th></th></tr></thead><tbody>'+
  clx81EqSelectedRows.map((r,i)=>'<tr>'+r.map(x=>'<td>'+esc(String(x))+'</td>').join('')+'<td><button type="button" class="btn" aria-label="Remove equipment row" onclick="clx81RemoveEquipmentRow('+i+')">×</button></td></tr>').join('')+'</tbody></table></div>';
 }
@@ -2473,7 +2490,7 @@ function clx81UpdateEquipmentMetrics(){
  const v=id=>document.getElementById(id)?.value||'',n=id=>Number(String(v(id)).replace(',','.'));
  const size=v('clx81EqSize'),qty=n('clx81EqQty'),count=n('clx81CargoItems'),gross=n('clx81EqGross');
  const lcl=v('clx81ShipmentType')==='LCL';const details=document.getElementById('clx81LclCargoDetails');if(details){details.hidden=true;details.open=false;}
- const factor={'10':0.5,'20':1,'40':2,'45':2.25,'53':2.65}[size];
+ const factor={'10':0.5,'20':1,'40':2,'45':2,'53':2.65}[size];
  const good=Number.isInteger(qty)&&qty>0&&Number.isFinite(factor);
  const dims=['clx81CargoL','clx81CargoW','clx81CargoH'].map(n);
  const cbm=dims.every(x=>Number.isFinite(x)&&x>0)&&Number.isInteger(count)&&count>0?dims.reduce((a,b)=>a*b,1)*count:null;
