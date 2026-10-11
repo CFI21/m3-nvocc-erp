@@ -185,7 +185,7 @@ button.btn:not(.primary):hover,button.rowAction:hover,button.clx81DotsButton:hov
   background:var(--brand2);border-color:#9bc5b0;
 }
 button:disabled{cursor:not-allowed;opacity:.48}
-.clx81ChargeFlow{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));gap:5px;margin:5px 0 9px}.clx81ChargeFlow>div{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #c7ced8;padding:8px;font-size:10px}.clx81ChargeFlow b{border:1px solid #b8c2cf;border-radius:50%;min-width:19px;height:19px;display:grid;place-items:center}.clx81ChargeTotals{display:flex;gap:16px;flex-wrap:wrap;padding:8px 2px;border-top:1px solid #c7ced8}.clx81ChargeTotals span{display:flex;align-items:center;gap:7px;font-weight:700}.clx81ChargeTotals b{background:white;border:1px solid #b8c2cf;min-width:100px;padding:4px 6px;text-align:right}@media(max-width:1100px){.clx81ChargeFlow{grid-template-columns:repeat(3,minmax(125px,1fr))}}</style><style>
+.clx81ChargeFlow{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));gap:5px;margin:5px 0 9px}.clx81ChargeFlow>div{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #c7ced8;padding:8px;font-size:10px}.clx81ChargeFlow b{border:1px solid #b8c2cf;border-radius:50%;min-width:19px;height:19px;display:grid;place-items:center}.clx81ChargeTotals{display:flex;gap:16px;flex-wrap:wrap;padding:8px 2px;border-top:1px solid #c7ced8}.clx81ChargeTotals span{display:flex;align-items:center;gap:7px;font-weight:700}.clx81ChargeTotals b{background:white;border:1px solid #b8c2cf;min-width:100px;padding:4px 6px;text-align:right}@media(max-width:1100px){.clx81ChargeFlow{grid-template-columns:repeat(3,minmax(125px,1fr))}}.clxPaTabs{display:flex;gap:5px;margin:10px 0}.clxPaFields{display:grid;grid-template-columns:repeat(3,minmax(180px,1fr));gap:8px}.clxPaField{display:flex;flex-direction:column;gap:4px;font-size:11px}.clxPaField input{height:30px;width:100%;background:#f5f7f9;border:1px solid #ccd3dd;border-radius:3px;padding:5px}.clxPaFlags{display:grid;grid-template-columns:repeat(4,minmax(140px,1fr));gap:6px;margin:12px 0}.clxPaFlags label{font-size:11px}@media(max-width:850px){.clxPaFields{grid-template-columns:repeat(2,minmax(140px,1fr))}.clxPaFlags{grid-template-columns:repeat(2,minmax(130px,1fr))}}</style><style>
 .clx81ThreeColumnLayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);border:1px solid #b8c2cf;align-items:stretch}
 .clx81BookingColumn,.clx81CommercialColumn{min-width:0;border-right:1px solid #b8c2cf}
 .clx81ThreeColumnLayout .clx81TopGroup{border-bottom:1px solid #b8c2cf}
@@ -599,15 +599,47 @@ async function openHoGovernedSetup(workspace,label,target){
   else if(workspace==='local-recovery')await renderHoLocalRecovery();
   else if(workspace==='long-ageing')await renderHoLongAgeing();
 }
+let clxPaPartiesCache=[];
+let clxPaSelected=-1;
+let clxPaTab='Details';
+function clxPaSelect(i){clxPaSelected=i;clxPaTab='Details';clxPaRenderDetails();}
+function clxPaChangeTab(tab){clxPaTab=tab;clxPaRenderDetails();}
+function clxPaRenderDetails(){
+ const target=document.getElementById('clxPaDetails');if(!target)return;
+ const p=clxPaPartiesCache[clxPaSelected];
+ if(!p){target.innerHTML='';return;}
+ const data=p.payload||{},address=Array.isArray(data.addresses)?data.addresses:[],contacts=Array.isArray(data.contacts)?data.contacts:[];
+ const detail=(name,value)=>'<label class="clxPaField"><span>'+esc(name)+'</span><input readonly value="'+esc(String(value??''))+'"></label>';
+ const group=items=>'<div class="clxPaFields">'+items.join('')+'</div>';
+ const tabs=['Details','Addresses','Contacts'];
+ const top='<div class="clxPaTabs">'+tabs.map(t=>'<button class="btn '+(clxPaTab===t?'primary':'')+'" onclick="clxPaChangeTab(\''+t+'\')">'+t+'</button>').join('')+'</div>';
+ let body='';
+ if(clxPaTab==='Details'){
+  const flags=['ACTIVE CLIENT','NATIONAL ACCOUNT','GLOBAL SUPPLIER','TEMPORARY ACCOUNT','RECEIVABLES','PAYABLES','SHIPPER','CONSIGNEE','TRANSPORT CLIENT','WAREHOUSE','CARRIER','FORWARDER / AGENT','BROKER','SERVICES','COMPETITOR','CONTROLLING CUSTOMER','CONTROLLING AGENT'];
+  body=group([detail('Organization Code',p.record_key),detail('Organization Category',data.organization_category||data.category||''),detail('Full Name',p.display_name||data.name||''),detail('Screening',data.screening||''),detail('Security',data.security||''),detail('Country',data.country||''),detail('City',data.city||''),detail('Post Code',data.post_code||''),detail('Phone',data.phone||''),detail('Mobile',data.mobile||''),detail('Fax',data.fax||''),detail('Email',data.email||''),detail('Website URL',data.website||''),detail('Language',data.language||''),detail('Tax / EIN',data.ein||data.tax_id||'')])+
+   '<div class="clxPaFlags">'+flags.map(f=>'<label><input type="checkbox" disabled '+(data[f.toLowerCase().replace(/[^a-z]+/g,'_')]?'checked':'')+'> '+esc(f)+'</label>').join('')+'</div>';
+ }else if(clxPaTab==='Addresses'){
+  const cols=['Address 1','Address 2','Country','City','State','Post Code','Type','Main'];
+  const records=address.length?address:[data];
+  body='<div class="tablewrap"><table><thead><tr>'+cols.map(x=>'<th>'+x+'</th>').join('')+'</tr></thead><tbody>'+
+   records.map(x=>'<tr>'+[x.address_1||x.address1||'',x.address_2||x.address2||'',x.country||'',x.city||'',x.state||'',x.post_code||'',x.type||'',x.main?'Yes':''].map(v=>'<td>'+esc(String(v))+'</td>').join('')+'</tr>').join('')+'</tbody></table></div>';
+ }else{
+  body='<div class="tablewrap"><table><thead><tr><th>Contact Name</th><th>Job Title</th><th>Phone</th><th>Mobile</th><th>Email</th><th>Active</th></tr></thead><tbody>'+
+   (contacts.length?contacts.map(c=>'<tr>'+[c.name||'',c.job_title||'',c.phone||'',c.mobile||'',c.email||'',c.active===false?'No':'Yes'].map(v=>'<td>'+esc(String(v))+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="6">No contact records in this Common Party.</td></tr>')+'</tbody></table></div>';
+ }
+ target.innerHTML=top+body+'<div class="toolbar"><button class="btn primary" onclick="openScreen(\'master-data::common-partys\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'PA Parties · Common Parties\'})">Manage in Common Parties</button></div>';
+}
 async function renderHoPaParties(){
-  try{
-    const parties=await api('/api/masterdata/records/common-party');
-    const rows=(parties||[]).map(p=>{const x=p.payload||{};return {code:p.record_key,name:p.display_name||x.name||'',party_type:x.party_type||'OTHER',status:p.status,version:p.version,effective_from:p.effective_from||x.effective_from||'',effective_to:p.effective_to||x.effective_to||''}}).filter(x=>['CUSTOMER','AGENT','CARRIER','VENDOR','PRINCIPAL','DEPOT','TERMINAL','TRANSPORTER','OTHER'].includes(String(x.party_type).toUpperCase()));
-    $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>PA Parties</b><span class="muted">Filtered Common Party view. “PA” is retained as the legacy label only; no new business meaning or persistence is invented.</span><span class="grow"></span><button class="btn primary" onclick="openScreen(\'master-data::common-partys\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'PA Parties · Common Parties\'})">Manage Common Parties</button></div></div>'+
-      '<div class="tablewrap"><table><thead><tr><th>Party Code</th><th>Name</th><th>Party Type</th><th>Status</th><th>Version</th><th>Effective From</th><th>Effective To</th></tr></thead><tbody>'+
-      (rows.length?rows.map(r=>'<tr><td><b>'+esc(r.code)+'</b></td><td>'+esc(r.name)+'</td><td>'+esc(r.party_type)+'</td><td>'+esc(r.status)+'</td><td>'+esc(r.version)+'</td><td>'+esc(r.effective_from)+'</td><td>'+esc(r.effective_to)+'</td></tr>').join(''):'<tr><td colspan="7" class="muted">No Common Party records available.</td></tr>')+
-      '</tbody></table></div></div>';
-  }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>PA Parties load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
+ try{
+  const parties=await api('/api/masterdata/records/common-party');
+  clxPaPartiesCache=Array.isArray(parties)?parties:[];
+  const rows=clxPaPartiesCache;
+  $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>PA Parties</b><span class="grow"></span><button class="btn primary" onclick="openScreen(\'master-data::common-partys\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\'PA Parties · Common Parties\'})">Manage Common Parties</button></div></div>'+
+    '<div class="tablewrap"><table><thead><tr><th>Party Code</th><th>Name</th><th>Party Type</th><th>Status</th><th>Version</th></tr></thead><tbody>'+
+    (rows.length?rows.map((p,i)=>'<tr onclick="clxPaSelect('+i+')" style="cursor:pointer"><td><b>'+esc(p.record_key)+'</b></td><td>'+esc(p.display_name||p.payload?.name||'')+'</td><td>'+esc(p.payload?.party_type||'OTHER')+'</td><td>'+esc(p.status)+'</td><td>'+esc(p.version)+'</td></tr>').join(''):'<tr><td colspan="5">No Common Party records available.</td></tr>')+
+    '</tbody></table></div><div id="clxPaDetails"></div>';
+  if(rows.length){clxPaSelected=0;clxPaTab='Details';clxPaRenderDetails();}
+ }catch(e){$('gridArea').innerHTML='<div class="card badtext"><b>PA Parties load failed</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
 async function renderHoStamps(){
   try{
