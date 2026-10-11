@@ -3084,6 +3084,14 @@ async function renderClx084FinanceMaster(){
     out+=clx84Section('Bill Charge Lines',clx84Rows('Existing GL account/cost lines',Array.isArray(base['Account Lines'])?base['Account Lines']:links));
   }
   if(key==='soa'){
+    out+='<div class="toolbar clx84SoaActions">'+
+      '<button class="btn" type="button" onclick="renderClx084FinanceMaster()">Refresh</button>'+
+      '<button class="btn" type="button" onclick="clx84TogglePreview()">Print / Preview</button>'+
+      '<button class="btn" type="button" onclick="openScreen(\'gl-accounts::receipt\')">Receipts</button>'+
+      '<button class="btn" type="button" onclick="openScreen(\'gl-accounts::payment\')">Payments</button>'+
+      '<button class="btn" type="button" onclick="openScreen(\'agent-tasks::booking\')">Booking Source</button>'+
+      '<button class="btn" type="button" onclick="openMrgWorkspace(\'GENERAL\',\'MRG\')">Rate Sources</button>'+
+      '</div>';
     out+=clx84Section('SOA Master',clx84Grid([
       clx84RO('Party',clx84Pick(base,'Party','Agent','Customer','Principal')),
       clx84RO('Party Type',clx84Pick(base,'Party Type')),
