@@ -615,7 +615,7 @@ function clxPaRenderDetails(){
  const top='<div class="clxPaTabs">'+tabs.map(t=>'<button class="btn '+(clxPaTab===t?'primary':'')+'" onclick="clxPaChangeTab(\''+t+'\')">'+t+'</button>').join('')+'</div>';
  let body='';
  if(clxPaTab==='Details'){
-  const flags=['ACTIVE CLIENT','NATIONAL ACCOUNT','GLOBAL SUPPLIER','TEMPORARY ACCOUNT','RECEIVABLES','PAYABLES','SHIPPER','CONSIGNEE','TRANSPORT CLIENT','WAREHOUSE','CARRIER','FORWARDER / AGENT','BROKER','SERVICES','COMPETITOR','CONTROLLING CUSTOMER','CONTROLLING AGENT'];
+  const flags=['ACTIVE CLIENT','NATIONAL ACCOUNT','GLOBAL SUPPLIER','TEMPORARY ACCOUNT','RECEIVABLES','PAYABLES','SHIPPER','CONSIGNEE','TRANSPORT CLIENT','WAREHOUSE','CARRIER','FORWARDER / AGENT','PRINCIPAL','BROKER','SERVICES','COMPETITOR','CONTROLLING CUSTOMER','CONTROLLING AGENT'];
   body=group([detail('Organization Code',p.record_key),detail('Organization Category',data.organization_category||data.category||''),detail('Full Name',p.display_name||data.name||''),detail('Screening',data.screening||''),detail('Security',data.security||''),detail('Country',data.country||''),detail('City',data.city||''),detail('Post Code',data.post_code||''),detail('Phone',data.phone||''),detail('Mobile',data.mobile||''),detail('Fax',data.fax||''),detail('Email',data.email||''),detail('Website URL',data.website||''),detail('Language',data.language||''),detail('Tax / EIN',data.ein||data.tax_id||'')])+
    '<div class="clxPaFlags">'+flags.map(f=>'<label><input type="checkbox" disabled '+(data[f.toLowerCase().replace(/[^a-z]+/g,'_')]?'checked':'')+'> '+esc(f)+'</label>').join('')+'</div>';
  }else if(clxPaTab==='Addresses'){
