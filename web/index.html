@@ -2222,7 +2222,7 @@ async function clx78BookingBottom(w){
     try{
       const e=await equipmentApi('/api/clx070/container-control/booking-context/'+encodeURIComponent(jr));
       const req=e.requirement||{},fin=e.financial_summary||{},rows=e.allocated_containers||[];
-      return '<div class="clx78Ledger"><div class="equipGrid">'+
+      return '<div class="clx78Ledger">'+clx81EquipmentSelectionPanel(req)+'<div class="equipGrid">'+
         '<div class="equipKpi">Equipment<b>'+esc(req.equipment||'—')+'</b></div>'+
         '<div class="equipKpi">Quantity<b>'+esc(req.quantity||'—')+'</b></div>'+
         '<div class="equipKpi">Provider<b>'+esc(req.provider||'—')+'</b></div>'+
@@ -2418,6 +2418,44 @@ const CLX81_EQUIPMENT_DIMENSION_REFERENCE=Object.freeze({
  '40':Object.freeze({GP:[12.192,2.438,2.591],HC:[12.192,2.438,2.896],FR:[12.192,2.438,2.591],OT:[12.192,2.438,2.591]}),
  '45':Object.freeze({HC:[13.716,2.438,2.896]})
 });
+function clx81EquipmentSelectionPanel(req){
+ const eq=String(req?.equipment||'').toUpperCase(),match=eq.match(/(20|40|45|10|53)/),size=match?.[1]||'40';
+ const type=/FR|FLAT/.test(eq)?'FR':/OT|OPEN/.test(eq)?'OT':/RF|REEFER/.test(eq)?'RF':/HC|HIGH/.test(eq)?'HC':'GP';
+ const sel=(id,options,val)=>'<select id="'+id+'" onchange="clx81UpdateEquipmentMetrics()">'+options.map(x=>'<option value="'+esc(x[0])+'"'+(x[0]===val?' selected':'')+'>'+esc(x[1])+'</option>').join('')+'</select>';
+ const inp=(id,label,value,kind='number')=>'<label>'+esc(label)+'<input id="'+id+'" type="'+kind+'" value="'+esc(String(value??''))+'" oninput="clx81UpdateEquipmentMetrics()"></label>';
+ const sizes=['10','20','40','45','53'].map(x=>[x,x+"'"]);
+ const types=[['GP','General Purpose'],['HC','High Cube'],['RF','Reefer'],['FR','Flat Rack'],['OT','Open Top']];
+ return '<section class="card"><b>Equipment Selection & Cargo Metrics — Reference Only</b><p class="muted">Existing allocation remains authoritative. Reference values do not create or duplicate Booking equipment allocations.</p><div class="clx81CargoFields">'+
+ '<label>Equipment Size'+sel('clx81EqSize',sizes,size)+'</label><label>Equipment Type'+sel('clx81EqType',types,type)+'</label>'+
+ inp('clx81EqQty','Quantity',req?.quantity||1)+inp('clx81EqGross','Gross Weight','')+
+ '<label>Weight Unit'+sel('clx81EqWeightUnit',[['KG','KG'],['MT','MT'],['LB','LB']],'KG')+'</label>'+
+ inp('clx81EqPackages','Packages','')+
+ '<label>Package Unit'+sel('clx81EqPackageUnit',[['CARTON','Carton'],['PALLET','Pallet'],['CRATE','Crate'],['BAG','Bag'],['DRUM','Drum']],'CARTON')+'</label>'+
+ inp('clx81CargoL','Cargo Length (m)','')+inp('clx81CargoW','Cargo Width (m)','')+inp('clx81CargoH','Cargo Height (m)','')+inp('clx81CargoItems','Cargo Item Quantity',1)+
+ '<label>Shipment Type'+sel('clx81ShipmentType',[['FCL','FCL'],['LCL','LCL']],'FCL')+'</label></div>'+
+ '<div class="clx81CargoFields"><label>TEUs (auto)<input id="clx81EqTEU" readonly></label><label>CBM (auto)<input id="clx81EqCBM" readonly></label><label>LCL W/M Chargeable Units (auto)<input id="clx81EqWM" readonly></label></div><p id="clx81EqValidation" class="muted">Edit selection to calculate.</p></section>';
+}
+function clx81UpdateEquipmentMetrics(){
+ const v=id=>document.getElementById(id)?.value||'',n=id=>Number(String(v(id)).replace(',','.'));
+ const size=v('clx81EqSize'),qty=n('clx81EqQty'),count=n('clx81CargoItems'),gross=n('clx81EqGross');
+ const factor={'10':0.5,'20':1,'40':2,'45':2.25,'53':2.65}[size];
+ const good=Number.isInteger(qty)&&qty>0&&Number.isFinite(factor);
+ const dims=['clx81CargoL','clx81CargoW','clx81CargoH'].map(n);
+ const cbm=dims.every(x=>Number.isFinite(x)&&x>0)&&Number.isInteger(count)&&count>0?dims.reduce((a,b)=>a*b,1)*count:null;
+ const unit=v('clx81EqWeightUnit'),weightKg=v('clx81EqGross').trim()?gross*(unit==='MT'?1000:unit==='LB'?0.45359237:1):null;
+ const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val};
+ set('clx81EqTEU',good?(qty*factor).toFixed(2):'');
+ set('clx81EqCBM',cbm===null?'':cbm.toFixed(3));
+ set('clx81EqWM',v('clx81ShipmentType')==='LCL'&&cbm!==null&&weightKg!==null?Math.max(cbm,weightKg/1000).toFixed(3):'');
+ const notes=[];
+ if(!good)notes.push('Enter positive whole-number equipment quantity.');
+ if(v('clx81EqGross')&&(!Number.isFinite(weightKg)||weightKg<0))notes.push('Enter valid gross weight.');
+ if(cbm===null)notes.push('Enter positive cargo L/W/H and item quantity to calculate CBM.');
+ if(v('clx81EqGross'))notes.push('Maximum gross mass / VGM must be checked against approved equipment type and unit plate before release.');
+ if(size==='10'||size==='53')notes.push('Non-standard TEU factor is indicative; verify tariff/operational rule.');
+ notes.push('Equipment master payload, cargo-specific weight limits and rated tariff validation pending.');
+ const msg=document.getElementById('clx81EqValidation');if(msg)msg.textContent=notes.join(' ');
+}
 function clx81OogSpec(raw){
  const normalized=String(raw||'').toUpperCase().replace(/['’"]/g,'').replace(/[-_]/g,' ').replace(/FLAT\s*RACK/g,'FR').replace(/OPEN\s*TOP/g,'OT').replace(/HIGH\s*CUBE/g,'HC').replace(/GENERAL\s*PURPOSE/g,'GP').replace(/PLATFORM/g,'PF').replace(/REEFER/g,'RF').trim();
  const match=normalized.match(/^(20|40|45)\s*(?:FT|FEET)?\s*(GP|DV|ST|DC|HC|HQ|OT|FR|PF|PL|TK|RF)$/);
