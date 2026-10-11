@@ -118,14 +118,21 @@ def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','domains':DOMAINS
 def overview():
     c=connect();init_schema(c);out={'records':c.execute('SELECT COUNT(*) n FROM md_records').fetchone()['n'],'pending_changes':c.execute("SELECT COUNT(*) n FROM md_change_requests WHERE status='PENDING'").fetchone()['n'],'quality_issues':c.execute("SELECT COUNT(*) n FROM md_quality_issues WHERE status='OPEN'").fetchone()['n'],'domains':len(DOMAINS),'screens':len(SCREENS),'aliases':c.execute("SELECT COUNT(*) n FROM md_aliases WHERE status='ACTIVE'").fetchone()['n']};out['by_domain']={r['domain']:r['n'] for r in c.execute('SELECT domain,COUNT(*) n FROM md_records GROUP BY domain')};c.close();return out
 @router.get('/records/{domain}')
-def records(domain:str):
+def records(domain:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     if domain not in DOMAINS:raise HTTPException(404,'Unknown domain')
-    c=connect();
-    if not using_postgres(): init_schema(c)
-    rows=[]
-    for r in c.execute('SELECT * FROM md_records WHERE domain=? ORDER BY record_key',(domain,)):
-        d=dict(r);d['payload']=json.loads(d.pop('payload_json'));rows.append(d)
-    c.close();return rows
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        # Fail closed for cross-organization masters pending row-level IAM relationship validation.
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_READ_SCOPE_NOT_AUTHORIZED'})
+        rows=[]
+        for r in c.execute('SELECT * FROM md_records WHERE domain=? ORDER BY record_key',(domain,)):
+            d=dict(r);d['payload']=json.loads(d.pop('payload_json'));rows.append(d)
+        return rows
+    finally:
+        c.close()
 @router.post('/changes')
 def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
@@ -232,9 +239,23 @@ def sequence_next(b:SequenceNext,x_m3_session:Optional[str]=Header(None,alias='X
     if not r:c.execute('ROLLBACK');c.close();raise HTTPException(404,'Sequence not found')
     n=r['next_number'];val=f"{r['prefix']}{n:0{r['width']}d}";c.execute('UPDATE md_sequences SET next_number=next_number+1,version=version+1 WHERE id=?',(r['id'],));c.execute('COMMIT');c.close();return {'value':val,'sequence_code':b.sequence_code}
 @router.get('/sequences')
-def sequences():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_sequences ORDER BY sequence_code')];c.close();return x
+def sequences(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        init_schema(c)
+        _,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):raise HTTPException(403,{'code':'SEQUENCE_READ_DENIED'})
+        return [dict(r) for r in c.execute('SELECT * FROM md_sequences ORDER BY sequence_code')]
+    finally:c.close()
 @router.get('/configuration')
-def configuration():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_config ORDER BY config_key')];c.close();return x
+def configuration(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        init_schema(c)
+        _,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):raise HTTPException(403,{'code':'CONFIG_READ_DENIED'})
+        return [dict(r) for r in c.execute('SELECT * FROM md_config ORDER BY config_key')]
+    finally:c.close()
 @router.get('/integrity')
 def integrity():
     c=connect();init_schema(c);issues=[]
