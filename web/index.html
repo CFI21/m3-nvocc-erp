@@ -208,7 +208,7 @@
 .clx81LiveCell{min-width:0}.clx81LiveCell input{background:#fff;border-color:#91b49d}.clx81LiveCell input:focus{outline:1px solid #2f6b55}.clx81LiveCell span{font-weight:600}
 .clx81CargoSection{margin:10px 0;border:1px solid #d4dae2;padding:10px}.clx81CargoSection h4{margin:0 0 8px}.clx81CargoFields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.clx81CargoField{display:flex;flex-direction:column;gap:3px;font-size:11px}.clx81CargoField input{height:27px;min-width:0;border:1px solid #c1cad5;padding:3px 6px}@media(max-width:650px){.clx81CargoFields{grid-template-columns:repeat(2,minmax(0,1fr))}}.clx81KillResult{margin-top:10px;padding:10px;border:1px solid #9fbba5;background:#f1f8f2;color:#245337;font-weight:600}.clx81KillResultHeadline{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:8px}.clx81KillResultHeadline strong{font-size:17px}
 .clx81KillBreakdown{padding:8px 10px;background:#fff;border-left:3px solid #719684;margin-bottom:10px;font-size:12px;line-height:1.8}.clx81KillResult{overflow:auto}.clx81KillResult table{min-width:790px}\n.clx81KillCompactCard{border:1px solid #aeb9c5;padding:10px 12px;margin:0 0 10px;background:#fff;font-size:12px;line-height:1.9}.clx81KillCompactGrid{display:grid;grid-template-columns:minmax(150px,1fr) minmax(260px,2fr);gap:12px}.clx81KillCompactCard strong{font-size:18px;color:#245337}.clx81KillFactor{font-weight:600}@media(max-width:580px){.clx81KillCompactGrid{grid-template-columns:1fr}}
-.clx81EquipmentOneRow{display:grid;grid-template-columns:0.7fr 1.2fr 0.7fr 1fr 1fr 0.75fr 1fr 0.8fr;gap:7px;align-items:end;margin-top:7px}.clx81EquipmentOneRow label{min-width:0;display:flex;flex-direction:column;font-size:11px;font-weight:600;gap:4px}.clx81EquipmentOneRow input,.clx81EquipmentOneRow select{width:100%;min-width:0;height:30px}.clx81EquipmentMore{margin-top:9px}.clx81EquipmentMore summary{cursor:pointer;color:var(--brand);font-weight:600}@media(max-width:1000px){.clx81EquipmentOneRow{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:580px){.clx81EquipmentOneRow{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.clx81EquipmentOneRow{display:grid;grid-template-columns:64px minmax(125px,180px) 66px 90px 110px 80px 110px 80px;gap:7px;align-items:end;margin-top:7px}.clx81EquipmentOneRow label{min-width:0;display:flex;flex-direction:column;font-size:11px;font-weight:600;gap:4px}.clx81EquipmentOneRow input,.clx81EquipmentOneRow select{width:100%;min-width:0;height:30px}.clx81EquipmentMore{margin-top:9px}.clx81EquipmentMore summary{cursor:pointer;color:var(--brand);font-weight:600}@media(max-width:1000px){.clx81EquipmentOneRow{grid-template-columns:repeat(4,minmax(0,1fr))}}@media(max-width:580px){.clx81EquipmentOneRow{grid-template-columns:repeat(2,minmax(0,1fr))}}
 </style></head>
 <body><script>
 const M3_API_BASE='https://m3-pr124-booking-api-preview.onrender.com';
@@ -2420,15 +2420,15 @@ const CLX81_EQUIPMENT_DIMENSION_REFERENCE=Object.freeze({
  '45':Object.freeze({HC:[13.716,2.438,2.896]})
 });
 function clx81EquipmentSelectionPanel(req){
- const eq=String(req?.equipment||'').toUpperCase(),match=eq.match(/(20|40|45|10|53)/),size=match?.[1]||'40';
+ const eq=String(req?.equipment||'').toUpperCase(),match=eq.match(/(20|40|45)/),size=match?.[1]||'40';
  const type=/FR|FLAT/.test(eq)?'FR':/OT|OPEN/.test(eq)?'OT':/RF|REEFER/.test(eq)?'RF':/HC|HIGH/.test(eq)?'HC':'GP';
  const sel=(id,options,val)=>'<select id="'+id+'" onchange="clx81UpdateEquipmentMetrics()">'+options.map(x=>'<option value="'+esc(x[0])+'"'+(x[0]===val?' selected':'')+'>'+esc(x[1])+'</option>').join('')+'</select>';
  const inp=(id,label,value,kind='number')=>'<label>'+esc(label)+'<input id="'+id+'" type="'+kind+'" value="'+esc(String(value??''))+'" oninput="clx81UpdateEquipmentMetrics()"></label>';
- const sizes=['10','20','40','45','53'].map(x=>[x,x+"'"]);
+ const sizes=['20','40','45'].map(x=>[x,x+"'"]);
  const types=[['GP','General Purpose'],['HC','High Cube'],['RF','Reefer'],['FR','Flat Rack'],['OT','Open Top']];
  return '<section class="card clx81EquipmentSelect"><b>Equipment Selection</b><div class="clx81EquipmentOneRow">'+
  '<label>Size'+sel('clx81EqSize',sizes,size)+'</label><label>Type'+sel('clx81EqType',types,type)+'</label>'+
- inp('clx81EqQty','Quantity',req?.quantity||1)+
+ '<label>Quantity<input id="clx81EqQty" type="number" min="1" max="9999" step="1" maxlength="4" value="'+esc(String(req?.quantity||1))+'" oninput="if(this.value.length>4)this.value=this.value.slice(0,4);clx81UpdateEquipmentMetrics()"></label>'+
  '<label>Shipment Type'+sel('clx81ShipmentType',[['FCL','FCL'],['LCL','LCL']],'FCL')+'</label>'+
  inp('clx81EqGross','Gross Weight','')+
  inp('clx81EqPackages','Package','')+
