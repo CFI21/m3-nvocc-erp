@@ -50,3 +50,59 @@ Investigate authorization of `app/masterdata.py GET /records/{domain}` and calle
 Navigation entry points: use existing M3 modules and linked APIs, not new parallel booking, equipment, GL or party data stores. Portals are role-scoped experiences and must not be treated as proof of complete implementation until end-to-end tests pass.
 Test each: authenticated identity association to the authoritative Common Party ID, cross-tenant 403/404 protection on list/detail/download/export, draft vs approved document redaction, audit trail, revoked permissions, and Principal vs HO visibility. Keep providers OFF, real money OFF; no new paid tiers.
 Portal rollout gate: cannot activate until P1 authenticated master reads and applicable relationships, scoped API endpoints and UAT pass. No merge/deploy to production without separate authorization.
+
+## Central Master — Related Tasks and Portal Relationship Register (approved design, not yet implementation)
+All references below link to existing authoritative modules where supported. Missing fields/screens are backlog requirements and must be assessed, not auto-created as duplicate modules.
+
+### Master record: Common Party / Organization
+Identity: immutable Party ID, system sequence; organization code, legal name, display name, organization category, selected business roles (multi-role), branch, country, address, contacts, communication/language, tax identity, currency, status, effective dates, owner, Principal association, security scope, version and approval/audit.
+Child panels/tabs: Details, Address (multiple addresses, capabilities, operational constraints), Contact (multiple contacts and communication preferences), A/R, A/P, Related Parties, Staff Assignments, Web Security, Rating, Config; only activate fields with authorized persistence.
+Relationships: HO -> Principal -> Agent (Export/Import/Transshipment), customer and vendor organization contacts, Investor and equipment ownership, depot/carrier/transporters; allow multiple valid business relationships without duplicating Party ID.
+Unique identifiers: Party ID distinct from agent/customer/vendor reference and subledger ID; GL control account from approved GL master mapping. Automatic generation must reuse existing reference sequences atomically, retain active counters and avoid collisions.
+Governance: Submit / Review / Approve / Reject / Rectify / Block / Unblock / History / Duplicate Review; actions permission-gated and reason/audit recorded. No overwrite of posted financial records.
+
+### Related Task routing for each party classification
+HO: Master Governance, Party Administration, Global Agent Network, Reference Sequences, Finance Chart of Accounts, Master Security Roles, Audit and Exception Control, Global Equipment Tower, Management KPI.
+Principal: Principal Setup, linked Agent Setup and assignment, customer/vendor oversight, region/country/port/agent network control, Booking/BL oversight, MRG tariffs, receivables/payables, Principal/Agent SOA, Global Equipment Tower, financial holds/approvals and audit.
+Agent: Agent Setup, authorized customer and vendor party registration, Booking, B/L, Transport/Depot Delivery Order, container journey, MRG rate selection, document approval routing, own A/R and A/P, Agent SOA and exceptions; agent isolation enforced server-side.
+Customer: Customer Registration/Contacts, authorized booking requests, booking/BL status, track & trace, cargo/container milestones, delivery and release documents, customer invoices/statements/payment status, cases and notifications. Exclude purchase rates, costs, other-party data.
+Vendor: Vendor Registration/Contacts, linked service requests and jobs, quotation/rate submissions where approved, transport/depot/warehouse assignments, confirmations/evidence, vendor invoice submission, A/P status, discrepancy resolution. Exclude other vendors and Principal profits.
+Investor: Investor Party Setup, existing container investor owner/sharing relationships, equipment interest, governed investor finance views and approvals subject to authority; no duplicate asset register.
+Carrier/Depot/Terminal/Transporter/Warehouse: service/operating role, location, equipment and job assignment, event updates, operational documents, approved payable/recovery terms and audit, each scoped to assigned tasks only.
+
+### Operate navigation (existing links first)
+Principal: principal control tower and linked agent network operations.
+Forwarding: Booking, routing, B/L, shipment events, transport instructions and documents.
+Customs: customs-specific tasks and releases only if existing authorized workflows support them.
+Transport: transport allocation, pickup/delivery, proof of delivery, cost evidence.
+Warehouse: warehouse/depot stock, receipt/release, inspections, related charges.
+These are navigation/role views, never new unrelated job models.
+
+### Manage navigation
+Tariffs: Charge Master / MRG revenue/cost / Agent Matrix / effective validity / approval history.
+General Ledger: Existing GL master, posting definitions, accounting preview, exceptions/audit.
+Receivables: Customer and Agent A/R, invoice/receipt allocations, SOA, disputes and approvals.
+Payables: Vendor and Agent A/P, cost verification, approvals, settlements/holds and SOA.
+Do not create a parallel accounting ledger.
+
+### Portal navigation and cross-links
+Principal Portal: Executive Overview; Global Equipment Tower; Regions; Countries; Agents; Customer/Vendor Network; Movements; Booking/BL; Tariffs; Revenue/Cost; SOA; Exceptions; Audit; Approvals.
+Agent Portal: My Overview; My Customers; My Vendors; Bookings; BL; Equipment; Movements; Rates; Documents; My AR/AP; Agent SOA; Exceptions; Notifications.
+Customer Portal: My Shipments; Booking Requests; Tracking; BL/Release Documents; Invoices/Statements; Payments Status; Support/Notifications.
+Vendor Portal: My Assigned Jobs; Transport/Depot/Warehouse Tasks; Service Orders; Rates/Quotations; Evidence; Invoices; AP Status; Disputes/Notifications.
+Forwarding/Customs/Transport/Warehouse portals: role-scoped workspaces over existing operational APIs with assigned task queues and document events; only expose actions and data for approved parties.
+All portal menu visibility and endpoint filtering must agree; frontend-only hiding is insufficient.
+
+### Related task panel standard for every master
+Columns: Task/Module, Linked Party ID, Relationship Role, Record Reference, Owner Agent, Principal, Region, Access Scope, Status, Last Activity, Action.
+Filter dimensions: party type, authorized Principal/Agent, region/country, status, task category, active/inactive.
+Open record via existing authoritative screen; use same approved field styling and compact widths, no extra-wide blank controls. Do not fabricate counts, jobs, charges or relationship links.
+Only display task relationships that are actually supported by source APIs; unavailable capabilities should show 'Not connected' not sample production data.
+
+### Acceptance checks
+- Cross-party duplicate and alias detection, multi-role assignment, stable Party ID, approvals.
+- HO, Principal, Agent, Customer, Vendor, Investor scope for list, detail, save, file download and export.
+- Country/region/agent breakdown in GET matches booking/equipment event sources, no synthetic movement.
+- GL/subledger mapping reconciles actual finance records, customer/vendor portal never leaks costs/margins.
+- Portal actions guarded by backend IAM; deny forbidden links with correct audit events.
+- Current 196-screen regression and isolated preview smoke before release.
