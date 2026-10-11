@@ -165,7 +165,27 @@
 .clx81RefToolbar{flex-wrap:wrap}.clx81RefToolbar button{font-size:11px;padding:4px 8px;border-radius:0}.clx81RefToolbar button.active{background:#dfe9f5;border-color:#7995b8;font-weight:700}.clx81GridTabContent{min-height:110px;overflow-x:auto;border-top:1px solid #c3cad4}.clx81GridTabContent .clx78Ledger{margin:0}.clx81RefLeft{min-width:0}
 .clx81RoutingPair[hidden]{display:none}
 .clx81RoutingPair{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:8px;align-items:center;min-width:0}.clx81RoutingPair .clx78Field{min-width:0;grid-template-columns:125px minmax(0,1fr)}@media(max-width:760px){.clx81RoutingPair{grid-template-columns:minmax(0,1fr)}}
-.clx81TopLayout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-bottom:1px solid #b8c2cf}.clx81TopGroup{min-width:0;border-right:1px solid #b8c2cf}.clx81TopCells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 4px;padding:3px}.clx81TopCell{min-width:0;display:flex;align-items:center;gap:3px;font-size:10px;white-space:nowrap}.clx81TopCell span{flex:0 0 auto}.clx81TopCell input{width:100%;min-width:0;height:24px;box-sizing:border-box;border:1px solid #c5ced9;border-radius:0;background:#f9fafb;font-size:10px;padding:1px 3px}@media(max-width:900px){.clx81TopLayout{grid-template-columns:1fr}}</style><style>
+.clx81TopLayout{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-bottom:1px solid #b8c2cf}.clx81TopGroup{min-width:0;border-right:1px solid #b8c2cf}.clx81TopCells{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px 4px;padding:3px}.clx81TopCell{min-width:0;display:flex;align-items:center;gap:3px;font-size:10px;white-space:nowrap}.clx81TopCell span{flex:0 0 auto}.clx81TopCell input{width:100%;min-width:0;height:24px;box-sizing:border-box;border:1px solid #c5ced9;border-radius:0;background:#f9fafb;font-size:10px;padding:1px 3px}@media(max-width:900px){.clx81TopLayout{grid-template-columns:1fr}}
+/* M3 shared button-only visual standard: preserve all form fields, grid data, layout and actions. */
+button.btn,button.rowAction,button.clx81DotsButton,.fabMenu button,.moreMenu button,.clx81EquipmentPopup button{
+  font-family:inherit;transition:background-color .12s ease,border-color .12s ease,box-shadow .12s ease;
+}
+button.btn:not(.primary),button.rowAction,button.clx81DotsButton{
+  border:1px solid #b8c2cf;border-radius:4px;background:#fff;color:var(--ink);
+}
+button.rowAction,button.clx81DotsButton{
+  opacity:1;display:inline-flex;align-items:center;justify-content:center;
+}
+button.btn:focus-visible,button.rowAction:focus-visible,button.clx81DotsButton:focus-visible,
+.fabMenu button:focus-visible,.moreMenu button:focus-visible,.clx81EquipmentPopup button:focus-visible{
+  outline:2px solid var(--brand);outline-offset:2px;
+}
+button.btn:not(.primary):hover,button.rowAction:hover,button.clx81DotsButton:hover,
+.fabMenu button:hover,.moreMenu button:hover,.clx81EquipmentPopup button:hover{
+  background:var(--brand2);border-color:#9bc5b0;
+}
+button:disabled{cursor:not-allowed;opacity:.48}
+</style><style>
 .clx81ThreeColumnLayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);border:1px solid #b8c2cf;align-items:stretch}
 .clx81BookingColumn,.clx81CommercialColumn{min-width:0;border-right:1px solid #b8c2cf}
 .clx81ThreeColumnLayout .clx81TopGroup{border-bottom:1px solid #b8c2cf}
