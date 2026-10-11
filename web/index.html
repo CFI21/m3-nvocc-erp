@@ -2434,7 +2434,7 @@ function clx81EquipmentSelectionPanel(req){
  inp('clx81EqPackages','Package','')+
  '<label>Unit'+sel('clx81EqPackageUnit',[['CARTON','Carton'],['PALLET','Pallet'],['CRATE','Crate'],['BAG','Bag'],['DRUM','Drum']],'CARTON')+'</label>'+
  '<label>TEUs (auto)<input id="clx81EqTEU" readonly></label></div>'+
- '<details class="clx81EquipmentMore"><summary>Additional Cargo / W-M Calculations</summary><div class="clx81CargoFields">'+
+ '<details class="clx81EquipmentMore" id="clx81LclCargoDetails" hidden><summary>Additional Cargo / W-M Calculations</summary><div class="clx81CargoFields">'+
  '<label>Weight Unit'+sel('clx81EqWeightUnit',[['KG','KG'],['MT','MT'],['LB','LB']],'KG')+'</label>'+
  inp('clx81CargoL','Cargo Length (m)','')+inp('clx81CargoW','Cargo Width (m)','')+inp('clx81CargoH','Cargo Height (m)','')+inp('clx81CargoItems','Cargo Item Quantity',1)+
  '<label>CBM (auto)<input id="clx81EqCBM" readonly></label><label>LCL W/M (auto)<input id="clx81EqWM" readonly></label></div></details>'+
@@ -2443,6 +2443,7 @@ function clx81EquipmentSelectionPanel(req){
 function clx81UpdateEquipmentMetrics(){
  const v=id=>document.getElementById(id)?.value||'',n=id=>Number(String(v(id)).replace(',','.'));
  const size=v('clx81EqSize'),qty=n('clx81EqQty'),count=n('clx81CargoItems'),gross=n('clx81EqGross');
+ const lcl=v('clx81ShipmentType')==='LCL';const details=document.getElementById('clx81LclCargoDetails');if(details){details.hidden=!lcl;if(lcl)details.open=true;else details.open=false;}
  const factor={'10':0.5,'20':1,'40':2,'45':2.25,'53':2.65}[size];
  const good=Number.isInteger(qty)&&qty>0&&Number.isFinite(factor);
  const dims=['clx81CargoL','clx81CargoW','clx81CargoH'].map(n);
@@ -2455,7 +2456,7 @@ function clx81UpdateEquipmentMetrics(){
  const notes=[];
  if(!good)notes.push('Enter positive whole-number equipment quantity.');
  if(v('clx81EqGross')&&(!Number.isFinite(weightKg)||weightKg<0))notes.push('Enter valid gross weight.');
- if(cbm===null)notes.push('Enter positive cargo L/W/H and item quantity to calculate CBM.');
+ if(lcl&&cbm===null)notes.push('Enter positive cargo L/W/H and item quantity to calculate CBM.');
  if(v('clx81EqGross'))notes.push('Maximum gross mass / VGM must be checked against approved equipment type and unit plate before release.');
  if(size==='10'||size==='53')notes.push('Non-standard TEU factor is indicative; verify tariff/operational rule.');
  notes.push('Equipment master payload, cargo-specific weight limits and rated tariff validation pending.');
