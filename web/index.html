@@ -185,7 +185,7 @@ button.btn:not(.primary):hover,button.rowAction:hover,button.clx81DotsButton:hov
   background:var(--brand2);border-color:#9bc5b0;
 }
 button:disabled{cursor:not-allowed;opacity:.48}
-</style><style>
+.clx81ChargeFlow{display:grid;grid-template-columns:repeat(6,minmax(120px,1fr));gap:5px;margin:5px 0 9px}.clx81ChargeFlow>div{display:flex;align-items:center;gap:5px;background:#fff;border:1px solid #c7ced8;padding:8px;font-size:10px}.clx81ChargeFlow b{border:1px solid #b8c2cf;border-radius:50%;min-width:19px;height:19px;display:grid;place-items:center}.clx81ChargeTotals{display:flex;gap:16px;flex-wrap:wrap;padding:8px 2px;border-top:1px solid #c7ced8}.clx81ChargeTotals span{display:flex;align-items:center;gap:7px;font-weight:700}.clx81ChargeTotals b{background:white;border:1px solid #b8c2cf;min-width:100px;padding:4px 6px;text-align:right}@media(max-width:1100px){.clx81ChargeFlow{grid-template-columns:repeat(3,minmax(125px,1fr))}}</style><style>
 .clx81ThreeColumnLayout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);border:1px solid #b8c2cf;align-items:stretch}
 .clx81BookingColumn,.clx81CommercialColumn{min-width:0;border-right:1px solid #b8c2cf}
 .clx81ThreeColumnLayout .clx81TopGroup{border-bottom:1px solid #b8c2cf}
@@ -2281,41 +2281,48 @@ async function clx78BookingBottom(w){
     ]);
     const ops=[...(gl.operational_sources||[]),...(tre.operational_sources||[])];
     const gls=tre.gl_sources||[],trs=tre.treasury_records||[],links=gl.links||[];
+    const charges=Array.isArray(w.booking?.fields?.['Commercial Charges'])?w.booking.fields['Commercial Charges']:[];
+    const approved=String(w.booking?.status||w.booking?.fields?.['Approval Status']||'').toUpperCase();
+    const locked=['APPROVED','RELEASED','ISSUED','COMPLETED','CLOSED'].includes(approved);
+    const num=x=>{const v=Number(x);return Number.isFinite(v)?v:0};
+    const fmt=x=>Number(num(x).toFixed(2)).toFixed(2);
+    const display=x=>esc(String(x??''));
+    const total=side=>charges.filter(x=>String(x.rate_side).toUpperCase()===side).reduce((v,x)=>v+num(x.applied_rate),0);
+    const totals='<div class="clx81ChargeTotals"><span>Total Cost <b>'+fmt(total('COST'))+'</b></span><span>Total Revenue <b>'+fmt(total('REVENUE'))+'</b></span><span>Net Amount <b>'+fmt(total('REVENUE')-total('COST'))+'</b></span></div>';
     if(clx78BookingBottomTab==='Agreed Charges'){
-      const commercial=(w.booking?.fields?.['Commercial Charges']||[]).map(x=>({...x,module:x.charge_code,rate_source:x.source_type,source_ref:x.source_reference,rule_version:x.source_version,basis:x.rate_basis,currency:x.currency,amount:x.rate_side==='REVENUE'?x.applied_rate:'',vendor_cost:x.party_type==='VENDOR'?x.applied_rate:'',agent_cost:x.party_type==='AGENT'&&x.rate_side==='COST'?x.applied_rate:'',customer_ar:x.party_type==='CUSTOMER'&&x.rate_side==='REVENUE'?x.applied_rate:''}));
-      const rows=[...commercial,...ops,...links].filter((x,i,a)=>a.findIndex(y=>(y.source_reference||y.external_ref||y.source_ref||y.id)===(x.source_reference||x.external_ref||x.source_ref||x.id))===i);
-      const pick=(x,...ks)=>{for(const k of ks)if(x?.[k]!==undefined&&x?.[k]!==null&&x?.[k]!=='')return x[k];return ''};
-      const cols=[
-        ['Charge',['Charge','charge','charge_code','module']],
-        ['Rate Source',['Rate Source','rate_source','source_ref','external_ref']],
-        ['Rule / Version',['Rule / Version','rule_version','version']],
-        ['PP/CC',['PP/CC','pp_cc','freight_term']],
-        ['Collected By',['Collected By','collected_by']],
-        ['Basis',['Basis','basis']],
-        ['Equipment',['Equipment','equipment','size_type']],
-        ['Qty',['Qty','qty','quantity']],
-        ['Currency',['Currency','currency']],
-        ['Sell / Full Local',['Sell / Full Local','sell_full_local','amount']],
-        ['Vendor Cost',['Vendor Cost','vendor_cost']],
-        ['Agent Cost',['Agent Cost','agent_cost']],
-        ['Principal Rec.',['Principal Rec.','principal_receivable']],
-        ['Principal Pay.',['Principal Pay.','principal_payable']],
-        ['Principal Net',['Principal Net','principal_net']],
-        ['Customer AR',['Customer AR','customer_ar']]
-      ];
-      return '<div class="clx78Ledger"><div class="clx81ChargeNote"><b>Agreed Charges</b> · Booking commercial payload + linked operational / GL sources · no parallel Booking model.</div><div class="toolbar">'+writeUi('<button class="btn primary" onclick="openMrgImportForBooking()">Import MRG</button><button class="btn" onclick="clx81ManualChargeNotice()">Add Manual Charge (Review)</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button><span class="muted">MRG import is optional.</span></div>'+
-        '<div class="tablewrap"><table><thead><tr>'+cols.map(x=>'<th>'+esc(x[0])+'</th>').join('')+'</tr></thead><tbody>'+
-        (rows.length?rows.map(r=>'<tr>'+cols.map(x=>'<td>'+esc(pick(r,...x[1]))+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="16">No linked agreed-charge records yet.</td></tr>')+
-        '</tbody></table></div></div>';
+      const phase=['Approved Rate Sources','Booking Context','Charge Ledger','Party Allocation','Principal / Agent SOA','Receipt / Settlement'];
+      const workflow='<div class="clx81ChargeFlow">'+phase.map((name,i)=>'<div><b>'+(i+1)+'</b><span>'+esc(name)+'</span></div>').join('')+'</div>';
+      const cols=['#','Charge','Rate Source','Rule / Version','PP/CC','Collected By','Basis','Equipment','Qty','Currency','Sell / Full Local','Vendor Cost','Agent Cost','Principal Rec.','Principal Pay.','Principal Net'];
+      const chargeCell=(x,k)=>{const amt=num(x.applied_rate),side=String(x.rate_side).toUpperCase(),pty=String(x.party_type).toUpperCase();
+        const values=[x.charge_code,x.source_type||'MRG',[(x.source_reference||x.mrg_reference||''),(x.source_version||'')].filter(Boolean).join(' / '),x.freight_term||'',x.collected_by||'',x.rate_basis||'',x.size_type||'',x.quantity||1,x.currency||'',side==='REVENUE'?fmt(amt):'',side==='COST'&&pty!=='AGENT'?fmt(amt):'',side==='COST'&&pty==='AGENT'?fmt(amt):'',x.principal_receivable??'',x.principal_payable??'',x.principal_net??''];return values[k-1]??'';};
+      return '<div class="clx78Ledger">'+workflow+
+        '<div class="toolbar"><button class="btn" onclick="openMrgImportForBooking()">Check Rates / Get Agreed Charges</button><button class="btn" onclick="openMrgWorkspace(\'GENERAL\',\'MRG\')">Rate Management</button>'+
+        '<button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Special Rate Request</button>'+
+        '<span class="muted">'+(locked?'Approved Booking — use governed amendment for changes':'Draft Booking — existing MRG import available')+'</span></div>'+
+        '<div class="tablewrap"><table><thead><tr>'+cols.map(v=>'<th>'+v+'</th>').join('')+'</tr></thead><tbody>'+
+        (charges.length?charges.map((x,i)=>'<tr><td>'+(i+1)+'</td>'+cols.slice(1).map((_,k)=>'<td>'+display(chargeCell(x,k+1))+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'">No approved Booking commercial charges linked.</td></tr>')+
+        '</tbody></table></div>'+totals+'</div>';
     }
-    let rows=[];
-    if(clx78BookingBottomTab==='Revenue') rows=gls.filter(x=>['invoice','receipt'].includes(x.module));
-    if(clx78BookingBottomTab==='Cost') rows=gls.filter(x=>['bills','payment'].includes(x.module));
-    if(clx78BookingBottomTab==='Financial Auto') rows=[...gls,...trs].slice(0,30);
+    if(clx78BookingBottomTab==='Revenue'||clx78BookingBottomTab==='Cost'){
+      const side=clx78BookingBottomTab.toUpperCase();
+      const rows=charges.filter(x=>String(x.rate_side).toUpperCase()===side);
+      const cols=['#','Charges','Size','Type'].concat(side==='COST'?['Slot Term']:[]).concat(['Quantity','MRG','Rate','Amount','Currency','Ex.Rate','Amount($)','Freight Type','PA Party / TPA Agent','Hide','Remarks','Action']);
+      const cells=x=>{
+        const sz=String(x.size_type||x.equipment||''),size=sz.match(/20|40|45/)?.[0]||'',type=sz.replace(/20|40|45/,'');
+        return [x.charge_code||'',size,type,...(side==='COST'?[x.slot_term||'']:[]),x.quantity||1,
+          [x.source_type||'MRG',x.party_type==='AGENT'?'Agent Matrix':''].filter(Boolean).join(' + '),
+          fmt(x.applied_rate),fmt(x.applied_rate),x.currency||'',x.fx_rate||'1.0000',fmt(x.applied_rate),
+          x.freight_term||'',x.party_code||x.party_type||'',x.hide?'Yes':'No',x.remarks||'Derived from agreed charge ledger',locked?'Locked':'Source'];
+      };
+      return '<div class="clx78Ledger"><div class="clx81ChargeNote">Derived from the existing Agreed Charges records. No duplicate manual '+esc(side.toLowerCase())+' entry.</div>'+
+        '<div class="tablewrap"><table><thead><tr>'+cols.map(v=>'<th>'+esc(v)+'</th>').join('')+'</tr></thead><tbody>'+
+        (rows.length?rows.map((x,i)=>'<tr><td>'+(i+1)+'</td>'+cells(x).map(v=>'<td>'+display(v)+'</td>').join('')+'</tr>').join(''):'<tr><td colspan="'+cols.length+'">No '+esc(side.toLowerCase())+' charge lines in the Booking ledger.</td></tr>')+
+        '</tbody></table></div>'+totals+'</div>';
+    }
+    const rows=[...gls,...trs].slice(0,30);
     const heads=rows.length?Object.keys(rows[0]).slice(0,10):['Status'];
-    const costRevenueActions=(clx78BookingBottomTab==='Revenue'||clx78BookingBottomTab==='Cost')?'<div class="toolbar">'+writeUi('<button class="btn primary" onclick="openMrgImportForBooking()">Import Approved Revenue / Cost Rate</button>')+'<button class="btn" onclick="openScreen(\'agent-tasks::special-rates-request\')">Request Special Rate</button><span class="muted">Direct manual line creation requires approved commercial controls.</span></div>':'';
-    return '<div class="clx78Ledger"><div class="equipNote"><b>'+esc(clx78BookingBottomTab)+'</b> · linked to existing Finance/Treasury/GL records for Job '+esc(jr)+'. No parallel finance model.</div>'+
-      costRevenueActions+'<div class="tablewrap"><table><thead><tr>'+heads.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+
+    return '<div class="clx78Ledger"><div class="equipNote">Financial Auto · Existing Finance/Treasury/GL records only</div>'+
+      '<div class="tablewrap"><table><thead><tr>'+heads.map(h=>'<th>'+esc(h)+'</th>').join('')+'</tr></thead><tbody>'+
       (rows.length?rows.map(r=>'<tr>'+heads.map(h=>'<td>'+esc(r[h]??'')+'</td>').join('')+'</tr>').join(''):'<tr><td>No linked records yet.</td></tr>')+
       '</tbody></table></div></div>';
   }catch(e){return '<div class="clx78Ledger"><div class="equipNote">'+esc(e.message)+'</div></div>'}
