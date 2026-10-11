@@ -2426,6 +2426,7 @@ function clx81EquipmentSelectionPanel(req){
  const inp=(id,label,value,kind='number')=>'<label>'+esc(label)+'<input id="'+id+'" type="'+kind+'" value="'+esc(String(value??''))+'" oninput="clx81UpdateEquipmentMetrics()"></label>';
  const sizes=['20','40','45'].map(x=>[x,x+"'"]);
  const types=[['GP','General Purpose'],['HC','High Cube'],['RF','Reefer'],['FR','Flat Rack'],['OT','Open Top']];
+ queueMicrotask(()=>{clx81FetchEquipmentTypes();clx81UpdateEquipmentMetrics();clx81RenderEquipmentRows();});
  return '<section class="card clx81EquipmentSelect"><div class="clx81EquipmentOneRow">'+
  '<label>Size'+sel('clx81EqSize',sizes,size)+'</label><label>Type'+sel('clx81EqType',types,type)+'</label>'+
  '<label>Quantity<input id="clx81EqQty" type="number" min="1" max="9999" step="1" maxlength="4" value="'+esc(String(req?.quantity||1))+'" oninput="if(this.value.length>4)this.value=this.value.slice(0,4);clx81UpdateEquipmentMetrics()"></label>'+
