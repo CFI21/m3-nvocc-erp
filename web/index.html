@@ -4231,7 +4231,43 @@ function m3PreviewAccessPrompt(message='Enter the dedicated preview UAT token to
   overlay.style.display='flex';
   document.getElementById('m3PreviewAccessToken').focus();
 }
+async function m3EnsureIamLogin(){
+  if(sessionStorage.getItem('M3_SESSION')||sessionStorage.getItem('M3_SESSION_TOKEN'))return;
+  return new Promise(resolve=>{
+    const cover=document.createElement('div');cover.id='m3LocalIamLogin';
+    cover.style.cssText='position:fixed;inset:0;background:#f4f6f9;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:Arial;padding:20px';
+    const card=document.createElement('form');
+    card.style.cssText='width:min(420px,100%);background:#fff;border:1px solid #cbd5e1;border-radius:7px;padding:22px;display:grid;gap:12px';
+    const title=document.createElement('h2');title.textContent='M3 — User Sign In';title.style.margin='0 0 3px';
+    const intro=document.createElement('p');intro.textContent='Sign in using an existing local M3 test user. The preview token alone does not grant party or finance access.';intro.style.margin='0';intro.style.color='#475569';
+    const username=document.createElement('input');username.placeholder='Username';username.autocomplete='username';username.required=true;
+    const password=document.createElement('input');password.type='password';password.placeholder='Password';password.autocomplete='current-password';password.required=true;
+    const mfa=document.createElement('input');mfa.placeholder='MFA code, if required';mfa.autocomplete='one-time-code';
+    const message=document.createElement('p');message.style.cssText='margin:0;color:#b42318;font-size:12px';
+    const submit=document.createElement('button');submit.type='submit';submit.textContent='Sign in';submit.className='btn primary';
+    for(const input of [username,password,mfa])input.style.cssText='height:36px;padding:7px;border:1px solid #94a3b8;border-radius:4px';
+    card.append(title,intro,username,password,mfa,message,submit);cover.append(card);document.body.append(cover);
+    card.addEventListener('submit',async event=>{
+      event.preventDefault();submit.disabled=true;message.textContent='';
+      try{
+        const res=await fetch('/api/admin/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username.value.trim(),password:password.value,mfa_code:mfa.value.trim()||null})});
+        if(!res.ok)throw Error('Sign-in failed (HTTP '+res.status+'). Verify your local test-user credentials and MFA requirements.');
+        const result=await res.json();
+        if(!result.session_token)throw Error('Login returned no IAM session');
+        sessionStorage.setItem('M3_SESSION',result.session_token);
+        const roles=Array.isArray(result.roles)?result.roles:[];
+        const allowed=['SUPER_ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','FINANCE','OPS','AGENT','VIEWER'];
+        const selected=allowed.find(role=>roles.includes(role));
+        if(selected){state.role=selected==='SUPER_ADMIN'?'ADMIN':selected;const roleSelect=document.getElementById('role');if(roleSelect&&[...roleSelect.options].some(x=>x.value===state.role))roleSelect.value=state.role;}
+        password.value='';mfa.value='';cover.remove();resolve();
+      }catch(error){message.textContent=error.message||'Sign-in failed';password.value='';}
+      finally{submit.disabled=false;}
+    });
+    username.focus();
+  });
+}
 async function m3PreviewInitWithTimeout(){
+  await m3EnsureIamLogin();
   let timeoutId;
   try{
     await Promise.race([init(),new Promise((_,reject)=>{timeoutId=setTimeout(()=>reject(new Error('Preview API did not respond within 90 seconds. Please retry.')),90000)})]);
