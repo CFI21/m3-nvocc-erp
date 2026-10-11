@@ -42,3 +42,11 @@ Historical passes do not grant a current release.
 
 ## Next engineering task
 Investigate authorization of `app/masterdata.py GET /records/{domain}` and caller migration (web lookup bootstrapping and 196 screens). Implement and validate a safe scoped access policy on the isolated preview branch before exposing customer/agent records to Principal views.
+
+## Authorized portal delivery sequence (approved)
+1. Agent Portal FIRST: agent-owned customers/vendors, role-based Export/Import/Transshipment operations, own bookings/B-L, container movements, rate visibility, documents, invoices and Agent SOA. Principal can supervise only expressly linked agents; agent may not see another agent's private rates or customers.
+2. Customer Portal SECOND: authenticated organization contact views own approved bookings, tracking milestones, permitted BL/release documents, invoices and payment statuses; no access to agent costs, vendor purchase rates, other customers or internal approval data.
+3. Vendor Portal THIRD: authenticated vendor contact views only assigned transport/depot/service tasks, work orders, evidence, approved submitted invoices and payment status; no access to principal margins, unrelated supplier prices, agent settlement or other vendors.
+Navigation entry points: use existing M3 modules and linked APIs, not new parallel booking, equipment, GL or party data stores. Portals are role-scoped experiences and must not be treated as proof of complete implementation until end-to-end tests pass.
+Test each: authenticated identity association to the authoritative Common Party ID, cross-tenant 403/404 protection on list/detail/download/export, draft vs approved document redaction, audit trail, revoked permissions, and Principal vs HO visibility. Keep providers OFF, real money OFF; no new paid tiers.
+Portal rollout gate: cannot activate until P1 authenticated master reads and applicable relationships, scoped API endpoints and UAT pass. No merge/deploy to production without separate authorization.
