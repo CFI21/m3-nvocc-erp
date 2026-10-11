@@ -2433,7 +2433,7 @@ function clx81EquipmentSelectionPanel(req){
  inp('clx81EqGross','Gross Weight','')+
  inp('clx81EqPackages','Package','')+
  '<label>Unit'+sel('clx81EqPackageUnit',[['CARTON','Carton'],['PALLET','Pallet'],['CRATE','Crate'],['BAG','Bag'],['DRUM','Drum']],'CARTON')+'</label>'+
- '<label>TEUs (auto)<input id="clx81EqTEU" readonly></label></div>'+
+ '<label>TEUs<input id="clx81EqTEU" readonly></label></div>'+
  '<details class="clx81EquipmentMore" id="clx81LclCargoDetails" hidden><summary>Additional Cargo / W-M Calculations</summary><div class="clx81CargoFields">'+
  '<label>Weight Unit'+sel('clx81EqWeightUnit',[['KG','KG'],['MT','MT'],['LB','LB']],'KG')+'</label>'+
  inp('clx81CargoL','Cargo Length (m)','')+inp('clx81CargoW','Cargo Width (m)','')+inp('clx81CargoH','Cargo Height (m)','')+inp('clx81CargoItems','Cargo Item Quantity',1)+
@@ -2450,7 +2450,7 @@ function clx81UpdateEquipmentMetrics(){
  const cbm=dims.every(x=>Number.isFinite(x)&&x>0)&&Number.isInteger(count)&&count>0?dims.reduce((a,b)=>a*b,1)*count:null;
  const unit=v('clx81EqWeightUnit'),weightKg=v('clx81EqGross').trim()?gross*(unit==='MT'?1000:unit==='LB'?0.45359237:1):null;
  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val};
- set('clx81EqTEU',good?(qty*factor).toFixed(2):'');
+ set('clx81EqTEU',good?String(Number((qty*factor).toFixed(2))):'');
  set('clx81EqCBM',cbm===null?'':cbm.toFixed(3));
  set('clx81EqWM',v('clx81ShipmentType')==='LCL'&&cbm!==null&&weightKg!==null?Math.max(cbm,weightKg/1000).toFixed(3):'');
  const notes=[];
