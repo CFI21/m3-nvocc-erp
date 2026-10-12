@@ -436,7 +436,10 @@ def booking_context(job_ref:str,x_role:str=Header("VIEWER"),x_m3_session:Optiona
         if a["role"]=="AGENT" and a["agent"]!=j["agent_code"]:raise HTTPException(404,"Job outside agent scope")
         tr=c.execute("SELECT payload_json FROM transaction_records WHERE job_id=? AND module='booking' ORDER BY id LIMIT 1",(j["id"],)).fetchone()
         fields=_json(tr["payload_json"] if tr else None,{})
-        allocations=[dict(r) for r in c.execute("SELECT * FROM containers WHERE job_id=? OR booking_ref=? ORDER BY container_no",(j["id"],j["booking_ref"])).fetchall()]
+        allocations=[dict(r) for r in c.execute("""SELECT c.* FROM containers c
+            LEFT JOIN jobs linked_job ON linked_job.id=c.job_id
+            WHERE c.job_id=? OR linked_job.booking_id=(SELECT booking_id FROM jobs WHERE id=?)
+            ORDER BY c.container_no""",(j["id"],j["id"])).fetchall()]
         fin=dict(c.execute("""SELECT COALESCE(SUM(CASE WHEN entry_type='REVENUE' THEN amount ELSE 0 END),0) revenue,
                                    COALESCE(SUM(CASE WHEN entry_type='COST' THEN amount ELSE 0 END),0) cost,
                                    COALESCE(SUM(CASE WHEN entry_type='COMMISSION' THEN amount ELSE 0 END),0) commission,
