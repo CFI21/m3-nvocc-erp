@@ -114,3 +114,34 @@ def test_authenticated_role_and_data_scope_are_server_authoritative(isolated):
     with pytest.raises(HTTPException) as exc:
         related("50002",x_role="SUPER_ADMIN",x_m3_session=ops,**scope_none)
     assert exc.value.status_code==404
+
+
+def test_booking_equipment_lines_validation_and_legacy_fallback():
+    from app.main import validate_fields
+    from app.agent_setup import _qty, _teu
+    job={"job_ref":"50001","booking_ref":"BK-TEST","pol":"NLRTM","pod":"SGSIN"}
+    valid={"Job Ref":"50001","Equipment Lines":[
+        {"size":"20","type":"GP","quantity":2,"teu":2},
+        {"size":"40","type":"HC","quantity":3,"teu":6},
+        {"size":"45","type":"HC","quantity":1,"teu":2},
+    ]}
+    assert validate_fields("booking",job,valid)==[]
+    assert _qty(valid)==6
+    assert _teu(valid)==10
+    assert _qty({"Equipment":"40GP","Quantity":"2"})==2
+    assert _teu({"Equipment":"40GP","Quantity":"2"})==4
+    for quantity in (1.5,"1.5",True,0,-1,10000):
+        payload={"Equipment Lines":[{"size":"20","quantity":quantity,"teu":2}]}
+        assert "INVALID_EQUIPMENT_LINE" in validate_fields("booking",job,payload)
+    for invalid in ({"size":"53","quantity":1,"teu":2},
+                    {"size":"20","quantity":2,"teu":4},
+                    {"size":"40","quantity":1,"teu":"NaN"}):
+        assert "INVALID_EQUIPMENT_LINE" in validate_fields("booking",job,{"Equipment Lines":[invalid]})
+    assert "INVALID_EQUIPMENT_LINES" in validate_fields("booking",job,{"Equipment Lines":"not-a-list"})
+
+
+def test_booking_ui_multi_equipment_payload_wiring_present():
+    assert "clx81BookingDraft.values['Equipment Lines']=lines" in HTML
+    assert "clx49Workspace?.booking?.fields?.['Equipment Lines']" in HTML
+    assert "clx81EquipmentRowBookingKey!==bookingKey" in HTML
+    assert "details.hidden=!lcl" in HTML
