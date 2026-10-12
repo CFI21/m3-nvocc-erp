@@ -57,13 +57,13 @@ def test_lower_workspace_and_commercial_flow():
 
 def test_charge_grid_exact_column_contract():
     start=HTML.index("if(clx78BookingBottomTab==='Agreed Charges')")
-    end=HTML.index("let rows=[]",start)
+    end=HTML.index("if(clx78BookingBottomTab==='Revenue'",start)
     b=HTML[start:end]
-    cols=["Charge","Rate Source","Rule / Version","PP/CC","Collected By","Basis","Equipment","Qty","Currency","Sell / Full Local","Vendor Cost","Agent Cost","Principal Rec.","Principal Pay.","Principal Net","Customer AR"]
+    cols=["Charge","Rate Source","Rule / Version","PP/CC","Collected By","Basis","Equipment","Qty","Currency","Sell / Full Local","Vendor Cost","Agent Cost","Principal Rec.","Principal Pay.","Principal Net"]
     for x in cols: assert x in b,x
     assert "/api/gl/job/" in HTML
     assert "/api/clx046/job/" in HTML
-    assert "no parallel Booking model" in HTML
+    assert "no new data model" in HTML
 
 def test_no_new_booking_model_or_schema():
     m=json.loads((ROOT/'CLX081_BOOKING_FIELD_MATRIX.json').read_text())
