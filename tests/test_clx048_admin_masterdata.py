@@ -138,7 +138,7 @@ def test_unreferenced_master_four_eyes_version_and_audit(isolated):
     assert done['version']==2
     row=next(x for x in records('carrier',x_m3_session=admin_session()) if x['record_key']=='CLX-NEW-CARRIER')
     assert row['status']=='INACTIVE'
-    assert any(x['record_key']=='CLX-NEW-CARRIER' for x in audit_list(x_m3_session=admin_session()))
+    assert any(x['record_key']=='CLX-NEW-CARRIER' for x in audit_list())
 
 def test_master_and_iam_audits_are_immutable(isolated):
     token=admin_session()
