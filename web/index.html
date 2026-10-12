@@ -2789,7 +2789,7 @@ function clx81BookingReferenceGrid(w,r){
   };
   const topGroup=(title,items)=>'<div class="clx81TopGroup"><div class="clx81RefSubhead">'+title+'</div><div class="clx81TopCells">'+items.map(x=>topCell(x[0],x[1])).join('')+'</div></div>';
   const topLeft=[['BK Date',val('BK Date',val('Booking Date'))],['BK #',val('BK #',ref)],['Approval #',val('Approval #')],['Job #',val('Job #',val('Job Ref'))],['Currency',val('Currency')],['Inv Type',val('Inv Type')]];
-  const topRight=[['Reference',val('Reference',val('Reference #'))],['Job Category',val('Job Category')],['Inv Type',val('Inv Type')],['SOA #',val('SOA #')],['Status',val('Status',r?.status)],['Settled / Un-Settled',val('Settlement Status')]];
+  const topRight=[['Reference',val('Reference',val('Reference #'))],['Job Category',val('Job Category')],['SOA #',val('SOA #')],['Status',val('Status',r?.status)],['Settled / Un-Settled',val('Settlement Status')]];
   const detailRow=(items)=>'<div class="clx81DetailRow'+(items.length===1&&items[0][0]==='Principal'?' clx81PrincipalRow':'')+'">'+items.map(x=>topCell(x[0],x[1])).join('')+(items.length===1&&items[0][0]==='Principal'?'<button type="button" class="clx81PrincipalBtn" onclick="clx81ShowPrincipalInventory()">Inventory</button><button type="button" class="clx81PrincipalBtn" onclick="clx81ShowMergeJobInfo()">Merge Job</button>':'')+'</div>';
   const detailGroup=(title,rows)=>'<div class="clx81DetailsGroup"><div class="clx81RefSubhead">'+title+'</div>'+rows.map(detailRow).join('')+'</div>';
   const detailsLeft=[
