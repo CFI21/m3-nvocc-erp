@@ -221,6 +221,24 @@ def validate_fields(module,job,fields):
         try:
             if float(fields.get('Allocated',0))>float(fields.get('Booked',0)): errs.append('OVER_ALLOCATION')
         except Exception: errs.append('INVALID_ALLOCATION')
+    if module=='booking' and 'Equipment Lines' in fields:
+        lines=fields['Equipment Lines']
+        if not isinstance(lines,list) or len(lines)>500:
+            errs.append('INVALID_EQUIPMENT_LINES')
+        else:
+            for line in lines:
+                if not isinstance(line,dict):
+                    errs.append('INVALID_EQUIPMENT_LINE'); break
+                size=str(line.get('size','')).replace("'","")
+                try:
+                    qty=int(line.get('quantity'))
+                    teu=float(line.get('teu'))
+                    expected=qty*(1 if size=='20' else 2)
+                    valid=qty>=1 and qty<=9999 and size in ('20','40','45') and abs(teu-expected)<0.001
+                except (ValueError,TypeError,OverflowError):
+                    valid=False
+                if not valid:
+                    errs.append('INVALID_EQUIPMENT_LINE'); break
     if module=='booking':
         if fields.get('Booking No.') and fields.get('Booking No.')!=job['booking_ref']: errs.append('BOOKING_MASTER_MISMATCH')
         if fields.get('POL') and fields.get('POL')!=job['pol']: errs.append('POL_JOB_MISMATCH')
