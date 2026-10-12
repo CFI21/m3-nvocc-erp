@@ -2218,7 +2218,7 @@ function clx81CaptureBookingDraft(){
   if(!record||!fields.length)return;
   const key=String(w.context?.job_ref||'')+':'+String(record.id||'');
   if(clx81BookingDraft?.key!==key)clx81BookingDraft={key,values:{}};
-  for(const el of fields){const k=el.dataset.clx49Field;if(!Object.prototype.hasOwnProperty.call(clx81BookingDraft.values,k))clx81BookingDraft.values[k]=el.type==='checkbox'?el.checked:el.value;}
+  for(const el of fields){const k=el.dataset.clx49Field;clx81BookingDraft.values[k]=el.type==='checkbox'?el.checked:el.value;}
   for(const el of document.querySelectorAll('.clx78Workspace [data-clx81-grid-field]'))clx81BookingDraft.values[el.dataset.clx81GridField]=el.value;
 }
 function clx81RestoreBookingDraft(w){
