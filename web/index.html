@@ -2644,7 +2644,7 @@ function clx81AddEquipmentRow(){
 function clx81UpdateEquipmentMetrics(){
  const v=id=>document.getElementById(id)?.value||'',n=id=>Number(String(v(id)).replace(',','.'));
  const size=v('clx81EqSize'),qty=n('clx81EqQty'),count=n('clx81CargoItems'),gross=n('clx81EqGross');
- const lcl=v('clx81ShipmentType')==='LCL';const details=document.getElementById('clx81LclCargoDetails');if(details){details.hidden=true;details.open=false;}
+ const lcl=v('clx81ShipmentType')==='LCL';const details=document.getElementById('clx81LclCargoDetails');if(details){details.hidden=!lcl;details.open=lcl;}
  const factor={'10':0.5,'20':1,'40':2,'45':2,'53':2.65}[size];
  const good=Number.isInteger(qty)&&qty>0&&Number.isFinite(factor);
  const dims=['clx81CargoL','clx81CargoW','clx81CargoH'].map(n);
