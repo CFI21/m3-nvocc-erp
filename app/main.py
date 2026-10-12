@@ -231,7 +231,9 @@ def validate_fields(module,job,fields):
                     errs.append('INVALID_EQUIPMENT_LINE'); break
                 size=str(line.get('size','')).replace("'","")
                 try:
-                    qty=int(line.get('quantity'))
+                    qty_raw=line.get('quantity')
+                    if isinstance(qty_raw,bool) or not str(qty_raw).isdigit(): raise ValueError('Invalid quantity')
+                    qty=int(qty_raw)
                     teu=float(line.get('teu'))
                     expected=qty*(1 if size=='20' else 2)
                     valid=qty>=1 and qty<=9999 and size in ('20','40','45') and abs(teu-expected)<0.001
