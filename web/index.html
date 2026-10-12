@@ -2528,6 +2528,8 @@ const CLX81_EQUIPMENT_DIMENSION_REFERENCE=Object.freeze({
  '45':Object.freeze({HC:[13.716,2.438,2.896]})
 });
 function clx81EquipmentSelectionPanel(req){
+ const bookingKey=String(clx49Workspace?.context?.job_ref||'')+':'+String(clx49Workspace?.booking?.id||'');
+ if(clx81EquipmentRowBookingKey!==bookingKey){clx81EqSelectedRows=[];clx81EquipmentRowBookingKey=bookingKey;}
  const eq=String(req?.equipment||'').toUpperCase(),match=eq.match(/(20|40|45)/),size=match?.[1]||'40';
  const type=/FR|FLAT/.test(eq)?'FR':/OT|OPEN/.test(eq)?'OT':/RF|REEFER/.test(eq)?'RF':/HC|HIGH/.test(eq)?'HC':'GP';
  const sel=(id,options,val)=>'<select id="'+id+'" onchange="'+(id==='clx81EqSize'?'clx81SetTypesForSize()':'clx81UpdateEquipmentMetrics()')+'">'+options.map(x=>'<option value="'+esc(x[0])+'"'+(x[0]===val?' selected':'')+'>'+esc(x[1])+'</option>').join('')+'</select>';
@@ -2551,6 +2553,7 @@ function clx81EquipmentSelectionPanel(req){
 }
 // Existing Booking Equipment entry rows; preview presentation only, no second booking or equipment model.
 let clx81EqSelectedRows=[];
+let clx81EquipmentRowBookingKey=null;
 let clx81EquipmentMasterRows=[];
 async function clx81FetchEquipmentTypes(){
  const size=document.getElementById('clx81EqSize'),type=document.getElementById('clx81EqType'),unit=document.getElementById('clx81EqPackageUnit');
