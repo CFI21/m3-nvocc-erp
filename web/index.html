@@ -2529,7 +2529,11 @@ const CLX81_EQUIPMENT_DIMENSION_REFERENCE=Object.freeze({
 });
 function clx81EquipmentSelectionPanel(req){
  const bookingKey=String(clx49Workspace?.context?.job_ref||'')+':'+String(clx49Workspace?.booking?.id||'');
- if(clx81EquipmentRowBookingKey!==bookingKey){clx81EqSelectedRows=[];clx81EquipmentRowBookingKey=bookingKey;}
+ if(clx81EquipmentRowBookingKey!==bookingKey){
+  const saved=clx49Workspace?.booking?.fields?.['Equipment Lines'];
+  clx81EqSelectedRows=Array.isArray(saved)?saved.filter(x=>x&&['20','40','45'].includes(String(x.size))&&Number.isInteger(Number(x.quantity))&&Number(x.quantity)>0).map(x=>[String(x.size)+"'",String(x.type||'GP'),String(x.quantity),String(x.shipment_type||'FCL'),String(x.gross_weight??''),String(x.packages??''),String(x.unit||'CARTON'),String(x.total_weight??''),String(x.teu??(Number(x.quantity)*(String(x.size)==='20'?1:2)))]):[];
+  clx81EquipmentRowBookingKey=bookingKey;
+ }
  const eq=String(req?.equipment||'').toUpperCase(),match=eq.match(/(20|40|45)/),size=match?.[1]||'40';
  const type=/FR|FLAT/.test(eq)?'FR':/OT|OPEN/.test(eq)?'OT':/RF|REEFER/.test(eq)?'RF':/HC|HIGH/.test(eq)?'HC':'GP';
  const sel=(id,options,val)=>'<select id="'+id+'" onchange="'+(id==='clx81EqSize'?'clx81SetTypesForSize()':'clx81UpdateEquipmentMetrics()')+'">'+options.map(x=>'<option value="'+esc(x[0])+'"'+(x[0]===val?' selected':'')+'>'+esc(x[1])+'</option>').join('')+'</select>';
@@ -2961,6 +2965,11 @@ async function saveClx049Tab(module,id,version){
     if(module==='booking'&&!clx81ValidateMasterFields())return;
     if(module==='booking')document.querySelectorAll('.clx78Workspace [data-clx81-master]').forEach(el=>{el.value=clx81MasterStoredValue(el)});
     if(module==='booking')clx81CaptureBookingDraft();
+    if(module==='booking'&&clx81EquipmentRowBookingKey===String(clx49Workspace?.context?.job_ref||'')+':'+String(id)){
+      const lines=clx81EqSelectedRows.map(r=>({size:String(r[0]).replace(/'/g,''),type:r[1],quantity:Number(r[2]),shipment_type:r[3],gross_weight:r[4],packages:r[5],unit:r[6],total_weight:r[7],teu:Number(r[8])}));
+      if(!clx81BookingDraft)clx81BookingDraft={key:String(clx49Workspace?.context?.job_ref||'')+':'+String(id),values:{}};
+      clx81BookingDraft.values['Equipment Lines']=lines;
+    }
     const fields={};document.querySelectorAll('[data-clx49-field]').forEach(el=>fields[el.dataset.clx49Field]=el.type==='checkbox'?(el.checked?'true':'false'):el.value);
     if(module==='booking'&&clx81BookingDraft?.key===String(clx49Workspace?.context?.job_ref||'')+':'+String(id))Object.assign(fields,Object.fromEntries(Object.entries(clx81BookingDraft.values).map(([k,v])=>[k,typeof v==='boolean'?(v?'true':'false'):(clx81MasterDomains[k]?(clx81MasterCache[clx81MasterDomains[k]]||[]).find(r=>v===r.code+' — '+r.name)?.code||v:v)])));
     const headers={'Content-Type':'application/json',...clx49Headers(clx49Workspace)};
