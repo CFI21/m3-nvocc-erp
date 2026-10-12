@@ -136,9 +136,9 @@ def test_unreferenced_master_four_eyes_version_and_audit(isolated):
     dr=create_change(Change(domain='carrier',record_key='CLX-NEW-CARRIER',operation='DEACTIVATE',payload={},reason='retire'),x_m3_session=maker_session())
     done=decide(dr['change_ref'],Decision(decision='APPROVE'),x_m3_session=checker_session())
     assert done['version']==2
-    row=next(x for x in records('carrier') if x['record_key']=='CLX-NEW-CARRIER')
+    row=next(x for x in records('carrier',x_m3_session=admin_session()) if x['record_key']=='CLX-NEW-CARRIER')
     assert row['status']=='INACTIVE'
-    assert any(x['record_key']=='CLX-NEW-CARRIER' for x in audit_list())
+    assert any(x['record_key']=='CLX-NEW-CARRIER' for x in audit_list(x_m3_session=admin_session()))
 
 def test_master_and_iam_audits_are_immutable(isolated):
     token=admin_session()
