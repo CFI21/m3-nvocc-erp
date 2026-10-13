@@ -189,7 +189,7 @@ def test_agent_master_create_update_four_eyes_and_readback(isolated):
     first=next(x for x in records('agent',x_m3_session=admin_session()) if x['record_key']==code)
     assert all(first['payload'][k]==v for k,v in initial.items())
     updated=create_change(Change(domain='agent',record_key=code,operation='UPDATE',
-                                 payload={'short_name':'UAT2','import_email':'import@example.com'},
+                                 payload={'short_name':'UAT2','import_email':'import@example.com','active':False},
                                  reason='agent field readback'),
                           x_m3_session=maker_session())
     assert decide(updated['change_ref'],Decision(decision='APPROVE'),
@@ -198,3 +198,4 @@ def test_agent_master_create_update_four_eyes_and_readback(isolated):
     assert saved['payload']['short_name']=='UAT2'
     assert saved['payload']['import_email']=='import@example.com'
     assert saved['payload']['export_email']==initial['export_email']
+    assert saved['payload']['active'] is False
