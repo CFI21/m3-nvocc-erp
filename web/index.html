@@ -774,10 +774,10 @@ function m3AgentPaint(){
  if(row&&m3AgentTab==='Emails'){
   const keys=['email','export_email','import_email'];
   const populated=keys.filter(k=>String(p[k]||'').trim());
-  fields+='<div style="grid-column:1/-1"><span class="muted">Available configured email destinations: '+esc(populated.length?populated.map(k=>k.replaceAll('_',' ').toUpperCase()).join(', '):'None')+'. Port-specific email rows are governed configuration records and require independent approval.</span></div>';
+  fields+='<div style="grid-column:1/-1"><b>Configured Agent email destinations</b>'+(populated.length?populated.map(k=>'<div><span class="muted">'+esc((m3AgentLabels[k]||k.replaceAll('_',' ')).toUpperCase())+':</span> '+esc(String(p[k]))+'</div>').join(''):'<div class="muted">None configured</div>')+'<p class="muted">Port-specific email rows are governed configuration records and require independent approval.</p></div>';
  }
  if(row&&m3AgentTab==='B/L Template'){
-  fields+='<div style="grid-column:1/-1" class="muted">Only existing Agent Master template references are displayed. No unverified B/L template is assigned automatically.</div>';
+  fields+='<div style="grid-column:1/-1"><b>Existing B/L template reference</b><div>'+esc(String(p.bl_template||'Not assigned'))+'</div><p class="muted">Reference only. No template is created or assigned automatically.</p></div>';
  }
  if(row&&m3AgentTab==='CRO Detail'){
   fields+='<div style="grid-column:1/-1" class="muted">CRO values are governed Agent Master fields, not a separate duplicated operational record.</div>';
