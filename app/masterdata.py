@@ -64,6 +64,12 @@ def validate_payload(domain,payload,existing=None):
         required=()
         if kind=='AGENT_OFFICE_ASSIGNMENT':
             required=('agent_code','office_code')
+        elif kind=='AGENT_EMAIL':
+            required=('agent_code','port_code','email')
+            from email.utils import parseaddr
+            email=str(merged.get('email') or '').strip()
+            if email and (parseaddr(email)[1]!=email or '@' not in email or '.' not in email.rsplit('@',1)[-1]):
+                errs.append('AGENT_EMAIL_INVALID')
         elif kind=='AGENT_NETWORK' and str(merged.get('network_type') or '').upper()=='PORT_COVERAGE':
             required=('agent_code','office_code','scope','port_code')
             if str(merged.get('scope') or '').upper() not in ('POL','POD','TS'):
