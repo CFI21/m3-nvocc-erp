@@ -145,3 +145,24 @@ def test_booking_ui_multi_equipment_payload_wiring_present():
     assert "clx49Workspace?.booking?.fields?.['Equipment Lines']" in HTML
     assert "clx81EquipmentRowBookingKey!==bookingKey" in HTML
     assert "details.hidden=!lcl" in HTML
+
+
+def test_booking_rejects_duplicate_equipment_size_and_type():
+    from app.main import validate_fields
+    from app.agent_setup import _qty, _teu
+    job={"job_ref":"50001","booking_ref":"BK-TEST","pol":"NLRTM","pod":"SGSIN"}
+    lines=[{"size":"40","type":"FR","quantity":2,"teu":4},
+           {"size":"40","type":"fr","quantity":1,"teu":2}]
+    assert "DUPLICATE_EQUIPMENT_TYPE" in validate_fields("booking",job,{"Equipment Lines":lines})
+    unique=[{"size":"40","type":"FR","quantity":3,"teu":6},
+            {"size":"40","type":"HC","quantity":2,"teu":4},
+            {"size":"20","type":"FR","quantity":1,"teu":1}]
+    fields={"Equipment Lines":unique}
+    assert validate_fields("booking",job,fields)==[]
+    assert _qty(fields)==6
+    assert _teu(fields)==11
+
+
+def test_booking_ui_prevents_duplicate_type_and_type_change_on_edit():
+    assert "This container size/type is already selected." in HTML
+    assert "Container size/type cannot be changed after selection." in HTML
