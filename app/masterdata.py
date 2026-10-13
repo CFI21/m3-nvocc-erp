@@ -176,12 +176,21 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     ref='MDC-'+uuid.uuid4().hex[:10].upper();base=existing['version'] if existing else 0
     c.execute('INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) VALUES(?,?,?,?,?,?,?,?,?)',(ref,b.domain,b.record_key,b.operation,j(b.payload),b.reason,user,now(),base));audit(c,user,'CHANGE_REQUEST_CREATE',b.domain,b.record_key,ref,None,b.payload);c.close();return {'change_ref':ref,'status':'PENDING','base_version':base}
 @router.get('/changes')
-def changes(status:Optional[str]=None):
-    c=connect();init_schema(c);q='SELECT * FROM md_change_requests';args=[]
-    if status:q+=' WHERE status=?';args=[status]
-    q+=' ORDER BY id DESC';out=[]
-    for r in c.execute(q,args):d=dict(r);d['payload']=json.loads(d.pop('payload_json'));out.append(d)
-    c.close();return out
+def changes(status:Optional[str]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_CHANGE_READ_NOT_AUTHORIZED'})
+        q='SELECT * FROM md_change_requests';args=[]
+        if status:q+=' WHERE status=?';args=[status]
+        q+=' ORDER BY id DESC';out=[]
+        for r in c.execute(q,args):
+            d=dict(r);d['payload']=json.loads(d.pop('payload_json'));out.append(d)
+        return out
+    finally:
+        c.close()
 @router.post('/changes/{change_ref}/decision')
 def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
