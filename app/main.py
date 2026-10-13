@@ -159,6 +159,22 @@ def booking_agent_reference_prefix(operational_responsibility: str) -> str:
     return BOOKING_AGENT_REFERENCE_PREFIXES[key]
 
 
+def booking_port_allowed(port_code, allowed_ports, *, all_ports_granted=False):
+    """Fail closed unless a verified permission grant covers this exact port.
+
+    Caller must obtain allowed_ports/all_ports_granted from authoritative IAM,
+    not from submitted Booking payloads or caller-supplied headers.
+    """
+    port=str(port_code or '').strip().upper()
+    if not port or not re.fullmatch(r'[A-Z0-9]{3,8}', port):
+        return False
+    if all_ports_granted is True:
+        return True
+    if not isinstance(allowed_ports,(set,list,tuple,frozenset)):
+        return False
+    return port in {str(p).strip().upper() for p in allowed_ports if isinstance(p,str)}
+
+
 class CreateBody(BaseModel):
     job_ref:str=Field(pattern=r'^\d{5}$')
     external_ref:Optional[str]=None
