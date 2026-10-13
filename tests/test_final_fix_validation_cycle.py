@@ -272,3 +272,11 @@ def test_booking_session_agent_write_guard_present():
     from pathlib import Path
     text=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
     assert text.count('BOOKING_AGENT_LOGIN_NOT_AUTHORIZED') == 2
+
+
+def test_existing_agent_office_cannot_silently_cross_country_scope():
+    from pathlib import Path
+    source=(Path(__file__).resolve().parents[1]/'app'/'admin.py').read_text(encoding='utf-8')
+    assert 'AGENT_OFFICE_SCOPE_CONFLICT' in source
+    assert "office['country_id']!=co['id']" in source
+    assert "office['organization_id']!=org['id']" in source
