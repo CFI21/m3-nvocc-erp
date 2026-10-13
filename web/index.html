@@ -705,7 +705,7 @@ function agentConfigManage(label){
     '<button class="btn" onclick="openScreen(\'master-data::agents\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Agents\'})">Agent Master</button>';
 }
 
-let m3AgentRows=[],m3AgentIndex=-1,m3AgentTab='Agent Detail';
+let m3AgentRows=[],m3AgentConfigs=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false;
 const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template'];
 const m3AgentFields={
  'Agent Detail':['phone','mobile','export_email','import_email','website','contact','fax','port','next_agent','next_port','default_depot','booking_restriction','company_logo','stamp'],
@@ -715,26 +715,61 @@ const m3AgentFields={
  'CRO Detail':['bs_code','operator_code','cro_remarks','noc_note'],
  'B/L Template':['bl_template']
 };
-function m3AgentSelect(i){m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentPaint()}
-function m3AgentSelectTab(t){if(m3AgentTabs.includes(t)){m3AgentTab=t;m3AgentPaint()}}
+function m3AgentSelect(i){m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentEditing=false;m3AgentPaint()}
+function m3AgentSelectTab(t){if(m3AgentTabs.includes(t)){m3AgentTab=t;m3AgentEditing=false;m3AgentPaint()}}
+function m3AgentConfigMatches(r,agent){
+ const p=r.payload||{};
+ return String(p.agent_code||'')===String(agent.record_key||'');
+}
 function m3AgentPaint(){
- const row=m3AgentRows[m3AgentIndex];
- const p=row?.payload||{};
+ const row=m3AgentRows[m3AgentIndex],p=row?.payload||{};
  const buttons=m3AgentRows.map((x,i)=>'<button class="btn'+(i===m3AgentIndex?' primary':'')+'" onclick="m3AgentSelect('+i+')">'+esc(x.display_name||x.record_key)+'</button>').join('');
  const tabs=m3AgentTabs.map(t=>'<button class="btn'+(t===m3AgentTab?' primary':'')+'" data-agent-tab="'+esc(t)+'">'+esc(t)+'</button>').join('');
- const fields=(m3AgentFields[m3AgentTab]||[]).map(k=>{
+ let fields=(m3AgentFields[m3AgentTab]||[]).map(k=>{
    const raw=p[k]??p[k.replaceAll('_',' ')];
-   return '<div style="min-width:155px;padding:7px;border-bottom:1px solid #dce3e0"><div class="muted">'+esc(k.replaceAll('_',' ').toUpperCase())+'</div><b>'+esc(raw===null||raw===undefined||raw===''?'—':String(raw))+'</b></div>';
+   const value=raw===null||raw===undefined?'':String(raw);
+   const label=esc(k.replaceAll('_',' ').toUpperCase());
+   return '<div style="min-width:150px;padding:6px;border-bottom:1px solid #dce3e0"><label class="muted">'+label+'</label>'+(m3AgentEditing?'<input data-m3-agent-field="'+esc(k)+'" value="'+esc(value)+'" style="width:100%;max-width:230px">':'<div><b>'+esc(value||'—')+'</b></div>')+'</div>';
  }).join('');
- $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Authoritative Agent data · read-only review</span><span class="grow"></span><button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?'<div><b>'+esc(row.display_name||row.record_key)+'</b> · '+esc(row.record_key)+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Unpopulated fields show —. Governed editing and related office records are not yet connected.</p>':'<p>No Agent records returned.</p>')+'</div>';
+ if(row&&(m3AgentTab==='Countries'||m3AgentTab==='Offices')){
+  const kind=m3AgentTab==='Countries'?'AGENT_OFFICE_ASSIGNMENT':'AGENT_OFFICE_ASSIGNMENT';
+  const linked=m3AgentConfigs.filter(x=>String(x.payload?.config_type||'').toUpperCase()===kind&&m3AgentConfigMatches(x,row)&&x.status==='ACTIVE');
+  fields+='<div style="grid-column:1/-1"><b>Authorized assignment configuration records</b><div class="muted">Configuration alone does not grant IAM access.</div>'+
+    (linked.map(x=>'<div>'+esc(String(x.payload?.office_code||''))+' · '+esc(String(x.payload?.country_code||'Country resolved through IAM'))+'</div>').join('')||'<div class="muted">No explicit assignment records found. Legacy office lookup may apply.</div>')+'</div>';
+ }
+ const editor=row?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
+ const save=m3AgentEditing?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
+ $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?'<div><b>'+esc(row.display_name||row.record_key)+'</b> · '+esc(row.record_key)+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
  document.getElementById('m3AgentReload')?.addEventListener('click',renderHoAgentMasterWorkspace);
+ document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{m3AgentEditing=!m3AgentEditing;m3AgentPaint()});
+ document.getElementById('m3AgentSave')?.addEventListener('click',m3AgentSubmit);
+}
+async function m3AgentSubmit(){
+ const row=m3AgentRows[m3AgentIndex];if(!row)return;
+ const payload={};
+ document.querySelectorAll('[data-m3-agent-field]').forEach(el=>{
+  const key=el.dataset.m3AgentField,val=el.value.trim();
+  if(val!==String(row.payload?.[key]??''))payload[key]=val;
+ });
+ if(!Object.keys(payload).length){alert('No changes to submit');return}
+ const reason=prompt('Reason for Agent Master change request:');
+ if(!reason||!reason.trim())return;
+ try{
+  const result=await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'agent',record_key:row.record_key,operation:'UPDATE',payload,reason:reason.trim()})});
+  alert('Agent change submitted for approval: '+(result.change_ref||'pending'));
+  m3AgentEditing=false;await renderHoAgentMasterWorkspace();
+ }catch(e){alert('Agent change request failed: '+e.message)}
 }
 async function renderHoAgentMasterWorkspace(){
  try{
-  const rows=await api('/api/masterdata/records/agent');
+  const [rows,configs]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration')]);
+  const selected=m3AgentRows[m3AgentIndex]?.record_key;
   m3AgentRows=Array.isArray(rows)?rows:rows.records||[];
-  m3AgentIndex=m3AgentRows.length?0:-1;m3AgentTab='Agent Detail';m3AgentPaint();
+  m3AgentConfigs=Array.isArray(configs)?configs:[];
+  m3AgentIndex=Math.max(0,m3AgentRows.findIndex(x=>x.record_key===selected));
+  if(!m3AgentRows.length)m3AgentIndex=-1;
+  m3AgentEditing=false;m3AgentPaint();
  }catch(e){$('gridArea').innerHTML='<div class="card badtext">Agent Master unavailable: '+esc(e.message)+'</div>'}
 }
 
