@@ -737,6 +737,22 @@ function m3AgentPaint(){
   fields+='<div style="grid-column:1/-1"><b>Agent office assignments</b><div class="muted">These are governed configuration records; actual access additionally requires IAM membership. Manage assignments through the existing governed configuration workflow.</div>'+
     (linked.map(x=>'<div>'+esc(String(x.payload?.office_code||'Office not specified'))+(x.payload?.country_code?' · '+esc(String(x.payload.country_code)):' · Country is resolved by IAM')+'</div>').join('')||'<div class="muted">No explicit assignments recorded. The legacy single-office rule may apply.</div>')+'</div>';
  }
+ if(row&&m3AgentTab==='Offices'){
+  const coverage=m3AgentConfigs.filter(x=>x.status==='ACTIVE'&&m3AgentConfigMatches(x,row)&&String(x.payload?.config_type||'').toUpperCase()==='AGENT_NETWORK'&&String(x.payload?.network_type||'').toUpperCase()==='PORT_COVERAGE');
+  fields+='<div style="grid-column:1/-1"><b>Configured port coverage</b><div class="muted">Operational coverage is subject to the IAM office membership and effective dates; this list does not itself grant access.</div>'+
+   (coverage.map(x=>'<div>'+esc(String(x.payload?.office_code||'—'))+' · '+esc(String(x.payload?.scope||'—'))+' · '+esc(String(x.payload?.port_code||'—'))+'</div>').join('')||'<div class="muted">No configured port coverage records.</div>')+'</div>';
+ }
+ if(row&&m3AgentTab==='Emails'){
+  const keys=['email','export_email','import_email'];
+  const populated=keys.filter(k=>String(p[k]||'').trim());
+  fields+='<div style="grid-column:1/-1"><span class="muted">Available configured email destinations: '+esc(populated.length?populated.map(k=>k.replaceAll('_',' ').toUpperCase()).join(', '):'None')+'. Multiple port-specific email rows are not yet present in the Agent Master model.</span></div>';
+ }
+ if(row&&m3AgentTab==='B/L Template'){
+  fields+='<div style="grid-column:1/-1" class="muted">Only existing Agent Master template references are displayed. No unverified B/L template is assigned automatically.</div>';
+ }
+ if(row&&m3AgentTab==='CRO Detail'){
+  fields+='<div style="grid-column:1/-1" class="muted">CRO values are governed Agent Master fields, not a separate duplicated operational record.</div>';
+ }
  const editable=m3AgentTab!=='Countries'&&m3AgentTab!=='Offices';
  const editor=row&&editable?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
  const save=m3AgentEditing?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
