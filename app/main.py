@@ -175,6 +175,28 @@ def booking_port_allowed(port_code, allowed_ports, *, all_ports_granted=False):
     return port in {str(p).strip().upper() for p in allowed_ports if isinstance(p,str)}
 
 
+def booking_validate_authorized_ports(fields, grants):
+    """Validate Booking ports against verified, per-field IAM grants.
+
+    A missing grant denies a populated field; the caller may not supply grants
+    from request payload. Principal/HO all-port access requires an explicit
+    trusted Boolean True for that field.
+    """
+    mapping={'POL':'POL','POD':'POD','POT (1)':'TS','POT (2)':'TS'}
+    if not isinstance(grants,dict):
+        raise HTTPException(403,{'code':'BOOKING_PORT_PERMISSION_MISSING'})
+    for field,scope in mapping.items():
+        value=fields.get(field)
+        if value in (None,''):
+            continue
+        rule=grants.get(scope)
+        if not isinstance(rule,dict) or not booking_port_allowed(
+            value,rule.get('ports'),all_ports_granted=rule.get('all_ports') is True
+        ):
+            raise HTTPException(403,{'code':'BOOKING_PORT_NOT_AUTHORIZED','field':field})
+    return True
+
+
 class CreateBody(BaseModel):
     job_ref:str=Field(pattern=r'^\d{5}$')
     external_ref:Optional[str]=None
