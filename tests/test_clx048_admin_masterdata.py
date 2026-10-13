@@ -172,3 +172,29 @@ def test_workspace_and_live_access_trace(isolated):
     a=user_access('md.maker','AUDITOR')
     assert a['evaluated_live'] is True
     assert any(r['role_code']=='MASTER_DATA' for r in a['roles'])
+
+
+def test_agent_master_create_update_four_eyes_and_readback(isolated):
+    code='UAT-AGENT-001'
+    initial={'name':'UAT Agent','short_name':'UAT','currency':'USD','active':True,
+             'export_email':'export@example.com','booking_restriction':'None'}
+    created=create_change(Change(domain='agent',record_key=code,operation='CREATE',
+                                 payload=initial,reason='isolated agent acceptance'),
+                          x_m3_session=maker_session())
+    with pytest.raises(HTTPException):
+        decide(created['change_ref'],Decision(decision='APPROVE'),x_m3_session=maker_session())
+    assert not any(x['record_key']==code for x in records('agent',x_m3_session=admin_session()))
+    assert decide(created['change_ref'],Decision(decision='APPROVE'),
+                  x_m3_session=checker_session())['version']==1
+    first=next(x for x in records('agent',x_m3_session=admin_session()) if x['record_key']==code)
+    assert all(first['payload'][k]==v for k,v in initial.items())
+    updated=create_change(Change(domain='agent',record_key=code,operation='UPDATE',
+                                 payload={'short_name':'UAT2','import_email':'import@example.com'},
+                                 reason='agent field readback'),
+                          x_m3_session=maker_session())
+    assert decide(updated['change_ref'],Decision(decision='APPROVE'),
+                  x_m3_session=checker_session())['version']==2
+    saved=next(x for x in records('agent',x_m3_session=admin_session()) if x['record_key']==code)
+    assert saved['payload']['short_name']=='UAT2'
+    assert saved['payload']['import_email']=='import@example.com'
+    assert saved['payload']['export_email']==initial['export_email']
