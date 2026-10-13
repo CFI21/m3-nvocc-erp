@@ -790,13 +790,16 @@ function m3AgentPaint(){
  const save=m3AgentEditing&&editable?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
  const canApprove=['SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role);
  const checkerActions=pending&&canApprove?'<button class="btn" id="m3AgentApprove">Approve change</button><button class="btn" id="m3AgentReject">Reject change</button>':'';
+ const pendingCreates=m3AgentPending.filter(x=>x.domain==='agent'&&x.operation==='CREATE'&&x.status==='PENDING'&&!m3AgentRows.some(r=>r.record_key===x.record_key));
+ const pendingCreatePanel=pendingCreates.length?'<div class="equipNote"><b>New Agents awaiting approval</b>'+pendingCreates.map(x=>'<div>'+esc(x.record_key)+' · '+esc(x.payload?.name||'Pending new Agent')+' · '+esc(x.change_ref||'')+(canApprove?' <button class="btn" data-agent-create-decision="APPROVE" data-agent-create-ref="'+esc(x.change_ref)+'">Approve</button> <button class="btn" data-agent-create-decision="REJECT" data-agent-create-ref="'+esc(x.change_ref)+'">Reject</button>':' · Checker approval required')+'</div>').join('')+'</div>':'';
  const relatedPending=m3AgentPending.filter(x=>x.domain==='configuration'&&x.status==='PENDING'&&String(x.payload?.agent_code||'')===String(row?.record_key||''));
  const pendingNotice=pending?'<span class="muted">Pending change '+esc(pending.change_ref||'')+' · independent checker required</span>':'';
  const relatedNotice=relatedPending.length?'<span class="muted">'+relatedPending.length+' relationship change(s) awaiting approval</span>':'';
- $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+relatedNotice+checkerActions+newAgentButton+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
+ $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+relatedNotice+checkerActions+newAgentButton+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+pendingCreatePanel+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
  document.getElementById('m3AgentReload')?.addEventListener('click',renderHoAgentMasterWorkspace);
  document.getElementById('m3AgentNew')?.addEventListener('click',m3AgentCreate);
+ document.querySelectorAll('[data-agent-create-decision]').forEach(el=>el.addEventListener('click',()=>m3AgentDecide(el.dataset.agentCreateDecision,el.dataset.agentCreateRef)));
  document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{if(m3AgentEditing)m3AgentDiscardDraft();else m3AgentEditing=true;m3AgentPaint()});
  document.getElementById('m3AgentSave')?.addEventListener('click',m3AgentSubmit);
  document.getElementById('m3AgentRelatedAdd')?.addEventListener('click',m3AgentRelatedCreate);
@@ -834,9 +837,9 @@ async function m3AgentRelatedCreate(){
   await renderHoAgentMasterWorkspace();
  }catch(e){alert('Could not submit relationship: '+e.message)}
 }
-async function m3AgentDecide(decision){
+async function m3AgentDecide(decision,changeRef){
  const row=m3AgentRows[m3AgentIndex];
- const change=m3AgentPending.find(x=>x.domain==='agent'&&x.record_key===row?.record_key&&x.status==='PENDING');
+ const change=m3AgentPending.find(x=>x.domain==='agent'&&x.status==='PENDING'&&(changeRef?x.change_ref===changeRef:x.record_key===row?.record_key));
  if(!change)return alert('No pending change found');
  if(!['SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role))return alert('Checker role required');
  if(!confirm((decision==='APPROVE'?'Approve':'Reject')+' Agent change '+change.change_ref+'? This action is audited.'))return;
