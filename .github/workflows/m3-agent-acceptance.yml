@@ -20,8 +20,8 @@ jobs:
           cache: pip
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
-      - name: Agent Master approval and persistence
-        run: python -m pytest -q tests/test_clx048_admin_masterdata.py -k "agent_master_create_update_four_eyes_and_readback"
+      - name: Agent Master governance, approval and persistence
+        run: python -m pytest -q tests/test_clx048_admin_masterdata.py
       - name: Agent Master six-tab UI contract
         run: python -m pytest -q tests/test_agent_master_ui_contract.py
       - name: Agent Master regression coverage
