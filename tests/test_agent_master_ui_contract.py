@@ -91,3 +91,12 @@ def test_new_agent_and_refresh_protect_unsaved_edits():
     assert "Discard unsaved Agent edits and refresh?" in source
     assert "Discard unsaved Agent edits and create a new Agent?" in source
     assert "m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])" in source
+
+
+def test_email_and_bl_reference_are_visible_in_six_tab_readback():
+    source = agent_source()
+    assert "Configured Agent email destinations" in source
+    assert "esc(String(p[k]))" in source
+    assert "Existing B/L template reference" in source
+    assert "esc(String(p.bl_template||'Not assigned'))" in source
+    assert "No template is created or assigned automatically" in source
