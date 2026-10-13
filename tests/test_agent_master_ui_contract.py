@@ -22,7 +22,7 @@ def test_agent_master_six_tab_contract():
         "CRO Detail", "B/L Template",
     ]
     for tab in tabs:
-        assert f"'{tab}':[" in source or tab == "B/L Template"
+        assert f"'{tab}':[" in source, f"Missing field map for {tab}"
 
 
 def test_agent_switch_only_prompts_for_real_unsaved_changes():
