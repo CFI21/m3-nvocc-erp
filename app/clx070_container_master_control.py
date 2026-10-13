@@ -451,7 +451,7 @@ def booking_context(job_ref:str,x_role:str=Header("VIEWER"),x_m3_session:Optiona
                                        COALESCE(SUM(CASE WHEN entry_type='SHARE' THEN amount ELSE 0 END),0) share
                                 FROM container_financial_ledger WHERE job_id=? OR booking_ref=?""",(j["id"],j["booking_ref"])).fetchone())
             fin["margin"]=float(fin["revenue"])-float(fin["cost"])-float(fin["commission"])-float(fin["share"])
-            else:
+        else:
             if using_postgres():
                 raise RuntimeError("M3_FINANCIAL_LEDGER_MISSING")
             fin=None
