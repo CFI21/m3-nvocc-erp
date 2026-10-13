@@ -705,7 +705,7 @@ function agentConfigManage(label){
     '<button class="btn" onclick="openScreen(\'master-data::agents\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Agents\'})">Agent Master</button>';
 }
 
-let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false,m3AgentDraft={};
+let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false,m3AgentDraft={},m3AgentFocusCode='';
 const m3AgentHeaderKeys=['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','active','port_restriction','principal_office','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person'];
 const m3AgentBooleanKeys=new Set(['active','port_restriction','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person']);
 const m3AgentMultilineKeys=new Set(['bank_details','address','invoice_note','invoice_department_address','cro_remarks','noc_note']);
@@ -850,6 +850,7 @@ async function m3AgentDecide(decision,changeRef){
    method:'POST',headers:{'Content-Type':'application/json'},
    body:JSON.stringify({decision,comment:comment.trim()})
   });
+  if(decision==='APPROVE')m3AgentFocusCode=change.record_key;
   await renderHoAgentMasterWorkspace();
   alert('Agent change '+(decision==='APPROVE'?'approved':'rejected')+'.');
  }catch(e){alert('Checker decision failed: '+e.message)}
@@ -889,13 +890,13 @@ async function m3AgentSubmit(){
 async function renderHoAgentMasterWorkspace(){
  try{
   const [rows,configs,pending]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration'),api('/api/masterdata/changes?status=PENDING')]);
-  const selected=m3AgentRows[m3AgentIndex]?.record_key;
+  const selected=m3AgentFocusCode||m3AgentRows[m3AgentIndex]?.record_key;
   m3AgentRows=Array.isArray(rows)?rows:rows.records||[];
   m3AgentConfigs=Array.isArray(configs)?configs:[];
   m3AgentPending=Array.isArray(pending)?pending:[];
   m3AgentIndex=Math.max(0,m3AgentRows.findIndex(x=>x.record_key===selected));
   if(!m3AgentRows.length)m3AgentIndex=-1;
-  m3AgentDiscardDraft();m3AgentPaint();
+  m3AgentFocusCode='';m3AgentDiscardDraft();m3AgentPaint();
  }catch(e){$('gridArea').innerHTML='<div class="card badtext">Agent Master unavailable: '+esc(e.message)+'</div>'}
 }
 
