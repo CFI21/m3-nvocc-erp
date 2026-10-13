@@ -353,3 +353,34 @@ def test_online_request_types_and_internal_ids():
         validate_online_request_input('EXPORT', {'job_ref':'50001'})
     with pytest.raises(HTTPException):
         validate_online_request_input('EXPORT', {'approval_ref':'XYZ'})
+
+
+def test_agent_profile_reuses_common_party_and_rejects_unassigned_agent():
+    import sqlite3
+    from app.admin import _authorized_agent_profile
+    c=sqlite3.connect(':memory:')
+    c.row_factory=sqlite3.Row
+    try:
+        c.executescript("""
+        CREATE TABLE md_records(domain TEXT,record_key TEXT,display_name TEXT,payload_json TEXT,status TEXT);
+        CREATE TABLE iam_party_access(user_id INTEGER,party_type TEXT,party_key TEXT,status TEXT);
+        CREATE TABLE iam_office_membership(user_id INTEGER,office_id INTEGER,status TEXT);
+        CREATE TABLE iam_offices(id INTEGER,office_code TEXT,country_id INTEGER,organization_id INTEGER,status TEXT);
+        CREATE TABLE iam_countries(id INTEGER,country_code TEXT,status TEXT);
+        CREATE TABLE iam_organizations(id INTEGER,org_code TEXT,status TEXT);
+        INSERT INTO md_records VALUES('agent','AG01','Example Agent','{"common_party_key":"PA01"}','ACTIVE');
+        INSERT INTO md_records VALUES('common-party','PA01','Example Party','{}','ACTIVE');
+        INSERT INTO iam_party_access VALUES(4,'AGENT','AG01','ACTIVE');
+        INSERT INTO iam_countries VALUES(1,'NL','ACTIVE');
+        INSERT INTO iam_organizations VALUES(1,'M3-GLOBAL','ACTIVE');
+        INSERT INTO iam_offices VALUES(1,'AGT-AG01',1,1,'ACTIVE');
+        INSERT INTO iam_office_membership VALUES(4,1,'ACTIVE');
+        """)
+        profile=_authorized_agent_profile(c,4,'AG01')
+        assert profile['common_party_key']=='PA01'
+        assert profile['offices'][0]['country_code']=='NL'
+        with pytest.raises(HTTPException) as denied:
+            _authorized_agent_profile(c,8,'AG01')
+        assert denied.value.status_code==403
+    finally:
+        c.close()
