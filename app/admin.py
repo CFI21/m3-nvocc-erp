@@ -410,3 +410,33 @@ def assign(b:Assign,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')
     try:c.execute('INSERT INTO iam_user_roles(user_id,role_id,office_id,valid_from,valid_to,status,assigned_by) VALUES(?,?,?,?,?,?,?)',(u['id'],r['id'],o['id'],now(),b.valid_to,'ACTIVE',s['user_ref']))
     except Exception as e:c.close();raise HTTPException(409,{'code':'ASSIGNMENT_CONFLICT','detail':str(e)})
     audit(c,s['user_ref'],'ROLE_ASSIGN','USER',u['user_ref'],after={'role':b.role_code,'office':o['office_code']});c.close();return {'status':'ASSIGNED','user':u['user_ref'],'role':b.role_code,'office':o['office_code']}
+
+def _assigned_agent_offices(c,user_id,agent_code):
+    """Resolve one agent's assigned offices from existing IAM membership only."""
+    grant=c.execute("""SELECT 1 FROM iam_party_access
+        WHERE user_id=? AND party_type='AGENT' AND party_key=?
+          AND status='ACTIVE' LIMIT 1""",(user_id,agent_code)).fetchone()
+    if not grant:
+        raise HTTPException(403,{'code':'AGENT_PARTY_ACCESS_DENIED'})
+    return [dict(x) for x in c.execute("""SELECT DISTINCT o.office_code,co.country_code,
+            org.org_code organization_code
+        FROM iam_office_membership m
+        JOIN iam_offices o ON o.id=m.office_id AND o.status='ACTIVE'
+        JOIN iam_countries co ON co.id=o.country_id AND co.status='ACTIVE'
+        JOIN iam_organizations org ON org.id=o.organization_id AND org.status='ACTIVE'
+        WHERE m.user_id=? AND m.status='ACTIVE'
+        ORDER BY co.country_code,o.office_code""",(user_id,)).fetchall()]
+
+
+@router.get('/agent/{agent_code}/authorized-offices')
+def agent_authorized_offices(agent_code:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Authenticated selector source; never infer access from agent name or country."""
+    c=connect()
+    try:
+        s=session(c,x_m3_session)
+        if not _agent_master(c,agent_code):
+            raise HTTPException(404,{'code':'AGENT_MASTER_NOT_FOUND'})
+        offices=_assigned_agent_offices(c,s['user_id'],agent_code)
+        return {'agent_code':agent_code,'offices':offices,'count':len(offices)}
+    finally:
+        c.close()
