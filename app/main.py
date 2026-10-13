@@ -175,6 +175,19 @@ def booking_port_allowed(port_code, allowed_ports, *, all_ports_granted=False):
     return port in {str(p).strip().upper() for p in allowed_ports if isinstance(p,str)}
 
 
+def booking_iam_agent_granted(conn, user_id, agent_code):
+    """Verify an active agent-party assignment; no implicit global grant."""
+    if not isinstance(user_id,int) or isinstance(user_id,bool):
+        return False
+    code=str(agent_code or '').strip()
+    if not code:
+        return False
+    row=conn.execute("""SELECT 1 FROM iam_party_access
+        WHERE user_id=? AND party_type='AGENT' AND party_key=?
+        AND status='ACTIVE' LIMIT 1""",(user_id,code)).fetchone()
+    return bool(row)
+
+
 def booking_validate_authorized_ports(fields, grants):
     """Validate Booking ports against verified, per-field IAM grants.
 
