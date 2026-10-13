@@ -425,7 +425,8 @@ def _assigned_agent_offices(c,user_id,agent_code):
         JOIN iam_countries co ON co.id=o.country_id AND co.status='ACTIVE'
         JOIN iam_organizations org ON org.id=o.organization_id AND org.status='ACTIVE'
         WHERE m.user_id=? AND m.status='ACTIVE'
-        ORDER BY co.country_code,o.office_code""",(user_id,)).fetchall()]
+          AND o.office_code LIKE ?
+        ORDER BY co.country_code,o.office_code""",(user_id,'AGT-'+agent_code)).fetchall()]
 
 
 @router.get('/agent/{agent_code}/authorized-offices')
