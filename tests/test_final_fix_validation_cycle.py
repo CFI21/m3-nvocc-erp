@@ -271,7 +271,7 @@ def test_booking_agent_iam_binding_is_fail_closed():
 def test_booking_session_agent_write_guard_present():
     from pathlib import Path
     text=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
-    assert text.count('BOOKING_AGENT_LOGIN_NOT_AUTHORIZED') == 2
+    assert text.count('BOOKING_AGENT_LOGIN_NOT_AUTHORIZED') == 3
 
 
 def test_existing_agent_office_cannot_silently_cross_country_scope():
@@ -467,7 +467,7 @@ def test_multi_country_agent_offices_require_explicit_mapping_and_membership():
 def test_booking_agent_network_port_grants_connected_to_writes():
     from pathlib import Path
     s=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
-    assert s.count('booking_agent_port_grants(conn,ga[')==2
+    assert s.count('booking_agent_port_grants(conn,ga[')==3
     assert "config.get('network_type')" in s
     assert "config.get('office_code')" in s
 
