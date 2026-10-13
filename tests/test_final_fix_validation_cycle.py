@@ -569,7 +569,10 @@ def test_booking_api_rejects_unauthenticated_governed_create(isolated,monkeypatc
     from fastapi.testclient import TestClient
     from app.main import app
     monkeypatch.setenv('M3_BULK_PERMISSION_GOVERNANCE_ENABLED','true')
-    client=TestClient(app,raise_server_exceptions=False)
+    # Existing UAT authorization permits API tests while production stays OFF.
+    monkeypatch.setenv('M3_PRODUCTION_TRAFFIC','OFF')
+    monkeypatch.setenv('M3_UAT_TOKEN','isolated-booking-api-test')
+    client=TestClient(app,raise_server_exceptions=False,headers={'X-M3-UAT-Token':'isolated-booking-api-test'})
     with db.connect() as conn:
         before=conn.execute("SELECT COUNT(*) FROM transaction_records WHERE module='booking'").fetchone()[0]
     response=client.post('/api/v1/booking',json={'job_ref':'50001','fields':{'POL':'NLRTM'}})
@@ -583,11 +586,14 @@ def test_booking_api_rejects_unauthenticated_governed_update(isolated,monkeypatc
     from fastapi.testclient import TestClient
     from app.main import app
     monkeypatch.setenv('M3_BULK_PERMISSION_GOVERNANCE_ENABLED','true')
+    # Existing UAT authorization permits API tests while production stays OFF.
+    monkeypatch.setenv('M3_PRODUCTION_TRAFFIC','OFF')
+    monkeypatch.setenv('M3_UAT_TOKEN','isolated-booking-api-test')
     with db.connect() as conn:
         record=conn.execute("SELECT id,payload_json,version FROM transaction_records WHERE module='booking' ORDER BY id LIMIT 1").fetchone()
     if record is None:
         pytest.skip('Seed has no Booking transaction to exercise authenticated update gate')
-    client=TestClient(app,raise_server_exceptions=False)
+    client=TestClient(app,raise_server_exceptions=False,headers={'X-M3-UAT-Token':'isolated-booking-api-test'})
     response=client.put(f"/api/v1/booking/{record['id']}",json={'version':record['version'],'fields':{'POL':'USNYC'}})
     assert response.status_code in (401,403), response.text
     with db.connect() as conn:
