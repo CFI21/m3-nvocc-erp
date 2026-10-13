@@ -391,3 +391,39 @@ def test_agent_profile_country_mismatch_guard_present():
     code=(Path(__file__).resolve().parents[1]/'app'/'admin.py').read_text(encoding='utf-8')
     assert 'AGENT_OFFICE_COUNTRY_MISMATCH' in code
     assert "o['country_code']" in code
+
+
+def test_agent_setup_bulk_existing_master_permissions_and_booking_rules():
+    import sqlite3
+    from app.admin import _authorized_agent_profile
+    from app.agent_setup import booking_rule_check
+    c=sqlite3.connect(':memory:')
+    c.row_factory=sqlite3.Row
+    try:
+        c.executescript("""
+        CREATE TABLE md_records(domain TEXT,record_key TEXT,display_name TEXT,payload_json TEXT,status TEXT);
+        CREATE TABLE iam_party_access(user_id INTEGER,party_type TEXT,party_key TEXT,status TEXT);
+        CREATE TABLE iam_office_membership(user_id INTEGER,office_id INTEGER,status TEXT);
+        CREATE TABLE iam_offices(id INTEGER,office_code TEXT,country_id INTEGER,organization_id INTEGER,status TEXT);
+        CREATE TABLE iam_countries(id INTEGER,country_code TEXT,status TEXT);
+        CREATE TABLE iam_organizations(id INTEGER,org_code TEXT,status TEXT);
+        INSERT INTO md_records VALUES('agent','AG01','Agent','{"common_party_key":"PA01","country":"NL"}','ACTIVE');
+        INSERT INTO md_records VALUES('common-party','PA01','Party','{}','ACTIVE');
+        INSERT INTO iam_party_access VALUES(5,'AGENT','AG01','ACTIVE');
+        INSERT INTO iam_countries VALUES(1,'NL','ACTIVE'),(2,'DE','ACTIVE');
+        INSERT INTO iam_organizations VALUES(1,'M3-GLOBAL','ACTIVE');
+        INSERT INTO iam_offices VALUES(1,'AGT-AG01',1,1,'ACTIVE'),(2,'AGT-OTHER',2,1,'ACTIVE');
+        INSERT INTO iam_office_membership VALUES(5,1,'ACTIVE'),(5,2,'ACTIVE');
+        """)
+        profile=_authorized_agent_profile(c,5,'AG01')
+        assert profile['common_party_key']=='PA01'
+        assert [o['office_code'] for o in profile['offices']]==['AGT-AG01']
+        assert profile['offices'][0]['country_code']=='NL'
+        with pytest.raises(HTTPException):
+            _authorized_agent_profile(c,6,'AG01')
+        # Existing configured network restrictions still apply to Booking;
+        # operational network configuration must never substitute for IAM grants.
+        result=booking_rule_check(c,{'agent_code':'AG01'}, {})
+        assert not result['errors']
+    finally:
+        c.close()
