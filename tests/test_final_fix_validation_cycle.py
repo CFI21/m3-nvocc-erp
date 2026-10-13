@@ -639,3 +639,23 @@ def test_booking_api_rejects_revoked_session_without_creating_record(isolated,mo
     with db.connect() as conn:
         after=conn.execute("SELECT COUNT(*) FROM transaction_records WHERE module='booking'").fetchone()[0]
     assert before==after
+
+
+def test_agent_multirow_email_governance_contract():
+    from app.masterdata import validate_payload
+    good={'config_type':'AGENT_EMAIL','agent_code':'CLX-AGT-RTM','port_code':'NLRTM','email':'ops@example.com'}
+    assert validate_payload('configuration',good)==[]
+    assert 'AGENT_CONFIGURATION_REQUIRED_FIELDS' in validate_payload(
+        'configuration',{**good,'email':''})
+    assert 'AGENT_EMAIL_INVALID' in validate_payload(
+        'configuration',{**good,'email':'not-an-email'})
+
+
+def test_agent_six_tab_related_master_workflow_wiring():
+    from pathlib import Path
+    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding='utf-8')
+    assert "const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template']" in html
+    assert "async function m3AgentRelatedCreate()" in html
+    assert "config_type:'AGENT_EMAIL'" in html
+    assert "config_type:'AGENT_OFFICE_ASSIGNMENT'" in html
+    assert "operation:'CREATE',payload,reason:reason.trim()" in html
