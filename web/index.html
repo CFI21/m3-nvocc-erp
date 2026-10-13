@@ -747,7 +747,7 @@ function m3AgentPaint(){
  const buttons=m3AgentRows.map((x,i)=>'<button class="btn'+(i===m3AgentIndex?' primary':'')+'" onclick="m3AgentSelect('+i+')">'+esc(x.display_name||x.record_key)+'</button>').join('');
  const tabs=m3AgentTabs.map(t=>'<button class="btn'+(t===m3AgentTab?' primary':'')+'" data-agent-tab="'+esc(t)+'">'+esc(t)+'</button>').join('');
  const header=row?'<div style="border:1px solid #d7dde5;padding:8px;margin:8px 0"><div class="toolbar"><b>Agent Code: '+esc(row.record_key)+'</b><span class="muted">Authoritative master code · '+esc(row.status||'')+'</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:5px">'+m3AgentHeaderKeys.map(k=>m3AgentField(k,p)).join('')+'</div></div>':'';
- let fields=(m3AgentFields[m3AgentTab]||[]).filter(k=>!m3AgentHeaderKeys.includes(k)&&!(m3AgentTab==='Emails'&&['email','export_email','import_email'].includes(k))&&!(m3AgentTab==='B/L Template'&&k==='bl_template')).map(k=>m3AgentField(k,p)).join('');
+ let fields=(m3AgentFields[m3AgentTab]||[]).filter(k=>!m3AgentHeaderKeys.includes(k)&&!(m3AgentTab==='Emails'&&!m3AgentEditing&&['email','export_email','import_email'].includes(k))&&!(m3AgentTab==='B/L Template'&&k==='bl_template')).map(k=>m3AgentField(k,p)).join('');
  if(row&&m3AgentTab==='Offices'){
   const kind='AGENT_OFFICE_ASSIGNMENT';
   const linked=m3AgentConfigs.filter(x=>String(x.payload?.config_type||'').toUpperCase()===kind&&m3AgentConfigMatches(x,row)&&x.status==='ACTIVE');
