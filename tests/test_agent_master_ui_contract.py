@@ -58,3 +58,13 @@ def test_new_agent_uses_existing_approval_queue():
     assert "domain:'agent'" in create
     assert "'/api/masterdata/changes'" in create
     assert "record_key:code" in create
+
+ 
+def test_pending_new_agents_have_checker_decision_controls():
+    source = agent_source()
+    assert "New Agents awaiting approval" in source
+    assert "data-agent-create-decision" in source
+    assert "data-agent-create-ref" in source
+    assert "async function m3AgentDecide(decision,changeRef)" in source
+    assert "changeRef?x.change_ref===changeRef" in source
+    assert "canApprove?" in source
