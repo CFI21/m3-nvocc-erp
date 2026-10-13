@@ -77,3 +77,10 @@ def test_agent_master_ui_roles_align_with_authorized_master_reads():
     )[0]
     assert "['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)" in segment
     assert "['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role)" not in segment
+
+
+def test_approved_agent_selected_for_immediate_readback():
+    source = agent_source()
+    assert "if(decision==='APPROVE')m3AgentFocusCode=change.record_key" in source
+    assert "const selected=m3AgentFocusCode||m3AgentRows[m3AgentIndex]?.record_key" in source
+    assert "m3AgentFocusCode='';m3AgentDiscardDraft();m3AgentPaint()" in source
