@@ -525,6 +525,8 @@ async def create_record(module:str,body:CreateBody,request:Request,x_role:str=He
                 if prior['request_hash']!=rh: raise HTTPException(409,'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
                 conn.execute('COMMIT'); return JSONResponse(json.loads(prior['response_json']),status_code=prior['status_code'])
         ctx=job_context(conn,body.job_ref)
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT' and not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
+            raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
         if role=='AGENT' and ctx['agent_code']!=ascope: raise HTTPException(403,'Job outside agent scope')
         errs=validate_fields(module,ctx,body.fields)
         if errs: raise HTTPException(422,{'codes':errs})
@@ -566,6 +568,8 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
             if not role_ok(role,'edit'): raise HTTPException(403,'Role cannot edit')
             r=get_tx(conn,module,tid,role,ascope,cscope)
         before=serialize_tx(r); ctx=job_context(conn,r['job_ref'])
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT' and not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
+            raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
