@@ -26,6 +26,9 @@ jobs:
         run: python -m pytest -q tests/test_agent_master_ui_contract.py --junitxml=agent-ui.xml
       - name: Agent Master regression coverage
         run: python -m pytest -q tests/test_final_fix_validation_cycle.py -k "agent or booking_port" --junitxml=agent-regression.xml
+      - name: Summarize B01 test evidence
+        if: always()
+        run: python tests/report_agent_b01.py
       - name: Publish B01 test evidence
         if: always()
         uses: actions/upload-artifact@v4
