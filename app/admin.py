@@ -418,6 +418,18 @@ def _assigned_agent_offices(c,user_id,agent_code):
           AND status='ACTIVE' LIMIT 1""",(user_id,agent_code)).fetchone()
     if not grant:
         raise HTTPException(403,{'code':'AGENT_PARTY_ACCESS_DENIED'})
+    # Explicit office links live in existing governed configuration records.
+    # These records grant no access by themselves: IAM membership is also required.
+    configured=set()
+    for row in c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'").fetchall():
+        try:
+            p=json.loads(row['payload_json'] or '{}')
+        except (TypeError,ValueError):
+            continue
+        if str(p.get('config_type') or '').upper()=='AGENT_OFFICE_ASSIGNMENT' and str(p.get('agent_code') or '')==agent_code:
+            code=str(p.get('office_code') or '').strip()
+            if code: configured.add(code)
+    allowed=configured if configured else {'AGT-'+agent_code}
     return [dict(x) for x in c.execute("""SELECT DISTINCT o.office_code,co.country_code,
             org.org_code organization_code
         FROM iam_office_membership m
@@ -425,8 +437,7 @@ def _assigned_agent_offices(c,user_id,agent_code):
         JOIN iam_countries co ON co.id=o.country_id AND co.status='ACTIVE'
         JOIN iam_organizations org ON org.id=o.organization_id AND org.status='ACTIVE'
         WHERE m.user_id=? AND m.status='ACTIVE'
-          AND o.office_code = ?
-        ORDER BY co.country_code,o.office_code""",(user_id,'AGT-'+agent_code)).fetchall()]
+        ORDER BY co.country_code,o.office_code""",(user_id,)).fetchall() if x['office_code'] in allowed]
 
 
 @router.get('/agent/{agent_code}/authorized-offices')
@@ -443,6 +454,19 @@ def agent_authorized_offices(agent_code:str,x_m3_session:Optional[str]=Header(No
         c.close()
 
 
+def _agent_has_explicit_office_assignments(c,agent_code):
+    for row in c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'").fetchall():
+        try:
+            p=json.loads(row['payload_json'] or '{}')
+        except (TypeError,ValueError):
+            continue
+        if (str(p.get('config_type') or '').upper()=='AGENT_OFFICE_ASSIGNMENT'
+                and str(p.get('agent_code') or '')==agent_code
+                and str(p.get('office_code') or '').strip()):
+            return True
+    return False
+
+
 def _authorized_agent_profile(c,user_id,agent_code):
     """Resolve existing Agent/PA Party/IAM identities without copying master fields."""
     agent=_agent_master(c,agent_code)
@@ -451,7 +475,7 @@ def _authorized_agent_profile(c,user_id,agent_code):
     offices=_assigned_agent_offices(c,user_id,agent_code)
     payload=json.loads(agent['payload_json'] or '{}')
     master_country=str(payload.get('country') or '').strip().upper()
-    if master_country and any(str(o['country_code']).upper()!=master_country for o in offices):
+    if master_country and not _agent_has_explicit_office_assignments(c,agent_code) and any(str(o['country_code']).upper()!=master_country for o in offices):
         raise HTTPException(409,{'code':'AGENT_OFFICE_COUNTRY_MISMATCH'})
     key=str(payload.get('common_party_key') or '').strip()
     if not key:
