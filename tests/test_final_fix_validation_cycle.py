@@ -177,3 +177,11 @@ def test_booking_approval_controls_are_safe_until_governed_actions_exist():
     assert "Approval requires governed authorization and reference issuance" in HTML
     assert "Approved — Locked" in HTML
     assert "String(r.status||'').toLowerCase()==='approved'" in HTML
+
+
+def test_booking_status_cannot_be_issued_by_ordinary_save():
+    from pathlib import Path
+    src=(Path(__file__).resolve().parents[1]/"app"/"main.py").read_text(encoding="utf-8")
+    assert "BOOKING_STATUS_ACTION_REQUIRED" in src
+    assert "str(body.fields.get('Status','Draft')).strip().lower() != 'draft'" in src
+    assert "'Status' in body.fields and str(body.fields['Status']).strip().lower()!=str(r['status']).strip().lower()" in src
