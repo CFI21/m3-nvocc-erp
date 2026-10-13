@@ -210,6 +210,36 @@ def booking_validate_authorized_ports(fields, grants):
     return True
 
 
+def booking_agent_port_grants(conn,user_id,agent_code):
+    """Derive explicit scoped port grants from existing IAM and Agent Network masters.
+
+    No user-supplied fields or headers can grant access. Port coverage must
+    identify the agent, a verified operating office, a scope and an exact port.
+    """
+    from .admin import _assigned_agent_offices
+    offices={x['office_code'] for x in _assigned_agent_offices(conn,user_id,agent_code)}
+    grants={scope:{'ports':set(),'all_ports':False} for scope in ('POL','POD','TS')}
+    if not offices:
+        return grants
+    rows=conn.execute("""SELECT payload_json FROM md_records
+        WHERE domain='configuration' AND status='ACTIVE'""").fetchall()
+    for row in rows:
+        try:
+            config=json.loads(row['payload_json'] or '{}')
+        except (ValueError,TypeError):
+            continue
+        if (str(config.get('config_type') or '').upper()!='AGENT_NETWORK'
+                or str(config.get('network_type') or '').upper()!='PORT_COVERAGE'
+                or str(config.get('agent_code') or '')!=agent_code
+                or str(config.get('office_code') or '') not in offices):
+            continue
+        scope=str(config.get('scope') or '').upper()
+        port=str(config.get('port_code') or '').strip().upper()
+        if scope in grants and re.fullmatch(r'[A-Z0-9]{3,8}',port):
+            grants[scope]['ports'].add(port)
+    return grants
+
+
 class CreateBody(BaseModel):
     job_ref:str=Field(pattern=r'^\d{5}$')
     external_ref:Optional[str]=None
@@ -527,6 +557,8 @@ async def create_record(module:str,body:CreateBody,request:Request,x_role:str=He
         ctx=job_context(conn,body.job_ref)
         if module=='booking' and bulk_permission_enabled() and role=='AGENT' and not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
             raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT':
+            booking_validate_authorized_ports(body.fields,booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
         if role=='AGENT' and ctx['agent_code']!=ascope: raise HTTPException(403,'Job outside agent scope')
         errs=validate_fields(module,ctx,body.fields)
         if errs: raise HTTPException(422,{'codes':errs})
@@ -570,6 +602,8 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
         before=serialize_tx(r); ctx=job_context(conn,r['job_ref'])
         if module=='booking' and bulk_permission_enabled() and role=='AGENT' and not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
             raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT':
+            booking_validate_authorized_ports({**json.loads(r['payload_json']),**body.fields},booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
