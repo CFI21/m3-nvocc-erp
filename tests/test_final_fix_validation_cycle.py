@@ -384,3 +384,10 @@ def test_agent_profile_reuses_common_party_and_rejects_unassigned_agent():
         assert denied.value.status_code==403
     finally:
         c.close()
+
+
+def test_agent_profile_country_mismatch_guard_present():
+    from pathlib import Path
+    code=(Path(__file__).resolve().parents[1]/'app'/'admin.py').read_text(encoding='utf-8')
+    assert 'AGENT_OFFICE_COUNTRY_MISMATCH' in code
+    assert "o['country_code']" in code
