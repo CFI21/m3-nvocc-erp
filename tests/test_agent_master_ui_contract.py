@@ -107,3 +107,33 @@ def test_agent_email_fields_editable_in_emails_tab():
     assert "m3AgentTab==='Emails'&&!m3AgentEditing" in source
     assert "['email','export_email','import_email']" in source
     assert "m3AgentField(k,p)" in source
+
+
+def test_agent_office_and_country_views_use_governed_relations():
+    source = agent_source()
+    assert "AGENT_OFFICE_ASSIGNMENT" in source
+    assert "AGENT_NETWORK" in source
+    assert "Configured port coverage" in source
+    assert "Countries derive from approved office assignment records" in source
+    assert "Office assignment never overrides IAM membership" in source
+    assert "No explicit assignments recorded" in source
+
+
+def test_agent_cro_and_bl_use_existing_master_values():
+    source = agent_source()
+    assert "'CRO Detail':['bs_code','operator_code','cro_remarks','noc_note']" in source
+    assert "CRO values are governed Agent Master fields" in source
+    assert "'B/L Template':['bl_template']" in source
+    assert "Existing B/L template reference" in source
+    assert "No template is created or assigned automatically" in source
+
+
+def test_agent_relationship_requests_use_governed_change_approval():
+    source = agent_source()
+    related = source.split("async function m3AgentRelatedCreate()", 1)[1].split(
+        "async function m3AgentDecide(", 1
+    )[0]
+    assert "AGENT_EMAIL" in related
+    assert "AGENT_OFFICE_ASSIGNMENT" in related
+    assert "/api/masterdata/changes" in related
+    assert "operation:'CREATE'" in related
