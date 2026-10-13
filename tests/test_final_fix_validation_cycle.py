@@ -498,6 +498,8 @@ def test_booking_agent_port_grants_sqlite_allow_deny_and_revocation():
             booking_validate_authorized_ports({'POD':'NLRTM'},grants)
         with pytest.raises(HTTPException):
             booking_validate_authorized_ports({'POL':'DEHAM'},grants)
+        c.execute("""UPDATE md_records SET payload_json=? WHERE record_key='N1'""", ('{"config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE","agent_code":"AG01","office_code":"AGT-AG01","scope":"POL","port_code":"NLRTM","effective_to":"2020-01-01"}',))
+        assert booking_agent_port_grants(c,7,'AG01')['POL']['ports']==set()
         c.execute("UPDATE iam_office_membership SET status='INACTIVE' WHERE user_id=7")
         with pytest.raises(HTTPException):
             booking_validate_authorized_ports({'POL':'NLRTM',},booking_agent_port_grants(c,7,'AG01'))
