@@ -254,3 +254,15 @@ def test_booking_pol_pod_ts_scopes_require_verified_grants():
         assert exc.status_code==403
     else:
         raise AssertionError('Untrusted string cannot grant all-port access')
+
+
+def test_booking_agent_iam_binding_is_fail_closed():
+    import sqlite3
+    from app.main import booking_iam_agent_granted
+    db=sqlite3.connect(':memory:')
+    db.execute('CREATE TABLE iam_party_access (user_id INTEGER,party_type TEXT,party_key TEXT,status TEXT)')
+    db.execute('INSERT INTO iam_party_access VALUES (7, ?, ?, ?)',('AGENT','AG001','ACTIVE'))
+    assert booking_iam_agent_granted(db,7,'AG001')
+    assert not booking_iam_agent_granted(db,8,'AG001')
+    assert not booking_iam_agent_granted(db,7,'AG002')
+    db.close()
