@@ -143,6 +143,22 @@ RELEASE_MODULES={'trt','export-trt','import-trt','transshipment-trt','delivery-o
 GOVERNED_POST_APPROVAL_MODULES={'booking','trt','export-trt','import-trt','transshipment-trt'}
 POST_APPROVAL_LOCK_STATUSES={'approved','released','issued','completed','closed'}
 
+# Cycle 24: formatting policy only. Issuance must remain within a governed
+# RFA action after session, agent/port scope and unique-number checks.
+BOOKING_AGENT_REFERENCE_PREFIXES={
+    'POL_EXPORT':'SE',
+    'POD_IMPORT':'SI',
+    'TRANSSHIPMENT':'TS',
+    'PRINCIPAL':'PR',
+}
+
+def booking_agent_reference_prefix(operational_responsibility: str) -> str:
+    key=str(operational_responsibility or '').strip().upper()
+    if key not in BOOKING_AGENT_REFERENCE_PREFIXES:
+        raise HTTPException(422, {'code':'UNRECOGNIZED_AGENT_RESPONSIBILITY'})
+    return BOOKING_AGENT_REFERENCE_PREFIXES[key]
+
+
 class CreateBody(BaseModel):
     job_ref:str=Field(pattern=r'^\d{5}$')
     external_ref:Optional[str]=None
