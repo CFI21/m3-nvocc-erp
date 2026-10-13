@@ -288,3 +288,10 @@ def test_agent_offices_endpoint_uses_existing_iam_memberships():
     assert "@router.get('/agent/{agent_code}/authorized-offices')" in s
     assert 'iam_office_membership' in s
     assert 'AGENT_PARTY_ACCESS_DENIED' in s
+
+
+def test_agent_office_lookup_has_exact_agent_scope():
+    from pathlib import Path
+    s=(Path(__file__).resolve().parents[1]/'app'/'admin.py').read_text(encoding='utf-8')
+    assert "o.office_code = ?" in s
+    assert "(user_id,'AGT-'+agent_code)" in s
