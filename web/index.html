@@ -705,7 +705,7 @@ function agentConfigManage(label){
     '<button class="btn" onclick="openScreen(\'master-data::agents\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Agents\'})">Agent Master</button>';
 }
 
-let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false,m3AgentDraft={},m3AgentRelations={};
+let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false,m3AgentDraft={};
 const m3AgentHeaderKeys=['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','active','port_restriction','principal_office','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person'];
 const m3AgentBooleanKeys=new Set(['active','port_restriction','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person']);
 const m3AgentMultilineKeys=new Set(['bank_details','address','invoice_note','invoice_department_address','cro_remarks','noc_note']);
@@ -735,7 +735,7 @@ const m3AgentFields={
  'CRO Detail':['bs_code','operator_code','cro_remarks','noc_note'],
  'B/L Template':['bl_template']
 };
-function m3AgentSelect(i){if(m3AgentEditing&&Object.keys(m3AgentDraft).length&&!confirm('Discard unsaved edits for this Agent?'))return;m3AgentDiscardDraft();m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentPaint()}
+function m3AgentSelect(i){if(m3AgentEditing){m3AgentCaptureDraft();if(Object.keys(m3AgentDraft).length&&!confirm('Discard unsaved edits for this Agent?'))return}m3AgentDiscardDraft();m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentPaint()}
 function m3AgentSelectTab(t){if(m3AgentTabs.includes(t)){if(m3AgentEditing)m3AgentCaptureDraft();m3AgentTab=t;m3AgentPaint()}}
 function m3AgentConfigMatches(r,agent){
  const p=r.payload||{};
@@ -771,7 +771,7 @@ function m3AgentPaint(){
  if(row&&m3AgentTab==='Emails'){
   const keys=['email','export_email','import_email'];
   const populated=keys.filter(k=>String(p[k]||'').trim());
-  fields+='<div style="grid-column:1/-1"><span class="muted">Available configured email destinations: '+esc(populated.length?populated.map(k=>k.replaceAll('_',' ').toUpperCase()).join(', '):'None')+'. Multiple port-specific email rows are not yet present in the Agent Master model.</span></div>';
+  fields+='<div style="grid-column:1/-1"><span class="muted">Available configured email destinations: '+esc(populated.length?populated.map(k=>k.replaceAll('_',' ').toUpperCase()).join(', '):'None')+'. Port-specific email rows are governed configuration records and require independent approval.</span></div>';
  }
  if(row&&m3AgentTab==='B/L Template'){
   fields+='<div style="grid-column:1/-1" class="muted">Only existing Agent Master template references are displayed. No unverified B/L template is assigned automatically.</div>';
@@ -810,6 +810,7 @@ async function m3AgentRelatedCreate(){
  if(!isEmail&&!['Countries','Offices'].includes(m3AgentTab))return;
  const code=prompt(isEmail?'Port code for email:':'Existing IAM office code (the office must already exist):');
  if(!code||!code.trim())return;
+ if(!/^[A-Za-z0-9_-]{2,20}$/.test(code.trim()))return alert('Enter a valid existing office or port code.');
  const second=prompt(isEmail?'Email address:':'Office address (optional):');
  if(second===null)return;
  const payload=isEmail?{config_type:'AGENT_EMAIL',agent_code:row.record_key,port_code:code.trim().toUpperCase(),email:second.trim()}:
@@ -846,7 +847,7 @@ async function m3AgentSubmit(){
  if(!['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role)){alert('Master Data edit permission required');return}
  m3AgentCaptureDraft();
  const combined={...row.payload,...m3AgentDraft};
- if(!String(combined.name||row.display_name||'').trim()||!String(combined.short_name||'').trim()){alert('Name and Short Name are required.');return}
+ if(!String(combined.name||'').trim()||!String(combined.short_name||'').trim()){alert('Name and Short Name are required.');return}
  const payload={};
  Object.entries(m3AgentDraft).forEach(([key,val])=>{const original=row.payload?.[key];if(String(val)!==String(original??''))payload[key]=typeof val==='string'?val.trim():val});
  if(!Object.keys(payload).length){alert('No changes to submit');return}
