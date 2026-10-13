@@ -100,3 +100,10 @@ def test_email_and_bl_reference_are_visible_in_six_tab_readback():
     assert "Existing B/L template reference" in source
     assert "esc(String(p.bl_template||'Not assigned'))" in source
     assert "No template is created or assigned automatically" in source
+
+
+def test_agent_email_fields_editable_in_emails_tab():
+    source = agent_source()
+    assert "m3AgentTab==='Emails'&&!m3AgentEditing" in source
+    assert "['email','export_email','import_email']" in source
+    assert "m3AgentField(k,p)" in source
