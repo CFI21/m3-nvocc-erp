@@ -462,3 +462,11 @@ def test_multi_country_agent_offices_require_explicit_mapping_and_membership():
         assert [x['office_code'] for x in _assigned_agent_offices(c,5,'AG01')]==['AGT-AG01']
     finally:
         c.close()
+
+
+def test_booking_agent_network_port_grants_connected_to_writes():
+    from pathlib import Path
+    s=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
+    assert s.count('booking_agent_port_grants(conn,ga[')==2
+    assert "config.get('network_type')" in s
+    assert "config.get('office_code')" in s
