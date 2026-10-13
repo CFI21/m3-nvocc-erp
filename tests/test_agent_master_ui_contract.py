@@ -68,3 +68,12 @@ def test_pending_new_agents_have_checker_decision_controls():
     assert "async function m3AgentDecide(decision,changeRef)" in source
     assert "changeRef?x.change_ref===changeRef" in source
     assert "canApprove?" in source
+
+
+def test_agent_master_ui_roles_align_with_authorized_master_reads():
+    source = agent_source()
+    segment = source.split('let m3AgentRows=', 1)[1].split(
+        'async function renderHoAgentMasterWorkspace()', 1
+    )[0]
+    assert "['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)" in segment
+    assert "['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role)" not in segment
