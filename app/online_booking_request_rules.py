@@ -28,3 +28,20 @@ def online_request_transition(status: str, action: str, *, approved: bool = Fals
     if operation == "CONVERT" and (not approved or linked_job_ref):
         raise HTTPException(409, {"code": "ONLINE_REQUEST_CONVERSION_NOT_ALLOWED"})
     return target
+
+
+ONLINE_REQUEST_TYPES = frozenset({"EXPORT", "IMPORT", "TRANSSHIPMENT"})
+
+
+def validate_online_request_input(kind: str, fields: dict) -> dict:
+    """Pre-job payload contract: no client-issued job, approval, or booking refs."""
+    from copy import deepcopy
+    if str(kind or "").upper() not in ONLINE_REQUEST_TYPES:
+        raise HTTPException(422, {"code": "ONLINE_REQUEST_TYPE_INVALID"})
+    if not isinstance(fields, dict):
+        raise HTTPException(422, {"code": "ONLINE_REQUEST_FIELDS_INVALID"})
+    forbidden = {"job_ref", "job no", "job number", "booking_ref", "approval_ref",
+                 "approved by", "approved date", "converted_job_ref", "status"}
+    if any(str(k).strip().lower() in forbidden for k in fields):
+        raise HTTPException(422, {"code": "ONLINE_REQUEST_SERVER_FIELDS_FORBIDDEN"})
+    return {"request_type": str(kind).upper(), "fields": deepcopy(fields)}
