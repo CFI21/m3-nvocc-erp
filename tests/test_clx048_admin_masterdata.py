@@ -199,3 +199,29 @@ def test_agent_master_create_update_four_eyes_and_readback(isolated):
     assert saved['payload']['import_email']=='import@example.com'
     assert saved['payload']['export_email']==initial['export_email']
     assert saved['payload']['active'] is False
+
+
+def test_agent_master_pending_reject_and_resubmit_lifecycle(isolated):
+    code='UAT-AGENT-REJECT-001'
+    initial={'name':'UAT Agent Rejection Cycle','short_name':'UATR','active':True}
+    request=create_change(Change(domain='agent',record_key=code,operation='CREATE',
+                                 payload=initial,reason='isolated create review'),
+                          x_m3_session=maker_session())
+    assert not any(row['record_key']==code for row in records('agent',x_m3_session=admin_session()))
+    with pytest.raises(HTTPException):
+        decide(request['change_ref'],Decision(decision='APPROVE'),
+               x_m3_session=maker_session())
+    rejected=decide(request['change_ref'],Decision(decision='REJECT',comment='check required'),
+                    x_m3_session=checker_session())
+    assert rejected['status']=='REJECTED'
+    assert not any(row['record_key']==code for row in records('agent',x_m3_session=admin_session()))
+    resubmitted=create_change(Change(domain='agent',record_key=code,operation='CREATE',
+                                     payload=initial,reason='resubmitted after rejection'),
+                              x_m3_session=maker_session())
+    approved=decide(resubmitted['change_ref'],Decision(decision='APPROVE',comment='approved'),
+                    x_m3_session=checker_session())
+    assert approved['version']==1
+    row=next(row for row in records('agent',x_m3_session=admin_session())
+             if row['record_key']==code)
+    assert row['payload']['name']==initial['name']
+    assert row['payload']['active'] is True
