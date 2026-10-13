@@ -710,8 +710,8 @@ const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B
 const m3AgentFields={
  'Agent Detail':['phone','mobile','export_email','import_email','website','contact','fax','port','next_agent','next_port','default_depot','booking_restriction','company_logo','stamp'],
  'Emails':['email','export_email','import_email'],
- 'Countries':['country'],
- 'Offices':['office_code','port','address'],
+ 'Countries':[],
+ 'Offices':[],
  'CRO Detail':['bs_code','operator_code','cro_remarks','noc_note'],
  'B/L Template':['bl_template']
 };
@@ -734,10 +734,11 @@ function m3AgentPaint(){
  if(row&&(m3AgentTab==='Countries'||m3AgentTab==='Offices')){
   const kind=m3AgentTab==='Countries'?'AGENT_OFFICE_ASSIGNMENT':'AGENT_OFFICE_ASSIGNMENT';
   const linked=m3AgentConfigs.filter(x=>String(x.payload?.config_type||'').toUpperCase()===kind&&m3AgentConfigMatches(x,row)&&x.status==='ACTIVE');
-  fields+='<div style="grid-column:1/-1"><b>Authorized assignment configuration records</b><div class="muted">Configuration alone does not grant IAM access.</div>'+
+  fields+='<div style="grid-column:1/-1"><b>Agent office assignments</b><div class="muted">These are governed configuration records; actual access additionally requires IAM membership. Manage assignments through the existing governed configuration workflow.</div>'+
     (linked.map(x=>'<div>'+esc(String(x.payload?.office_code||''))+' · '+esc(String(x.payload?.country_code||'Country resolved through IAM'))+'</div>').join('')||'<div class="muted">No explicit assignment records found. Legacy office lookup may apply.</div>')+'</div>';
  }
- const editor=row?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
+ const editable=m3AgentTab!=='Countries'&&m3AgentTab!=='Offices';
+ const editor=row&&editable?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
  const save=m3AgentEditing?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
  $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?'<div><b>'+esc(row.display_name||row.record_key)+'</b> · '+esc(row.record_key)+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
