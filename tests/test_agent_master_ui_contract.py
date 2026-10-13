@@ -1,0 +1,47 @@
+"""Regression contract for the existing M3 Agent Master six-tab UI.
+
+These are static source checks, not a replacement for browser acceptance.
+"""
+from pathlib import Path
+import re
+
+SOURCE = Path(__file__).resolve().parents[1] / "web" / "index.html"
+
+
+def agent_source():
+    return SOURCE.read_text(encoding="utf-8")
+
+
+def test_agent_master_six_tab_contract():
+    source = agent_source()
+    match = re.search(r"const m3AgentTabs\s*=\s*\[([^\]]+)\]", source)
+    assert match, "Agent Master tabs declaration missing"
+    tabs = re.findall(r"'([^']+)'", match.group(1))
+    assert tabs == [
+        "Agent Detail", "Emails", "Countries", "Offices",
+        "CRO Detail", "B/L Template",
+    ]
+    for tab in tabs:
+        assert f"'{tab}':[" in source or tab == "B/L Template"
+
+
+def test_agent_switch_only_prompts_for_real_unsaved_changes():
+    source = agent_source()
+    assert "function m3AgentHasChanges(row)" in source
+    assert "if(i===m3AgentIndex)return" in source
+    assert "m3AgentHasChanges(m3AgentRows[m3AgentIndex])" in source
+    assert "Object.keys(m3AgentDraft).length&&!confirm" not in source
+
+
+def test_agent_boolean_compare_applies_to_dirty_and_submit_paths():
+    source = agent_source()
+    dirty = source.split("function m3AgentHasChanges(row)", 1)[1].split(
+        "function m3AgentSelect(i)", 1
+    )[0]
+    submit = source.split("async function m3AgentSubmit()", 1)[1].split(
+        "async function renderHoAgentMasterWorkspace()", 1
+    )[0]
+    assert "m3AgentBooleanKeys.has(key)" in dirty
+    assert "m3AgentBooleanKeys.has(key)" in submit
+    assert "payload[key]=" in submit
+    assert "operation:'UPDATE'" in submit
