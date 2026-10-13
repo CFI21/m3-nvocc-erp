@@ -503,3 +503,18 @@ def test_booking_agent_port_grants_sqlite_allow_deny_and_revocation():
             booking_validate_authorized_ports({'POL':'NLRTM',},booking_agent_port_grants(c,7,'AG01'))
     finally:
         c.close()
+
+
+def test_agent_setup_configuration_contract_validation():
+    from app.masterdata import validate_payload
+    office={'config_type':'AGENT_OFFICE_ASSIGNMENT','agent_code':'AG01','office_code':'HAM'}
+    port={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+          'agent_code':'AG01','office_code':'HAM','scope':'TS','port_code':'DEHAM'}
+    assert not validate_payload('configuration',office)
+    assert not validate_payload('configuration',port)
+    assert 'AGENT_CONFIGURATION_REQUIRED_FIELDS' in validate_payload(
+        'configuration',{'config_type':'AGENT_OFFICE_ASSIGNMENT','agent_code':'AG01'})
+    assert 'AGENT_PORT_SCOPE_INVALID' in validate_payload(
+        'configuration',{**port,'scope':'UNKNOWN'})
+    assert 'AGENT_PORT_CODE_INVALID' in validate_payload(
+        'configuration',{**port,'port_code':'invalid-port-code'})
