@@ -226,10 +226,15 @@ def validate_fields(module,job,fields):
         if not isinstance(lines,list) or len(lines)>500:
             errs.append('INVALID_EQUIPMENT_LINES')
         else:
+            selected_types=set()
             for line in lines:
                 if not isinstance(line,dict):
                     errs.append('INVALID_EQUIPMENT_LINE'); break
                 size=str(line.get('size','')).replace("'","")
+                selected_key=(size,str(line.get('type','')).strip().upper())
+                if selected_key in selected_types:
+                    errs.append('DUPLICATE_EQUIPMENT_TYPE'); break
+                selected_types.add(selected_key)
                 try:
                     qty_raw=line.get('quantity')
                     if isinstance(qty_raw,bool) or not str(qty_raw).isdigit(): raise ValueError('Invalid quantity')
