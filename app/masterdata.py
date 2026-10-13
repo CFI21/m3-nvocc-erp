@@ -106,6 +106,26 @@ def active_master(c,domain,key):
 
 def reference_errors(c,domain,payload):
     errs=[]
+    if domain=='configuration':
+        kind=str(payload.get('config_type') or '').upper()
+        if kind in ('AGENT_OFFICE_ASSIGNMENT','AGENT_EMAIL','AGENT_NETWORK'):
+            agent_code=str(payload.get('agent_code') or '').strip()
+            if agent_code and not active_master(c,'agent',agent_code):
+                errs.append('AGENT_REFERENCE_NOT_ACTIVE')
+        if kind=='AGENT_OFFICE_ASSIGNMENT':
+            office_code=str(payload.get('office_code') or '').strip()
+            if office_code:
+                office=c.execute("""SELECT o.id, co.country_code
+                   FROM iam_offices o JOIN iam_countries co ON co.id=o.country_id
+                   WHERE o.office_code=? AND o.status='ACTIVE' AND co.status='ACTIVE'""",(office_code,)).fetchone()
+                if not office:
+                    errs.append('AGENT_OFFICE_REFERENCE_NOT_ACTIVE')
+                elif payload.get('country_code') and str(payload['country_code']).upper()!=str(office['country_code']).upper():
+                    errs.append('AGENT_OFFICE_COUNTRY_MISMATCH')
+        if kind=='AGENT_EMAIL':
+            port_code=str(payload.get('port_code') or '').strip()
+            if port_code and not active_master(c,'port',port_code):
+                errs.append('AGENT_EMAIL_PORT_REFERENCE_NOT_ACTIVE')
     if domain=='bank-account':
         if payload.get('bank') and not active_master(c,'bank',payload.get('bank')): errs.append('BANK_REFERENCE_NOT_ACTIVE')
         if payload.get('currency') and not active_master(c,'currency',payload.get('currency')): errs.append('CURRENCY_REFERENCE_NOT_ACTIVE')
