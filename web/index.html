@@ -708,7 +708,7 @@ function agentConfigManage(label){
 let m3AgentRows=[],m3AgentConfigs=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false;
 const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template'];
 const m3AgentFields={
- 'Agent Detail':['phone','mobile','export_email','import_email','website','contact','fax','port','next_agent','next_port','default_depot','booking_restriction','company_logo','stamp'],
+ 'Agent Detail':['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','phone','mobile','website','contact','fax','port','next_agent','next_port','default_depot','booking_restriction','company_logo','stamp'],
  'Emails':['email','export_email','import_email'],
  'Countries':[],
  'Offices':[],
@@ -732,10 +732,10 @@ function m3AgentPaint(){
    return '<div style="min-width:150px;padding:6px;border-bottom:1px solid #dce3e0"><label class="muted">'+label+'</label>'+(m3AgentEditing?'<input data-m3-agent-field="'+esc(k)+'" value="'+esc(value)+'" style="width:100%;max-width:230px">':'<div><b>'+esc(value||'—')+'</b></div>')+'</div>';
  }).join('');
  if(row&&(m3AgentTab==='Countries'||m3AgentTab==='Offices')){
-  const kind=m3AgentTab==='Countries'?'AGENT_OFFICE_ASSIGNMENT':'AGENT_OFFICE_ASSIGNMENT';
+  const kind='AGENT_OFFICE_ASSIGNMENT';
   const linked=m3AgentConfigs.filter(x=>String(x.payload?.config_type||'').toUpperCase()===kind&&m3AgentConfigMatches(x,row)&&x.status==='ACTIVE');
   fields+='<div style="grid-column:1/-1"><b>Agent office assignments</b><div class="muted">These are governed configuration records; actual access additionally requires IAM membership. Manage assignments through the existing governed configuration workflow.</div>'+
-    (linked.map(x=>'<div>'+esc(String(x.payload?.office_code||''))+' · '+esc(String(x.payload?.country_code||'Country resolved through IAM'))+'</div>').join('')||'<div class="muted">No explicit assignment records found. Legacy office lookup may apply.</div>')+'</div>';
+    (linked.map(x=>'<div>'+esc(String(x.payload?.office_code||'Office not specified'))+(x.payload?.country_code?' · '+esc(String(x.payload.country_code)):' · Country is resolved by IAM')+'</div>').join('')||'<div class="muted">No explicit assignments recorded. The legacy single-office rule may apply.</div>')+'</div>';
  }
  const editable=m3AgentTab!=='Countries'&&m3AgentTab!=='Offices';
  const editor=row&&editable?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
