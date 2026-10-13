@@ -146,6 +146,9 @@ def _ensure_agent_office(c,agent_code,agent):
       (office_code,agent['display_name'],org['id'],co['id'],timezone))
     office=c.execute("SELECT * FROM iam_offices WHERE office_code=? AND status='ACTIVE'",(office_code,)).fetchone()
     if not office: raise HTTPException(409,{'code':'AGENT_OFFICE_NOT_ACTIVE'})
+    # Existing agent office identifiers cannot be silently reused across countries.
+    if office['country_id']!=co['id'] or office['organization_id']!=org['id']:
+        raise HTTPException(409,{'code':'AGENT_OFFICE_SCOPE_CONFLICT'})
     return office,co,org,port
 
 def _identity_maker(c,s):
