@@ -552,6 +552,13 @@ async def create_record(module:str,body:CreateBody,request:Request,x_role:str=He
         if not role_ok(role,'create'): conn.close(); raise HTTPException(403,'Role cannot create')
     raw=await request.body(); rh=hashlib.sha256(raw).hexdigest(); tx(conn)
     try:
+        # Revoked agent/port access must also block idempotent create replays.
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT':
+            replay_ctx=job_context(conn,body.job_ref)
+            if not booking_iam_agent_granted(conn,ga['session']['user_id'],replay_ctx['agent_code']):
+                raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+            booking_validate_authorized_ports(
+                body.fields,booking_agent_port_grants(conn,ga['session']['user_id'],replay_ctx['agent_code']))
         if idempotency_key:
             prior=conn.execute('SELECT * FROM idempotency_keys WHERE actor_role=? AND idem_key=?',(role,idempotency_key)).fetchone()
             if prior:
