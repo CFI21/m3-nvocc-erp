@@ -461,7 +461,10 @@ async def create_record(module:str,body:CreateBody,request:Request,x_role:str=He
         if role=='AGENT' and ctx['agent_code']!=ascope: raise HTTPException(403,'Job outside agent scope')
         errs=validate_fields(module,ctx,body.fields)
         if errs: raise HTTPException(422,{'codes':errs})
-        if module=='booking': assert_booking_rules(conn,ctx,body.fields,None)
+        if module=='booking':
+            if str(body.fields.get('Status','Draft')).strip().lower() != 'draft':
+                raise HTTPException(409,{'code':'BOOKING_STATUS_ACTION_REQUIRED'})
+            assert_booking_rules(conn,ctx,body.fields,None)
         ext=body.external_ref or f"CLX-{module.upper()}-{body.job_ref}-{uuid.uuid4().hex[:8].upper()}"
         if conn.execute('SELECT 1 FROM transaction_records WHERE module=? AND external_ref=?',(module,ext)).fetchone(): raise HTTPException(409,'DUPLICATE_TRANSACTION')
         payload=dict(body.fields); payload.setdefault('Job Ref',body.job_ref); payload.setdefault('Agent',ctx['agent_code']); payload.setdefault('Customer',ctx['customer_name']); payload.setdefault('Status','Draft')
@@ -497,6 +500,8 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
+        if module=='booking' and 'Status' in body.fields and str(body.fields['Status']).strip().lower()!=str(r['status']).strip().lower():
+            raise HTTPException(409,{'code':'BOOKING_STATUS_ACTION_REQUIRED'})
         payload=json.loads(r['payload_json']); payload.update(body.fields); errs=validate_fields(module,ctx,payload)
         if errs: raise HTTPException(422,{'codes':errs})
         if module=='booking': assert_booking_rules(conn,ctx,payload,tid)
