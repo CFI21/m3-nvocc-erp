@@ -735,7 +735,8 @@ const m3AgentFields={
  'CRO Detail':['bs_code','operator_code','cro_remarks','noc_note'],
  'B/L Template':['bl_template']
 };
-function m3AgentSelect(i){if(m3AgentEditing){m3AgentCaptureDraft();if(Object.keys(m3AgentDraft).length&&!confirm('Discard unsaved edits for this Agent?'))return}m3AgentDiscardDraft();m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentPaint()}
+function m3AgentHasChanges(row){return Object.entries(m3AgentDraft).some(([key,value])=>String(value??'').trim()!==String(row?.payload?.[key]??'').trim())}
+function m3AgentSelect(i){if(i===m3AgentIndex)return;if(m3AgentEditing){m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])&&!confirm('Discard unsaved edits for this Agent?'))return}m3AgentDiscardDraft();m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentPaint()}
 function m3AgentSelectTab(t){if(m3AgentTabs.includes(t)){if(m3AgentEditing)m3AgentCaptureDraft();m3AgentTab=t;m3AgentPaint()}}
 function m3AgentConfigMatches(r,agent){
  const p=r.payload||{};
