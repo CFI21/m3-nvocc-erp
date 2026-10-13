@@ -705,7 +705,7 @@ function agentConfigManage(label){
     '<button class="btn" onclick="openScreen(\'master-data::agents\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Agents\'})">Agent Master</button>';
 }
 
-let m3AgentRows=[],m3AgentConfigs=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false;
+let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false;
 const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template'];
 const m3AgentFields={
  'Agent Detail':['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','phone','mobile','website','contact','fax','port','next_agent','next_port','default_depot','booking_restriction','company_logo','stamp'],
@@ -753,10 +753,13 @@ function m3AgentPaint(){
  if(row&&m3AgentTab==='CRO Detail'){
   fields+='<div style="grid-column:1/-1" class="muted">CRO values are governed Agent Master fields, not a separate duplicated operational record.</div>';
  }
- const editable=m3AgentTab!=='Countries'&&m3AgentTab!=='Offices';
+ const canEdit=['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role);
+ const pending=m3AgentPending.find(x=>x.domain==='agent'&&x.record_key===row?.record_key&&x.status==='PENDING');
+ const editable=canEdit&&!pending&&m3AgentTab!=='Countries'&&m3AgentTab!=='Offices';
  const editor=row&&editable?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
- const save=m3AgentEditing?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
- $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?'<div><b>'+esc(row.display_name||row.record_key)+'</b> · '+esc(row.record_key)+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
+ const save=m3AgentEditing&&editable?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
+ const pendingNotice=pending?'<span class="muted">Pending change '+esc(pending.change_ref||'')+' · approval required</span>':'';
+ $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?'<div><b>'+esc(row.display_name||row.record_key)+'</b> · '+esc(row.record_key)+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
  document.getElementById('m3AgentReload')?.addEventListener('click',renderHoAgentMasterWorkspace);
  document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{m3AgentEditing=!m3AgentEditing;m3AgentPaint()});
@@ -764,6 +767,7 @@ function m3AgentPaint(){
 }
 async function m3AgentSubmit(){
  const row=m3AgentRows[m3AgentIndex];if(!row)return;
+ if(!['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role)){alert('Master Data edit permission required');return}
  const payload={};
  document.querySelectorAll('[data-m3-agent-field]').forEach(el=>{
   const key=el.dataset.m3AgentField,val=el.value.trim();
@@ -780,10 +784,11 @@ async function m3AgentSubmit(){
 }
 async function renderHoAgentMasterWorkspace(){
  try{
-  const [rows,configs]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration')]);
+  const [rows,configs,pending]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration'),api('/api/masterdata/changes?status=PENDING')]);
   const selected=m3AgentRows[m3AgentIndex]?.record_key;
   m3AgentRows=Array.isArray(rows)?rows:rows.records||[];
   m3AgentConfigs=Array.isArray(configs)?configs:[];
+  m3AgentPending=Array.isArray(pending)?pending:[];
   m3AgentIndex=Math.max(0,m3AgentRows.findIndex(x=>x.record_key===selected));
   if(!m3AgentRows.length)m3AgentIndex=-1;
   m3AgentEditing=false;m3AgentPaint();
