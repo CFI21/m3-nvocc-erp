@@ -280,3 +280,11 @@ def test_existing_agent_office_cannot_silently_cross_country_scope():
     assert 'AGENT_OFFICE_SCOPE_CONFLICT' in source
     assert "office['country_id']!=co['id']" in source
     assert "office['organization_id']!=org['id']" in source
+
+
+def test_agent_offices_endpoint_uses_existing_iam_memberships():
+    from pathlib import Path
+    s=(Path(__file__).resolve().parents[1]/'app'/'admin.py').read_text(encoding='utf-8')
+    assert "@router.get('/agent/{agent_code}/authorized-offices')" in s
+    assert 'iam_office_membership' in s
+    assert 'AGENT_PARTY_ACCESS_DENIED' in s
