@@ -21,8 +21,19 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Agent Master governance, approval and persistence
-        run: python -m pytest -q tests/test_clx048_admin_masterdata.py
+        run: python -m pytest -q tests/test_clx048_admin_masterdata.py --junitxml=agent-governance.xml
       - name: Agent Master six-tab UI contract
-        run: python -m pytest -q tests/test_agent_master_ui_contract.py
+        run: python -m pytest -q tests/test_agent_master_ui_contract.py --junitxml=agent-ui.xml
       - name: Agent Master regression coverage
-        run: python -m pytest -q tests/test_final_fix_validation_cycle.py -k "agent or booking_port"
+        run: python -m pytest -q tests/test_final_fix_validation_cycle.py -k "agent or booking_port" --junitxml=agent-regression.xml
+      - name: Publish B01 test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-b01-agent-master-evidence
+          path: |
+            agent-governance.xml
+            agent-ui.xml
+            agent-regression.xml
+          if-no-files-found: warn
+          retention-days: 14
