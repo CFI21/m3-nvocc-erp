@@ -342,3 +342,14 @@ def test_online_booking_request_is_pre_job_and_approval_gated():
         online_request_transition("APPROVED","CONVERT",approved=False)
     with pytest.raises(HTTPException):
         online_request_transition("REJECTED","CONVERT",approved=True)
+
+
+def test_online_request_types_and_internal_ids():
+    from app.online_booking_request_rules import validate_online_request_input
+    assert validate_online_request_input('EXPORT', {'POL':'NLRTM'})['request_type']=='EXPORT'
+    assert validate_online_request_input('IMPORT', {})['request_type']=='IMPORT'
+    assert validate_online_request_input('TRANSSHIPMENT', {})['request_type']=='TRANSSHIPMENT'
+    with pytest.raises(HTTPException):
+        validate_online_request_input('EXPORT', {'job_ref':'50001'})
+    with pytest.raises(HTTPException):
+        validate_online_request_input('EXPORT', {'approval_ref':'XYZ'})
