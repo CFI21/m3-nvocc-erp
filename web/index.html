@@ -708,7 +708,7 @@ function agentConfigManage(label){
 let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false;
 const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template'];
 const m3AgentFields={
- 'Agent Detail':['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','phone','mobile','website','contact','fax','port','next_agent','next_port','default_depot','booking_restriction','company_logo','stamp'],
+ 'Agent Detail':['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','active','port_restriction','principal_office','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person','phone','mobile','export_email','import_email','website','contact','fax','port','next_agent','next_port','default_depot','invoice_department_address','booking_restriction','company_logo','stamp'],
  'Emails':['email','export_email','import_email'],
  'Countries':[],
  'Offices':[],
@@ -729,7 +729,11 @@ function m3AgentPaint(){
    const raw=p[k]??p[k.replaceAll('_',' ')];
    const value=raw===null||raw===undefined?'':String(raw);
    const label=esc(k.replaceAll('_',' ').toUpperCase());
-   return '<div style="min-width:150px;padding:6px;border-bottom:1px solid #dce3e0"><label class="muted">'+label+'</label>'+(m3AgentEditing?'<input data-m3-agent-field="'+esc(k)+'" value="'+esc(value)+'" style="width:100%;max-width:230px">':'<div><b>'+esc(value||'—')+'</b></div>')+'</div>';
+   const toggles=['active','port_restriction','principal_office','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person'];
+   const multi=['bank_details','address','invoice_note','invoice_department_address','cro_remarks','noc_note'];
+   const checked=raw===true||raw==='true'||raw===1||raw==='1';
+   const widget=toggles.includes(k)?(m3AgentEditing?'<input type="checkbox" data-m3-agent-field="'+esc(k)+'"'+(checked?' checked':'')+'>':(checked?'Yes':'No')):multi.includes(k)?(m3AgentEditing?'<textarea data-m3-agent-field="'+esc(k)+'" rows="3">'+esc(value)+'</textarea>':esc(value||'—')):(m3AgentEditing?'<input data-m3-agent-field="'+esc(k)+'" value="'+esc(value)+'" style="width:100%;max-width:230px">':esc(value||'—'));
+   return '<div style="min-width:150px;padding:6px;border-bottom:1px solid #dce3e0"><label class="muted">'+label+'</label><div>'+widget+'</div></div>';
  }).join('');
  if(row&&(m3AgentTab==='Countries'||m3AgentTab==='Offices')){
   const kind='AGENT_OFFICE_ASSIGNMENT';
@@ -791,8 +795,8 @@ async function m3AgentSubmit(){
  if(!['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role)){alert('Master Data edit permission required');return}
  const payload={};
  document.querySelectorAll('[data-m3-agent-field]').forEach(el=>{
-  const key=el.dataset.m3AgentField,val=el.value.trim();
-  if(val!==String(row.payload?.[key]??''))payload[key]=val;
+  const key=el.dataset.m3AgentField,val=el.type==='checkbox'?el.checked:el.value.trim();
+  if(String(val)!==String(row.payload?.[key]??''))payload[key]=val;
  });
  if(!Object.keys(payload).length){alert('No changes to submit');return}
  const reason=prompt('Reason for Agent Master change request:');
