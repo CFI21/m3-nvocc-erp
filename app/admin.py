@@ -450,6 +450,9 @@ def _authorized_agent_profile(c,user_id,agent_code):
         raise HTTPException(404,{'code':'AGENT_MASTER_NOT_FOUND'})
     offices=_assigned_agent_offices(c,user_id,agent_code)
     payload=json.loads(agent['payload_json'] or '{}')
+    master_country=str(payload.get('country') or '').strip().upper()
+    if master_country and any(str(o['country_code']).upper()!=master_country for o in offices):
+        raise HTTPException(409,{'code':'AGENT_OFFICE_COUNTRY_MISMATCH'})
     key=str(payload.get('common_party_key') or '').strip()
     if not key:
         raise HTTPException(409,{'code':'AGENT_COMMON_PARTY_REQUIRED'})
