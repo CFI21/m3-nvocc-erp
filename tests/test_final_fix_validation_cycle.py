@@ -470,3 +470,36 @@ def test_booking_agent_network_port_grants_connected_to_writes():
     assert s.count('booking_agent_port_grants(conn,ga[')==2
     assert "config.get('network_type')" in s
     assert "config.get('office_code')" in s
+
+
+def test_booking_agent_port_grants_sqlite_allow_deny_and_revocation():
+    import sqlite3
+    from app.main import booking_agent_port_grants, booking_validate_authorized_ports
+    c=sqlite3.connect(':memory:')
+    c.row_factory=sqlite3.Row
+    try:
+        c.executescript("""
+        CREATE TABLE md_records(domain TEXT,record_key TEXT,payload_json TEXT,status TEXT);
+        CREATE TABLE iam_party_access(user_id INTEGER,party_type TEXT,party_key TEXT,status TEXT);
+        CREATE TABLE iam_office_membership(user_id INTEGER,office_id INTEGER,status TEXT);
+        CREATE TABLE iam_offices(id INTEGER,office_code TEXT,country_id INTEGER,organization_id INTEGER,status TEXT);
+        CREATE TABLE iam_countries(id INTEGER,country_code TEXT,status TEXT);
+        CREATE TABLE iam_organizations(id INTEGER,org_code TEXT,status TEXT);
+        INSERT INTO iam_party_access VALUES(7,'AGENT','AG01','ACTIVE');
+        INSERT INTO iam_countries VALUES(1,'NL','ACTIVE');
+        INSERT INTO iam_organizations VALUES(1,'M3-GLOBAL','ACTIVE');
+        INSERT INTO iam_offices VALUES(1,'AGT-AG01',1,1,'ACTIVE');
+        INSERT INTO iam_office_membership VALUES(7,1,'ACTIVE');
+        INSERT INTO md_records VALUES('configuration','N1','{"config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE","agent_code":"AG01","office_code":"AGT-AG01","scope":"POL","port_code":"NLRTM"}','ACTIVE');
+        """)
+        grants=booking_agent_port_grants(c,7,'AG01')
+        assert booking_validate_authorized_ports({'POL':'NLRTM'},grants) is True
+        with pytest.raises(HTTPException):
+            booking_validate_authorized_ports({'POD':'NLRTM'},grants)
+        with pytest.raises(HTTPException):
+            booking_validate_authorized_ports({'POL':'DEHAM'},grants)
+        c.execute("UPDATE iam_office_membership SET status='INACTIVE' WHERE user_id=7")
+        with pytest.raises(HTTPException):
+            booking_validate_authorized_ports({'POL':'NLRTM',},booking_agent_port_grants(c,7,'AG01'))
+    finally:
+        c.close()
