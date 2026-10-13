@@ -84,3 +84,10 @@ def test_approved_agent_selected_for_immediate_readback():
     assert "if(decision==='APPROVE')m3AgentFocusCode=change.record_key" in source
     assert "const selected=m3AgentFocusCode||m3AgentRows[m3AgentIndex]?.record_key" in source
     assert "m3AgentFocusCode='';m3AgentDiscardDraft();m3AgentPaint()" in source
+
+
+def test_new_agent_and_refresh_protect_unsaved_edits():
+    source = agent_source()
+    assert "Discard unsaved Agent edits and refresh?" in source
+    assert "Discard unsaved Agent edits and create a new Agent?" in source
+    assert "m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])" in source
