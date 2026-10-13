@@ -520,3 +520,46 @@ def test_agent_setup_configuration_contract_validation():
         'configuration',{**port,'scope':'UNKNOWN'})
     assert 'AGENT_PORT_CODE_INVALID' in validate_payload(
         'configuration',{**port,'port_code':'invalid-port-code'})
+
+
+@pytest.mark.parametrize("field,scope", [
+    ("POL","POL"),("POD","POD"),("POT (1)","TS"),("POT (2)","TS")
+])
+def test_booking_agent_scoped_port_matrix(field,scope):
+    from app.main import booking_validate_authorized_ports
+    grants={
+        "POL":{"ports":{"NLRTM"},"all_ports":False},
+        "POD":{"ports":{"DEHAM"},"all_ports":False},
+        "TS":{"ports":{"BEANR"},"all_ports":False},
+    }
+    valid={"POL":"NLRTM","POD":"DEHAM","TS":"BEANR"}[scope]
+    assert booking_validate_authorized_ports({field:valid},grants)
+    with pytest.raises(HTTPException) as denied:
+        booking_validate_authorized_ports({field:"USNYC"},grants)
+    assert denied.value.status_code==403
+    assert denied.value.detail["field"]==field
+    with pytest.raises(HTTPException):
+        booking_validate_authorized_ports({field:valid},{"POL":{"ports":[]}})
+    with pytest.raises(HTTPException):
+        booking_validate_authorized_ports({field:valid},None)
+
+
+def test_booking_agent_replay_rechecks_current_grants_before_idempotent_return():
+    from pathlib import Path
+    import inspect
+    from app.main import create_record
+    code=inspect.getsource(create_record)
+    replay=code.index("if idempotency_key:")
+    guard=code.index("replay_ctx=job_context(")
+    port=code.index("booking_validate_authorized_ports(")
+    assert guard<replay and port<replay
+    assert "booking_iam_agent_granted(conn,ga['session']['user_id'],replay_ctx['agent_code'])" in code[:replay]
+
+
+def test_agent_setup_ui_acceptance_missing_tabs_documented():
+    from pathlib import Path
+    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding='utf-8')
+    assert "master-data::agents" in html
+    assert "renderHoAgentRelation" in html
+    assert "renderHoAgentNetwork" in html
+    assert "renderHoPaParties" in html
