@@ -215,3 +215,14 @@ def test_booking_approval_reference_requires_governed_action():
     assert source.count('BOOKING_APPROVAL_REFERENCE_ACTION_REQUIRED') == 2
     assert "previous_fields=json.loads(r['payload_json'])" in source
     assert "'Approval #','Approval Ref','Approval Reference'" in source
+
+
+def test_booking_port_permission_predicate_fails_closed():
+    from app.main import booking_port_allowed
+    assert booking_port_allowed('NLRTM',{'NLRTM','SGSIN'})
+    assert not booking_port_allowed('USNYC',{'NLRTM','SGSIN'})
+    assert not booking_port_allowed('NLRTM',None)
+    assert not booking_port_allowed('NLRTM',[])
+    assert booking_port_allowed('USNYC',None,all_ports_granted=True)
+    assert not booking_port_allowed('USNYC',None,all_ports_granted='true')
+    assert not booking_port_allowed('',{'NLRTM'},all_ports_granted=True)
