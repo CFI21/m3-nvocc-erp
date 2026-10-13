@@ -226,3 +226,31 @@ def test_booking_port_permission_predicate_fails_closed():
     assert booking_port_allowed('USNYC',None,all_ports_granted=True)
     assert not booking_port_allowed('USNYC',None,all_ports_granted='true')
     assert not booking_port_allowed('',{'NLRTM'},all_ports_granted=True)
+
+
+def test_booking_pol_pod_ts_scopes_require_verified_grants():
+    from fastapi import HTTPException
+    from app.main import booking_validate_authorized_ports
+    fields={'POL':'NLRTM','POD':'SGSIN','POT (1)':'AEJEA'}
+    grants={
+        'POL':{'ports':['NLRTM']},
+        'POD':{'ports':['SGSIN']},
+        'TS':{'ports':['AEJEA']},
+    }
+    assert booking_validate_authorized_ports(fields,grants)
+    for invalid in (None,{}, {'POL':{'ports':['NLRTM']}}):
+        try:
+            booking_validate_authorized_ports(fields,invalid)
+        except HTTPException as exc:
+            assert exc.status_code==403
+        else:
+            raise AssertionError('Missing field permission must deny access')
+    assert booking_validate_authorized_ports(fields,{
+        'POL':{'all_ports':True},'POD':{'all_ports':True},'TS':{'all_ports':True}})
+    try:
+        booking_validate_authorized_ports(fields,{
+            'POL':{'all_ports':'true'},'POD':{'all_ports':True},'TS':{'all_ports':True}})
+    except HTTPException as exc:
+        assert exc.status_code==403
+    else:
+        raise AssertionError('Untrusted string cannot grant all-port access')
