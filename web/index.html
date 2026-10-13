@@ -2329,7 +2329,7 @@ async function clx78BookingBottom(w){
         '<div class="equipKpi">Quantity<b>'+esc(req.quantity||'—')+'</b></div>'+
         '<div class="equipKpi">Provider<b>'+esc(req.provider||'—')+'</b></div>'+
         '<div class="equipKpi">Allocated<b>'+rows.length+'</b></div>'+
-        '<div class="equipKpi">Margin<b>'+Number(fin.margin||0).toLocaleString()+'</b></div></div>'+
+        '<div class="equipKpi">Margin<b>'+(e.financial_summary_available===false?'Unavailable':Number(fin.margin||0).toLocaleString())+'</b></div></div>'+
         '<div class="tablewrap"><table><thead><tr><th>Container</th><th>Type</th><th>Owner</th><th>Principal</th><th>Agent</th><th>Depot</th><th>Status</th><th></th></tr></thead><tbody>'+
         rows.map(x=>'<tr><td><b>'+esc(x.container_no)+'</b></td><td>'+esc(x.size_type)+'</td><td>'+esc(x.owner_party_type||x.ownership)+'</td><td>'+esc(x.principal_code||'')+'</td><td>'+esc(x.agent_code||'')+'</td><td>'+esc(x.depot_code||'')+'</td><td>'+esc(x.equipment_status)+'</td><td><button class="btn" onclick="showContainerDetail(\''+esc(x.container_no)+'\')">Open</button></td></tr>').join('')+
         '</tbody></table></div><div class="toolbar"><button class="btn" onclick="state.equipmentJobRef=\''+esc(jr)+'\';showEquipmentWorkspace(\'allocation\')">Allocation / Shortage</button><button class="btn" onclick="showEquipmentWorkspace(\'tower\')">Open Global Equipment Tower</button><button class="btn" onclick="clx81SetBottom(\'Equipment\');document.querySelector(\'[data-clx49-field=Equipment]\')?.focus()">Booking Equipment Size / Type</button></div></div>';
