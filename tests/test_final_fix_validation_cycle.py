@@ -192,3 +192,18 @@ def test_booking_approval_is_blocked_pending_governed_numbering():
     source=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
     assert 'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL' in source
     assert 'BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY' in source
+
+
+def test_booking_agent_reference_prefix_policy_does_not_issue_numbers():
+    from fastapi import HTTPException
+    from app.main import booking_agent_reference_prefix
+    assert booking_agent_reference_prefix('POL_EXPORT')=='SE'
+    assert booking_agent_reference_prefix('POD_IMPORT')=='SI'
+    assert booking_agent_reference_prefix('TRANSSHIPMENT')=='TS'
+    assert booking_agent_reference_prefix('PRINCIPAL')=='PR'
+    try:
+        booking_agent_reference_prefix('OTHER')
+    except HTTPException as exc:
+        assert exc.status_code==422
+    else:
+        raise AssertionError('Unknown operational responsibility must be rejected')
