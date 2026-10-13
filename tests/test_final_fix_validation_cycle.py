@@ -166,3 +166,14 @@ def test_booking_rejects_duplicate_equipment_size_and_type():
 def test_booking_ui_prevents_duplicate_type_and_type_change_on_edit():
     assert "This container size/type is already selected." in HTML
     assert "Container size/type cannot be changed after selection." in HTML
+
+
+
+def test_booking_approval_controls_are_safe_until_governed_actions_exist():
+    assert "Save Draft</button>" in HTML
+    assert "Submit RFA</button>" in HTML
+    assert "Approve</button>" in HTML
+    assert "RFA issuance requires governed backend numbering" in HTML
+    assert "Approval requires governed authorization and reference issuance" in HTML
+    assert "Approved — Locked" in HTML
+    assert "String(r.status||'').toLowerCase()==='approved'" in HTML
