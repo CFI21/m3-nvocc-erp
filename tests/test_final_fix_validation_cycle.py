@@ -295,3 +295,33 @@ def test_agent_office_lookup_has_exact_agent_scope():
     s=(Path(__file__).resolve().parents[1]/'app'/'admin.py').read_text(encoding='utf-8')
     assert "o.office_code = ?" in s
     assert "(user_id,'AGT-'+agent_code)" in s
+
+
+def test_agent_offices_permission_boundary_in_sqlite():
+    import sqlite3
+    from app.admin import _assigned_agent_offices
+    c=sqlite3.connect(':memory:')
+    c.row_factory=sqlite3.Row
+    try:
+        c.executescript("""
+        CREATE TABLE iam_party_access(user_id INTEGER,party_type TEXT,party_key TEXT,status TEXT);
+        CREATE TABLE iam_office_membership(user_id INTEGER,office_id INTEGER,status TEXT);
+        CREATE TABLE iam_offices(id INTEGER,office_code TEXT,country_id INTEGER,organization_id INTEGER,status TEXT);
+        CREATE TABLE iam_countries(id INTEGER,country_code TEXT,status TEXT);
+        CREATE TABLE iam_organizations(id INTEGER,org_code TEXT,status TEXT);
+        INSERT INTO iam_party_access VALUES(7,'AGENT','A01','ACTIVE');
+        INSERT INTO iam_party_access VALUES(7,'AGENT','B02','ACTIVE');
+        INSERT INTO iam_countries VALUES(1,'NL','ACTIVE'),(2,'DE','ACTIVE');
+        INSERT INTO iam_organizations VALUES(1,'M3-GLOBAL','ACTIVE');
+        INSERT INTO iam_offices VALUES(1,'AGT-A01',1,1,'ACTIVE'),(2,'AGT-B02',2,1,'ACTIVE');
+        INSERT INTO iam_office_membership VALUES(7,1,'ACTIVE'),(7,2,'ACTIVE');
+        """)
+        a=_assigned_agent_offices(c,7,'A01')
+        b=_assigned_agent_offices(c,7,'B02')
+        assert [(x['office_code'],x['country_code']) for x in a]==[('AGT-A01','NL')]
+        assert [(x['office_code'],x['country_code']) for x in b]==[('AGT-B02','DE')]
+        with pytest.raises(HTTPException) as denied:
+            _assigned_agent_offices(c,8,'A01')
+        assert denied.value.status_code==403
+    finally:
+        c.close()
