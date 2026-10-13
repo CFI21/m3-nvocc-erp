@@ -207,3 +207,11 @@ def test_booking_agent_reference_prefix_policy_does_not_issue_numbers():
         assert exc.status_code==422
     else:
         raise AssertionError('Unknown operational responsibility must be rejected')
+
+
+def test_booking_approval_reference_requires_governed_action():
+    from pathlib import Path
+    source=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
+    assert source.count('BOOKING_APPROVAL_REFERENCE_ACTION_REQUIRED') == 2
+    assert "previous_fields=json.loads(r['payload_json'])" in source
+    assert "'Approval #','Approval Ref','Approval Reference'" in source
