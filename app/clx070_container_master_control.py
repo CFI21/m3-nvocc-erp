@@ -440,14 +440,23 @@ def booking_context(job_ref:str,x_role:str=Header("VIEWER"),x_m3_session:Optiona
             LEFT JOIN jobs linked_job ON linked_job.id=c.job_id
             WHERE c.job_id=? OR linked_job.booking_id=(SELECT booking_id FROM jobs WHERE id=?)
             ORDER BY c.container_no""",(j["id"],j["id"])).fetchall()]
-        fin=dict(c.execute("""SELECT COALESCE(SUM(CASE WHEN entry_type='REVENUE' THEN amount ELSE 0 END),0) revenue,
-                                   COALESCE(SUM(CASE WHEN entry_type='COST' THEN amount ELSE 0 END),0) cost,
-                                   COALESCE(SUM(CASE WHEN entry_type='COMMISSION' THEN amount ELSE 0 END),0) commission,
-                                   COALESCE(SUM(CASE WHEN entry_type='SHARE' THEN amount ELSE 0 END),0) share
-                            FROM container_financial_ledger WHERE job_id=? OR booking_ref=?""",(j["id"],j["booking_ref"])).fetchone())
-        fin["margin"]=float(fin["revenue"])-float(fin["cost"])-float(fin["commission"])-float(fin["share"])
+        # The isolated SQLite preview may omit the optional financial ledger.
+        # Never fabricate financial amounts; preserve full checks in PostgreSQL.
+        from .db import using_postgres, table_exists
+        financial_summary_available=table_exists(c,"container_financial_ledger")
+        if financial_summary_available:
+            fin=dict(c.execute("""SELECT COALESCE(SUM(CASE WHEN entry_type='REVENUE' THEN amount ELSE 0 END),0) revenue,
+                                       COALESCE(SUM(CASE WHEN entry_type='COST' THEN amount ELSE 0 END),0) cost,
+                                       COALESCE(SUM(CASE WHEN entry_type='COMMISSION' THEN amount ELSE 0 END),0) commission,
+                                       COALESCE(SUM(CASE WHEN entry_type='SHARE' THEN amount ELSE 0 END),0) share
+                                FROM container_financial_ledger WHERE job_id=? OR booking_ref=?""",(j["id"],j["booking_ref"])).fetchone())
+            fin["margin"]=float(fin["revenue"])-float(fin["cost"])-float(fin["commission"])-float(fin["share"])
+            else:
+            if using_postgres():
+                raise RuntimeError("M3_FINANCIAL_LEDGER_MISSING")
+            fin=None
         req={"equipment":fields.get("Equipment"),"quantity":fields.get("Quantity"),"provider":fields.get("Equipment Provider"),"owner":fields.get("Container Owner"),"soc_coc":fields.get("SOC / COC")}
-        return {"actor":a,"context":dict(j),"requirement":req,"booking_fields":fields,"allocated_containers":allocations,"financial_summary":fin}
+        return {"actor":a,"context":dict(j),"requirement":req,"booking_fields":fields,"allocated_containers":allocations,"financial_summary":fin,"financial_summary_available":financial_summary_available}
     finally:c.close()
 
 @router.get("/kpis")
