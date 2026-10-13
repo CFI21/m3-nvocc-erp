@@ -325,3 +325,20 @@ def test_agent_offices_permission_boundary_in_sqlite():
         assert denied.value.status_code==403
     finally:
         c.close()
+
+
+def test_online_booking_request_is_pre_job_and_approval_gated():
+    from app.online_booking_request_rules import online_request_transition
+    assert online_request_transition("DRAFT","SUBMIT")=="SUBMITTED"
+    assert online_request_transition("SUBMITTED","APPROVE")=="APPROVED"
+    assert online_request_transition("SUBMITTED","REJECT")=="REJECTED"
+    assert online_request_transition("APPROVED","CONVERT",approved=True)=="CONVERTED"
+    assert online_request_transition("CONVERTED","CONVERT",linked_job_ref="50001")=="CONVERTED"
+    with pytest.raises(HTTPException):
+        online_request_transition("DRAFT","CONVERT",approved=True)
+    with pytest.raises(HTTPException):
+        online_request_transition("SUBMITTED","CONVERT",approved=True)
+    with pytest.raises(HTTPException):
+        online_request_transition("APPROVED","CONVERT",approved=False)
+    with pytest.raises(HTTPException):
+        online_request_transition("REJECTED","CONVERT",approved=True)
