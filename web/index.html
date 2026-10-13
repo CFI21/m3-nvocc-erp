@@ -735,7 +735,7 @@ const m3AgentFields={
  'CRO Detail':['bs_code','operator_code','cro_remarks','noc_note'],
  'B/L Template':['bl_template']
 };
-function m3AgentHasChanges(row){return Object.entries(m3AgentDraft).some(([key,value])=>String(value??'').trim()!==String(row?.payload?.[key]??'').trim())}
+function m3AgentHasChanges(row){return Object.entries(m3AgentDraft).some(([key,value])=>(m3AgentBooleanKeys.has(key)?(value===true||value==='true')!==(row?.payload?.[key]===true||row?.payload?.[key]==='true'||row?.payload?.[key]===1||row?.payload?.[key]==='1'):String(value??'').trim()!==String(row?.payload?.[key]??'').trim()))}
 function m3AgentSelect(i){if(i===m3AgentIndex)return;if(m3AgentEditing){m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])&&!confirm('Discard unsaved edits for this Agent?'))return}m3AgentDiscardDraft();m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentPaint()}
 function m3AgentSelectTab(t){if(m3AgentTabs.includes(t)){if(m3AgentEditing)m3AgentCaptureDraft();m3AgentTab=t;m3AgentPaint()}}
 function m3AgentConfigMatches(r,agent){
@@ -856,7 +856,7 @@ async function m3AgentSubmit(){
  const combined={...row.payload,...m3AgentDraft};
  if(!String(combined.name||'').trim()||!String(combined.short_name||'').trim()){alert('Name and Short Name are required.');return}
  const payload={};
- Object.entries(m3AgentDraft).forEach(([key,val])=>{const original=row.payload?.[key];if(String(val)!==String(original??''))payload[key]=typeof val==='string'?val.trim():val});
+ Object.entries(m3AgentDraft).forEach(([key,val])=>{const original=row.payload?.[key];if(m3AgentBooleanKeys.has(key)?(val===true||val==='true')!==(original===true||original==='true'||original===1||original==='1'):String(val??'').trim()!==String(original??'').trim())payload[key]=typeof val==='string'?val.trim():val});
  if(!Object.keys(payload).length){alert('No changes to submit');return}
  const reason=prompt('Reason for Agent Master change request:');
  if(!reason||!reason.trim())return;
