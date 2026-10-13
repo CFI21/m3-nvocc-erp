@@ -705,7 +705,27 @@ function agentConfigManage(label){
     '<button class="btn" onclick="openScreen(\'master-data::agents\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Agents\'})">Agent Master</button>';
 }
 
-let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false;
+let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false,m3AgentDraft={},m3AgentRelations={};
+const m3AgentHeaderKeys=['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','active','port_restriction','principal_office','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person'];
+const m3AgentBooleanKeys=new Set(['active','port_restriction','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person']);
+const m3AgentMultilineKeys=new Set(['bank_details','address','invoice_note','invoice_department_address','cro_remarks','noc_note']);
+const m3AgentLabels={name:'Name *',short_name:'Short Name *',common_party_key:'Common Party',sub_company:'Sub Company',gl_account:'GL Account',ftp_sub_folder:'FTP Sub Folder',active:'Active',port_restriction:'Port Restriction',principal_office:'Principal Office',finance_approval_required_for_bl_print:'Finance Approval Req For BL Print',pick_detention_free_days_on_bl:'Pick Detention FreeDays on BL',restrict_pofd_agent_on_booking:'Restrict POFD Agent on Booking',required_sales_person:'Req. Sales Person',bs_code:'BS Code',cro_remarks:'CRO Remarks',noc_note:'NOC Note',booking_restriction:'Booking Restriction'};
+function m3AgentCaptureDraft(){document.querySelectorAll('[data-m3-agent-field]').forEach(el=>{m3AgentDraft[el.dataset.m3AgentField]=el.type==='checkbox'?el.checked:el.value})}
+function m3AgentDiscardDraft(){m3AgentDraft={};m3AgentEditing=false}
+function m3AgentField(k,p){
+ const raw=Object.prototype.hasOwnProperty.call(m3AgentDraft,k)?m3AgentDraft[k]:(p[k]??p[k.replaceAll('_',' ')]);
+ const value=raw==null?'':String(raw),label=esc(m3AgentLabels[k]||k.replaceAll('_',' ').toUpperCase());
+ const checked=raw===true||raw==='true'||raw===1||raw==='1';
+ let widget;
+ if(!m3AgentEditing)widget=m3AgentBooleanKeys.has(k)?(checked?'Yes':'No'):esc(value||'—');
+ else if(m3AgentBooleanKeys.has(k))widget='<input type="checkbox" data-m3-agent-field="'+esc(k)+'"'+(checked?' checked':'')+'>';
+ else if(m3AgentMultilineKeys.has(k))widget='<textarea data-m3-agent-field="'+esc(k)+'" rows="2" style="width:100%">'+esc(value)+'</textarea>';
+ else if(k==='booking_restriction')widget='<select data-m3-agent-field="'+esc(k)+'">'+['','None','SRR','MRG'].map(opt=>'<option value="'+esc(opt)+'"'+(value===opt?' selected':'')+'>'+esc(opt||'Select')+'</option>').join('')+'</select>';
+ else widget='<input data-m3-agent-field="'+esc(k)+'" value="'+esc(value)+'" style="width:100%;min-width:0"'+(['name','short_name'].includes(k)?' required':'')+'>';
+ return '<div style="min-width:0;padding:5px;border-bottom:1px solid #dce3e0"><label class="muted">'+label+'</label><div>'+widget+'</div></div>';
+}
+function m3AgentRelevantRows(row,kind){return m3AgentConfigs.filter(x=>x.status==='ACTIVE'&&m3AgentConfigMatches(x,row)&&String(x.payload?.config_type||'').toUpperCase()===kind)}
+
 const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template'];
 const m3AgentFields={
  'Agent Detail':['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','active','port_restriction','principal_office','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person','phone','mobile','export_email','import_email','website','contact','fax','port','next_agent','next_port','default_depot','invoice_department_address','booking_restriction','company_logo','stamp'],
@@ -715,8 +735,8 @@ const m3AgentFields={
  'CRO Detail':['bs_code','operator_code','cro_remarks','noc_note'],
  'B/L Template':['bl_template']
 };
-function m3AgentSelect(i){m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentEditing=false;m3AgentPaint()}
-function m3AgentSelectTab(t){if(m3AgentTabs.includes(t)){m3AgentTab=t;m3AgentEditing=false;m3AgentPaint()}}
+function m3AgentSelect(i){if(m3AgentEditing&&Object.keys(m3AgentDraft).length&&!confirm('Discard unsaved edits for this Agent?'))return;m3AgentDiscardDraft();m3AgentIndex=i;m3AgentTab='Agent Detail';m3AgentPaint()}
+function m3AgentSelectTab(t){if(m3AgentTabs.includes(t)){if(m3AgentEditing)m3AgentCaptureDraft();m3AgentTab=t;m3AgentPaint()}}
 function m3AgentConfigMatches(r,agent){
  const p=r.payload||{};
  return String(p.agent_code||'')===String(agent.record_key||'');
@@ -725,16 +745,8 @@ function m3AgentPaint(){
  const row=m3AgentRows[m3AgentIndex],p=row?.payload||{};
  const buttons=m3AgentRows.map((x,i)=>'<button class="btn'+(i===m3AgentIndex?' primary':'')+'" onclick="m3AgentSelect('+i+')">'+esc(x.display_name||x.record_key)+'</button>').join('');
  const tabs=m3AgentTabs.map(t=>'<button class="btn'+(t===m3AgentTab?' primary':'')+'" data-agent-tab="'+esc(t)+'">'+esc(t)+'</button>').join('');
- let fields=(m3AgentFields[m3AgentTab]||[]).map(k=>{
-   const raw=p[k]??p[k.replaceAll('_',' ')];
-   const value=raw===null||raw===undefined?'':String(raw);
-   const label=esc(k.replaceAll('_',' ').toUpperCase());
-   const toggles=['active','port_restriction','principal_office','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person'];
-   const multi=['bank_details','address','invoice_note','invoice_department_address','cro_remarks','noc_note'];
-   const checked=raw===true||raw==='true'||raw===1||raw==='1';
-   const widget=toggles.includes(k)?(m3AgentEditing?'<input type="checkbox" data-m3-agent-field="'+esc(k)+'"'+(checked?' checked':'')+'>':(checked?'Yes':'No')):multi.includes(k)?(m3AgentEditing?'<textarea data-m3-agent-field="'+esc(k)+'" rows="3">'+esc(value)+'</textarea>':esc(value||'—')):(m3AgentEditing?'<input data-m3-agent-field="'+esc(k)+'" value="'+esc(value)+'" style="width:100%;max-width:230px">':esc(value||'—'));
-   return '<div style="min-width:150px;padding:6px;border-bottom:1px solid #dce3e0"><label class="muted">'+label+'</label><div>'+widget+'</div></div>';
- }).join('');
+ const header=row?'<div style="border:1px solid #d7dde5;padding:8px;margin:8px 0"><div class="toolbar"><b>Agent Code: '+esc(row.record_key)+'</b><span class="muted">Authoritative master code · '+esc(row.status||'')+'</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:5px">'+m3AgentHeaderKeys.map(k=>m3AgentField(k,p)).join('')+'</div></div>':'';
+ let fields=(m3AgentFields[m3AgentTab]||[]).filter(k=>!m3AgentHeaderKeys.includes(k)&&!(m3AgentTab==='Emails'&&['email','export_email','import_email'].includes(k))&&!(m3AgentTab==='B/L Template'&&k==='bl_template')).map(k=>m3AgentField(k,p)).join('');
  if(row&&(m3AgentTab==='Countries'||m3AgentTab==='Offices')){
   const kind='AGENT_OFFICE_ASSIGNMENT';
   const linked=m3AgentConfigs.filter(x=>String(x.payload?.config_type||'').toUpperCase()===kind&&m3AgentConfigMatches(x,row)&&x.status==='ACTIVE');
@@ -749,11 +761,10 @@ function m3AgentPaint(){
  if(row&&['Emails','Countries','Offices'].includes(m3AgentTab)){
   const allowed=['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role);
   const emailTab=m3AgentTab==='Emails';
-  const rows=m3AgentConfigs.filter(x=>x.status==='ACTIVE'&&m3AgentConfigMatches(x,row)&&
-     String(x.payload?.config_type||'').toUpperCase()===(emailTab?'AGENT_EMAIL':'AGENT_OFFICE_ASSIGNMENT'));
-  const view=emailTab?rows.map(x=>'<tr><td>'+esc(x.payload?.port_code||'—')+'</td><td>'+esc(x.payload?.email||'—')+'</td></tr>').join(''):
-    rows.map(x=>'<tr><td>'+esc(x.payload?.office_code||'—')+'</td><td>'+esc(x.payload?.country_code||'Resolved by IAM')+'</td><td>'+esc(x.payload?.address||'—')+'</td></tr>').join('');
-  fields+='<div style="grid-column:1/-1"><b>'+esc(m3AgentTab)+' records</b><table class="table"><thead><tr>'+(emailTab?'<th>Port</th><th>Email</th>':'<th>Office / Port</th><th>Country</th><th>Address</th>')+'</tr></thead><tbody>'+view+'</tbody></table>'+
+  const rows=m3AgentRelevantRows(row,emailTab?'AGENT_EMAIL':'AGENT_OFFICE_ASSIGNMENT');
+  const view=emailTab?rows.map(x=>'<tr><td>'+esc(x.payload?.port_code||'—')+'</td><td>'+esc(x.payload?.email||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join(''):
+    rows.map(x=>'<tr><td>'+esc(x.payload?.office_code||'—')+'</td><td>'+esc(x.payload?.country_code||'Resolved by IAM')+'</td><td>'+esc(x.payload?.address||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join('');
+  fields+='<div style="grid-column:1/-1"><b>'+esc(m3AgentTab)+' records</b><table class="table"><thead><tr>'+(emailTab?'<th>Port</th><th>Email</th><th>Action</th>':'<th>Office / Port</th><th>Country</th><th>Address</th><th>Action</th>')+'</tr></thead><tbody>'+view+'</tbody></table>'+
    (allowed?'<button class="btn" id="m3AgentRelatedAdd">Add governed '+esc(emailTab?'email':'office assignment')+'</button>':'')+
    '<p class="muted">Changes require approval. Office assignment never overrides IAM membership.</p></div>';
  }
@@ -770,26 +781,34 @@ function m3AgentPaint(){
  }
  const canEdit=['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role);
  const pending=m3AgentPending.find(x=>x.domain==='agent'&&x.record_key===row?.record_key&&x.status==='PENDING');
- const editable=canEdit&&!pending&&m3AgentTab!=='Countries'&&m3AgentTab!=='Offices';
+ const editable=canEdit&&!pending;
  const editor=row&&editable?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
  const save=m3AgentEditing&&editable?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
  const canApprove=['SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role);
  const checkerActions=pending&&canApprove?'<button class="btn" id="m3AgentApprove">Approve change</button><button class="btn" id="m3AgentReject">Reject change</button>':'';
  const pendingNotice=pending?'<span class="muted">Pending change '+esc(pending.change_ref||'')+' · independent checker required</span>':'';
- $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+checkerActions+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?'<div><b>'+esc(row.display_name||row.record_key)+'</b> · '+esc(row.record_key)+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
+ $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+checkerActions+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
  document.getElementById('m3AgentReload')?.addEventListener('click',renderHoAgentMasterWorkspace);
- document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{m3AgentEditing=!m3AgentEditing;m3AgentPaint()});
+ document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{if(m3AgentEditing)m3AgentDiscardDraft();else m3AgentEditing=true;m3AgentPaint()});
  document.getElementById('m3AgentSave')?.addEventListener('click',m3AgentSubmit);
  document.getElementById('m3AgentRelatedAdd')?.addEventListener('click',m3AgentRelatedCreate);
+ document.querySelectorAll('[data-agent-remove]').forEach(el=>el.addEventListener('click',()=>m3AgentRelatedRemove(el.dataset.agentRemove)));
  document.getElementById('m3AgentApprove')?.addEventListener('click',()=>m3AgentDecide('APPROVE'));
  document.getElementById('m3AgentReject')?.addEventListener('click',()=>m3AgentDecide('REJECT'));
+}
+async function m3AgentRelatedRemove(key){
+ const row=m3AgentRows[m3AgentIndex];const rel=m3AgentConfigs.find(x=>x.record_key===key&&m3AgentConfigMatches(x,row));
+ if(!rel||!['AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'].includes(String(rel.payload?.config_type||'').toUpperCase()))return;
+ if(!confirm('Submit removal of '+key+' for independent approval?'))return;
+ const reason=prompt('Reason for relationship removal (required):');if(!reason||!reason.trim())return;
+ try{await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'configuration',record_key:key,operation:'DEACTIVATE',payload:{},reason:reason.trim()})});alert('Removal submitted for independent approval.');await renderHoAgentMasterWorkspace()}catch(e){alert('Relationship removal failed: '+e.message)}
 }
 async function m3AgentRelatedCreate(){
  const row=m3AgentRows[m3AgentIndex];if(!row)return;
  const isEmail=m3AgentTab==='Emails';
  if(!isEmail&&!['Countries','Offices'].includes(m3AgentTab))return;
- const code=prompt(isEmail?'Port code for email:':'Existing IAM office code:');
+ const code=prompt(isEmail?'Port code for email:':'Existing IAM office code (the office must already exist):');
  if(!code||!code.trim())return;
  const second=prompt(isEmail?'Email address:':'Office address (optional):');
  if(second===null)return;
@@ -825,18 +844,18 @@ async function m3AgentDecide(decision){
 async function m3AgentSubmit(){
  const row=m3AgentRows[m3AgentIndex];if(!row)return;
  if(!['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role)){alert('Master Data edit permission required');return}
+ m3AgentCaptureDraft();
+ const combined={...row.payload,...m3AgentDraft};
+ if(!String(combined.name||row.display_name||'').trim()||!String(combined.short_name||'').trim()){alert('Name and Short Name are required.');return}
  const payload={};
- document.querySelectorAll('[data-m3-agent-field]').forEach(el=>{
-  const key=el.dataset.m3AgentField,val=el.type==='checkbox'?el.checked:el.value.trim();
-  if(String(val)!==String(row.payload?.[key]??''))payload[key]=val;
- });
+ Object.entries(m3AgentDraft).forEach(([key,val])=>{const original=row.payload?.[key];if(String(val)!==String(original??''))payload[key]=typeof val==='string'?val.trim():val});
  if(!Object.keys(payload).length){alert('No changes to submit');return}
  const reason=prompt('Reason for Agent Master change request:');
  if(!reason||!reason.trim())return;
  try{
   const result=await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'agent',record_key:row.record_key,operation:'UPDATE',payload,reason:reason.trim()})});
   alert('Agent change submitted for approval: '+(result.change_ref||'pending'));
-  m3AgentEditing=false;await renderHoAgentMasterWorkspace();
+  m3AgentDiscardDraft();await renderHoAgentMasterWorkspace();
  }catch(e){alert('Agent change request failed: '+e.message)}
 }
 async function renderHoAgentMasterWorkspace(){
@@ -848,7 +867,7 @@ async function renderHoAgentMasterWorkspace(){
   m3AgentPending=Array.isArray(pending)?pending:[];
   m3AgentIndex=Math.max(0,m3AgentRows.findIndex(x=>x.record_key===selected));
   if(!m3AgentRows.length)m3AgentIndex=-1;
-  m3AgentEditing=false;m3AgentPaint();
+  m3AgentDiscardDraft();m3AgentPaint();
  }catch(e){$('gridArea').innerHTML='<div class="card badtext">Agent Master unavailable: '+esc(e.message)+'</div>'}
 }
 
