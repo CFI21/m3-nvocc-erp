@@ -23,8 +23,10 @@ jobs:
       - name: Agent Master governance, approval and persistence
         run: python -m pytest -q tests/test_clx048_admin_masterdata.py --junitxml=agent-governance.xml
       - name: Agent Master six-tab UI contract
+        if: success() || failure()
         run: python -m pytest -q tests/test_agent_master_ui_contract.py --junitxml=agent-ui.xml
       - name: Agent Master regression coverage
+        if: success() || failure()
         run: python -m pytest -q tests/test_final_fix_validation_cycle.py -k "agent or booking_port" --junitxml=agent-regression.xml
       - name: Summarize B01 test evidence
         if: always()
