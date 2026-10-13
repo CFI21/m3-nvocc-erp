@@ -559,6 +559,10 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             audit(conn,role,ascope or cscope,'CLOSED_JOB_BLOCKED',module,tid,r['job_id'],before,before,{'attempted_action':action})
             conn.execute('COMMIT')
             return JSONResponse({'detail':{'code':'JOB_CLOSED','action':action}},status_code=422)
+        if module=='booking' and action=='approve' and str(r['status']).strip().lower()!='rfa':
+            raise HTTPException(409,{'code':'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL'})
+        if module=='booking' and action=='approve':
+            raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY'})
         if action=='advance':
             if module!='special-rates-request': raise HTTPException(422,{'code':'ADVANCE_ONLY_SPECIAL_RATE'})
             stages=['Requested','Pricing Review','Carrier Response','Approved','Linked']; curstage=payload.get('Stage','Requested'); idx=stages.index(curstage) if curstage in stages else 0; nextstage=stages[min(idx+1,len(stages)-1)]
