@@ -599,3 +599,43 @@ def test_booking_api_rejects_unauthenticated_governed_update(isolated,monkeypatc
     with db.connect() as conn:
         after=conn.execute("SELECT payload_json,version FROM transaction_records WHERE id=?",(record['id'],)).fetchone()
     assert (after['payload_json'],after['version'])==(record['payload_json'],record['version'])
+
+
+@pytest.mark.parametrize("session_token", ["nonexistent-session", ""])
+def test_booking_api_rejects_invalid_agent_session_without_creating_record(isolated,monkeypatch,session_token):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    monkeypatch.setenv('M3_BULK_PERMISSION_GOVERNANCE_ENABLED','true')
+    monkeypatch.setenv('M3_PRODUCTION_TRAFFIC','OFF')
+    monkeypatch.setenv('M3_UAT_TOKEN','isolated-booking-api-test')
+    client=TestClient(app,raise_server_exceptions=False,
+        headers={'X-M3-UAT-Token':'isolated-booking-api-test'})
+    with db.connect() as conn:
+        before=conn.execute("SELECT COUNT(*) FROM transaction_records WHERE module='booking'").fetchone()[0]
+    headers={'X-M3-Session':session_token} if session_token else {}
+    response=client.post('/api/v1/booking',
+        headers=headers,json={'job_ref':'50001','fields':{'POL':'NLRTM'}})
+    assert response.status_code==401, response.text
+    with db.connect() as conn:
+        after=conn.execute("SELECT COUNT(*) FROM transaction_records WHERE module='booking'").fetchone()[0]
+    assert before==after
+
+
+def test_booking_api_rejects_revoked_session_without_creating_record(isolated,monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    monkeypatch.setenv('M3_BULK_PERMISSION_GOVERNANCE_ENABLED','true')
+    monkeypatch.setenv('M3_PRODUCTION_TRAFFIC','OFF')
+    monkeypatch.setenv('M3_UAT_TOKEN','isolated-booking-api-test')
+    token=login(Login(username='admin',password='Admin123!',mfa_code='123456'))['session_token']
+    with db.connect() as conn:
+        conn.execute("UPDATE iam_sessions SET status='REVOKED' WHERE session_token=?",(token,))
+        conn.commit()
+        before=conn.execute("SELECT COUNT(*) FROM transaction_records WHERE module='booking'").fetchone()[0]
+    client=TestClient(app,raise_server_exceptions=False,
+        headers={'X-M3-UAT-Token':'isolated-booking-api-test','X-M3-Session':token})
+    response=client.post('/api/v1/booking',json={'job_ref':'50001','fields':{'POL':'NLRTM'}})
+    assert response.status_code==401, response.text
+    with db.connect() as conn:
+        after=conn.execute("SELECT COUNT(*) FROM transaction_records WHERE module='booking'").fetchone()[0]
+    assert before==after
