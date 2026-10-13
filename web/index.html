@@ -758,12 +758,33 @@ function m3AgentPaint(){
  const editable=canEdit&&!pending&&m3AgentTab!=='Countries'&&m3AgentTab!=='Offices';
  const editor=row&&editable?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
  const save=m3AgentEditing&&editable?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
- const pendingNotice=pending?'<span class="muted">Pending change '+esc(pending.change_ref||'')+' · approval required</span>':'';
- $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?'<div><b>'+esc(row.display_name||row.record_key)+'</b> · '+esc(row.record_key)+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
+ const canApprove=['SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role);
+ const checkerActions=pending&&canApprove?'<button class="btn" id="m3AgentApprove">Approve change</button><button class="btn" id="m3AgentReject">Reject change</button>':'';
+ const pendingNotice=pending?'<span class="muted">Pending change '+esc(pending.change_ref||'')+' · independent checker required</span>':'';
+ $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+checkerActions+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?'<div><b>'+esc(row.display_name||row.record_key)+'</b> · '+esc(row.record_key)+'</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
  document.getElementById('m3AgentReload')?.addEventListener('click',renderHoAgentMasterWorkspace);
  document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{m3AgentEditing=!m3AgentEditing;m3AgentPaint()});
  document.getElementById('m3AgentSave')?.addEventListener('click',m3AgentSubmit);
+ document.getElementById('m3AgentApprove')?.addEventListener('click',()=>m3AgentDecide('APPROVE'));
+ document.getElementById('m3AgentReject')?.addEventListener('click',()=>m3AgentDecide('REJECT'));
+}
+async function m3AgentDecide(decision){
+ const row=m3AgentRows[m3AgentIndex];
+ const change=m3AgentPending.find(x=>x.domain==='agent'&&x.record_key===row?.record_key&&x.status==='PENDING');
+ if(!change)return alert('No pending change found');
+ if(!['SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role))return alert('Checker role required');
+ if(!confirm((decision==='APPROVE'?'Approve':'Reject')+' Agent change '+change.change_ref+'? This action is audited.'))return;
+ const comment=prompt('Decision comment (required):');
+ if(!comment||!comment.trim())return;
+ try{
+  await api('/api/masterdata/changes/'+encodeURIComponent(change.change_ref)+'/decision',{
+   method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({decision,comment:comment.trim()})
+  });
+  await renderHoAgentMasterWorkspace();
+  alert('Agent change '+(decision==='APPROVE'?'approved':'rejected')+'.');
+ }catch(e){alert('Checker decision failed: '+e.message)}
 }
 async function m3AgentSubmit(){
  const row=m3AgentRows[m3AgentIndex];if(!row)return;
