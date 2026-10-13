@@ -266,3 +266,9 @@ def test_booking_agent_iam_binding_is_fail_closed():
     assert not booking_iam_agent_granted(db,8,'AG001')
     assert not booking_iam_agent_granted(db,7,'AG002')
     db.close()
+
+
+def test_booking_session_agent_write_guard_present():
+    from pathlib import Path
+    text=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
+    assert text.count('BOOKING_AGENT_LOGIN_NOT_AUTHORIZED') == 2
