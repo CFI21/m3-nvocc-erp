@@ -563,3 +563,33 @@ def test_agent_setup_ui_acceptance_missing_tabs_documented():
     assert "renderHoAgentRelation" in html
     assert "renderHoAgentNetwork" in html
     assert "renderHoPaParties" in html
+
+
+def test_booking_api_rejects_unauthenticated_governed_create(isolated,monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    monkeypatch.setenv('M3_BULK_PERMISSION_GOVERNANCE_ENABLED','true')
+    client=TestClient(app,raise_server_exceptions=False)
+    with db.connect() as conn:
+        before=conn.execute("SELECT COUNT(*) FROM transaction_records WHERE module='booking'").fetchone()[0]
+    response=client.post('/api/v1/booking',json={'job_ref':'50001','fields':{'POL':'NLRTM'}})
+    assert response.status_code in (401,403), response.text
+    with db.connect() as conn:
+        after=conn.execute("SELECT COUNT(*) FROM transaction_records WHERE module='booking'").fetchone()[0]
+    assert before==after
+
+
+def test_booking_api_rejects_unauthenticated_governed_update(isolated,monkeypatch):
+    from fastapi.testclient import TestClient
+    from app.main import app
+    monkeypatch.setenv('M3_BULK_PERMISSION_GOVERNANCE_ENABLED','true')
+    with db.connect() as conn:
+        record=conn.execute("SELECT id,payload_json,version FROM transaction_records WHERE module='booking' ORDER BY id LIMIT 1").fetchone()
+    if record is None:
+        pytest.skip('Seed has no Booking transaction to exercise authenticated update gate')
+    client=TestClient(app,raise_server_exceptions=False)
+    response=client.put(f"/api/v1/booking/{record['id']}",json={'version':record['version'],'fields':{'POL':'USNYC'}})
+    assert response.status_code in (401,403), response.text
+    with db.connect() as conn:
+        after=conn.execute("SELECT payload_json,version FROM transaction_records WHERE id=?",(record['id'],)).fetchone()
+    assert (after['payload_json'],after['version'])==(record['payload_json'],record['version'])
