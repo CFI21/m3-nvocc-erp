@@ -185,3 +185,10 @@ def test_booking_status_cannot_be_issued_by_ordinary_save():
     assert "BOOKING_STATUS_ACTION_REQUIRED" in src
     assert "str(body.fields.get('Status','Draft')).strip().lower() != 'draft'" in src
     assert "'Status' in body.fields and str(body.fields['Status']).strip().lower()!=str(r['status']).strip().lower()" in src
+
+
+def test_booking_approval_is_blocked_pending_governed_numbering():
+    from pathlib import Path
+    source=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
+    assert 'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL' in source
+    assert 'BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY' in source
