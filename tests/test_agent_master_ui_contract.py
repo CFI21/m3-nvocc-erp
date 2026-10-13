@@ -45,3 +45,16 @@ def test_agent_boolean_compare_applies_to_dirty_and_submit_paths():
     assert "m3AgentBooleanKeys.has(key)" in submit
     assert "payload[key]=" in submit
     assert "operation:'UPDATE'" in submit
+
+
+def test_new_agent_uses_existing_approval_queue():
+    source = agent_source()
+    assert "id=\"m3AgentNew\"" in source
+    assert "async function m3AgentCreate()" in source
+    create = source.split("async function m3AgentCreate()", 1)[1].split(
+        "async function m3AgentSubmit()", 1
+    )[0]
+    assert "operation:'CREATE'" in create
+    assert "domain:'agent'" in create
+    assert "'/api/masterdata/changes'" in create
+    assert "record_key:code" in create
