@@ -441,3 +441,33 @@ def agent_authorized_offices(agent_code:str,x_m3_session:Optional[str]=Header(No
         return {'agent_code':agent_code,'offices':offices,'count':len(offices)}
     finally:
         c.close()
+
+
+def _authorized_agent_profile(c,user_id,agent_code):
+    """Resolve existing Agent/PA Party/IAM identities without copying master fields."""
+    agent=_agent_master(c,agent_code)
+    if not agent:
+        raise HTTPException(404,{'code':'AGENT_MASTER_NOT_FOUND'})
+    offices=_assigned_agent_offices(c,user_id,agent_code)
+    payload=json.loads(agent['payload_json'] or '{}')
+    key=str(payload.get('common_party_key') or '').strip()
+    if not key:
+        raise HTTPException(409,{'code':'AGENT_COMMON_PARTY_REQUIRED'})
+    party=c.execute("""SELECT record_key,display_name FROM md_records
+        WHERE domain='common-party' AND record_key=? AND status='ACTIVE'""",(key,)).fetchone()
+    if not party:
+        raise HTTPException(409,{'code':'COMMON_PARTY_NOT_ACTIVE'})
+    return {'agent_code':agent_code,'agent_name':agent['display_name'],
+            'common_party_key':party['record_key'],'common_party_name':party['display_name'],
+            'offices':offices}
+
+
+@router.get('/agent/{agent_code}/authorized-profile')
+def agent_authorized_profile(agent_code:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Agent Setup read model built from authoritative existing records."""
+    c=connect()
+    try:
+        s=session(c,x_m3_session)
+        return _authorized_agent_profile(c,s['user_id'],agent_code)
+    finally:
+        c.close()
