@@ -420,8 +420,11 @@ def _assigned_agent_offices(c,user_id,agent_code):
         raise HTTPException(403,{'code':'AGENT_PARTY_ACCESS_DENIED'})
     # Explicit office links live in existing governed configuration records.
     # These records grant no access by themselves: IAM membership is also required.
+    from .db import table_exists
     configured=set()
-    for row in c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'").fetchall():
+    configurations=(c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'").fetchall()
+                    if table_exists(c,'md_records') else [])
+    for row in configurations:
         try:
             p=json.loads(row['payload_json'] or '{}')
         except (TypeError,ValueError):
@@ -455,6 +458,8 @@ def agent_authorized_offices(agent_code:str,x_m3_session:Optional[str]=Header(No
 
 
 def _agent_has_explicit_office_assignments(c,agent_code):
+    from .db import table_exists
+    if not table_exists(c,'md_records'): return False
     for row in c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'").fetchall():
         try:
             p=json.loads(row['payload_json'] or '{}')
