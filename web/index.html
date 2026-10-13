@@ -797,8 +797,8 @@ function m3AgentPaint(){
  const relatedNotice=relatedPending.length?'<span class="muted">'+relatedPending.length+' relationship change(s) awaiting approval</span>':'';
  $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+relatedNotice+checkerActions+newAgentButton+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+pendingCreatePanel+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
- document.getElementById('m3AgentReload')?.addEventListener('click',renderHoAgentMasterWorkspace);
- document.getElementById('m3AgentNew')?.addEventListener('click',m3AgentCreate);
+ document.getElementById('m3AgentReload')?.addEventListener('click',()=>{if(m3AgentEditing){m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])&&!confirm('Discard unsaved Agent edits and refresh?'))return}renderHoAgentMasterWorkspace()});
+ document.getElementById('m3AgentNew')?.addEventListener('click',()=>{if(m3AgentEditing){m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])&&!confirm('Discard unsaved Agent edits and create a new Agent?'))return}m3AgentCreate()});
  document.querySelectorAll('[data-agent-create-decision]').forEach(el=>el.addEventListener('click',()=>m3AgentDecide(el.dataset.agentCreateDecision,el.dataset.agentCreateRef)));
  document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{if(m3AgentEditing)m3AgentDiscardDraft();else m3AgentEditing=true;m3AgentPaint()});
  document.getElementById('m3AgentSave')?.addEventListener('click',m3AgentSubmit);
