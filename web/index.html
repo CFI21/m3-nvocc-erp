@@ -2640,6 +2640,14 @@ function clx81AddEquipmentRow(){
  const qty=Number(read('clx81EqQty')),teu=read('clx81EqTEU');
  if(!Number.isInteger(qty)||qty<1||qty>9999||!teu){document.getElementById('clx81EqQty')?.focus();return;}
  const row=['clx81EqSize','clx81EqType','clx81EqQty','clx81ShipmentType','clx81EqGross','clx81EqPackages','clx81EqPackageUnit'].map(read);
+ // One row per container size/type; increase quantity on its existing row.
+ const key=r=>String(r[0]).replace(/'/g,'').trim().toUpperCase()+'|'+String(r[1]).trim().toUpperCase();
+ const duplicate=clx81EqSelectedRows.findIndex((r,i)=>i!==clx81EditingEquipmentIndex&&key(r)===key(row));
+ if(duplicate>=0){alert('This container size/type is already selected. Use Edit to change its quantity.');return;}
+ if(clx81EditingEquipmentIndex>=0){
+   const original=clx81EqSelectedRows[clx81EditingEquipmentIndex];
+   if(original&&key(original)!==key(row)){alert('Container size/type cannot be changed after selection. Delete the row and add a different type.');return;}
+ }
  const gross=Number(read('clx81EqGross').replace(',','.'));
  row.push(read('clx81EqGross')&&Number.isFinite(gross)?String(Number((gross*qty).toFixed(3))):'');
  row.push(read('clx81EqTEU'));
