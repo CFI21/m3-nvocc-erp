@@ -2916,7 +2916,10 @@ async function clx49RenderBooking(tab){
       '</div></div></div>'+
       '<div class="clx78BottomTabs">'+
       '<span class="clx81Check" style="margin-left:8px"><input type="checkbox" disabled title="Reference control only; no governed clone-booking API exists"> Copy</span>'+
-      '<span class="clx81Status">Approval Status: <select disabled><option>'+esc(r?.status||p['Status']||'—')+'</option></select></span>'+
+      '<span class="clx81Status">Approval Status: <select disabled aria-label="Booking approval status"><option>'+esc(String(r?.status||'Draft').toLowerCase()==='approved'?'Approved':String(r?.status||'Draft').toLowerCase()==='rfa'?'RFA':'Draft')+'</option></select></span>'+
+      (r&&String(r.status||'').toLowerCase()==='approved'?'<span class="clx81Status" title="Approved booking locked">🔒 Approved — Locked</span>':'')+
+      (r&&String(r.status||'').toLowerCase()!=='approved'?'<button class="btn primary" onclick="saveClx049Tab(\'booking\','+r.id+','+r.version+')">Save Draft</button>':'')+
+      '<button class="btn" disabled title="RFA issuance requires governed backend numbering">Submit RFA</button><button class="btn" disabled title="Approval requires governed authorization and reference issuance">Approve</button>'+
       '<span class="grow"></span><button onclick="openScreen(\'agent-tasks::split-bl\')">Split Booking</button><button onclick="openClx49Link(\''+esc(w.deep_links.bl)+'\',\''+esc(w.context.job_ref)+'\')">B/L</button><button onclick="openScreen(\'agent-tasks::cro\')">CRO</button></div>'+
       '<div class="clx78Flow"><div class="clx78FlowStep">1 Approved Rate Sources<b>READY</b></div><div class="clx78FlowStep">2 Booking Context<b>READY</b></div><div class="clx78FlowStep">3 Charge Ledger<b>LINKED</b></div><div class="clx78FlowStep">4 Party Allocation<b>LINKED</b></div><div class="clx78FlowStep">5 Principal / Agent SOA<b>LINKED</b></div><div class="clx78FlowStep">6 Receipt / Settlement<b>LINKED</b></div></div>';
     html=html.replace('__M3_BOOKING_GRID_CONTENT__',await clx78BookingBottom(w));
@@ -2933,6 +2936,10 @@ async function clx49RenderBooking(tab){
   if(!viewCurrent(epoch,screenId,role)||clx49Workspace!==w||clx49ActiveTab!==tab||(tab==='Booking Info'&&clx78BookingBottomTab!==bottomTab))return;
   $('gridArea').innerHTML=renderGrid()+html;
   clx81RestoreBookingDraft(w);
+  if(r&&String(r.status||'').toLowerCase()==='approved'){
+    document.querySelectorAll('#gridArea input, #gridArea select, #gridArea textarea').forEach(el=>{el.disabled=true;el.style.backgroundColor='#edf0f3';});
+    document.querySelectorAll('#gridArea button').forEach(el=>{if(!/^(Split Booking|B\/L|CRO|Open Related B\/L)$/.test(el.textContent.trim())){el.disabled=true;el.style.opacity='.55';}});
+  }
   if(tab==='Booking Info')clx81LoadMasterOptions();
   if(tab==='Booking Info'){
     document.querySelector('[data-clx49-field="Route Type"]')?.addEventListener('change',clx81BookingRouteVisibility);
