@@ -746,6 +746,17 @@ function m3AgentPaint(){
   fields+='<div style="grid-column:1/-1"><b>Configured port coverage</b><div class="muted">Operational coverage is subject to the IAM office membership and effective dates; this list does not itself grant access.</div>'+
    (coverage.map(x=>'<div>'+esc(String(x.payload?.office_code||'—'))+' · '+esc(String(x.payload?.scope||'—'))+' · '+esc(String(x.payload?.port_code||'—'))+'</div>').join('')||'<div class="muted">No configured port coverage records.</div>')+'</div>';
  }
+ if(row&&['Emails','Countries','Offices'].includes(m3AgentTab)){
+  const allowed=['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role);
+  const emailTab=m3AgentTab==='Emails';
+  const rows=m3AgentConfigs.filter(x=>x.status==='ACTIVE'&&m3AgentConfigMatches(x,row)&&
+     String(x.payload?.config_type||'').toUpperCase()===(emailTab?'AGENT_EMAIL':'AGENT_OFFICE_ASSIGNMENT'));
+  const view=emailTab?rows.map(x=>'<tr><td>'+esc(x.payload?.port_code||'—')+'</td><td>'+esc(x.payload?.email||'—')+'</td></tr>').join(''):
+    rows.map(x=>'<tr><td>'+esc(x.payload?.office_code||'—')+'</td><td>'+esc(x.payload?.country_code||'Resolved by IAM')+'</td><td>'+esc(x.payload?.address||'—')+'</td></tr>').join('');
+  fields+='<div style="grid-column:1/-1"><b>'+esc(m3AgentTab)+' records</b><table class="table"><thead><tr>'+(emailTab?'<th>Port</th><th>Email</th>':'<th>Office / Port</th><th>Country</th><th>Address</th>')+'</tr></thead><tbody>'+view+'</tbody></table>'+
+   (allowed?'<button class="btn" id="m3AgentRelatedAdd">Add governed '+esc(emailTab?'email':'office assignment')+'</button>':'')+
+   '<p class="muted">Changes require approval. Office assignment never overrides IAM membership.</p></div>';
+ }
  if(row&&m3AgentTab==='Emails'){
   const keys=['email','export_email','import_email'];
   const populated=keys.filter(k=>String(p[k]||'').trim());
@@ -770,8 +781,29 @@ function m3AgentPaint(){
  document.getElementById('m3AgentReload')?.addEventListener('click',renderHoAgentMasterWorkspace);
  document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{m3AgentEditing=!m3AgentEditing;m3AgentPaint()});
  document.getElementById('m3AgentSave')?.addEventListener('click',m3AgentSubmit);
+ document.getElementById('m3AgentRelatedAdd')?.addEventListener('click',m3AgentRelatedCreate);
  document.getElementById('m3AgentApprove')?.addEventListener('click',()=>m3AgentDecide('APPROVE'));
  document.getElementById('m3AgentReject')?.addEventListener('click',()=>m3AgentDecide('REJECT'));
+}
+async function m3AgentRelatedCreate(){
+ const row=m3AgentRows[m3AgentIndex];if(!row)return;
+ const isEmail=m3AgentTab==='Emails';
+ if(!isEmail&&!['Countries','Offices'].includes(m3AgentTab))return;
+ const code=prompt(isEmail?'Port code for email:':'Existing IAM office code:');
+ if(!code||!code.trim())return;
+ const second=prompt(isEmail?'Email address:':'Office address (optional):');
+ if(second===null)return;
+ const payload=isEmail?{config_type:'AGENT_EMAIL',agent_code:row.record_key,port_code:code.trim().toUpperCase(),email:second.trim()}:
+   {config_type:'AGENT_OFFICE_ASSIGNMENT',agent_code:row.record_key,office_code:code.trim().toUpperCase(),address:second.trim()};
+ const reason=prompt('Reason for governed Agent relationship:');
+ if(!reason||!reason.trim())return;
+ const key='AGCFG-'+String(row.record_key).replace(/[^A-Z0-9]/gi,'').slice(-14)+'-'+Date.now().toString(36).toUpperCase();
+ try{
+  await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({domain:'configuration',record_key:key,operation:'CREATE',payload,reason:reason.trim()})});
+  alert('Relationship submitted to the Master Data approval queue.');
+  await renderHoAgentMasterWorkspace();
+ }catch(e){alert('Could not submit relationship: '+e.message)}
 }
 async function m3AgentDecide(decision){
  const row=m3AgentRows[m3AgentIndex];
