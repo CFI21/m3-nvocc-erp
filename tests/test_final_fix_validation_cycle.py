@@ -293,8 +293,8 @@ def test_agent_offices_endpoint_uses_existing_iam_memberships():
 def test_agent_office_lookup_has_exact_agent_scope():
     from pathlib import Path
     s=(Path(__file__).resolve().parents[1]/'app'/'admin.py').read_text(encoding='utf-8')
-    assert "o.office_code = ?" in s
-    assert "(user_id,'AGT-'+agent_code)" in s
+    assert "'AGT-'+agent_code" in s
+    assert "if x['office_code'] in allowed" in s
 
 
 def test_agent_offices_permission_boundary_in_sqlite():
@@ -425,5 +425,40 @@ def test_agent_setup_bulk_existing_master_permissions_and_booking_rules():
         # operational network configuration must never substitute for IAM grants.
         result=booking_rule_check(c,{'agent_code':'AG01'}, {})
         assert not result['errors']
+    finally:
+        c.close()
+
+
+def test_multi_country_agent_offices_require_explicit_mapping_and_membership():
+    import sqlite3
+    from app.admin import _assigned_agent_offices, _authorized_agent_profile
+    c=sqlite3.connect(':memory:')
+    c.row_factory=sqlite3.Row
+    try:
+        c.executescript("""
+        CREATE TABLE md_records(domain TEXT,record_key TEXT,display_name TEXT,payload_json TEXT,status TEXT);
+        CREATE TABLE iam_party_access(user_id INTEGER,party_type TEXT,party_key TEXT,status TEXT);
+        CREATE TABLE iam_office_membership(user_id INTEGER,office_id INTEGER,status TEXT);
+        CREATE TABLE iam_offices(id INTEGER,office_code TEXT,country_id INTEGER,organization_id INTEGER,status TEXT);
+        CREATE TABLE iam_countries(id INTEGER,country_code TEXT,status TEXT);
+        CREATE TABLE iam_organizations(id INTEGER,org_code TEXT,status TEXT);
+        INSERT INTO md_records VALUES('agent','AG01','Example Agent','{"common_party_key":"PA01","country":"NL"}','ACTIVE');
+        INSERT INTO md_records VALUES('common-party','PA01','Example Party','{}','ACTIVE');
+        INSERT INTO iam_party_access VALUES(5,'AGENT','AG01','ACTIVE');
+        INSERT INTO iam_countries VALUES(1,'NL','ACTIVE'),(2,'DE','ACTIVE');
+        INSERT INTO iam_organizations VALUES(1,'M3-GLOBAL','ACTIVE');
+        INSERT INTO iam_offices VALUES(1,'AGT-AG01',1,1,'ACTIVE'),(2,'HAM',2,1,'ACTIVE'),(3,'UNRELATED',2,1,'ACTIVE');
+        INSERT INTO iam_office_membership VALUES(5,1,'ACTIVE'),(5,2,'ACTIVE'),(5,3,'ACTIVE');
+        """)
+        assert [x['office_code'] for x in _assigned_agent_offices(c,5,'AG01')]==['AGT-AG01']
+        c.executescript("""
+        INSERT INTO md_records VALUES('configuration','AG01-O1','Agent NL','{"config_type":"AGENT_OFFICE_ASSIGNMENT","agent_code":"AG01","office_code":"AGT-AG01"}','ACTIVE');
+        INSERT INTO md_records VALUES('configuration','AG01-O2','Agent DE','{"config_type":"AGENT_OFFICE_ASSIGNMENT","agent_code":"AG01","office_code":"HAM"}','ACTIVE');
+        """)
+        offices=_authorized_agent_profile(c,5,'AG01')['offices']
+        assert {x['office_code'] for x in offices}=={'AGT-AG01','HAM'}
+        assert {x['country_code'] for x in offices}=={'NL','DE'}
+        c.execute("UPDATE iam_office_membership SET status='INACTIVE' WHERE office_id=2")
+        assert [x['office_code'] for x in _assigned_agent_offices(c,5,'AG01')]==['AGT-AG01']
     finally:
         c.close()
