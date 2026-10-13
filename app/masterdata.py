@@ -59,6 +59,20 @@ def validate_payload(domain,payload,existing=None):
     if domain not in ('configuration','reference-sequence') and not (merged.get('name') or merged.get('display_name')): errs.append('DISPLAY_NAME_REQUIRED')
     ef=merged.get('effective_from'); et=merged.get('effective_to')
     if ef and et and et<ef: errs.append('INVALID_EFFECTIVE_DATES')
+    if domain=='configuration':
+        kind=str(merged.get('config_type') or '').upper()
+        required=()
+        if kind=='AGENT_OFFICE_ASSIGNMENT':
+            required=('agent_code','office_code')
+        elif kind=='AGENT_NETWORK' and str(merged.get('network_type') or '').upper()=='PORT_COVERAGE':
+            required=('agent_code','office_code','scope','port_code')
+            if str(merged.get('scope') or '').upper() not in ('POL','POD','TS'):
+                errs.append('AGENT_PORT_SCOPE_INVALID')
+            import re
+            if not re.fullmatch(r'[A-Z0-9]{3,8}',str(merged.get('port_code') or '').strip().upper()):
+                errs.append('AGENT_PORT_CODE_INVALID')
+        if required and any(not str(merged.get(k) or '').strip() for k in required):
+            errs.append('AGENT_CONFIGURATION_REQUIRED_FIELDS')
     if domain=='currency' and merged.get('iso') and len(str(merged['iso']))!=3: errs.append('CURRENCY_ISO_INVALID')
     if domain=='port' and merged.get('unlocode') and len(str(merged['unlocode']))!=5: errs.append('UNLOCODE_INVALID')
     if domain=='bank-account' and not merged.get('currency'): errs.append('BANK_ACCOUNT_CURRENCY_REQUIRED')
