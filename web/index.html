@@ -747,7 +747,7 @@ function m3AgentPaint(){
  const tabs=m3AgentTabs.map(t=>'<button class="btn'+(t===m3AgentTab?' primary':'')+'" data-agent-tab="'+esc(t)+'">'+esc(t)+'</button>').join('');
  const header=row?'<div style="border:1px solid #d7dde5;padding:8px;margin:8px 0"><div class="toolbar"><b>Agent Code: '+esc(row.record_key)+'</b><span class="muted">Authoritative master code · '+esc(row.status||'')+'</span></div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:5px">'+m3AgentHeaderKeys.map(k=>m3AgentField(k,p)).join('')+'</div></div>':'';
  let fields=(m3AgentFields[m3AgentTab]||[]).filter(k=>!m3AgentHeaderKeys.includes(k)&&!(m3AgentTab==='Emails'&&['email','export_email','import_email'].includes(k))&&!(m3AgentTab==='B/L Template'&&k==='bl_template')).map(k=>m3AgentField(k,p)).join('');
- if(row&&(m3AgentTab==='Countries'||m3AgentTab==='Offices')){
+ if(row&&m3AgentTab==='Offices'){
   const kind='AGENT_OFFICE_ASSIGNMENT';
   const linked=m3AgentConfigs.filter(x=>String(x.payload?.config_type||'').toUpperCase()===kind&&m3AgentConfigMatches(x,row)&&x.status==='ACTIVE');
   fields+='<div style="grid-column:1/-1"><b>Agent office assignments</b><div class="muted">These are governed configuration records; actual access additionally requires IAM membership. Manage assignments through the existing governed configuration workflow.</div>'+
@@ -760,12 +760,14 @@ function m3AgentPaint(){
  }
  if(row&&['Emails','Countries','Offices'].includes(m3AgentTab)){
   const allowed=['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role);
-  const emailTab=m3AgentTab==='Emails';
+  const emailTab=m3AgentTab==='Emails',countryTab=m3AgentTab==='Countries';
   const rows=m3AgentRelevantRows(row,emailTab?'AGENT_EMAIL':'AGENT_OFFICE_ASSIGNMENT');
-  const view=emailTab?rows.map(x=>'<tr><td>'+esc(x.payload?.port_code||'—')+'</td><td>'+esc(x.payload?.email||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join(''):
+  const countries=[...new Map(rows.filter(x=>x.payload?.country_code).map(x=>[String(x.payload.country_code).toUpperCase(),x])).values()];
+  const view=countryTab?countries.map(x=>'<tr><td>'+esc(x.payload.country_code)+'</td><td>'+esc(x.payload.country_name||'Country name resolved through IAM')+'</td><td>'+esc(x.payload.office_code||'—')+'</td></tr>').join(''):
+   emailTab?rows.map(x=>'<tr><td>'+esc(x.payload?.port_code||'—')+'</td><td>'+esc(x.payload?.email||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join(''):
     rows.map(x=>'<tr><td>'+esc(x.payload?.office_code||'—')+'</td><td>'+esc(x.payload?.country_code||'Resolved by IAM')+'</td><td>'+esc(x.payload?.address||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join('');
-  fields+='<div style="grid-column:1/-1"><b>'+esc(m3AgentTab)+' records</b><table class="table"><thead><tr>'+(emailTab?'<th>Port</th><th>Email</th><th>Action</th>':'<th>Office / Port</th><th>Country</th><th>Address</th><th>Action</th>')+'</tr></thead><tbody>'+view+'</tbody></table>'+
-   (allowed?'<button class="btn" id="m3AgentRelatedAdd">Add governed '+esc(emailTab?'email':'office assignment')+'</button>':'')+
+  fields+='<div style="grid-column:1/-1"><b>'+esc(m3AgentTab)+' records</b><table class="table"><thead><tr>'+(emailTab?'<th>Port</th><th>Email</th><th>Action</th>':(countryTab?'<th>Country code</th><th>Country</th><th>Office</th>':'<th>Office / Port</th><th>Country</th><th>Address</th><th>Action</th>'))+'</tr></thead><tbody>'+view+'</tbody></table>'+
+   (allowed&&!countryTab?'<button class="btn" id="m3AgentRelatedAdd">Add governed '+esc(emailTab?'email':'office assignment')+'</button>':'')+(countryTab?'<p class="muted">Countries derive from approved office assignment records. Use Offices to request additions or removals. Blank countries are not inferred or used for authorization.</p>':'')+
    '<p class="muted">Changes require approval. Office assignment never overrides IAM membership.</p></div>';
  }
  if(row&&m3AgentTab==='Emails'){
@@ -786,8 +788,10 @@ function m3AgentPaint(){
  const save=m3AgentEditing&&editable?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
  const canApprove=['SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role);
  const checkerActions=pending&&canApprove?'<button class="btn" id="m3AgentApprove">Approve change</button><button class="btn" id="m3AgentReject">Reject change</button>':'';
+ const relatedPending=m3AgentPending.filter(x=>x.domain==='configuration'&&x.status==='PENDING'&&String(x.payload?.agent_code||'')===String(row?.record_key||''));
  const pendingNotice=pending?'<span class="muted">Pending change '+esc(pending.change_ref||'')+' · independent checker required</span>':'';
- $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+checkerActions+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
+ const relatedNotice=relatedPending.length?'<span class="muted">'+relatedPending.length+' relationship change(s) awaiting approval</span>':'';
+ $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+relatedNotice+checkerActions+editor+save'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
  document.getElementById('m3AgentReload')?.addEventListener('click',renderHoAgentMasterWorkspace);
  document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{if(m3AgentEditing)m3AgentDiscardDraft();else m3AgentEditing=true;m3AgentPaint()});
@@ -807,7 +811,7 @@ async function m3AgentRelatedRemove(key){
 async function m3AgentRelatedCreate(){
  const row=m3AgentRows[m3AgentIndex];if(!row)return;
  const isEmail=m3AgentTab==='Emails';
- if(!isEmail&&!['Countries','Offices'].includes(m3AgentTab))return;
+ if(!isEmail&&m3AgentTab!=='Offices')return;
  const code=prompt(isEmail?'Port code for email:':'Existing IAM office code (the office must already exist):');
  if(!code||!code.trim())return;
  if(!/^[A-Za-z0-9_-]{2,20}$/.test(code.trim()))return alert('Enter a valid existing office or port code.');
@@ -815,6 +819,8 @@ async function m3AgentRelatedCreate(){
  if(second===null)return;
  const payload=isEmail?{config_type:'AGENT_EMAIL',agent_code:row.record_key,port_code:code.trim().toUpperCase(),email:second.trim()}:
    {config_type:'AGENT_OFFICE_ASSIGNMENT',agent_code:row.record_key,office_code:code.trim().toUpperCase(),address:second.trim()};
+ if(isEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(second.trim()))return alert('A valid email address is required.');
+ if(!isEmail&&!second.trim())return alert('Please enter the office address.');
  const reason=prompt('Reason for governed Agent relationship:');
  if(!reason||!reason.trim())return;
  const key='AGCFG-'+String(row.record_key).replace(/[^A-Z0-9]/gi,'').slice(-14)+'-'+Date.now().toString(36).toUpperCase();
