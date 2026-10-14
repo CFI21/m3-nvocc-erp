@@ -42,17 +42,21 @@ def ddl_from_sqlite(source: str) -> str:
             match = re.fullmatch(
                 r"CREATE TRIGGER IF NOT EXISTS ([a-zA-Z_][\\w]*)\\s+"
                 r"BEFORE (UPDATE|DELETE) ON ([a-zA-Z_][\\w]*)\\s+"
+                r"(?:WHEN OLD\\.module LIKE '(gl|treasury):%'\\s+)?"
                 r"BEGIN SELECT RAISE\\(ABORT,'([A-Z_]+)'\\); END;?",
                 statement.strip(), re.I
             )
             if not match:
                 raise ValueError("Unsupported integrity trigger: " + name)
-            trigger_name, operation, table, error_code = match.groups()
+            trigger_name, operation, table, scope, error_code = match.groups()
             fn_name = "m3_uat_block_" + trigger_name
+            condition = ("IF OLD.module LIKE '" + scope + ":%' THEN " if scope else "")
+            ending = " END IF;" if scope else ""
             output.append(
                 "CREATE OR REPLACE FUNCTION " + fn_name + "() RETURNS trigger "
-                "LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION '" + error_code +
-                "'; END; $$;")
+                "LANGUAGE plpgsql AS $$ BEGIN " + condition +
+                "RAISE EXCEPTION '" + error_code + "';" + ending +
+                " RETURN OLD; END; $$;")
             output.append(
                 "CREATE TRIGGER " + trigger_name + " BEFORE " + operation +
                 " ON " + table + " FOR EACH ROW EXECUTE FUNCTION " + fn_name + "();"
