@@ -760,7 +760,7 @@ function m3AgentPaint(){
    (coverage.map(x=>'<div>'+esc(String(x.payload?.office_code||'—'))+' · '+esc(String(x.payload?.scope||'—'))+' · '+esc(String(x.payload?.port_code||'—'))+'</div>').join('')||'<div class="muted">No configured port coverage records.</div>')+'</div>';
  }
  if(row&&['Emails','Countries','Offices'].includes(m3AgentTab)){
-  const allowed=['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role);
+  const allowed=['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role);
   const emailTab=m3AgentTab==='Emails',countryTab=m3AgentTab==='Countries';
   const rows=m3AgentRelevantRows(row,emailTab?'AGENT_EMAIL':'AGENT_OFFICE_ASSIGNMENT');
   const countries=[...new Map(rows.filter(x=>x.payload?.country_code).map(x=>[String(x.payload.country_code).toUpperCase(),x])).values()];
@@ -782,13 +782,13 @@ function m3AgentPaint(){
  if(row&&m3AgentTab==='CRO Detail'){
   fields+='<div style="grid-column:1/-1" class="muted">CRO values are governed Agent Master fields, not a separate duplicated operational record.</div>';
  }
- const canEdit=['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role);
+ const canEdit=['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role);
  const pending=m3AgentPending.find(x=>x.domain==='agent'&&x.record_key===row?.record_key&&x.status==='PENDING');
  const editable=canEdit&&!pending;
  const newAgentButton=canEdit?'<button class="btn" id="m3AgentNew">New Agent</button>':'';
  const editor=row&&editable?'<button class="btn" id="m3AgentEdit">'+(m3AgentEditing?'Cancel edit':'Edit fields')+'</button>':'';
  const save=m3AgentEditing&&editable?'<button class="btn primary" id="m3AgentSave">Submit for approval</button>':'';
- const canApprove=['SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role);
+ const canApprove=['ADMIN','SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role);
  const checkerActions=pending&&canApprove?'<button class="btn" id="m3AgentApprove">Approve change</button><button class="btn" id="m3AgentReject">Reject change</button>':'';
  const pendingCreates=m3AgentPending.filter(x=>x.domain==='agent'&&x.operation==='CREATE'&&x.status==='PENDING'&&!m3AgentRows.some(r=>r.record_key===x.record_key));
  const pendingCreatePanel=pendingCreates.length?'<div class="equipNote"><b>New Agents awaiting approval</b>'+pendingCreates.map(x=>'<div>'+esc(x.record_key)+' · '+esc(x.payload?.name||'Pending new Agent')+' · '+esc(x.change_ref||'')+(canApprove?' <button class="btn" data-agent-create-decision="APPROVE" data-agent-create-ref="'+esc(x.change_ref)+'">Approve</button> <button class="btn" data-agent-create-decision="REJECT" data-agent-create-ref="'+esc(x.change_ref)+'">Reject</button>':' · Checker approval required')+'</div>').join('')+'</div>':'';
@@ -841,7 +841,7 @@ async function m3AgentDecide(decision,changeRef){
  const row=m3AgentRows[m3AgentIndex];
  const change=m3AgentPending.find(x=>x.domain==='agent'&&x.status==='PENDING'&&(changeRef?x.change_ref===changeRef:x.record_key===row?.record_key));
  if(!change)return alert('No pending change found');
- if(!['SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role))return alert('Checker role required');
+ if(!['ADMIN','SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role))return alert('Checker role required');
  if(!confirm((decision==='APPROVE'?'Approve':'Reject')+' Agent change '+change.change_ref+'? This action is audited.'))return;
  const comment=prompt('Decision comment (required):');
  if(!comment||!comment.trim())return;
@@ -856,7 +856,7 @@ async function m3AgentDecide(decision,changeRef){
  }catch(e){alert('Checker decision failed: '+e.message)}
 }
 async function m3AgentCreate(){
- if(!['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role))return;
+ if(!['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role))return;
  const code=String(prompt('New Agent Code (unique letters, numbers, _ or -):')||'').trim().toUpperCase();
  if(!code)return;
  if(!/^[A-Z0-9][A-Z0-9_-]{1,63}$/.test(code)){alert('Agent Code must be 2-64 letters, digits, _ or -.');return}
@@ -872,7 +872,7 @@ async function m3AgentCreate(){
 }
 async function m3AgentSubmit(){
  const row=m3AgentRows[m3AgentIndex];if(!row)return;
- if(!['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)){alert('Master Data edit permission required');return}
+ if(!['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)){alert('Master Data edit permission required');return}
  m3AgentCaptureDraft();
  const combined={...row.payload,...m3AgentDraft};
  if(!String(combined.name||'').trim()||!String(combined.short_name||'').trim()){alert('Name and Short Name are required.');return}
