@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 import json,datetime,re,hashlib,uuid
 from .db import connect,DB_PATH
@@ -93,6 +94,13 @@ def _load_seed():
         return {'modules':modules,'jobs':jobs,'data':data}
 
 def run(reset=True):
+    # UAT opt-in: preserve an existing SQLite database and all its IAM, Master Data,
+    # approval and audit records. Never silently fall back to destructive seeding.
+    if os.getenv('M3_UAT_PRESERVE_DATA', '').strip() == '1':
+        if reset:
+            raise RuntimeError('UAT_DATA_PROTECTION: destructive seed reset is forbidden; use run(reset=False)')
+        if DB_PATH.exists():
+            return str(DB_PATH)
     SEED=_load_seed()
     # CLX-049 build-first normalization: preserve existing Switch B/L test records,
     # but guarantee their source relationship resolves to the authoritative HBL.
