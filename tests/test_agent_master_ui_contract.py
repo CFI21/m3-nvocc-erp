@@ -162,3 +162,13 @@ def test_preview_switch_user_requires_fresh_iam_login():
     assert "location.reload()" in switch
     assert "M3_UAT_TOKEN" not in switch
     assert "await m3EnsureIamLogin();" in source
+
+
+def test_agent_checker_identity_diagnostic_and_ui_four_eyes_guard():
+    source=agent_source()
+    assert "api('/api/admin/auth/whoami').catch(()=>null)" in source
+    assert "Authenticated IAM user:" in source
+    assert "Maker: " in source
+    assert "change.maker===m3AgentIdentity.user_ref" in source
+    assert "if(!m3AgentIdentity)return alert(" in source
+    assert "M3_SESSION" in source
