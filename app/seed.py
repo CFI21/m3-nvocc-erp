@@ -94,6 +94,11 @@ def _load_seed():
         return {'modules':modules,'jobs':jobs,'data':data}
 
 def run(reset=True):
+    # The legacy operational seed contains synthetic data and is SQLite-only.
+    # Never execute it against persistent PostgreSQL UAT or production.
+    from .db import using_postgres
+    if using_postgres():
+        raise RuntimeError('POSTGRES_SEED_FORBIDDEN: run reviewed migrations and explicit provisioning instead')
     # UAT opt-in: preserve an existing SQLite database and all its IAM, Master Data,
     # approval and audit records. Never silently fall back to destructive seeding.
     if os.getenv('M3_UAT_PRESERVE_DATA', '').strip() == '1':
