@@ -256,11 +256,33 @@ def sync_agent_projections(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     return {'domain':'agent','projection':'agents','synced':synced,'authoritative_source':'md_records','new_master_model':False}
 
 @router.get('/versions/{domain}/{record_key}')
-def versions(domain:str,record_key:str):c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_versions WHERE domain=? AND record_key=? ORDER BY version DESC',(domain,record_key))];c.close();return x
+def versions(domain:str,record_key:str):
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        return [dict(r) for r in c.execute('SELECT * FROM md_versions WHERE domain=? AND record_key=? ORDER BY version DESC',(domain,record_key))]
+    finally: c.close()
+
 @router.get('/quality')
-def quality():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_quality_issues ORDER BY id DESC')];c.close();return x
+def quality():
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        return [dict(r) for r in c.execute('SELECT * FROM md_quality_issues ORDER BY id DESC')]
+    finally: c.close()
+
 @router.get('/duplicates')
-def duplicates():c=connect();init_schema(c);x=[dict(r) for r in c.execute("SELECT domain,lower(display_name) norm,COUNT(*) n,GROUP_CONCAT(record_key) keys FROM md_records WHERE status='ACTIVE' GROUP BY domain,lower(display_name) HAVING COUNT(*)>1")];c.close();return x
+def duplicates():
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        grouped={}
+        for row in c.execute("SELECT domain,display_name,record_key FROM md_records WHERE status='ACTIVE' ORDER BY domain,record_key"):
+            key=(row['domain'],row['display_name'].lower() if row['display_name'] is not None else None)
+            grouped.setdefault(key,[]).append(str(row['record_key']))
+        return [{'domain':domain,'norm':normalized,'n':len(keys),'keys':','.join(keys)}
+                for (domain,normalized),keys in sorted(grouped.items(),key=lambda kv:(kv[0][0],kv[0][1] or '')) if len(keys)>1]
+    finally: c.close()
 @router.get('/usage/{domain}/{record_key}')
 def usage(domain:str,record_key:str):c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_usage WHERE domain=? AND record_key=?',(domain,record_key))];c.close();return x
 @router.get('/delete-check/{domain}/{record_key}')
