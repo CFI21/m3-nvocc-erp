@@ -5,6 +5,9 @@ from .db import connect
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def phash(p,s='m3-test-salt'): return hashlib.pbkdf2_hmac('sha256',p.encode(),s.encode(),120000).hex()
 def run():
+    from .db import using_postgres
+    if using_postgres():
+        raise RuntimeError('POSTGRES_IAM_SEED_FORBIDDEN: provision unique credentials using a reviewed IAM migration')
     c=connect()
     # UAT account/password data is durable state. Never reseed an existing IAM
     # database or restore known sandbox passwords after a restart.
