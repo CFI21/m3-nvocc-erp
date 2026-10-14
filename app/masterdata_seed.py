@@ -4,6 +4,9 @@ from .masterdata import init_schema,audit,j
 
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def run():
+    from .db import using_postgres
+    if using_postgres():
+        raise RuntimeError('POSTGRES_MASTER_SEED_FORBIDDEN: governed Master Data requires explicit reviewed provisioning')
     c=connect();init_schema(c)
     # A partial or existing dataset must never be overwritten. In particular,
     # audit-only and version-only databases also count as existing state.
