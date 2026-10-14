@@ -75,7 +75,7 @@ def test_agent_master_ui_roles_align_with_authorized_master_reads():
     segment = source.split('let m3AgentRows=', 1)[1].split(
         'async function renderHoAgentMasterWorkspace()', 1
     )[0]
-    assert "['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)" in segment
+    assert "['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)" in segment
     assert "['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','OPS','FINANCE'].includes(state.role)" not in segment
 
 
@@ -144,3 +144,10 @@ def test_role_switch_keeps_governed_agent_workspace():
     assert "location.hash.startsWith('#ho-setup=')" in source
     assert "await openHoGovernedSetup(workspace,state.navContext?.label||state.current.name,state.current.screen_id)" in source
     assert "history.replaceState(null,'','#ho-setup='+encodeURIComponent(workspace))" in source
+
+
+def test_admin_ui_alias_shows_agent_master_controls_without_changing_backend_auth():
+    source = agent_source()
+    assert "['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)" in source
+    assert "['ADMIN','SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role)" in source
+    assert "'/api/masterdata/changes'" in source
