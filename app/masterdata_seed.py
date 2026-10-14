@@ -5,12 +5,18 @@ from .masterdata import init_schema,audit,j
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def run():
     c=connect();init_schema(c)
-    # Never erase governed records, pending approvals, or immutable audit events
-    # when an existing preview database is initialized again.
-    if c.execute('SELECT 1 FROM md_records LIMIT 1').fetchone() or c.execute('SELECT 1 FROM md_change_requests LIMIT 1').fetchone():
+    # A partial or existing dataset must never be overwritten. In particular,
+    # audit-only and version-only databases also count as existing state.
+    protected_tables = (
+        'md_audit', 'md_quality_issues', 'md_aliases', 'md_usage',
+        'md_versions', 'md_change_requests', 'md_records', 'md_sequences',
+        'md_config',
+    )
+    if any(c.execute('SELECT 1 FROM ' + table + ' LIMIT 1').fetchone()
+           for table in protected_tables):
         c.close()
         return
-    for t in ['md_audit','md_quality_issues','md_aliases','md_usage','md_versions','md_change_requests','md_records','md_sequences','md_config']:c.execute(f'DELETE FROM {t}')
+    # Empty schema: initial records may now be inserted without DELETE.
     ts=now(); data={}
     # Mirror canonical operational masters for reference integrity.
     data['customer']=[(r['code'],r['name'],{'name':r['name'],'effective_from':'2026-01-01'}) for r in c.execute('SELECT code,name FROM customers')]
