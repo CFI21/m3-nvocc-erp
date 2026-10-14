@@ -5,6 +5,11 @@ from .masterdata import init_schema,audit,j
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def run():
     c=connect();init_schema(c)
+    # Never erase governed records, pending approvals, or immutable audit events
+    # when an existing preview database is initialized again.
+    if c.execute('SELECT 1 FROM md_records LIMIT 1').fetchone() or c.execute('SELECT 1 FROM md_change_requests LIMIT 1').fetchone():
+        c.close()
+        return
     for t in ['md_audit','md_quality_issues','md_aliases','md_usage','md_versions','md_change_requests','md_records','md_sequences','md_config']:c.execute(f'DELETE FROM {t}')
     ts=now(); data={}
     # Mirror canonical operational masters for reference integrity.
