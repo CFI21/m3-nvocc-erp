@@ -172,3 +172,10 @@ def test_agent_checker_identity_diagnostic_and_ui_four_eyes_guard():
     assert "change.maker===m3AgentIdentity.user_ref" in source
     assert "if(!m3AgentIdentity)return alert(" in source
     assert "M3_SESSION" in source
+
+
+def test_preview_identity_fallback_never_stores_session_token_in_identity():
+    source=agent_source()
+    assert "sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles:result.roles||[]}))" in source
+    assert "identity||JSON.parse(sessionStorage.getItem('M3_IAM_IDENTITY')||'null')" in source
+    assert "sessionStorage.removeItem('M3_IAM_IDENTITY')" in source
