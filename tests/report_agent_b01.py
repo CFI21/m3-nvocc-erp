@@ -39,3 +39,7 @@ print(summary)
 if path := os.environ.get("GITHUB_STEP_SUMMARY"):
     with open(path, "a", encoding="utf-8") as stream:
         stream.write(summary)
+
+# Make missing or failing suite evidence a failing CI gate, not just a summary line.
+if not all_passed:
+    raise SystemExit(1)
