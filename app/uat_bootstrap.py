@@ -31,6 +31,16 @@ def ensure_uat_ready():
         ).fetchone()
         if identities["n"] != 2:
             raise RuntimeError("UAT_IAM_INITIALIZATION_REQUIRED: independent maker/checker accounts missing")
+        role_rows = conn.execute(
+            "SELECT u.username, u.status, r.role_code "
+            "FROM iam_users u JOIN iam_user_roles ur ON ur.user_id=u.id "
+            "JOIN iam_roles r ON r.id=ur.role_id "
+            "WHERE u.username IN ('md.maker','md.checker')"
+        ).fetchall()
+        assigned = {(row["username"], row["role_code"]) for row in role_rows if row["status"] == "ACTIVE"}
+        required = {("md.maker", "MASTER_DATA"), ("md.checker", "MASTER_DATA_MANAGER")}
+        if assigned != required:
+            raise RuntimeError("UAT_IAM_ROLE_SEPARATION_REQUIRED: active independent maker/checker roles missing or invalid")
         return {"database": "isolated-neon-uat", "schema": "ready",
                 "pending_approvals": pending["n"], "master_agents": agents["n"]}
     finally:
