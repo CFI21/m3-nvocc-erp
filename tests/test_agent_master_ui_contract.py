@@ -137,3 +137,10 @@ def test_agent_relationship_requests_use_governed_change_approval():
     assert "AGENT_OFFICE_ASSIGNMENT" in related
     assert "/api/masterdata/changes" in related
     assert "operation:'CREATE'" in related
+
+
+def test_role_switch_keeps_governed_agent_workspace():
+    source = agent_source()
+    assert "location.hash.startsWith('#ho-setup=')" in source
+    assert "await openHoGovernedSetup(workspace,state.navContext?.label||state.current.name,state.current.screen_id)" in source
+    assert "history.replaceState(null,'','#ho-setup='+encodeURIComponent(workspace))" in source
