@@ -8,7 +8,7 @@ from . import db
 
 REQUIRED_TABLES = (
     "iam_users", "iam_sessions", "md_records", "md_change_requests",
-    "md_audit", "agents", "bookings", "bills",
+    "md_audit", "iam_user_roles", "iam_roles", "agents", "bookings", "bills",
 )
 
 def ensure_uat_ready():
@@ -26,6 +26,11 @@ def ensure_uat_ready():
             raise RuntimeError("UAT_SCHEMA_MIGRATION_REQUIRED: " + ", ".join(absent))
         pending = conn.execute("SELECT COUNT(*) AS n FROM md_change_requests WHERE status='PENDING'").fetchone()
         agents = conn.execute("SELECT COUNT(*) AS n FROM md_records WHERE domain='agent'").fetchone()
+        identities = conn.execute(
+            "SELECT COUNT(*) AS n FROM iam_users WHERE username IN ('md.maker','md.checker')"
+        ).fetchone()
+        if identities["n"] != 2:
+            raise RuntimeError("UAT_IAM_INITIALIZATION_REQUIRED: independent maker/checker accounts missing")
         return {"database": "isolated-neon-uat", "schema": "ready",
                 "pending_approvals": pending["n"], "master_agents": agents["n"]}
     finally:
