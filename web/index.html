@@ -705,6 +705,7 @@ function agentConfigManage(label){
     '<button class="btn" onclick="openScreen(\'master-data::agents\',{domain:\'HO Tasks\',submenu:\'Setup\',label:\''+label.replaceAll("'","\\'")+' · Agents\'})">Agent Master</button>';
 }
 
+let m3AgentIdentity=null;
 let m3AgentRows=[],m3AgentConfigs=[],m3AgentPending=[],m3AgentIndex=-1,m3AgentTab='Agent Detail',m3AgentEditing=false,m3AgentDraft={},m3AgentFocusCode='';
 const m3AgentHeaderKeys=['name','short_name','common_party_key','sub_company','gl_account','network','bank_details','address','invoice_note','currency','ftp_sub_folder','active','port_restriction','principal_office','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person'];
 const m3AgentBooleanKeys=new Set(['active','port_restriction','detention_tariff_include_free_days','apply_specific_auto_tariff','finance_approval_required_for_bl_print','pick_detention_free_days_on_bl','restrict_pofd_agent_on_booking','show_all_inventory','la_notification','partner_edi','required_sales_person']);
@@ -791,11 +792,12 @@ function m3AgentPaint(){
  const canApprove=['ADMIN','SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role);
  const checkerActions=pending&&canApprove?'<button class="btn" id="m3AgentApprove">Approve change</button><button class="btn" id="m3AgentReject">Reject change</button>':'';
  const pendingCreates=m3AgentPending.filter(x=>x.domain==='agent'&&x.operation==='CREATE'&&x.status==='PENDING'&&!m3AgentRows.some(r=>r.record_key===x.record_key));
- const pendingCreatePanel=pendingCreates.length?'<div class="equipNote"><b>New Agents awaiting approval</b>'+pendingCreates.map(x=>'<div>'+esc(x.record_key)+' · '+esc(x.payload?.name||'Pending new Agent')+' · '+esc(x.change_ref||'')+(canApprove?' <button class="btn" data-agent-create-decision="APPROVE" data-agent-create-ref="'+esc(x.change_ref)+'">Approve</button> <button class="btn" data-agent-create-decision="REJECT" data-agent-create-ref="'+esc(x.change_ref)+'">Reject</button>':' · Checker approval required')+'</div>').join('')+'</div>':'';
+ const identityLabel=m3AgentIdentity?'<div class="equipNote"><b>Authenticated IAM user:</b> '+esc(m3AgentIdentity.username)+' · '+esc(m3AgentIdentity.user_ref)+' · '+esc((m3AgentIdentity.roles||[]).join(', '))+'<div class="muted">Role selector is display-only; backend compares user references for four-eyes approval.</div></div>':'<div class="equipNote badtext">IAM identity could not be verified. Do not approve changes until signed in.</div>';
+ const pendingCreatePanel=pendingCreates.length?'<div class="equipNote"><b>New Agents awaiting approval</b>'+pendingCreates.map(x=>'<div>'+esc(x.record_key)+' · '+esc(x.payload?.name||'Pending new Agent')+' · '+esc(x.change_ref||'')+' · Maker: '+esc(x.maker||'Unknown')+' · '+(m3AgentIdentity&&x.maker===m3AgentIdentity.user_ref?'Same IAM identity: independent checker required': 'Checker identity must differ')+(canApprove&&m3AgentIdentity&&x.maker!==m3AgentIdentity.user_ref?' <button class="btn" data-agent-create-decision="APPROVE" data-agent-create-ref="'+esc(x.change_ref)+'">Approve</button> <button class="btn" data-agent-create-decision="REJECT" data-agent-create-ref="'+esc(x.change_ref)+'">Reject</button>':' · Checker approval required')+'</div>').join('')+'</div>':'';
  const relatedPending=m3AgentPending.filter(x=>x.domain==='configuration'&&x.status==='PENDING'&&String(x.payload?.agent_code||'')===String(row?.record_key||''));
  const pendingNotice=pending?'<span class="muted">Pending change '+esc(pending.change_ref||'')+' · independent checker required</span>':'';
  const relatedNotice=relatedPending.length?'<span class="muted">'+relatedPending.length+' relationship change(s) awaiting approval</span>':'';
- $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+relatedNotice+checkerActions+newAgentButton+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+pendingCreatePanel+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
+ $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+relatedNotice+checkerActions+newAgentButton+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+identityLabel+pendingCreatePanel+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
  document.getElementById('m3AgentReload')?.addEventListener('click',()=>{if(m3AgentEditing){m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])&&!confirm('Discard unsaved Agent edits and refresh?'))return}renderHoAgentMasterWorkspace()});
  document.getElementById('m3AgentNew')?.addEventListener('click',()=>{if(m3AgentEditing){m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])&&!confirm('Discard unsaved Agent edits and create a new Agent?'))return}m3AgentCreate()});
@@ -841,6 +843,8 @@ async function m3AgentDecide(decision,changeRef){
  const row=m3AgentRows[m3AgentIndex];
  const change=m3AgentPending.find(x=>x.domain==='agent'&&x.status==='PENDING'&&(changeRef?x.change_ref===changeRef:x.record_key===row?.record_key));
  if(!change)return alert('No pending change found');
+ if(!m3AgentIdentity)return alert('Authenticated IAM identity unavailable. Sign in again before checker approval.');
+ if(change.maker===m3AgentIdentity.user_ref)return alert('FOUR_EYES_VIOLATION: this authenticated IAM user submitted the request. Sign in with a different authorized checker.');
  if(!['ADMIN','SUPER_ADMIN','MASTER_DATA_MANAGER'].includes(state.role))return alert('Checker role required');
  if(!confirm((decision==='APPROVE'?'Approve':'Reject')+' Agent change '+change.change_ref+'? This action is audited.'))return;
  const comment=prompt('Decision comment (required):');
@@ -889,7 +893,8 @@ async function m3AgentSubmit(){
 }
 async function renderHoAgentMasterWorkspace(){
  try{
-  const [rows,configs,pending]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration'),api('/api/masterdata/changes?status=PENDING')]);
+  const [rows,configs,pending,identity]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration'),api('/api/masterdata/changes?status=PENDING'),api('/api/admin/auth/whoami').catch(()=>null)]);
+  m3AgentIdentity=identity;
   const selected=m3AgentFocusCode||m3AgentRows[m3AgentIndex]?.record_key;
   m3AgentRows=Array.isArray(rows)?rows:rows.records||[];
   m3AgentConfigs=Array.isArray(configs)?configs:[];
