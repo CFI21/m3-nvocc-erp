@@ -1,7 +1,7 @@
 from fastapi import APIRouter,HTTPException,Header
 from pydantic import BaseModel,Field
 from typing import Optional
-import hashlib,uuid,json,datetime,secrets
+import hashlib,uuid,json,datetime,secrets,os
 from .db import connect
 
 
@@ -10,6 +10,10 @@ router=APIRouter(prefix='/api/admin',tags=['CLX-010 Identity & Administration'])
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def phash(p,s='m3-test-salt'): return hashlib.pbkdf2_hmac('sha256',p.encode(),s.encode(),120000).hex()
 def ih(x): return hashlib.sha256(x.encode()).hexdigest()
+
+def sandbox_mfa_allowed():
+    # The fixed MFA challenge is test-only. Never accept it when production traffic is enabled.
+    return os.getenv('M3_PRODUCTION_TRAFFIC','OFF').strip().upper() == 'OFF'
 def audit(c,actor,action,rt,rr=None,before=None,after=None,scope=None):
     ts=now(); base=json.dumps({'ts':ts,'actor':actor,'action':action,'resource':rt,'ref':rr,'before':before,'after':after,'scope':scope or {}},sort_keys=True)
     c.execute('INSERT INTO iam_audit_events(event_ref,ts,actor_user_ref,action,resource_type,resource_ref,scope_json,before_json,after_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?,?,?)',(str(uuid.uuid4()),ts,actor,action,rt,rr,json.dumps(scope or {},sort_keys=True),json.dumps(before,sort_keys=True) if before is not None else None,json.dumps(after,sort_keys=True) if after is not None else None,ih(base)))
@@ -85,6 +89,7 @@ def login(b:Login):
     if not u or u['status']!='ACTIVE' or u['password_hash']!=phash(b.password):
         if u:c.execute('UPDATE iam_users SET failed_attempts=failed_attempts+1 WHERE id=?',(u['id'],))
         h=ih(event+ts+b.username+'FAIL'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'] if u else None,'LOGIN','FAIL','{"reason":"INVALID_CREDENTIALS"}',h)); c.close(); raise HTTPException(401,{'code':'INVALID_CREDENTIALS'})
+    if u['mfa_required'] and not sandbox_mfa_allowed(): c.close(); raise HTTPException(503,{'code':'SANDBOX_MFA_DISABLED'})
     if u['mfa_required'] and b.mfa_code!='123456': c.close(); raise HTTPException(401,{'code':'MFA_REQUIRED','sandbox_code':'123456'})
     token=secrets.token_urlsafe(24); exp=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=int(policy(c,'session_minutes','60')))).isoformat(); c.execute('INSERT INTO iam_sessions(session_token,user_id,created_at,expires_at,last_seen_at,mfa_verified,status) VALUES(?,?,?,?,?,?,?)',(token,u['id'],ts,exp,ts,1,'ACTIVE')); c.execute('UPDATE iam_users SET failed_attempts=0,last_login_at=? WHERE id=?',(ts,u['id'])); h=ih(event+ts+b.username+'PASS'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','PASS','{}',h)); out={'session_token':token,'user_ref':u['user_ref'],'username':u['username'],'office':u['office_code'],'roles':[x['role_code'] for x in roles_for(c,u['id'])],'mfa_verified':True,'expires_at':exp}; c.close(); return out
 def session(c,token):
