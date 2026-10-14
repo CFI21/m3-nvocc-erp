@@ -42,3 +42,26 @@ def test_never_overwrites_existing_iam(monkeypatch):
     with pytest.raises(RuntimeError, match="ALREADY_INITIALIZED"):
         u.provision()
     assert c.closed
+
+def test_existing_user_rejection_does_not_issue_rollback(monkeypatch):
+    monkeypatch.setenv("M3_UAT_PROVISION_IAM", "YES")
+    monkeypatch.setattr(u.db, "_uat_target_approved", lambda: True)
+    monkeypatch.setenv("M3_UAT_MAKER_PASSWORD", "long-isolated-maker-secret-001")
+    monkeypatch.setenv("M3_UAT_CHECKER_PASSWORD", "long-isolated-checker-secret-002")
+    commands = []
+    class Existing:
+        def fetchone(self): return {"id": 1}
+    class Conn:
+        closed = False
+        def execute(self, sql, params=None):
+            commands.append(sql)
+            if sql == "SELECT 1 FROM iam_users LIMIT 1":
+                return Existing()
+            raise AssertionError("No transaction should have started: " + sql)
+        def close(self): self.closed = True
+    conn = Conn()
+    monkeypatch.setattr(u.db, "connect", lambda: conn)
+    with pytest.raises(RuntimeError, match="UAT_IAM_ALREADY_INITIALIZED"):
+        u.provision()
+    assert conn.closed
+    assert commands == ["SELECT 1 FROM iam_users LIMIT 1"]
