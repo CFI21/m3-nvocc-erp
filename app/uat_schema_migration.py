@@ -59,7 +59,7 @@ def ddl_from_sqlite(source: str) -> str:
             )
     if not table_count or not trigger_count:
         raise ValueError("Schema unexpectedly missing tables or integrity triggers")
-    return "\\n".join(output) + "\\n"
+    return "\n".join(output) + "\n"
 
 
 def main() -> None:
