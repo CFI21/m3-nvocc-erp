@@ -22,6 +22,21 @@ def ddl_from_sqlite(source: str) -> str:
         ).fetchall()
     finally:
         memory.close()
+    # PostgreSQL requires referenced tables to exist before FK creation.
+    tables = {name: ddl for kind, name, ddl in items if kind == "table"}
+    remaining = dict(tables)
+    sorted_tables = []
+    while remaining:
+        progressed = False
+        for table, definition in list(remaining.items()):
+            dependencies = set(re.findall(r"\\bREFERENCES\\s+([A-Za-z_]\\w*)", definition, re.I))
+            if not (dependencies - {table}) & remaining.keys():
+                sorted_tables.append(("table", table, definition))
+                del remaining[table]
+                progressed = True
+        if not progressed:
+            raise ValueError("Circular PostgreSQL foreign key dependencies: " + ", ".join(remaining))
+    items = sorted_tables + [(kind, name, ddl) for kind, name, ddl in items if kind != "table"]
     output = ["-- Generated offline from app/schema.sql; UAT only; review before application."]
     trigger_count = 0
     table_count = 0
