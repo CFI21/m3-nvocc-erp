@@ -93,6 +93,16 @@ def session(c,token):
     if not s or s['status']!='ACTIVE' or s['revoked_at'] or s['expires_at']<now():raise HTTPException(401,{'code':'SESSION_INVALID'})
     c.execute('UPDATE iam_sessions SET last_seen_at=? WHERE id=?',(now(),s['id'])); return s
 
+@router.get('/auth/whoami')
+def whoami(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        actor=session(c,x_m3_session)
+        return {'username':actor['username'],'user_ref':actor['user_ref'],
+                'roles':[r['role_code'] for r in roles_for(c,actor['user_id'])]}
+    finally:
+        c.close()
+
 @router.post('/auth/logout')
 def logout(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect()
