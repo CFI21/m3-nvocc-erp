@@ -19,3 +19,13 @@ def test_neon_uat_needs_explicit_flag_and_exact_host(monkeypatch):
     monkeypatch.setattr(db, 'DATABASE_URL', 'postgresql://uat_user:dummy@ep-uat-check.aws-us-east-2.aws.neon.tech/m3_uat')
     monkeypatch.setattr(db, 'M3_UAT_DB_HOST', '')
     assert not db.approved_database_target()
+
+def test_production_host_cannot_be_spoofed(monkeypatch):
+    from app import db
+    valid = 'postgresql://u:dummy@db.ozupgknqaqgvprliewxe.supabase.co/m3'
+    monkeypatch.setattr(db, 'DATABASE_URL', valid)
+    assert db._production_target_approved()
+    monkeypatch.setattr(db, 'DATABASE_URL', valid.replace('.supabase.co/', '.supabase.co.evil.example/'))
+    assert not db.approved_database_target()
+    monkeypatch.setattr(db, 'DATABASE_URL', 'postgresql://u:ozupgknqaqgvprliewxe@attacker.example/m3')
+    assert not db.approved_database_target()
