@@ -5,7 +5,19 @@ from .db import connect
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def phash(p,s='m3-test-salt'): return hashlib.pbkdf2_hmac('sha256',p.encode(),s.encode(),120000).hex()
 def run():
-    c=connect(); c.executescript(Path(__file__).with_name('schema.sql').read_text())
+    c=connect()
+    # UAT account/password data is durable state. Never reseed an existing IAM
+    # database or restore known sandbox passwords after a restart.
+    import os
+    if os.getenv('M3_UAT_PRESERVE_DATA') == '1':
+        existing=c.execute('SELECT 1 FROM iam_users LIMIT 1').fetchone()
+        if existing:
+            c.close()
+            return
+        if os.getenv('M3_UAT_ALLOW_INITIAL_IAM_SEED') != '1':
+            c.close()
+            raise RuntimeError('UAT_IAM_BOOTSTRAP_APPROVAL_REQUIRED')
+    c.executescript(Path(__file__).with_name('schema.sql').read_text())
     orgs=[('M3-GLOBAL','M3 Global NVOCC'),('M3-EU','M3 Europe')]
     for code,name in orgs:c.execute('INSERT OR IGNORE INTO iam_organizations(org_code,name) VALUES(?,?)',(code,name))
     for code,name in [('NL','Netherlands'),('AE','United Arab Emirates'),('PK','Pakistan'),('SG','Singapore'),('CN','China'),('GB','United Kingdom'),('US','United States'),('DE','Germany'),('BE','Belgium')]:c.execute('INSERT OR IGNORE INTO iam_countries(country_code,name) VALUES(?,?)',(code,name))
