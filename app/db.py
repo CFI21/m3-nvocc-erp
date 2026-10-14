@@ -42,8 +42,21 @@ def _uat_target_approved() -> bool:
         return False
 
 
+def _production_target_approved() -> bool:
+    # Preserve the existing approved production target without accepting a
+    # spoofed host, username, password, or query-string substring.
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(DATABASE_URL)
+        host = (parsed.hostname or '').lower()
+        return (parsed.scheme in ('postgres', 'postgresql')
+                and host == 'db.' + APPROVED_PROJECT_REF + '.supabase.co')
+    except (TypeError, ValueError):
+        return False
+
+
 def approved_database_target() -> bool:
-    return (not DATABASE_URL) or (APPROVED_PROJECT_REF in DATABASE_URL) or _uat_target_approved()
+    return (not DATABASE_URL) or _production_target_approved() or _uat_target_approved()
 
 
 def assert_approved_database_target() -> None:
