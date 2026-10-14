@@ -894,7 +894,7 @@ async function m3AgentSubmit(){
 async function renderHoAgentMasterWorkspace(){
  try{
   const [rows,configs,pending,identity]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration'),api('/api/masterdata/changes?status=PENDING'),api('/api/admin/auth/whoami').catch(()=>null)]);
-  m3AgentIdentity=identity;
+  m3AgentIdentity=identity||JSON.parse(sessionStorage.getItem('M3_IAM_IDENTITY')||'null');
   const selected=m3AgentFocusCode||m3AgentRows[m3AgentIndex]?.record_key;
   m3AgentRows=Array.isArray(rows)?rows:rows.records||[];
   m3AgentConfigs=Array.isArray(configs)?configs:[];
@@ -4464,6 +4464,7 @@ function m3SwitchPreviewUser(){
   if(!confirm('Sign out of this browser tab and sign in as another authorized M3 user?'))return;
   sessionStorage.removeItem('M3_SESSION');
   sessionStorage.removeItem('M3_SESSION_TOKEN');
+  sessionStorage.removeItem('M3_IAM_IDENTITY');
   location.reload();
 }
 async function m3EnsureIamLogin(){
@@ -4490,6 +4491,7 @@ async function m3EnsureIamLogin(){
         const result=await res.json();
         if(!result.session_token)throw Error('Login returned no IAM session');
         sessionStorage.setItem('M3_SESSION',result.session_token);
+        sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles:result.roles||[]}));
         const roles=Array.isArray(result.roles)?result.roles:[];
         const allowed=['SUPER_ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','FINANCE','OPS','AGENT','VIEWER'];
         const selected=allowed.find(role=>roles.includes(role));
