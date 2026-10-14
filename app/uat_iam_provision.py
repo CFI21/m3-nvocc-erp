@@ -5,7 +5,6 @@ M3_UAT_MAKER_PASSWORD / M3_UAT_CHECKER_PASSWORD environment secrets.
 Never import or invoke this module in normal API startup.
 """
 import os
-import secrets
 from . import db
 from .admin import phash
 
@@ -18,10 +17,12 @@ def provision():
     if any(p in ("Maker123!", "Checker123!", "Admin123!") for p in passwords):
         raise RuntimeError("UAT_IAM_KNOWN_PASSWORD_REJECTED")
     c = db.connect()
+    transaction_started = False
     try:
         if c.execute("SELECT 1 FROM iam_users LIMIT 1").fetchone():
             raise RuntimeError("UAT_IAM_ALREADY_INITIALIZED")
         c.execute("BEGIN")
+        transaction_started = True
         c.execute("INSERT INTO iam_organizations(org_code,name) VALUES(?,?)", ("M3-UAT", "M3 Isolated UAT"))
         c.execute("INSERT INTO iam_countries(country_code,name) VALUES(?,?)", ("NL", "Netherlands"))
         org = c.execute("SELECT id FROM iam_organizations WHERE org_code=?", ("M3-UAT",)).fetchone()["id"]
@@ -42,9 +43,11 @@ def provision():
             c.execute("INSERT INTO iam_user_roles(user_id,role_id,office_id,valid_from,assigned_by) VALUES(?,?,?,?,?)",
                       (uid,rid,office,"2026-01-01T00:00:00+00:00","uat-provisioner"))
         c.execute("COMMIT")
+        transaction_started = False
         return {"created": 2, "roles": ["MASTER_DATA", "MASTER_DATA_MANAGER"]}
     except Exception:
-        c.execute("ROLLBACK")
+        if transaction_started:
+            c.execute("ROLLBACK")
         raise
     finally:
         c.close()
