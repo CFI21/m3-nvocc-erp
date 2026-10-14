@@ -21,7 +21,7 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
       - name: Agent Master governance, approval and persistence
-        run: python -m pytest -q tests/test_clx048_admin_masterdata.py tests/test_m3_sandbox_mfa_boundary.py tests/test_m3_uat_iam_role_gate.py --junitxml=agent-governance.xml
+        run: python -m pytest -q tests/test_clx048_admin_masterdata.py tests/test_m3_sandbox_mfa_boundary.py tests/test_m3_uat_iam_role_gate.py tests/test_m3_masterdata_pg_read_compat.py --junitxml=agent-governance.xml
       - name: Agent Master six-tab UI contract
         if: success() || failure()
         run: python -m pytest -q tests/test_agent_master_ui_contract.py --junitxml=agent-ui.xml
