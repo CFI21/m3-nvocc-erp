@@ -1707,6 +1707,12 @@ async function openPrincipalWorkspace(workspace,label,target,group){
 }
 
 async function openScreen(id,navContext=null,historyMode='push'){
+  // B01: governed Master Data operators must land in the actual six-tab Agent
+  // workflow, including pending independent approvals, from every Agent alias.
+  // Backend IAM remains authoritative for all mutations and approvals.
+  if(id==='master-data::agents'&&['MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)){
+    return openHoGovernedSetup('agent-master','Agent','master-data::agents');
+  }
   let s=state.byId[id];if(!s)return;
   const epoch=++state.viewEpoch,role=state.role;
   $('drawer').classList.remove('open');$('fabWrap').classList.remove('open');
