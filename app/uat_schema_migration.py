@@ -55,7 +55,7 @@ def ddl_from_sqlite(source: str) -> str:
         else:
             trigger_count += 1
             match = re.fullmatch(
-                r"CREATE TRIGGER IF NOT EXISTS ([a-zA-Z_][\w]*)\s+"
+                r"CREATE TRIGGER (?:IF NOT EXISTS )?([a-zA-Z_][\w]*)\s+"
                 r"BEFORE (UPDATE|DELETE) ON ([a-zA-Z_][\w]*)\s+"
                 r"(?:WHEN OLD\.module LIKE '(gl|treasury):%'\s+)?"
                 r"BEGIN SELECT RAISE\(ABORT,'([A-Z_]+)'\); END;?",
