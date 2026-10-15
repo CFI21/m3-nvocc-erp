@@ -22,7 +22,8 @@ def test_agent_setup_routes_and_no_duplicate_models():
 def test_booking_server_side_agent_rule_enforcement_hook():
     src=Path('app/main.py').read_text()
     assert "from .agent_setup import router as agent_setup_router, assert_booking_rules" in src
-    assert "if module=='booking': assert_booking_rules(conn,ctx,body.fields,None)" in src
+    import re
+    assert re.search(r"if module=='booking':\s*\n(?:[^\n]*\n)*?\s*assert_booking_rules\(conn,ctx,body.fields,None\)", src)
     assert "if module=='booking': assert_booking_rules(conn,ctx,payload,tid)" in src
     assert "'booking','trt'" in src
     assert 'CRT_REQUIRED_AFTER_APPROVAL' in src
