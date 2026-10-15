@@ -4505,6 +4505,7 @@ function m3PreviewAccessPrompt(message='Enter the dedicated preview UAT token to
 }
 function m3SwitchPreviewUser(){
   if(!confirm('Sign out of this browser tab and sign in as another authorized M3 user?'))return;
+  sessionStorage.setItem('M3_FORCE_RELOGIN','1');
   sessionStorage.removeItem('M3_SESSION');
   sessionStorage.removeItem('M3_SESSION_TOKEN');
   sessionStorage.removeItem('M3_IAM_IDENTITY');
@@ -4512,7 +4513,9 @@ function m3SwitchPreviewUser(){
   location.reload();
 }
 async function m3EnsureIamLogin(){
-  const existing=sessionStorage.getItem('M3_SESSION')||sessionStorage.getItem('M3_SESSION_TOKEN')||'';
+  const forceRelogin=sessionStorage.getItem('M3_FORCE_RELOGIN')==='1';
+  if(forceRelogin){sessionStorage.removeItem('M3_SESSION');sessionStorage.removeItem('M3_SESSION_TOKEN');sessionStorage.removeItem('M3_IAM_IDENTITY');}
+  const existing=forceRelogin?'':(sessionStorage.getItem('M3_SESSION')||sessionStorage.getItem('M3_SESSION_TOKEN')||'');
   if(existing){
     try{
       const response=await fetch('/api/admin/auth/whoami',{headers:{'X-M3-Session':existing}});
@@ -4559,6 +4562,7 @@ async function m3EnsureIamLogin(){
         sessionStorage.setItem('M3_SESSION',result.session_token);
         sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles:result.roles||[]}));
         sessionStorage.setItem('M3_IAM_LAST_USER',result.username);
+        sessionStorage.removeItem('M3_FORCE_RELOGIN');
         const roles=Array.isArray(result.roles)?result.roles:[];
         const allowed=['SUPER_ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','FINANCE','OPS','AGENT','VIEWER'];
         const selected=allowed.find(role=>roles.includes(role));
