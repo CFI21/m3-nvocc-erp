@@ -9,7 +9,7 @@ from app.masterdata_seed import run as masterdata_seed_run
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data,quick_actions
 from app.admin import Login,Assign,TempAccess,UserStatus,login,assign,create_temp,set_user_status,permission,roles_for
-from app.masterdata import Change,Decision,create_change,decide,records,duplicates,audit_list
+from app.masterdata import Change,Decision,Withdrawal,create_change,decide,withdraw_change,records,duplicates,audit_list
 from app.clx048_admin_masterdata_hardening import workspace,job_master_trace,integrity_summary,user_access,verify
 
 @pytest.fixture()
@@ -231,3 +231,39 @@ def test_agent_master_pending_reject_and_resubmit_lifecycle(isolated):
              if row['record_key']==code)
     assert row['payload']['name']==initial['name']
     assert row['payload']['active'] is True
+
+
+def test_pending_change_withdrawal_is_maker_only_and_never_applies_record(isolated):
+    maker=maker_session()
+    checker=checker_session()
+    created=create_change(Change(domain='carrier',record_key='B01-WITHDRAW-1',operation='CREATE',
+                                 payload={'name':'B01 Withdrawal Carrier','short_name':'ORIGINAL'},
+                                 reason='B01 test creation'),x_m3_session=maker)
+    decide(created['change_ref'],Decision(decision='APPROVE',comment='independent approval'),x_m3_session=checker)
+    pending=create_change(Change(domain='carrier',record_key='B01-WITHDRAW-1',operation='UPDATE',
+                                 payload={'short_name':'UNAPPROVED'},reason='B01 update test'),
+                          x_m3_session=checker)
+    with pytest.raises(HTTPException) as unrelated:
+        withdraw_change(pending['change_ref'],Withdrawal(reason='Not my request'),x_m3_session=maker)
+    assert unrelated.value.status_code==403
+    assert unrelated.value.detail['code']=='WITHDRAW_MAKER_ONLY'
+    out=withdraw_change(pending['change_ref'],Withdrawal(reason='Mistaken UAT checker-originated update'),
+                        x_m3_session=checker)
+    assert out['status']=='WITHDRAWN'
+    row=next(x for x in records('carrier',x_m3_session=maker) if x['record_key']=='B01-WITHDRAW-1')
+    assert row['version']==1
+    assert row['payload']['short_name']=='ORIGINAL'
+    with pytest.raises(HTTPException) as already:
+        withdraw_change(pending['change_ref'],Withdrawal(reason='Repeated withdrawal'),x_m3_session=checker)
+    assert already.value.detail['code']=='CHANGE_ALREADY_DECIDED'
+    with pytest.raises(HTTPException) as cannot_approve:
+        decide(pending['change_ref'],Decision(decision='APPROVE',comment='cannot approve withdrawn request'),x_m3_session=maker)
+    assert cannot_approve.value.status_code in (403,409)
+    c=db.connect()
+    try:
+        change=c.execute('SELECT status,checker FROM md_change_requests WHERE change_ref=?',(pending['change_ref'],)).fetchone()
+        assert change['status']=='WITHDRAWN'
+        assert change['checker'] is None
+        assert c.execute("SELECT 1 FROM md_audit WHERE change_ref=? AND action='CHANGE_WITHDRAW'",(pending['change_ref'],)).fetchone()
+    finally:
+        c.close()
