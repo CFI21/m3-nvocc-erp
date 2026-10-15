@@ -4475,8 +4475,8 @@ async function m3EnsureIamLogin(){
     const card=document.createElement('form');
     card.style.cssText='width:min(420px,100%);background:#fff;border:1px solid #cbd5e1;border-radius:7px;padding:22px;display:grid;gap:12px';
     const title=document.createElement('h2');title.textContent='M3 — User Sign In';title.style.margin='0 0 3px';
-    const intro=document.createElement('p');intro.textContent='Sign in using an existing local M3 test user. The preview token alone does not grant party or finance access.';intro.style.margin='0';intro.style.color='#475569';
-    const username=document.createElement('input');username.placeholder='Username';username.autocomplete='username';username.required=true;
+    const intro=document.createElement('p');intro.textContent='Isolated B01 UAT: sign in as md.maker to create an Agent, or md.checker to approve. The password is required separately from the sandbox MFA code. The preview token alone does not grant party or finance access.';intro.style.margin='0';intro.style.color='#475569';
+    const username=document.createElement('input');username.placeholder='UAT username (md.maker or md.checker)';username.autocomplete='off';username.value='md.maker';username.required=true;
     const password=document.createElement('input');password.type='password';password.placeholder='Password';password.autocomplete='current-password';password.required=true;
     const mfa=document.createElement('input');mfa.placeholder='MFA code, if required';mfa.autocomplete='one-time-code';
     const message=document.createElement('p');message.style.cssText='margin:0;color:#b42318;font-size:12px';
@@ -4487,7 +4487,7 @@ async function m3EnsureIamLogin(){
       event.preventDefault();submit.disabled=true;message.textContent='';
       try{
         const res=await fetch('/api/admin/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username.value.trim(),password:password.value,mfa_code:mfa.value.trim()||null})});
-        if(!res.ok)throw Error('Sign-in failed (HTTP '+res.status+'). Verify your local test-user credentials and MFA requirements.');
+        if(!res.ok)throw Error(res.status===401?'Sign-in rejected (401). Enter the md.maker or md.checker account password as well as the MFA code. The admin account is not provisioned in this isolated UAT.':'Sign-in failed (HTTP '+res.status+'). Verify UAT access and MFA requirements.');
         const result=await res.json();
         if(!result.session_token)throw Error('Login returned no IAM session');
         sessionStorage.setItem('M3_SESSION',result.session_token);
