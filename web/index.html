@@ -4508,11 +4508,33 @@ function m3SwitchPreviewUser(){
   sessionStorage.removeItem('M3_SESSION');
   sessionStorage.removeItem('M3_SESSION_TOKEN');
   sessionStorage.removeItem('M3_IAM_IDENTITY');
-  sessionStorage.setItem('M3_NEXT_UAT_USER','md.checker');
+  sessionStorage.setItem('M3_NEXT_UAT_USER',sessionStorage.getItem('M3_IAM_LAST_USER')==='md.maker'?'md.checker':'md.maker');
   location.reload();
 }
 async function m3EnsureIamLogin(){
-  if(sessionStorage.getItem('M3_SESSION')||sessionStorage.getItem('M3_SESSION_TOKEN'))return;
+  const existing=sessionStorage.getItem('M3_SESSION')||sessionStorage.getItem('M3_SESSION_TOKEN')||'';
+  if(existing){
+    try{
+      const response=await fetch('/api/admin/auth/whoami',{headers:{'X-M3-Session':existing}});
+      if(response.ok){
+        const who=await response.json();
+        const cached=JSON.parse(sessionStorage.getItem('M3_IAM_IDENTITY')||'null');
+        if(cached&&cached.user_ref===who.user_ref&&cached.username===who.username){
+          const roles=Array.isArray(who.roles)?who.roles:[];
+          const selected=['SUPER_ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','FINANCE','OPS','AGENT','VIEWER'].find(r=>roles.includes(r));
+          if(selected){
+            state.role=selected==='SUPER_ADMIN'?'ADMIN':selected;
+            const selector=document.getElementById('role');
+            if(selector){selector.value=state.role;selector.disabled=true;}
+            return;
+          }
+        }
+      }
+    }catch(_error){}
+    sessionStorage.removeItem('M3_SESSION');
+    sessionStorage.removeItem('M3_SESSION_TOKEN');
+    sessionStorage.removeItem('M3_IAM_IDENTITY');
+  }
   return new Promise(resolve=>{
     const cover=document.createElement('div');cover.id='m3LocalIamLogin';
     cover.style.cssText='position:fixed;inset:0;background:#f4f6f9;z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:Arial;padding:20px';
@@ -4536,6 +4558,7 @@ async function m3EnsureIamLogin(){
         if(!result.session_token)throw Error('Login returned no IAM session');
         sessionStorage.setItem('M3_SESSION',result.session_token);
         sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles:result.roles||[]}));
+        sessionStorage.setItem('M3_IAM_LAST_USER',result.username);
         const roles=Array.isArray(result.roles)?result.roles:[];
         const allowed=['SUPER_ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','FINANCE','OPS','AGENT','VIEWER'];
         const selected=allowed.find(role=>roles.includes(role));
