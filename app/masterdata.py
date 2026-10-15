@@ -211,6 +211,38 @@ def changes(status:Optional[str]=None,x_m3_session:Optional[str]=Header(None,ali
         return out
     finally:
         c.close()
+class Withdrawal(BaseModel):
+    reason:str=Field(min_length=3)
+
+@router.post('/changes/{change_ref}/withdraw')
+def withdraw_change(change_ref:str,b:Withdrawal,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Allow only the original maker to withdraw an undecided change.
+
+    Withdrawal is not approval or rejection; it never modifies md_records or
+    md_versions and leaves the independent checker rule intact.
+    """
+    c=connect()
+    try:
+        sess,roles=authenticated_actor(c,x_m3_session)
+        if not can_make_roles(roles):
+            raise HTTPException(403,{'code':'MASTER_CHANGE_WITHDRAW_DENIED'})
+        change=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
+        if not change:
+            raise HTTPException(404,{'code':'MASTER_CHANGE_NOT_FOUND'})
+        if change['maker']!=sess['user_ref']:
+            raise HTTPException(403,{'code':'WITHDRAW_MAKER_ONLY'})
+        if change['status']!='PENDING':
+            raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
+        cursor=c.execute("UPDATE md_change_requests SET status='WITHDRAWN',decision_comment=?,decided_at=? WHERE id=? AND status='PENDING'",
+                         (b.reason.strip(),now(),change['id']))
+        if cursor.rowcount!=1:
+            raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
+        audit(c,sess['user_ref'],'CHANGE_WITHDRAW',change['domain'],change['record_key'],change_ref,
+              before={'status':'PENDING'},after={'status':'WITHDRAWN','reason':b.reason.strip()})
+        return {'change_ref':change_ref,'status':'WITHDRAWN'}
+    finally:
+        c.close()
+
 @router.post('/changes/{change_ref}/decision')
 def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
