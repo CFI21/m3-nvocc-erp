@@ -4485,6 +4485,7 @@ function m3SwitchPreviewUser(){
   sessionStorage.removeItem('M3_SESSION');
   sessionStorage.removeItem('M3_SESSION_TOKEN');
   sessionStorage.removeItem('M3_IAM_IDENTITY');
+  sessionStorage.setItem('M3_NEXT_UAT_USER','md.checker');
   location.reload();
 }
 async function m3EnsureIamLogin(){
@@ -4496,7 +4497,7 @@ async function m3EnsureIamLogin(){
     card.style.cssText='width:min(420px,100%);background:#fff;border:1px solid #cbd5e1;border-radius:7px;padding:22px;display:grid;gap:12px';
     const title=document.createElement('h2');title.textContent='M3 — User Sign In';title.style.margin='0 0 3px';
     const intro=document.createElement('p');intro.textContent='Isolated B01 UAT: sign in as md.maker to create an Agent, or md.checker to approve. The password is required separately from the sandbox MFA code. The preview token alone does not grant party or finance access.';intro.style.margin='0';intro.style.color='#475569';
-    const username=document.createElement('input');username.placeholder='UAT username (md.maker or md.checker)';username.autocomplete='off';username.value='md.maker';username.required=true;
+    const username=document.createElement('input');username.placeholder='UAT username (md.maker or md.checker)';username.autocomplete='off';username.value=sessionStorage.getItem('M3_NEXT_UAT_USER')||'md.maker';sessionStorage.removeItem('M3_NEXT_UAT_USER');username.required=true;
     const password=document.createElement('input');password.type='password';password.placeholder='Password';password.autocomplete='current-password';password.required=true;
     const mfa=document.createElement('input');mfa.placeholder='MFA code, if required';mfa.autocomplete='one-time-code';
     const message=document.createElement('p');message.style.cssText='margin:0;color:#b42318;font-size:12px';
@@ -4516,6 +4517,7 @@ async function m3EnsureIamLogin(){
         const allowed=['SUPER_ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','FINANCE','OPS','AGENT','VIEWER'];
         const selected=allowed.find(role=>roles.includes(role));
         if(selected){state.role=selected==='SUPER_ADMIN'?'ADMIN':selected;const roleSelect=document.getElementById('role');if(roleSelect&&[...roleSelect.options].some(x=>x.value===state.role))roleSelect.value=state.role;}
+        const roleSelect=document.getElementById('role');if(roleSelect)roleSelect.disabled=true;
         password.value='';mfa.value='';cover.remove();resolve();
       }catch(error){message.textContent=error.message||'Sign-in failed';password.value='';}
       finally{submit.disabled=false;}
