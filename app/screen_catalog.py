@@ -384,13 +384,17 @@ def build_catalog() -> dict[str, Any]:
     for key in MASTER_SCREENS:
         is_governance=key in governance_names
         name=governance_names.get(key,master_names.get(key,_humanize(key)))
-        screens.append(_base_screen(
+        screen=_base_screen(
             'master-data','Master Data','Governance' if is_governance else 'Master Records',
             key,name,f'/master-data/{"governance" if is_governance else "records"}/{key}',
             COMMON_READ + ['change-request','approve','reject','activate','deactivate','version-history'],
             (['Record Key','Name','Status','Effective From','Effective To','Version','Module Fields'] if not is_governance else ['Reference','Domain','Status','Maker','Checker','Reason','Created At','Updated At']),
             (['Record Key','Name','Status','Effective From','Effective To'] if not is_governance else ['Reference','Domain','Status','Created At'])
-        ))
+        )
+        # Catalog visibility follows existing Master Data API governance;
+        # exposing a screen never grants a backend mutation or approval right.
+        screen['roles']=['ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','AUDITOR','VIEWER']
+        screens.append(screen)
 
     # Stable menu derived from the rebuilt catalog.
     # CLX-031 adds HO Tasks as navigation aliases only. Alias targets must already exist.
