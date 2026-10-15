@@ -192,6 +192,12 @@ def test_agent_master_create_update_four_eyes_and_readback(isolated):
                                  payload={'short_name':'UAT2','import_email':'import@example.com','active':False},
                                  reason='agent field readback'),
                           x_m3_session=maker_session())
+    # Pending maker changes must never leak into the authoritative Agent read.
+    pending=next(x for x in records('agent',x_m3_session=admin_session()) if x['record_key']==code)
+    assert pending['version']==1
+    assert pending['payload']['short_name']=='UAT'
+    assert pending['payload'].get('import_email') is None
+    assert pending['payload']['active'] is True
     assert decide(updated['change_ref'],Decision(decision='APPROVE'),
                   x_m3_session=checker_session())['version']==2
     saved=next(x for x in records('agent',x_m3_session=admin_session()) if x['record_key']==code)
