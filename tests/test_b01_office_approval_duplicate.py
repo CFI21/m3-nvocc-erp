@@ -136,3 +136,53 @@ def test_office_update_cannot_take_existing_agent_office(office_database):
         "SELECT status FROM md_change_requests WHERE change_ref='MDC-OFFICE-UPDATE'"
     ).fetchone()["status"] == "PENDING"
     db.close()
+
+
+def test_checker_approval_preserves_iam_roles_and_country_derivation(office_database):
+    """Duplicate-approval rejection cannot modify IAM or resolved countries."""
+    db = office_database()
+    db.execute(
+        "CREATE TABLE iam_user_roles "
+        "(id INTEGER PRIMARY KEY,user_id INTEGER,office_id INTEGER)"
+    )
+    db.execute("INSERT INTO iam_user_roles VALUES (1,7,1)")
+    payload = {
+        "config_type": "AGENT_OFFICE_ASSIGNMENT",
+        "agent_code": "UAT-AGENT-001",
+        "office_code": "RTM",
+        "address": "Rotterdam",
+    }
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('configuration','OFFICE-PRIMARY',?,'ACTIVE','now','now')",
+        (json.dumps(payload),),
+    )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-OFFICE-IAM','configuration','OFFICE-DUP','CREATE',?,'review','office-maker','now',0)",
+        (json.dumps(payload),),
+    )
+    before = [tuple(row) for row in db.execute("SELECT * FROM iam_user_roles")]
+    db.close()
+
+    assert masterdata.agent_office_countries("maker") == [{
+        "agent_code": "UAT-AGENT-001",
+        "office_code": "RTM",
+        "source": "OFFICE",
+        "country_code": "NL",
+        "country_name": "Netherlands",
+    }]
+    with pytest.raises(HTTPException) as err:
+        masterdata.decide(
+            "MDC-OFFICE-IAM",
+            masterdata.Decision(decision="APPROVE", comment="reject collision"),
+            "checker",
+        )
+    assert err.value.status_code == 409
+    db = office_database()
+    assert [tuple(row) for row in db.execute("SELECT * FROM iam_user_roles")] == before
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_records WHERE domain='configuration' AND status='ACTIVE'"
+    ).fetchone()[0] == 1
+    db.close()
