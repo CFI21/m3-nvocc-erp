@@ -268,3 +268,11 @@ def test_booking_reference_grid_locks_editable_inputs_after_draft():
     grid=ui.split('function clx81BookingReferenceGrid(w,r){',1)[1].split('\nfunction ',1)[0]
     assert "const bookingLocked=saved&&String(r?.status||p.Status||'').trim().toLowerCase()!=='draft'" in grid
     assert "locked=viewerReadOnly()||bookingLocked" in grid
+
+
+def test_grid_change_refuses_mutation_outside_booking_draft():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    handler=ui.split('function clx81GridChange(el){',1)[1].split('\nfunction ',1)[0]
+    assert "String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in handler
+    assert handler.index("!=='draft'") < handler.index("clx81BookingDraft.values[key]=el.value")

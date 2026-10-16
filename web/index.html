@@ -2760,6 +2760,7 @@ function clx81GridChange(el){
   const key=el.dataset.clx81GridField;
   const w=clx49Workspace,r=w?.booking;
   if(!key||!r)return;
+  if(String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft')return;
   const draftKey=String(w.context?.job_ref||'')+':'+String(r.id||'');
   if(clx81BookingDraft?.key!==draftKey)clx81BookingDraft={key:draftKey,values:{}};
   clx81BookingDraft.values[key]=el.value;
