@@ -199,3 +199,11 @@ def test_agent_related_requests_have_governed_checker_and_maker_actions():
     assert "request.maker!==m3AgentIdentity.user_ref" in source
     assert "'/decision'" in source
     assert "'/withdraw'" in source
+
+
+def test_agent_country_is_derived_from_authoritative_iam_offices():
+    source=agent_source()
+    assert "api('/api/admin/offices')" in source
+    assert 'function m3AgentOfficeCountry(officeCode)' in source
+    assert 'derived_country:m3AgentOfficeCountry(x.payload?.office_code)' in source
+    assert "esc(m3AgentOfficeCountry(x.payload?.office_code)||'Unresolved')" in source
