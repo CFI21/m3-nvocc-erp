@@ -157,3 +157,21 @@ def test_checker_revalidates_pol_uniqueness():
     decision=source.split('def decide(change_ref:',1)[1]
     assert "ch['domain']=='configuration' and ch['operation'] in ('CREATE','UPDATE')" in decision
     assert "DUPLICATE_AGENT_RELATIONSHIP" in decision
+
+
+def test_pol_projection_fails_closed_if_port_unlocode_changes(country_db):
+    c=country_db()
+    coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')",(json.dumps({'unlocode':'DEHAM'}),))
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('configuration','COV-X',?,'ACTIVE','now','now')",(json.dumps(coverage),))
+    c.commit();c.close()
+    assert masterdata.agent_office_countries('valid') == []
+
+
+def test_pol_projection_fails_closed_if_port_inactive(country_db):
+    c=country_db()
+    coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'INACTIVE','now','now')",(json.dumps({'unlocode':'NLRTM'}),))
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('configuration','COV-X',?,'ACTIVE','now','now')",(json.dumps(coverage),))
+    c.commit();c.close()
+    assert masterdata.agent_office_countries('valid') == []
