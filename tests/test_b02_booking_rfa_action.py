@@ -14,7 +14,8 @@ def test_rfa_action_must_start_from_draft_and_recheck_permissions():
 def test_approval_issuance_remains_blocked_until_governed_reference_ready():
     source=inspect.getsource(action_record)
     assert "BOOKING_RFA_REQUIRED_BEFORE_APPROVAL" in source
-    assert "BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY" in source
+    assert "BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED" in source
+    assert "BOOKING_INDEPENDENT_APPROVER_REQUIRED" in source
     assert "OPTIMISTIC_LOCK_CONFLICT" in source
 
 
