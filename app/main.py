@@ -594,7 +594,7 @@ async def create_record(module:str,body:CreateBody,request:Request,x_role:str=He
         if module=='booking':
             if str(body.fields.get('Status','Draft')).strip().lower() != 'draft':
                 raise HTTPException(409,{'code':'BOOKING_STATUS_ACTION_REQUIRED'})
-            if any(str(body.fields.get(k) or '').strip() for k in ('Approval #','Approval Ref','Approval Reference')):
+            if any(k in body.fields for k in ('Approval #','Approval Ref','Approval Reference','Approved By','Approved At','RFA Submitted By')):
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ACTION_REQUIRED'})
             assert_booking_rules(conn,ctx,body.fields,None)
         ext=body.external_ref or f"CLX-{module.upper()}-{body.job_ref}-{uuid.uuid4().hex[:8].upper()}"

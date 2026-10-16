@@ -205,3 +205,11 @@ def test_closed_booking_job_uses_existing_audited_guard():
     assert "JOB_CLOSED" in code
     assert code.index("CLOSED_JOB_BLOCKED")<code.index("sequence_code='BOOKING_APPROVAL'")
 
+
+
+def test_booking_draft_create_rejects_client_supplied_approval_and_maker_fields():
+    from app.main import create_record
+    source=inspect.getsource(create_record)
+    assert "('Approval #','Approval Ref','Approval Reference','Approved By','Approved At','RFA Submitted By')" in source
+    assert "if any(k in body.fields" in source
+    assert "BOOKING_APPROVAL_REFERENCE_ACTION_REQUIRED" in source
