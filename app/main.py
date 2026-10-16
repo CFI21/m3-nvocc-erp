@@ -779,9 +779,10 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
         if module=='booking' and action=='submit-rfa':
             if not bulk_permission_enabled():
                 raise HTTPException(403,{'code':'BOOKING_RFA_REQUIRES_IAM_SESSION'})
-            if not str(ga['session'].get('user_ref') or '').strip():
+            maker_user=str(ga['session'].get('user_ref') or '').strip()
+            if not maker_user:
                 raise HTTPException(403,{'code':'BOOKING_RFA_MAKER_IDENTITY_MISSING'})
-            payload['RFA Submitted By']=str(ga['session']['user_ref']).strip()
+            payload['RFA Submitted By']=maker_user
             new_status='RFA'
         elif action=='advance':
             if module!='special-rates-request': raise HTTPException(422,{'code':'ADVANCE_ONLY_SPECIAL_RATE'})

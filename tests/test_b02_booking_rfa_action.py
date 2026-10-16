@@ -103,7 +103,7 @@ def test_approval_uses_existing_governed_sequence_with_fail_closed_configuration
 
 def test_booking_rfa_records_trusted_maker_and_approval_enforces_four_eyes():
     source=inspect.getsource(action_record)
-    assert "payload['RFA Submitted By']=str(ga['session']['user_ref']).strip()" in source
+    assert "payload['RFA Submitted By']=maker_user" in source
     assert "BOOKING_RFA_REQUIRES_IAM_SESSION" in source
     assert "BOOKING_RFA_MAKER_IDENTITY_REQUIRED" in source
     assert "BOOKING_FOUR_EYES_VIOLATION" in source
@@ -248,4 +248,4 @@ def test_booking_rfa_missing_session_identity_fails_closed():
     source=inspect.getsource(action_record)
     assert "BOOKING_RFA_MAKER_IDENTITY_MISSING" in source
     assert "ga['session'].get('user_ref')" in source
-    assert source.index("BOOKING_RFA_MAKER_IDENTITY_MISSING")<source.index("payload['RFA Submitted By']=str(ga['session']['user_ref']).strip()")
+    assert source.index("BOOKING_RFA_MAKER_IDENTITY_MISSING")<source.index("payload['RFA Submitted By']=maker_user")
