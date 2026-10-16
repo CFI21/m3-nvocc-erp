@@ -125,8 +125,9 @@ def reference_errors(c,domain,payload):
         if kind=='AGENT_NETWORK' and str(payload.get('network_type') or '').upper()=='PORT_COVERAGE':
             office=str(payload.get('office_code') or '').strip()
             port=str(payload.get('port_code') or '').strip().upper()
-            if not c.execute("SELECT 1 FROM iam_offices WHERE office_code=? AND status='ACTIVE'",(office,)).fetchone():
-                errs.append('AGENT_NETWORK_OFFICE_NOT_ACTIVE')
+            location=c.execute("SELECT co.country_code FROM iam_offices o JOIN iam_countries co ON co.id=o.country_id WHERE o.office_code=? AND o.status='ACTIVE' AND co.status='ACTIVE'",(office,)).fetchone()
+            if not location: errs.append('AGENT_NETWORK_OFFICE_NOT_ACTIVE')
+            elif port and location['country_code']!=port[:2]: errs.append('AGENT_NETWORK_OFFICE_COUNTRY_MISMATCH')
             master=c.execute("SELECT payload_json FROM md_records WHERE domain='port' AND record_key=? AND status='ACTIVE'",(port,)).fetchone()
             if not master: errs.append('AGENT_NETWORK_PORT_NOT_ACTIVE')
             elif str(json.loads(master['payload_json'] or '{}').get('unlocode') or port).upper()!=port:
