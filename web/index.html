@@ -781,7 +781,7 @@ function m3AgentPaint(){
    (coverage.map(x=>'<div>'+esc(String(x.payload?.office_code||'—'))+' · '+esc(String(x.payload?.scope||'—'))+' · '+esc(String(x.payload?.port_code||'—'))+'</div>').join('')||'<div class="muted">No configured port coverage records.</div>')+'</div>';
  }
  if(row&&['Emails','Countries','Offices'].includes(m3AgentTab)){
-  const allowed=['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role);
+  const allowed=['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)&&m3AgentIdentity?.username!=='md.checker';
   const emailTab=m3AgentTab==='Emails',countryTab=m3AgentTab==='Countries';
   const rows=m3AgentRelevantRows(row,emailTab?'AGENT_EMAIL':'AGENT_OFFICE_ASSIGNMENT');
   const countries=[...new Map(rows.filter(x=>x.payload?.country_code).map(x=>[String(x.payload.country_code).toUpperCase(),x])).values()];
