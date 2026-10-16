@@ -30,7 +30,17 @@ jobs:
       - name: Focused B01 maker checker and countries
         run: python -m pytest -q tests/test_b01_agent_countries_iam_resolution.py
       - name: Wider regression in disposable runner
-        run: python -m pytest -q
+        run: |
+          set -o pipefail
+          python -m pytest -q -ra --tb=short 2>&1 | tee b01-regression.log
+      - name: Preserve regression failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-b01-regression-failure-log
+          path: b01-regression.log
+          if-no-files-found: warn
+          retention-days: 7
       - name: Verify structural contracts
         run: |
           python - <<'PY'
