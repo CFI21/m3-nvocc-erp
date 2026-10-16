@@ -301,3 +301,11 @@ def test_cargo_popup_hides_apply_button_after_draft():
     popup=ui.split('function clx81OpenCargoDetails(){',1)[1].split('// Requested nine external',1)[0]
     assert "cargoLocked?'':" in popup
     assert "Apply to Booking Draft</button>" in popup
+
+
+def test_rfa_unsaved_grid_guard_is_scoped_to_current_booking():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    fn=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('async function clx49RenderBooking',1)[0]
+    assert 'clx81BookingDraft?.key===draftKey' in fn
+    assert 'if(dirty||pendingGridEdits)' in fn
