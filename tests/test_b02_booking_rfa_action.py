@@ -260,3 +260,11 @@ def test_approved_booking_readonly_audit_visible_in_reference_workspace():
         assert f"val('{key}')" in grid
     assert 'approvalAudit+' in grid
     assert 'input readonly' in grid
+
+
+def test_booking_reference_grid_locks_editable_inputs_after_draft():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    grid=ui.split('function clx81BookingReferenceGrid(w,r){',1)[1].split('\nfunction ',1)[0]
+    assert "const bookingLocked=saved&&String(r?.status||p.Status||'').trim().toLowerCase()!=='draft'" in grid
+    assert "locked=viewerReadOnly()||bookingLocked" in grid

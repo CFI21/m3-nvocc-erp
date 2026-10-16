@@ -3106,11 +3106,12 @@ function clx81BookingReferenceGrid(w,r){
   const approved=String(p['Approval Status']||p['approval_status']||r?.approval_status||'').trim().toUpperCase()==='APPROVED'||String(r?.status||'').trim().toUpperCase()==='APPROVED';
   const saved=Boolean(r?.id&&String(r.id).trim());
   const showFilters=saved&&approved;
+  const bookingLocked=saved&&String(r?.status||p.Status||'').trim().toLowerCase()!=='draft';
   const approvalAudit=approved?'<div class="clx81RefSummary" role="status"><div class="clx81RefSubhead">Booking Approval · Read Only</div><div class="clx81RefSummaryFields"><label>Approval Reference<input readonly value="'+esc(val('Approval #'))+'"></label><label>Approved By<input readonly value="'+esc(val('Approved By'))+'"></label><label>Approved At<input readonly value="'+esc(val('Approved At'))+'"></label></div></div>':'';
   const panel=(title,body)=>'<div class="clx81RefSummary"><div class="clx81RefSubhead">'+title+'</div><div class="clx81RefSummaryFields">'+body+'</div></div>';
   const liveKeys={'Route':'Route Type','Cargo Type':'Cargo Type','Cost Center':'Cost Center','Shipper':'Shipper','Consignee':'Consignee','POL Code + Name':'POL','POL Agent Code + Name':'POL Agent','POD Code + Name':'POD','POD Agent Code + Name':'POD Agent','POT Code + Name':'POT (1)','POT Agent Code + Name':'POT Agent','Vessel':'Vessel','Voyage':'Voyage','ETD':'Sailing Date','Cutoff':'SI Cut-off','Commodity':'Commodity','Cargo Type':'Cargo Type','Principal':'Principal','Billing Party':'Billing Party','Currency':'Currency'};
   const topCell=(label,value)=>{
-    const key=liveKeys[label],locked=viewerReadOnly();
+    const key=liveKeys[label],locked=viewerReadOnly()||bookingLocked;
     if(!key)return '<label class="clx81TopCell"><span>'+esc(label)+'</span><input readonly value="'+esc(String(value||''))+'"></label>';
     const domain=clx81MasterDomains[key]||'',type=(label==='ETD'||label==='Cutoff')?'date':'text',max=label==='Vessel'?7:label==='Voyage'?8:undefined;
     if(label==='Route')return '<label class="clx81TopCell clx81LiveCell"><span>Route:</span><select data-clx81-grid-field="Route Type" onchange="clx81GridChange(this)"'+(locked?' disabled':'')+'>'+['','DIRECT','VIA','THROUGH BL'].map(v=>'<option value="'+esc(v)+'"'+(value===v?' selected':'')+'>'+esc(v||'Select route')+'</option>').join('')+'</select></label>';
