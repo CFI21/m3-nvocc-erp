@@ -232,3 +232,38 @@ def test_governed_pol_create_and_remove_with_independent_checker(country_db, mon
     c=country_db()
     assert [tuple(x) for x in c.execute('SELECT * FROM iam_user_roles')]==[(1,7,1)]
     c.close()
+
+
+def test_governed_pol_edit_requires_second_identity(country_db, monkeypatch):
+    c=country_db()
+    for code in ('NLRTM','NLAMS'):
+        c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port',?,?,'ACTIVE','now','now')",
+                  (code,json.dumps({'unlocode':code})))
+    old={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+         'scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) VALUES ('configuration','POL-EDIT',?,'ACTIVE',1,'now','now')",
+              (json.dumps(old),))
+    c.commit();c.close()
+
+    def identity(_c, token):
+        if token=='maker': return {'user_ref':'maker-ref','username':'md.maker'}, {'MASTER_DATA'}
+        if token=='checker': return {'user_ref':'checker-ref','username':'md.checker'}, {'MASTER_DATA_MANAGER'}
+        raise HTTPException(401,'Invalid identity')
+    monkeypatch.setattr(masterdata,'authenticated_actor',identity)
+
+    submitted=masterdata.create_change(
+        masterdata.Change(domain='configuration',record_key='POL-EDIT',
+                          operation='UPDATE',payload={'port_code':'NLAMS'},
+                          reason='Change POL'), 'maker')
+    assert submitted['status']=='PENDING'
+    before=masterdata.agent_office_countries('checker')
+    assert any(x.get('port_code')=='NLRTM' for x in before)
+    assert not any(x.get('port_code')=='NLAMS' for x in before)
+    with pytest.raises(HTTPException) as denied:
+        masterdata.decide(submitted['change_ref'],masterdata.Decision(decision='APPROVE',comment='Self'), 'maker')
+    assert denied.value.status_code==403
+    accepted=masterdata.decide(submitted['change_ref'],masterdata.Decision(decision='APPROVE',comment='Checked'), 'checker')
+    assert accepted['status']=='APPROVED'
+    after=masterdata.agent_office_countries('checker')
+    assert any(x.get('port_code')=='NLAMS' for x in after)
+    assert not any(x.get('port_code')=='NLRTM' for x in after)
