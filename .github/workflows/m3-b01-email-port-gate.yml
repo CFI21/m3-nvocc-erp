@@ -4,8 +4,10 @@ on:
     branches: [preview-pr124-booking-isolated]
     paths:
       - 'app/masterdata.py'
+      - 'web/index.html'
       - 'tests/test_b01_email_port_gate.py'
       - 'tests/test_b01_office_approval_duplicate.py'
+      - 'tests/test_b01_agent_countries_iam_resolution.py'
       - '.github/workflows/m3-b01-email-port-gate.yml'
   workflow_dispatch:
 permissions:
