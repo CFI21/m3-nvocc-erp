@@ -490,6 +490,7 @@ def test_booking_agent_port_grants_sqlite_allow_deny_and_revocation():
         INSERT INTO iam_organizations VALUES(1,'M3-GLOBAL','ACTIVE');
         INSERT INTO iam_offices VALUES(1,'AGT-AG01',1,1,'ACTIVE');
         INSERT INTO iam_office_membership VALUES(7,1,'ACTIVE');
+        INSERT INTO md_records VALUES('port','NLRTM','{"unlocode":"NLRTM"}','ACTIVE');
         INSERT INTO md_records VALUES('configuration','N1','{"config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE","agent_code":"AG01","office_code":"AGT-AG01","scope":"POL","port_code":"NLRTM"}','ACTIVE');
         """)
         grants=booking_agent_port_grants(c,7,'AG01')
@@ -498,6 +499,9 @@ def test_booking_agent_port_grants_sqlite_allow_deny_and_revocation():
             booking_validate_authorized_ports({'POD':'NLRTM'},grants)
         with pytest.raises(HTTPException):
             booking_validate_authorized_ports({'POL':'DEHAM'},grants)
+        c.execute("UPDATE md_records SET status='INACTIVE' WHERE domain='port' AND record_key='NLRTM'")
+        assert booking_agent_port_grants(c,7,'AG01')['POL']['ports']==set()
+        c.execute("UPDATE md_records SET status='ACTIVE' WHERE domain='port' AND record_key='NLRTM'")
         c.execute("""UPDATE md_records SET payload_json=? WHERE record_key='N1'""", ('{"config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE","agent_code":"AG01","office_code":"AGT-AG01","scope":"POL","port_code":"NLRTM","effective_to":"2020-01-01"}',))
         assert booking_agent_port_grants(c,7,'AG01')['POL']['ports']==set()
         c.execute("UPDATE iam_office_membership SET status='INACTIVE' WHERE user_id=7")
