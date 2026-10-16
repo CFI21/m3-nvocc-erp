@@ -201,6 +201,9 @@ def agent_office_countries(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
             if not master or str(json.loads(master['payload_json'] or '{}').get('unlocode') or port).upper()!=str(port).upper(): continue
             country=c.execute("SELECT co.country_code,co.name FROM iam_offices o JOIN iam_countries co ON co.id=o.country_id WHERE o.office_code=? AND o.status='ACTIVE' AND co.status='ACTIVE'",(office,)).fetchone()
             if not country or country['country_code']!=port[:2]: continue
+            key=('POL',str(agent).upper(),str(office).upper(),str(port).upper())
+            if key in seen: continue
+            seen.add(key)
             result.append({'agent_code':agent,'office_code':office,'port_code':port,'source':'POL','record_key':rec['record_key'],'country_code':country['country_code'],'country_name':country['name']})
         return result
     finally:
