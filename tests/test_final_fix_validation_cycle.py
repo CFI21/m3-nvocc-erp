@@ -655,7 +655,8 @@ def test_agent_six_tab_related_master_workflow_wiring():
     from pathlib import Path
     html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding='utf-8')
     assert "const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template']" in html
-    assert "async function m3AgentRelatedCreate()" in html
+    assert "function m3AgentRelatedCreate()" in html
+    assert "async function m3AgentRelatedSubmit(event)" in html
     assert "config_type:'AGENT_EMAIL'" in html
     assert "config_type:'AGENT_OFFICE_ASSIGNMENT'" in html
-    assert "operation:'CREATE',payload,reason:reason.trim()" in html
+    assert "operation:'CREATE',payload,reason" in html
