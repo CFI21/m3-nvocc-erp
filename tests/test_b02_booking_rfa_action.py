@@ -198,3 +198,9 @@ def test_booking_approval_requires_iam_before_transaction_access():
     assert "BOOKING_APPROVAL_FLOW_REQUIRES_IAM" in code
     assert code.index("BOOKING_APPROVAL_FLOW_REQUIRES_IAM") < code.index("conn=connect(); tx(conn)")
     assert "action in {'submit-rfa','approve'}" in code
+
+
+def test_closed_booking_job_blocks_approval_before_sequence():
+    code=inspect.getsource(action_record)
+    assert "BOOKING_JOB_CLOSED" in code
+    assert code.index("BOOKING_JOB_CLOSED") < code.index("sequence_code='BOOKING_APPROVAL'")
