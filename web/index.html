@@ -789,7 +789,7 @@ function m3AgentPaint(){
    emailTab?rows.map(x=>'<tr><td>'+esc(x.payload?.port_code||'—')+'</td><td>'+esc(x.payload?.email||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join(''):
     rows.map(x=>'<tr><td>'+esc(x.payload?.office_code||'—')+'</td><td>'+esc(x.payload?.country_code||'Resolved by IAM')+'</td><td>'+esc(x.payload?.address||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join('');
   fields+='<div style="grid-column:1/-1"><b>'+esc(m3AgentTab)+' records</b><table class="table"><thead><tr>'+(emailTab?'<th>Port</th><th>Email</th><th>Action</th>':(countryTab?'<th>Country code</th><th>Country</th><th>Office</th>':'<th>Office / Port</th><th>Country</th><th>Address</th><th>Action</th>'))+'</tr></thead><tbody>'+view+'</tbody></table>'+
-   (allowed&&!countryTab?'<button class="btn" id="m3AgentRelatedAdd">Add governed '+esc(emailTab?'email':'office assignment')+'</button>':'')+(countryTab?'<p class="muted">Countries derive from approved office assignment records. Use Offices to request additions or removals. Blank countries are not inferred or used for authorization.</p>':'')+
+   (allowed&&!countryTab?'<form id="m3AgentRelatedForm" style="display:block;border:1px solid #cbd5e1;padding:14px;margin-top:12px;border-radius:8px"><b>New governed '+esc(emailTab?'Email':'Office assignment')+'</b><div class="muted">Complete all fields here. No pop-up steps; your entries remain visible until submitted.</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:8px"><label>'+(emailTab?'Existing Port code':'Existing IAM Office code')+'<input name="code" required maxlength="20" autocomplete="off" value="'+esc(m3RelatedDrafts[m3AgentTab]?.code||'')+'" style="width:100%;padding:8px"></label><label>'+(emailTab?'Email address':'Office address')+'<input name="value" required '+(emailTab?'type="email"':'type="text"')+' autocomplete="off" value="'+esc(m3RelatedDrafts[m3AgentTab]?.value||'')+'" style="width:100%;padding:8px"></label><label>Reason for approval<input name="reason" required autocomplete="off" value="'+esc(m3RelatedDrafts[m3AgentTab]?.reason||'')+'" style="width:100%;padding:8px"></label></div><p class="badtext" data-related-error role="status"></p><button type="submit" class="btn primary">Submit for independent approval</button></form>':'')+(countryTab?'<p class="muted">Countries derive from approved office assignment records. Use Offices to request additions or removals. Blank countries are not inferred or used for authorization.</p>':'')+
    '<p class="muted">Changes require approval. Office assignment never overrides IAM membership.</p></div>';
  }
  if(row&&m3AgentTab==='Emails'){
@@ -827,7 +827,11 @@ function m3AgentPaint(){
  document.getElementById('m3AgentEdit')?.addEventListener('click',()=>{if(m3AgentEditing)m3AgentDiscardDraft();else m3AgentEditing=true;m3AgentPaint()});
  document.getElementById('m3AgentSave')?.addEventListener('click',m3AgentSubmit);
  document.getElementById('m3AgentWithdraw')?.addEventListener('click',m3AgentWithdraw);
- document.getElementById('m3AgentRelatedAdd')?.addEventListener('click',m3AgentRelatedCreate);
+ const relatedForm=document.getElementById('m3AgentRelatedForm');
+ if(relatedForm){
+   relatedForm.addEventListener('input',()=>{m3RelatedDrafts[m3AgentTab]={code:relatedForm.elements.namedItem('code').value,value:relatedForm.elements.namedItem('value').value,reason:relatedForm.elements.namedItem('reason').value}});
+   relatedForm.addEventListener('submit',m3AgentRelatedSubmit);
+ }
  document.querySelectorAll('[data-agent-related-decision]').forEach(el=>el.addEventListener('click',()=>m3AgentRelatedDecide(el.dataset.agentRelatedDecision,el.dataset.agentRelatedRef)));
  document.querySelectorAll('[data-agent-related-withdraw]').forEach(el=>el.addEventListener('click',()=>m3AgentRelatedWithdraw(el.dataset.agentRelatedWithdraw)));
  document.querySelectorAll('[data-agent-remove]').forEach(el=>el.addEventListener('click',()=>m3AgentRelatedRemove(el.dataset.agentRemove)));
@@ -858,30 +862,32 @@ async function m3AgentRelatedRemove(key){
  const reason=prompt('Reason for relationship removal (required):');if(!reason||!reason.trim())return;
  try{await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'configuration',record_key:key,operation:'DEACTIVATE',payload:{},reason:reason.trim()})});alert('Removal submitted for independent approval.');await renderHoAgentMasterWorkspace()}catch(e){alert('Relationship removal failed: '+e.message)}
 }
-async function m3AgentRelatedCreate(){
- const row=m3AgentRows[m3AgentIndex];if(!row)return;
- if(m3AgentIdentity?.username==='md.checker')return alert('B01 UAT: use md.maker to propose Agent relationship changes.');
- const isEmail=m3AgentTab==='Emails';
- if(!isEmail&&m3AgentTab!=='Offices')return;
- const code=prompt(isEmail?'Port code for email:':'Existing IAM office code (the office must already exist):');
- if(!code||!code.trim())return;
- if(!/^[A-Za-z0-9_-]{2,20}$/.test(code.trim()))return alert('Enter a valid existing office or port code.');
- const second=prompt(isEmail?'Email address:':'Office address (optional):');
- if(second===null)return;
- const payload=isEmail?{config_type:'AGENT_EMAIL',agent_code:row.record_key,port_code:code.trim().toUpperCase(),email:second.trim()}:
-   {config_type:'AGENT_OFFICE_ASSIGNMENT',agent_code:row.record_key,office_code:code.trim().toUpperCase(),address:second.trim()};
- if(isEmail&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(second.trim()))return alert('A valid email address is required.');
- if(!isEmail&&!second.trim())return alert('Please enter the office address.');
- const reason=prompt('Reason for governed Agent relationship:');
- if(!reason||!reason.trim())return;
- const key='AGCFG-'+String(row.record_key).replace(/[^A-Z0-9]/gi,'').slice(-14)+'-'+Date.now().toString(36).toUpperCase();
- try{
-  await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({domain:'configuration',record_key:key,operation:'CREATE',payload,reason:reason.trim()})});
-  alert('Relationship submitted to the Master Data approval queue.');
-  await renderHoAgentMasterWorkspace();
- }catch(e){alert('Could not submit relationship: '+e.message)}
+let m3RelatedDrafts={Emails:{},Offices:{}};
+function m3AgentRelatedCreate(){
+ const form=document.getElementById('m3AgentRelatedForm');
+ if(form){form.style.display='block';form.querySelector('input')?.focus();}
 }
+async function m3AgentRelatedSubmit(event){
+ event.preventDefault();
+ const row=m3AgentRows[m3AgentIndex],tab=m3AgentTab;
+ if(!row||!['Emails','Offices'].includes(tab)||m3AgentIdentity?.username==='md.checker')return;
+ const form=event.currentTarget,code=form.elements.namedItem('code').value.trim().toUpperCase();
+ const value=form.elements.namedItem('value').value.trim(),reason=form.elements.namedItem('reason').value.trim();
+ const error=form.querySelector('[data-related-error]');
+ if(!/^[A-Z0-9_-]{2,20}$/.test(code)){error.textContent='Enter a valid office or port code.';return}
+ if(!value||!reason){error.textContent='All fields are required.';return}
+ if(tab==='Emails'&&!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value)){error.textContent='Enter a valid email address.';return}
+ const payload=tab==='Emails'?{config_type:'AGENT_EMAIL',agent_code:row.record_key,port_code:code,email:value}:{config_type:'AGENT_OFFICE_ASSIGNMENT',agent_code:row.record_key,office_code:code,address:value};
+ const key='AGCFG-'+String(row.record_key).replace(/[^A-Z0-9]/gi,'').slice(-14)+'-'+Date.now().toString(36).toUpperCase();
+ const button=form.querySelector('button[type="submit"]');button.disabled=true;error.textContent='Submitting for independent approval...';
+ try{
+   const result=await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'configuration',record_key:key,operation:'CREATE',payload,reason})});
+   m3RelatedDrafts[tab]={};
+   await renderHoAgentMasterWorkspace();
+   alert('Submitted for independent approval: '+(result.change_ref||'pending'));
+ }catch(e){error.textContent='Submission failed: '+e.message;button.disabled=false;}
+}
+
 async function m3AgentDecide(decision,changeRef){
  const row=m3AgentRows[m3AgentIndex];
  const change=m3AgentPending.find(x=>x.domain==='agent'&&x.status==='PENDING'&&(changeRef?x.change_ref===changeRef:x.record_key===row?.record_key));
