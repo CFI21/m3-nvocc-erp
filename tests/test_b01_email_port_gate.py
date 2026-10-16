@@ -375,3 +375,52 @@ def test_maker_rejects_duplicate_agent_email_update_before_queue(tmp_path, monke
         "SELECT COUNT(*) FROM md_change_requests WHERE record_key='EMAIL-CHANGING'"
     ).fetchone()[0] == 0
     db.close()
+
+
+def test_checker_create_fails_cleanly_when_key_was_claimed(tmp_path, monkeypatch):
+    """Concurrent approval cannot overwrite a record claimed after submission."""
+    import json
+    import pytest
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "claimed_key.sqlite3")
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(masterdata, "authenticated_actor", lambda _db, _token: (
+        {"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}
+    ))
+    db = connect()
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-CLAIMED','configuration','EMAIL-CLAIMED','CREATE',?,'race','maker','now',0)",
+        (json.dumps(_email()),),
+    )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-CLAIMED','{}','ACTIVE',1,'now','now')"
+    )
+    db.close()
+    with pytest.raises(HTTPException) as err:
+        masterdata.decide(
+            "MDC-CLAIMED",
+            masterdata.Decision(decision="APPROVE", comment="review"),
+            "checker",
+        )
+    assert err.value.status_code == 409
+    assert err.value.detail["code"] == "DUPLICATE_MASTER_KEY"
+    db = connect()
+    assert db.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref='MDC-CLAIMED'"
+    ).fetchone()["status"] == "PENDING"
+    assert db.execute(
+        "SELECT payload_json FROM md_records WHERE record_key='EMAIL-CLAIMED'"
+    ).fetchone()["payload_json"] == "{}"
+    db.close()
