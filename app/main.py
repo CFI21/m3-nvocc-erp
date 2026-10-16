@@ -668,6 +668,8 @@ def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Head
             role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
             if role not in {'ADMIN','SUPER_ADMIN'}: raise HTTPException(403,'ADMIN only delete')
             r=get_tx(conn,module,tid,role,ascope,cscope)
+        if module=='booking' and str(r['status']).strip().lower()!='draft':
+            raise HTTPException(409,{'code':'BOOKING_DELETE_REQUIRES_DRAFT','current_status':r['status']})
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})

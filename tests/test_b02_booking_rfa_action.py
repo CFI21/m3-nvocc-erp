@@ -72,3 +72,10 @@ def test_booking_edits_locked_after_rfa():
     html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
     booking=html.split('async function clx49RenderBooking(tab){',1)[1].split("if(tab==='Booking Info')",1)[0]
     assert "String(r.status||p.Status||'').toLowerCase()==='draft'" in booking
+
+
+def test_booking_delete_locked_after_rfa():
+    from app.main import delete_record
+    source=inspect.getsource(delete_record)
+    assert "BOOKING_DELETE_REQUIRES_DRAFT" in source
+    assert source.index("BOOKING_DELETE_REQUIRES_DRAFT")<source.index("DELETE FROM transaction_records")
