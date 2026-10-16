@@ -317,3 +317,12 @@ def test_rfa_allows_unchanged_grid_draft_values():
     fn=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('async function clx49RenderBooking(tab){',1)[0]
     assert "Object.entries(clx81BookingDraft.values||{}).some" in fn
     assert "String(value??'')!==String(w.booking.fields?.[key]??'')" in fn
+
+
+def test_submit_rfa_rechecks_live_reference_grid_inputs():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    submit=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('\nfunction clx49RenderBooking',1)[0]
+    assert "data-clx81-grid-field" in submit
+    assert "const gridDirty=" in submit
+    assert "if(dirty||gridDirty||pendingGridEdits)" in submit
