@@ -876,7 +876,7 @@ async function m3AgentRelatedSubmit(event){
  const error=form.querySelector('[data-related-error]');
  if(!/^[A-Z0-9_-]{2,20}$/.test(code)){error.textContent='Enter a valid office or port code.';return}
  if(!value||!reason){error.textContent='All fields are required.';return}
- if(tab==='Emails'&&!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value)){error.textContent='Enter a valid email address.';return}
+ if(tab==='Emails'&&(!value.includes('@')||!value.split('@')[1]?.includes('.')||value.includes(' '))){error.textContent='Enter a valid email address.';return}
  const payload=tab==='Emails'?{config_type:'AGENT_EMAIL',agent_code:row.record_key,port_code:code,email:value}:{config_type:'AGENT_OFFICE_ASSIGNMENT',agent_code:row.record_key,office_code:code,address:value};
  const key='AGCFG-'+String(row.record_key).replace(/[^A-Z0-9]/gi,'').slice(-14)+'-'+Date.now().toString(36).toUpperCase();
  const button=form.querySelector('button[type="submit"]');button.disabled=true;error.textContent='Submitting for independent approval...';
