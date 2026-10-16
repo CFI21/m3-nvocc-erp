@@ -742,6 +742,11 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
                 raise HTTPException(403,{'code':'BOOKING_FOUR_EYES_VIOLATION'})
             if any(str(payload.get(k) or '').strip() for k in ('Approval #','Approval Ref','Approval Reference')):
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ALREADY_SET'})
+            # Legacy standalone UAT databases may not have Master Data schema yet.
+            # Missing governed sequence infrastructure is a conflict, never a server 500.
+            sequence_table=conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='md_sequences'").fetchone()
+            if not sequence_table:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED'})
             seq=conn.execute("SELECT id,prefix,next_number,width FROM md_sequences WHERE sequence_code='BOOKING_APPROVAL' AND status='ACTIVE'").fetchone()
             if not seq:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED'})

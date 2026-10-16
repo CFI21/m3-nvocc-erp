@@ -164,3 +164,10 @@ def test_booking_approval_records_trusted_checker_audit_fields():
     assert "payload['Approved By']=checker_user" in approval
     assert "payload['Approved At']=now()" in approval
     assert "'Approved By','Approved At','RFA Submitted By'" in update
+
+
+def test_booking_approval_fails_closed_without_masterdata_sequence_table():
+    source=inspect.getsource(action_record)
+    assert "sqlite_master WHERE type='table' AND name='md_sequences'" in source
+    assert source.index("if not sequence_table:")<source.index("SELECT id,prefix,next_number,width FROM md_sequences")
+    assert "BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED" in source
