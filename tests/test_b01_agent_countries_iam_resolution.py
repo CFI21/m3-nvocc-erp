@@ -175,3 +175,11 @@ def test_pol_projection_fails_closed_if_port_inactive(country_db):
     c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('configuration','COV-X',?,'ACTIVE','now','now')",(json.dumps(coverage),))
     c.commit();c.close()
     assert masterdata.agent_office_countries('valid') == []
+
+
+def test_removal_request_appears_in_independent_checker_queue():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    assert "x.payload?.agent_code||approved?.payload?.agent_code" in ui
+    assert "m3AgentConfigs.find(c=>c.record_key===x.record_key&&c.status==='ACTIVE')" in ui
+    assert "data-agent-related-decision" in ui
