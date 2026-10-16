@@ -54,3 +54,10 @@ def test_booking_unknown_action_rejected_before_database_access():
         action_record('booking',1,'arbitrary-action',ActionBody(version=1))
     assert error.value.status_code==422
     assert error.value.detail['code']=='BOOKING_ACTION_NOT_SUPPORTED'
+
+
+def test_closed_job_blocks_booking_rfa():
+    import inspect
+    code=inspect.getsource(action_record)
+    assert "if ctx['closed'] and action in {'submit-rfa','approve'" in code
+    assert code.index("if ctx['closed'] and action") < code.index("if module=='booking' and action=='submit-rfa':")

@@ -698,7 +698,7 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid,'action':action})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         ctx=job_context(conn,r['job_ref']); payload=json.loads(r['payload_json']); new_status=r['status']
-        if ctx['closed'] and action in {'approve','release','hold','cancel','amend','reissue','advance'}:
+        if ctx['closed'] and action in {'submit-rfa','approve','release','hold','cancel','amend','reissue','advance'}:
             audit(conn,role,ascope or cscope,'CLOSED_JOB_BLOCKED',module,tid,r['job_id'],before,before,{'attempted_action':action})
             conn.execute('COMMIT')
             return JSONResponse({'detail':{'code':'JOB_CLOSED','action':action}},status_code=422)
