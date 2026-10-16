@@ -155,3 +155,12 @@ def test_governed_job_actor_ignores_explicit_deny_matches(monkeypatch):
     with pytest.raises(HTTPException) as denied:
         main.governed_job_actor(None, 'isolated-test-session', '50001', 'approve')
     assert denied.value.status_code == 403
+
+
+def test_booking_approval_records_trusted_checker_audit_fields():
+    from app.main import update_record
+    approval=inspect.getsource(action_record)
+    update=inspect.getsource(update_record)
+    assert "payload['Approved By']=checker_user" in approval
+    assert "payload['Approved At']=now()" in approval
+    assert "'Approved By','Approved At','RFA Submitted By'" in update

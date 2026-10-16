@@ -640,7 +640,7 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         if module=='booking':
             previous_fields=json.loads(r['payload_json'])
-            for reference_field in ('Approval #','Approval Ref','Approval Reference'):
+            for reference_field in ('Approval #','Approval Ref','Approval Reference','Approved By','Approved At','RFA Submitted By'):
                 if reference_field in body.fields and str(body.fields[reference_field] or '').strip()!=str(previous_fields.get(reference_field) or '').strip():
                     raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ACTION_REQUIRED'})
         if module=='booking' and 'Status' in body.fields and str(body.fields['Status']).strip().lower()!=str(r['status']).strip().lower():
@@ -750,6 +750,8 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             if updated.rowcount!=1:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_CONFLICT'})
             payload['Approval #']=number
+            payload['Approved By']=checker_user
+            payload['Approved At']=now()
         if module=='booking' and action=='submit-rfa':
             if not bulk_permission_enabled():
                 raise HTTPException(403,{'code':'BOOKING_RFA_REQUIRES_IAM_SESSION'})
