@@ -191,3 +191,10 @@ def test_booking_rfa_requires_iam_before_transition_validation():
     code=inspect.getsource(action_record)
     assert "if module=='booking' and action=='submit-rfa' and not bulk_permission_enabled():" in code
     assert code.index("BOOKING_RFA_REQUIRES_IAM_SESSION") < code.index("BOOKING_DRAFT_REQUIRED_FOR_RFA")
+
+
+def test_booking_approval_requires_iam_before_transaction_access():
+    code=inspect.getsource(action_record)
+    assert "BOOKING_APPROVAL_FLOW_REQUIRES_IAM" in code
+    assert code.index("BOOKING_APPROVAL_FLOW_REQUIRES_IAM") < code.index("conn=connect(); tx(conn)")
+    assert "action in {'submit-rfa','approve'}" in code

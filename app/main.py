@@ -685,6 +685,8 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
     require_module(module); action=action.lower()
     if action=='submit-rfa' and module!='booking':
         raise HTTPException(422,{'code':'BOOKING_RFA_ACTION_ONLY'})
+    if module=='booking' and action in {'submit-rfa','approve'} and not bulk_permission_enabled():
+        raise HTTPException(403,{'code':'BOOKING_APPROVAL_FLOW_REQUIRES_IAM'})
     if module=='booking' and action not in {'submit-rfa','approve','hold','cancel','amend'}:
         raise HTTPException(422,{'code':'BOOKING_ACTION_NOT_SUPPORTED'})
     if action=='release' and module not in RELEASE_MODULES: raise HTTPException(422,{'code':'MODULE_NOT_RELEASABLE'})
