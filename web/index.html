@@ -3162,6 +3162,22 @@ function clx81BookingReferenceGrid(w,r){
 function clx81FilterBookingGrid(){const filters=[...document.querySelectorAll('[data-clx81-grid-filter]')].map(el=>el.value.trim().toLowerCase());document.querySelectorAll('.clx81BookingRefRow').forEach(row=>{const values=[...row.cells].map(c=>c.textContent.toLowerCase());row.hidden=filters.some((v,i)=>v&&!values[i].includes(v));});}
 function clx81ToggleBookingNotes(){const el=document.getElementById('clx81BookingNotes');if(el)el.hidden=!el.hidden;}
 function clx81SelectNotesTab(tab){document.querySelectorAll('[data-clx81-note-tab]').forEach(el=>el.hidden=el.dataset.clx81NoteTab!==tab);}
+async function clx81SubmitBookingRfa(id,version){
+  if(viewerReadOnly()||!id||!version)return;
+  const w=clx49Workspace;
+  if(!w?.booking||String(w.booking.status||w.booking.fields?.Status||'').toLowerCase()!=='draft'){
+    alert('Only a saved Draft can be submitted for approval.');return;
+  }
+  if(!confirm('Submit this saved Booking Draft for independent approval?'))return;
+  try{
+    const headers={'Content-Type':'application/json',...clx49Headers(w)};
+    await api('/api/v1/booking/'+encodeURIComponent(id)+'/actions/submit-rfa',{
+      method:'POST',headers,body:JSON.stringify({version,reason:'Booking submitted for approval'})
+    });
+    clx49Workspace=await api('/api/clx049/workspace/'+encodeURIComponent(w.context.job_ref),{headers:clx49Headers(w)});
+    await clx49RenderBooking(clx49ActiveTab||'Booking Info');
+  }catch(e){alert('RFA submission failed: '+e.message)}
+}
 async function clx49RenderBooking(tab){
   const w=clx49Workspace,epoch=state.viewEpoch,screenId=state.current?.screen_id,role=state.role,bottomTab=clx78BookingBottomTab,r=w.booking;clx49ActiveTab=tab;
   const p=r?.fields||{};
@@ -3178,7 +3194,7 @@ async function clx49RenderBooking(tab){
   ]);
   const other=Object.keys(p).filter(k=>!known.has(k));
   let html=clx49ContextHeader(w)+clx49Nav(w);
-  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>FULL FLOW</b><span class="muted">'+esc(w.context.booking_ref||r?.external_ref||'')+' · '+esc(w.context.customer_name||'')+' · '+esc(w.context.pol||'')+' → '+esc(w.context.pod||'')+'</span><span class="grow"></span><button class="btn">Master Data</button><button class="btn" onclick="clx49RenderBooking(\''+tab+'\')">Reset View</button>'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+(r?.id||0)+','+(r?.version||1)+')">Save Draft</button>')+'</div>'+
+  html+='<div class="clx78Workspace"><div class="clx78TopBar"><b>FULL FLOW</b><span class="muted">'+esc(w.context.booking_ref||r?.external_ref||'')+' · '+esc(w.context.customer_name||'')+' · '+esc(w.context.pol||'')+' → '+esc(w.context.pod||'')+'</span><span class="grow"></span><button class="btn">Master Data</button><button class="btn" onclick="clx49RenderBooking(\''+tab+'\')">Reset View</button>'+writeUi('<button class="btn primary" onclick="saveClx049Tab(\'booking\','+(r?.id||0)+','+(r?.version||1)+')">Save Draft</button>')+((r&&String(r.status||p.Status||'').toLowerCase()==='draft')?writeUi('<button class="btn" onclick="clx81SubmitBookingRfa('+(r.id||0)+','+(r.version||1)+')">Submit RFA</button>'):'')+'</div>'+
     '<div class="clx78Hint">CLX-081 Booking Master Field Alignment · approved Booking reference layout · current authoritative Booking/Job APIs · Reference # remains REVIEW_LATER.</div>'+
     clx81BookingDropdownNav(tab);
   if(tab==='Booking Info'){

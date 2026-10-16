@@ -16,3 +16,12 @@ def test_approval_issuance_remains_blocked_until_governed_reference_ready():
     assert "BOOKING_RFA_REQUIRED_BEFORE_APPROVAL" in source
     assert "BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY" in source
     assert "OPTIMISTIC_LOCK_CONFLICT" in source
+
+
+def test_booking_ui_exposes_governed_rfa_action():
+    from pathlib import Path
+    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    assert 'async function clx81SubmitBookingRfa(id,version)' in html
+    assert '/actions/submit-rfa' in html
+    assert 'Save Draft</button>' in html
+    assert 'Submit RFA</button>' in html
