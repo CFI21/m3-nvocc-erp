@@ -118,3 +118,10 @@ def test_booking_rfa_checker_approval_ui_wired_to_existing_api():
     assert '/api/v1/booking/' in html
     assert "['ADMIN','SUPER_ADMIN'].includes(state.role)" in html
     assert 'Approve RFA</button>' in html
+
+
+def test_governed_job_actor_fails_closed_without_allow_role():
+    from app.main import governed_job_actor
+    code=inspect.getsource(governed_job_actor)
+    assert "GOVERNED_JOB_ROLE_NOT_GRANTED" in code
+    assert "role=roles[0] if roles else 'SUPER_ADMIN'" not in code

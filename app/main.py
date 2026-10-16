@@ -287,7 +287,9 @@ def governed_job_actor(conn,session_token,job_ref,action):
     s=iam_session(conn,session_token)
     out=bulk_assert_job_access(conn,s['user_id'],job_ref,'agent-tasks',action)
     roles=[m['role'] for m in out.get('matches',[]) if m.get('effect')=='ALLOW']
-    role=roles[0] if roles else 'SUPER_ADMIN'
+    if not roles:
+        raise HTTPException(403,{'code':'GOVERNED_JOB_ROLE_NOT_GRANTED'})
+    role=roles[0]
     return {'session':s,'role':role,'access':out}
 
 def scope_clause(role,agent_scope,customer_scope):
