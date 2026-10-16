@@ -183,3 +183,47 @@ def test_removal_request_appears_in_independent_checker_queue():
     assert "x.payload?.agent_code||approved?.payload?.agent_code" in ui
     assert "m3AgentConfigs.find(c=>c.record_key===x.record_key&&c.status==='ACTIVE')" in ui
     assert "data-agent-related-decision" in ui
+
+
+def test_governed_pol_create_and_remove_with_independent_checker(country_db, monkeypatch):
+    c=country_db()
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')", (json.dumps({'unlocode':'NLRTM'}),))
+    c.commit()
+    c.close()
+
+    def identity(_c, token):
+        if token=='maker':
+            return {'user_ref':'maker-ref','username':'md.maker'}, {'MASTER_DATA'}
+        if token=='checker':
+            return {'user_ref':'checker-ref','username':'md.checker'}, {'MASTER_DATA_MANAGER'}
+        raise HTTPException(401, 'Invalid test identity')
+    monkeypatch.setattr(masterdata,'authenticated_actor',identity)
+
+    coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+              'scope':'POL','agent_code':'UAT-AGENT-001',
+              'office_code':'RTM','port_code':'NLRTM'}
+    created=masterdata.create_change(
+        masterdata.Change(domain='configuration',record_key='COV-LIFECYCLE',
+                          operation='CREATE',payload=coverage,reason='UAT coverage'), 'maker')
+    with pytest.raises(HTTPException) as denied:
+        masterdata.decide(created['change_ref'],
+                          masterdata.Decision(decision='APPROVE',comment='Self approval'),
+                          'maker')
+    assert denied.value.status_code == 403
+    assert masterdata.agent_office_countries('checker') == []
+
+    approved=masterdata.decide(
+        created['change_ref'],masterdata.Decision(decision='APPROVE',comment='Reviewed'), 'checker')
+    assert approved['status']=='APPROVED'
+    projected=masterdata.agent_office_countries('checker')
+    assert any(x.get('source')=='POL' and x.get('port_code')=='NLRTM' for x in projected)
+
+    removed=masterdata.create_change(
+        masterdata.Change(domain='configuration',record_key='COV-LIFECYCLE',
+                          operation='DEACTIVATE',payload={},reason='End coverage'), 'maker')
+    assert any(x.get('source')=='POL' for x in masterdata.agent_office_countries('checker'))
+    result=masterdata.decide(
+        removed['change_ref'],masterdata.Decision(decision='APPROVE',comment='Reviewed removal'),
+        'checker')
+    assert result['status']=='APPROVED'
+    assert not any(x.get('source')=='POL' for x in masterdata.agent_office_countries('checker'))
