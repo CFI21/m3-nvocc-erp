@@ -125,3 +125,33 @@ def test_governed_job_actor_fails_closed_without_allow_role():
     code=inspect.getsource(governed_job_actor)
     assert "GOVERNED_JOB_ROLE_NOT_GRANTED" in code
     assert "role=roles[0] if roles else 'SUPER_ADMIN'" not in code
+
+
+
+def test_governed_job_actor_denies_empty_allow_matches_runtime(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from app import main
+    monkeypatch.setattr(main, 'bulk_permission_enabled', lambda: True)
+    monkeypatch.setattr(main, 'iam_session', lambda conn, token: {'user_id': 42})
+    monkeypatch.setattr(main, 'bulk_assert_job_access',
+                        lambda conn, user, job, module, action: {'matches': []})
+    with pytest.raises(HTTPException) as denied:
+        main.governed_job_actor(None, 'isolated-test-session', '50001', 'approve')
+    assert denied.value.status_code == 403
+    assert denied.value.detail['code'] == 'GOVERNED_JOB_ROLE_NOT_GRANTED'
+
+
+def test_governed_job_actor_ignores_explicit_deny_matches(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    from app import main
+    monkeypatch.setattr(main, 'bulk_permission_enabled', lambda: True)
+    monkeypatch.setattr(main, 'iam_session', lambda conn, token: {'user_id': 42})
+    monkeypatch.setattr(main, 'bulk_assert_job_access',
+                        lambda conn, user, job, module, action: {
+                            'matches': [{'effect': 'DENY', 'role': 'SUPER_ADMIN'}]
+                        })
+    with pytest.raises(HTTPException) as denied:
+        main.governed_job_actor(None, 'isolated-test-session', '50001', 'approve')
+    assert denied.value.status_code == 403
