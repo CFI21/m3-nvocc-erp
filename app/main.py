@@ -766,7 +766,7 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             number=prefix+f"{next_number:0{width}d}"
             # Protect historical references if a governed sequence was reset or imported.
             duplicate=conn.execute(
-                "SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND json_valid(payload_json) AND json_extract(payload_json, '$.\"Approval #\"')=? LIMIT 1",
+                "SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.\"Approval #\"') ELSE NULL END = ? LIMIT 1",
                 (tid,number)).fetchone()
             if duplicate:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_DUPLICATE'})

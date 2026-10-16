@@ -227,3 +227,18 @@ def test_booking_approval_rejects_duplicate_historical_reference_before_consumin
     assert "BOOKING_APPROVAL_REFERENCE_DUPLICATE" in source
     assert "json_extract(payload_json" in source
     assert source.index("BOOKING_APPROVAL_REFERENCE_DUPLICATE") < source.index("UPDATE md_sequences SET next_number")
+
+
+def test_duplicate_approval_check_handles_invalid_legacy_json_safely():
+    import sqlite3
+    db=sqlite3.connect(':memory:')
+    db.execute('CREATE TABLE transaction_records(id INTEGER,module TEXT,payload_json TEXT)')
+    db.executemany('INSERT INTO transaction_records VALUES(?,?,?)',[
+        (1,'booking','{invalid'),
+        (2,'booking','{"Approval #":"BA00001"}'),
+        (3,'booking','{"Approval #":"BA00002"}'),
+    ])
+    sql="SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.\\\"Approval #\\\"') ELSE NULL END = ? LIMIT 1"
+    row=db.execute(sql,(3,'BA00001')).fetchone()
+    assert row==(2,)
+    assert db.execute(sql,(3,'BA99999')).fetchone() is None
