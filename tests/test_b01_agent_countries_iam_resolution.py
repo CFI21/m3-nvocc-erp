@@ -188,6 +188,8 @@ def test_removal_request_appears_in_independent_checker_queue():
 def test_governed_pol_create_and_remove_with_independent_checker(country_db, monkeypatch):
     c=country_db()
     c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')", (json.dumps({'unlocode':'NLRTM'}),))
+    c.execute('CREATE TABLE iam_user_roles (id INTEGER PRIMARY KEY,user_id INTEGER,office_id INTEGER)')
+    c.execute('INSERT INTO iam_user_roles VALUES (1,7,1)')
     c.commit()
     c.close()
 
@@ -227,3 +229,6 @@ def test_governed_pol_create_and_remove_with_independent_checker(country_db, mon
         'checker')
     assert result['status']=='APPROVED'
     assert not any(x.get('source')=='POL' for x in masterdata.agent_office_countries('checker'))
+    c=country_db()
+    assert [tuple(x) for x in c.execute('SELECT * FROM iam_user_roles')]==[(1,7,1)]
+    c.close()
