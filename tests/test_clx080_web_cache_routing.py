@@ -43,7 +43,8 @@ def test_role_change_does_not_reset_current_route():
     m=re.search(r"\$\('role'\)\.addEventListener\('change'.{0,1000}",HTML,re.S)
     assert m
     assert 'showExecutiveHome' not in m.group(0)
-    assert 'location.hash' not in m.group(0)
+    assert "routeFromLocation('none')" not in m.group(0)
+    # Role changes may inspect location.hash to restore governed workspaces.
 
 def test_clx079_tower_preserved_not_old_duplicate_nav():
     assert 'LIVE M3 EQUIPMENT CONTROL — AUTHORITATIVE CONTAINER MASTER' in HTML
