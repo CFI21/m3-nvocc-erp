@@ -186,3 +186,16 @@ def test_governed_agent_route_restored_after_refresh():
     assert "const governed=decodeURIComponent((raw.match(/ho-setup=([^&]+)/)||[])[1]||'');" in source
     assert "if(governed==='agent-master'&&['MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role))" in source
     assert "await openHoGovernedSetup('agent-master','Agent','master-data::agents');return;" in source
+
+
+def test_agent_related_requests_have_governed_checker_and_maker_actions():
+    source=agent_source()
+    assert "relatedDecisionPanel" in source
+    assert "data-agent-related-decision" in source
+    assert "data-agent-related-withdraw" in source
+    assert "async function m3AgentRelatedDecide(decision,ref)" in source
+    assert "async function m3AgentRelatedWithdraw(ref)" in source
+    assert "request.maker===m3AgentIdentity.user_ref" in source
+    assert "request.maker!==m3AgentIdentity.user_ref" in source
+    assert "'/decision'" in source
+    assert "'/withdraw'" in source
