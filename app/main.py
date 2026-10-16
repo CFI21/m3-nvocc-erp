@@ -730,8 +730,14 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
         if module=='booking' and action=='approve':
             # Approval references are allocated transactionally from the existing
             # governed sequence. Never accept a client-supplied approval number.
-            if role not in {'ADMIN','SUPER_ADMIN'}:
+            if role not in {'ADMIN','SUPER_ADMIN'} or not bulk_permission_enabled():
                 raise HTTPException(403,{'code':'BOOKING_INDEPENDENT_APPROVER_REQUIRED'})
+            submitting_user=str(payload.get('RFA Submitted By') or '').strip()
+            checker_user=str(ga['session']['user_ref'] or '').strip()
+            if not submitting_user:
+                raise HTTPException(409,{'code':'BOOKING_RFA_MAKER_IDENTITY_REQUIRED'})
+            if not checker_user or submitting_user==checker_user:
+                raise HTTPException(403,{'code':'BOOKING_FOUR_EYES_VIOLATION'})
             if any(str(payload.get(k) or '').strip() for k in ('Approval #','Approval Ref','Approval Reference')):
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ALREADY_SET'})
             seq=conn.execute("SELECT id,prefix,next_number,width FROM md_sequences WHERE sequence_code='BOOKING_APPROVAL' AND status='ACTIVE'").fetchone()
@@ -743,6 +749,9 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_CONFLICT'})
             payload['Approval #']=number
         if module=='booking' and action=='submit-rfa':
+            if not bulk_permission_enabled():
+                raise HTTPException(403,{'code':'BOOKING_RFA_REQUIRES_IAM_SESSION'})
+            payload['RFA Submitted By']=ga['session']['user_ref']
             new_status='RFA'
         elif action=='advance':
             if module!='special-rates-request': raise HTTPException(422,{'code':'ADVANCE_ONLY_SPECIAL_RATE'})

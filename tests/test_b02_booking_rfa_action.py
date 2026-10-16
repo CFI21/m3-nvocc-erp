@@ -99,3 +99,13 @@ def test_approval_uses_existing_governed_sequence_with_fail_closed_configuration
     assert "BOOKING_APPROVAL_SEQUENCE_CONFLICT" in source
     assert "payload['Approval #']=number" in source
     assert "BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY" not in source
+
+
+def test_booking_rfa_records_trusted_maker_and_approval_enforces_four_eyes():
+    source=inspect.getsource(action_record)
+    assert "payload['RFA Submitted By']=ga['session']['user_ref']" in source
+    assert "BOOKING_RFA_REQUIRES_IAM_SESSION" in source
+    assert "BOOKING_RFA_MAKER_IDENTITY_REQUIRED" in source
+    assert "BOOKING_FOUR_EYES_VIOLATION" in source
+    assert "submitting_user==checker_user" in source
+    assert source.index("BOOKING_FOUR_EYES_VIOLATION")<source.index("payload['Approval #']=number")
