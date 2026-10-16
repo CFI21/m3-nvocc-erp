@@ -186,3 +186,33 @@ def test_checker_approval_preserves_iam_roles_and_country_derivation(office_data
         "SELECT COUNT(*) FROM md_records WHERE domain='configuration' AND status='ACTIVE'"
     ).fetchone()[0] == 1
     db.close()
+
+
+def test_maker_cannot_submit_colliding_office_update(office_database):
+    """Fail before queuing a duplicate Office assignment."""
+    db=office_database()
+    base={"config_type":"AGENT_OFFICE_ASSIGNMENT","agent_code":"UAT-AGENT-001"}
+    for key, office in (("OFFICE-RTM","RTM"),("OFFICE-AMS","AMS")):
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+            "VALUES ('configuration',?,?,'ACTIVE',1,'now','now')",
+            (key,json.dumps({**base,"office_code":office})),
+        )
+    db.close()
+
+    with pytest.raises(HTTPException) as error:
+        masterdata.create_change(
+            masterdata.Change(
+                domain="configuration",record_key="OFFICE-AMS",
+                operation="UPDATE",payload={"office_code":"rtm"},
+                reason="Duplicate routing attempt",
+            ),
+            "maker",
+        )
+    assert error.value.status_code==409
+    assert error.value.detail["code"]=="DUPLICATE_AGENT_RELATIONSHIP"
+    db=office_database()
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_change_requests WHERE record_key='OFFICE-AMS'"
+    ).fetchone()[0]==0
+    db.close()
