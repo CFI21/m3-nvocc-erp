@@ -132,3 +132,56 @@ def test_email_requires_independent_checker_and_keeps_audit(tmp_path, monkeypatc
         "SELECT COUNT(*) FROM md_versions WHERE domain='configuration' AND record_key='EMAIL-GOV-001'"
     ).fetchone()[0] == 1
     c.close()
+
+
+def test_checker_rejects_email_and_preserves_no_active_record(tmp_path, monkeypatch):
+    """Rejected requests remain historical only; no active configuration is created."""
+    import json
+    from app import masterdata
+
+    dbfile = str(tmp_path / "b01_email_rejection.sqlite3")
+
+    def connection():
+        c = sqlite3.connect(dbfile, isolation_level=None)
+        c.row_factory = sqlite3.Row
+        masterdata.init_schema(c)
+        return c
+
+    monkeypatch.setattr(masterdata, "connect", connection)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _c, token: (
+            {"user_ref": "email-maker" if token == "maker" else "email-checker"},
+            {"MASTER_DATA"} if token == "maker" else {"MASTER_DATA_MANAGER"},
+        ),
+    )
+    c = connection()
+    for domain, key in (("agent", "UAT-AGENT-001"), ("port", "NLRTM")):
+        c.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES (?,?,?,'ACTIVE','now','now')",
+            (domain,key,json.dumps({"unlocode":key} if domain=="port" else {"name":"UAT Agent"})),
+        )
+    c.close()
+    pending = masterdata.create_change(
+        masterdata.Change(
+            domain="configuration",record_key="EMAIL-REJECT-001",
+            operation="CREATE",payload=_email(),reason="B01 review",
+        ),"maker",
+    )
+    rejected = masterdata.decide(
+        pending["change_ref"],
+        masterdata.Decision(decision="REJECT",comment="Not authorized"),
+        "checker",
+    )
+    assert rejected["status"] == "REJECTED"
+    c = connection()
+    assert c.execute(
+        "SELECT COUNT(*) FROM md_records WHERE domain='configuration' AND record_key='EMAIL-REJECT-001'"
+    ).fetchone()[0] == 0
+    assert c.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref=?",
+        (pending["change_ref"],),
+    ).fetchone()["status"] == "REJECTED"
+    c.close()
