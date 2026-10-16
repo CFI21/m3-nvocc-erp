@@ -276,3 +276,12 @@ def test_grid_change_refuses_mutation_outside_booking_draft():
     handler=ui.split('function clx81GridChange(el){',1)[1].split('\nfunction ',1)[0]
     assert "String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in handler
     assert handler.index("!=='draft'") < handler.index("clx81BookingDraft.values[key]=el.value")
+
+
+def test_booking_cargo_popup_is_readonly_after_draft():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    cargo=ui.split('function clx81OpenCargoDetails(){',1)[1].split('// Requested nine external',1)[0]
+    assert "const cargoLocked=viewerReadOnly()||String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in cargo
+    assert "(cargoLocked?' disabled':'')" in cargo
+    assert "(viewerReadOnly()?' disabled':'')" not in cargo
