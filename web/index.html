@@ -833,6 +833,7 @@ function m3AgentPaint(){
 }
 async function m3AgentRelatedRemove(key){
  const row=m3AgentRows[m3AgentIndex];const rel=m3AgentConfigs.find(x=>x.record_key===key&&m3AgentConfigMatches(x,row));
+ if(m3AgentIdentity?.username==='md.checker')return alert('B01 UAT: checker cannot submit related Agent changes.');
  if(!rel||!['AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'].includes(String(rel.payload?.config_type||'').toUpperCase()))return;
  if(!confirm('Submit removal of '+key+' for independent approval?'))return;
  const reason=prompt('Reason for relationship removal (required):');if(!reason||!reason.trim())return;
@@ -840,6 +841,7 @@ async function m3AgentRelatedRemove(key){
 }
 async function m3AgentRelatedCreate(){
  const row=m3AgentRows[m3AgentIndex];if(!row)return;
+ if(m3AgentIdentity?.username==='md.checker')return alert('B01 UAT: use md.maker to propose Agent relationship changes.');
  const isEmail=m3AgentTab==='Emails';
  if(!isEmail&&m3AgentTab!=='Offices')return;
  const code=prompt(isEmail?'Port code for email:':'Existing IAM office code (the office must already exist):');
