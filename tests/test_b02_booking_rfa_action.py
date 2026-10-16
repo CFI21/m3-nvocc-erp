@@ -185,3 +185,9 @@ def test_booking_hold_cancel_cannot_mutate_approved_or_terminal_records():
     assert "action in {'hold','cancel'}" in source
     assert "BOOKING_TERMINAL_STATUS_LOCK" in source
     assert source.index("BOOKING_TERMINAL_STATUS_LOCK")<source.index("elif action=='cancel':")
+
+
+def test_booking_rfa_requires_iam_before_transition_validation():
+    code=inspect.getsource(action_record)
+    assert "if module=='booking' and action=='submit-rfa' and not bulk_permission_enabled():" in code
+    assert code.index("BOOKING_RFA_REQUIRES_IAM_SESSION") < code.index("BOOKING_DRAFT_REQUIRED_FOR_RFA")
