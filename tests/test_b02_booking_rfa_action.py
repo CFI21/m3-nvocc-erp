@@ -79,3 +79,12 @@ def test_booking_delete_locked_after_rfa():
     source=inspect.getsource(delete_record)
     assert "BOOKING_DELETE_REQUIRES_DRAFT" in source
     assert source.index("BOOKING_DELETE_REQUIRES_DRAFT")<source.index("DELETE FROM transaction_records")
+
+
+def test_booking_amend_requires_rfa_and_valid_agent_grants():
+    code=inspect.getsource(action_record)
+    amend=code.split("if module=='booking' and action=='amend':",1)[1].split("if module=='booking' and action=='approve'",1)[0]
+    assert "BOOKING_RFA_REQUIRED_FOR_AMEND" in amend
+    assert "booking_iam_agent_granted" in amend
+    assert "booking_validate_authorized_ports" in amend
+    assert "booking_agent_port_grants" in amend

@@ -717,6 +717,14 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             errs=validate_fields(module,ctx,payload)
             if errs: raise HTTPException(422,{'codes':errs})
             assert_booking_rules(conn,ctx,payload,tid)
+        if module=='booking' and action=='amend':
+            if str(r['status']).strip().lower()!='rfa':
+                raise HTTPException(409,{'code':'BOOKING_RFA_REQUIRED_FOR_AMEND'})
+            if bulk_permission_enabled() and role=='AGENT':
+                if not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
+                    raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+                booking_validate_authorized_ports(
+                    payload,booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
         if module=='booking' and action=='approve' and str(r['status']).strip().lower()!='rfa':
             raise HTTPException(409,{'code':'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL'})
         if module=='booking' and action=='approve':
