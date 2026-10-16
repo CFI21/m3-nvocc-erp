@@ -191,7 +191,9 @@ def test_booking_approval_is_blocked_pending_governed_numbering():
     from pathlib import Path
     source=(Path(__file__).resolve().parents[1]/'app'/'main.py').read_text(encoding='utf-8')
     assert 'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL' in source
-    assert 'BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY' in source
+    assert 'BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED' in source
+    assert "sequence_code='BOOKING_APPROVAL' AND status='ACTIVE'" in source
+    assert 'BOOKING_FOUR_EYES_VIOLATION' in source
 
 
 def test_booking_agent_reference_prefix_policy_does_not_issue_numbers():
