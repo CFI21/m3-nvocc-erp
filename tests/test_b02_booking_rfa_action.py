@@ -220,3 +220,10 @@ def test_booking_approval_rejects_invalid_sequence_config_before_increment():
     assert "BOOKING_APPROVAL_SEQUENCE_INVALID" in approval
     assert "len(str(next_number))>width" in approval
     assert approval.index("BOOKING_APPROVAL_SEQUENCE_INVALID")<approval.index("UPDATE md_sequences SET next_number")
+
+
+def test_booking_approval_rejects_duplicate_historical_reference_before_consuming_sequence():
+    source=inspect.getsource(action_record)
+    assert "BOOKING_APPROVAL_REFERENCE_DUPLICATE" in source
+    assert "json_extract(payload_json" in source
+    assert source.index("BOOKING_APPROVAL_REFERENCE_DUPLICATE") < source.index("UPDATE md_sequences SET next_number")

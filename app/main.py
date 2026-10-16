@@ -764,6 +764,12 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             if not prefix or not isinstance(next_number,int) or next_number<1 or not isinstance(width,int) or not (1<=width<=12) or len(str(next_number))>width:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_INVALID'})
             number=prefix+f"{next_number:0{width}d}"
+            # Protect historical references if a governed sequence was reset or imported.
+            duplicate=conn.execute(
+                "SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND json_valid(payload_json) AND json_extract(payload_json, '$.\"Approval #\"')=? LIMIT 1",
+                (tid,number)).fetchone()
+            if duplicate:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_DUPLICATE'})
             updated=conn.execute("UPDATE md_sequences SET next_number=next_number+1,version=version+1 WHERE id=? AND next_number=?",(seq['id'],seq['next_number']))
             if updated.rowcount!=1:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_CONFLICT'})
