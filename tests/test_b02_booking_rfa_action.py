@@ -293,3 +293,11 @@ def test_cargo_capture_handler_rejects_non_draft_booking():
     fn=ui.split('function clx81CaptureCargoDetails(){',1)[1].split('\nfunction ',1)[0]
     assert "String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in fn
     assert fn.index("!=='draft'")<fn.index("clx81BookingDraft.values[el.dataset.clx81Cargo]")
+
+
+def test_cargo_popup_hides_apply_button_after_draft():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    popup=ui.split('function clx81OpenCargoDetails(){',1)[1].split('// Requested nine external',1)[0]
+    assert "cargoLocked?'':" in popup
+    assert "Apply to Booking Draft</button>" in popup
