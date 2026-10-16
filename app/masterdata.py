@@ -122,6 +122,17 @@ def reference_errors(c,domain,payload):
                     errs.append('AGENT_OFFICE_REFERENCE_NOT_ACTIVE')
                 elif payload.get('country_code') and str(payload['country_code']).upper()!=str(office['country_code']).upper():
                     errs.append('AGENT_OFFICE_COUNTRY_MISMATCH')
+        if kind=='AGENT_NETWORK' and str(payload.get('network_type') or '').upper()=='PORT_COVERAGE':
+            office=str(payload.get('office_code') or '').strip()
+            port=str(payload.get('port_code') or '').strip().upper()
+            if not c.execute("SELECT 1 FROM iam_offices WHERE office_code=? AND status='ACTIVE'",(office,)).fetchone():
+                errs.append('AGENT_NETWORK_OFFICE_NOT_ACTIVE')
+            master=c.execute("SELECT payload_json FROM md_records WHERE domain='port' AND record_key=? AND status='ACTIVE'",(port,)).fetchone()
+            if not master: errs.append('AGENT_NETWORK_PORT_NOT_ACTIVE')
+            elif str(json.loads(master['payload_json'] or '{}').get('unlocode') or port).upper()!=port:
+                errs.append('AGENT_NETWORK_PORT_CODE_MISMATCH')
+            if not c.execute("SELECT 1 FROM iam_countries WHERE country_code=? AND status='ACTIVE'",(port[:2],)).fetchone():
+                errs.append('AGENT_NETWORK_COUNTRY_NOT_ACTIVE')
         if kind=='AGENT_EMAIL':
             port_code=str(payload.get('port_code') or '').strip()
             if port_code and not active_master(c,'port',port_code):
