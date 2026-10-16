@@ -781,7 +781,7 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
                 raise HTTPException(403,{'code':'BOOKING_RFA_REQUIRES_IAM_SESSION'})
             if not str(ga['session'].get('user_ref') or '').strip():
                 raise HTTPException(403,{'code':'BOOKING_RFA_MAKER_IDENTITY_MISSING'})
-            payload['RFA Submitted By']=ga['session']['user_ref']
+            payload['RFA Submitted By']=str(ga['session']['user_ref']).strip()
             new_status='RFA'
         elif action=='advance':
             if module!='special-rates-request': raise HTTPException(422,{'code':'ADVANCE_ONLY_SPECIAL_RATE'})
