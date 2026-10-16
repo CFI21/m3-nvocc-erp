@@ -267,3 +267,29 @@ def test_pending_change_withdrawal_is_maker_only_and_never_applies_record(isolat
         assert c.execute("SELECT 1 FROM md_audit WHERE change_ref=? AND action='CHANGE_WITHDRAW'",(pending['change_ref'],)).fetchone()
     finally:
         c.close()
+
+
+def test_b01_strict_agent_role_split_does_not_affect_other_master_domains(isolated,monkeypatch):
+    monkeypatch.setenv('M3_PRODUCTION_TRAFFIC','OFF')
+    monkeypatch.setenv('M3_B01_STRICT_MAKER_CHECKER','true')
+    maker=maker_session()
+    checker=checker_session()
+    from app.masterdata import Withdrawal,withdraw_change
+    with pytest.raises(HTTPException) as blocked:
+        create_change(Change(domain='agent',record_key='B01-STRICT-AGENT',
+                             operation='CREATE',payload={'name':'Prohibited Checker Agent'},
+                             reason='strict separation test'),x_m3_session=checker)
+    assert blocked.value.status_code==403
+    assert blocked.value.detail['code']=='B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'
+    created=create_change(Change(domain='agent',record_key='B01-STRICT-AGENT',
+                                 operation='CREATE',payload={'name':'Permitted Maker Agent'},
+                                 reason='strict separation test'),x_m3_session=maker)
+    with pytest.raises(HTTPException):
+        decide(created['change_ref'],Decision(decision='APPROVE',comment='self'),x_m3_session=maker)
+    result=decide(created['change_ref'],Decision(decision='APPROVE',comment='separate checker'),x_m3_session=checker)
+    assert result['status']=='APPROVED'
+    other=create_change(Change(domain='carrier',record_key='B01-STRICT-CARRIER',
+                               operation='CREATE',payload={'name':'Independent Carrier'},
+                               reason='non-Agent role unaffected'),x_m3_session=checker)
+    assert other['status']=='PENDING'
+    assert withdraw_change(other['change_ref'],Withdrawal(reason='test cleanup'),x_m3_session=checker)['status']=='WITHDRAWN'
