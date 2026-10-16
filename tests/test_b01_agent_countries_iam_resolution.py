@@ -141,3 +141,11 @@ def test_countries_tab_preserves_six_tabs():
     ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
     assert "['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template']" in ui
     assert "m3CountryChange('DEACTIVATE'" in ui
+
+
+def test_pol_update_duplicate_guard_is_present():
+    from pathlib import Path
+    source=(Path(__file__).resolve().parents[1]/'app'/'masterdata.py').read_text()
+    assert "b.domain=='configuration' and b.operation=='UPDATE'" in source
+    assert "candidate={**existing_payload,**b.payload}" in source
+    assert "DUPLICATE_AGENT_RELATIONSHIP" in source
