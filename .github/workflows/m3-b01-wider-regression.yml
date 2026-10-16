@@ -1,0 +1,48 @@
+name: M3 B01 wider regression gate
+on:
+  push:
+    branches: [preview-pr124-booking-isolated]
+    paths:
+      - '.github/workflows/m3-b01-wider-regression.yml'
+      - 'app/**'
+      - 'tests/**'
+      - 'web/index.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: m3-b01-wider-validation
+  cancel-in-progress: false
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      M3_PRODUCTION_TRAFFIC: 'OFF'
+      M3_B01_STRICT_MAKER_CHECKER: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Focused B01 maker checker and countries
+        run: python -m pytest -q tests/test_b01_agent_countries_iam_resolution.py
+      - name: Wider regression in disposable runner
+        run: python -m pytest -q
+      - name: Verify structural contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          ui=Path('web/index.html').read_text()
+          backend=Path('app/masterdata.py').read_text()
+          assert "['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template']" in ui
+          assert "api('/api/masterdata/agent-office-countries')" in ui
+          assert 'def agent_office_countries(' in backend
+          endpoint=backend.split('def agent_office_countries(',1)[1].split("@router.get('/meta')",1)[0]
+          assert "authenticated_actor(c,x_m3_session)" in endpoint
+          assert "country.status='ACTIVE'" in endpoint
+          for forbidden in ('INSERT INTO', 'UPDATE iam_user_roles', 'DELETE FROM'):
+              assert forbidden not in endpoint
+          PY
