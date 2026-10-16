@@ -351,3 +351,17 @@ def test_pol_projection_dedup_keeps_distinct_ports(country_db):
     c.close()
     rows=[r for r in masterdata.agent_office_countries("valid") if r["source"]=="POL"]
     assert sorted(r["port_code"] for r in rows)==["NLAMS","NLRTM"]
+
+
+def test_agent_country_projection_has_stable_display_order(country_db):
+    """Order does not change with insertion order or database query plan."""
+    c=country_db()
+    c.execute("INSERT INTO iam_countries VALUES (2,'DE','Germany','ACTIVE')")
+    c.execute("INSERT INTO iam_offices VALUES (2,'HAM',2,'ACTIVE')")
+    c.close()
+    assign(country_db,key="OFFICE-HAM",office="HAM")
+    assign(country_db,key="OFFICE-RTM",office="RTM")
+    rows=masterdata.agent_office_countries("valid")
+    assert [(row["country_code"],row["office_code"]) for row in rows]==[
+        ("DE","HAM"),("NL","RTM")
+    ]
