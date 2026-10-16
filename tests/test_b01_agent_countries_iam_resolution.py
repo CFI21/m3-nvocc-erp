@@ -10,7 +10,7 @@ from app import masterdata
 def country_db(tmp_path, monkeypatch):
     filename = str(tmp_path / "b01_country.sqlite3")
     def connection():
-        c = sqlite3.connect(filename)
+        c = sqlite3.connect(filename, isolation_level=None)
         c.row_factory = sqlite3.Row
         c.execute("CREATE TABLE IF NOT EXISTS iam_countries (id INTEGER PRIMARY KEY, country_code TEXT, name TEXT, status TEXT)")
         c.execute("CREATE TABLE IF NOT EXISTS iam_offices (id INTEGER PRIMARY KEY, office_code TEXT, country_id INTEGER, status TEXT)")
