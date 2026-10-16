@@ -90,3 +90,39 @@ def test_reject_non_master_role(country_db, monkeypatch):
     with pytest.raises(HTTPException) as exc:
         masterdata.agent_office_countries("valid")
     assert exc.value.status_code == 403
+
+
+def test_approved_pol_coverage_resolves_country_without_new_iam_grant(country_db):
+    c=country_db()
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')",(json.dumps({'unlocode':'NLRTM'}),))
+    coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('configuration','COV-1',?,'ACTIVE','now','now')",(json.dumps(coverage),))
+    c.commit();c.close()
+    result=masterdata.agent_office_countries('valid')
+    assert result==[{'agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM','source':'POL','record_key':'COV-1','country_code':'NL','country_name':'Netherlands'}]
+
+
+def test_pending_or_inactive_pol_never_projects(country_db):
+    c=country_db()
+    coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('configuration','COV-2',?,'INACTIVE','now','now')",(json.dumps(coverage),))
+    c.commit();c.close()
+    assert masterdata.agent_office_countries('valid')==[]
+
+
+def test_pol_requires_approved_port_and_active_country(country_db):
+    c=country_db()
+    coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
+    assert 'AGENT_NETWORK_PORT_NOT_ACTIVE' in masterdata.reference_errors(c,'configuration',coverage)
+    c.close()
+
+
+def test_country_actions_keep_existing_maker_checker_endpoint():
+    from pathlib import Path
+    root=Path(__file__).resolve().parents[1]
+    ui=(root/'web'/'index.html').read_text()
+    assert 'data-country-edit' in ui and 'data-country-remove' in ui
+    assert 'id="m3CountryForm"' in ui
+    assert "m3CountryChange(key?'UPDATE':'CREATE'" in ui
+    assert "'/api/masterdata/changes'" in ui
+    assert 'm3AgentIdentity?.username' in ui
