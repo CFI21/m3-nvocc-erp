@@ -88,3 +88,13 @@ def test_booking_amend_requires_rfa_and_valid_agent_grants():
     assert "booking_iam_agent_granted" in amend
     assert "booking_validate_authorized_ports" in amend
     assert "booking_agent_port_grants" in amend
+
+
+def test_approval_uses_existing_governed_sequence_with_fail_closed_configuration():
+    source=inspect.getsource(action_record)
+    assert "BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED" in source
+    assert "sequence_code='BOOKING_APPROVAL' AND status='ACTIVE'" in source
+    assert "BOOKING_INDEPENDENT_APPROVER_REQUIRED" in source
+    assert "BOOKING_APPROVAL_SEQUENCE_CONFLICT" in source
+    assert "payload['Approval #']=number" in source
+    assert "BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY" not in source

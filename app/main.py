@@ -728,7 +728,20 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
         if module=='booking' and action=='approve' and str(r['status']).strip().lower()!='rfa':
             raise HTTPException(409,{'code':'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL'})
         if module=='booking' and action=='approve':
-            raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY'})
+            # Approval references are allocated transactionally from the existing
+            # governed sequence. Never accept a client-supplied approval number.
+            if role not in {'ADMIN','SUPER_ADMIN'}:
+                raise HTTPException(403,{'code':'BOOKING_INDEPENDENT_APPROVER_REQUIRED'})
+            if any(str(payload.get(k) or '').strip() for k in ('Approval #','Approval Ref','Approval Reference')):
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ALREADY_SET'})
+            seq=conn.execute("SELECT id,prefix,next_number,width FROM md_sequences WHERE sequence_code='BOOKING_APPROVAL' AND status='ACTIVE'").fetchone()
+            if not seq:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED'})
+            number=str(seq['prefix'])+f"{seq['next_number']:0{seq['width']}d}"
+            updated=conn.execute("UPDATE md_sequences SET next_number=next_number+1,version=version+1 WHERE id=? AND next_number=?",(seq['id'],seq['next_number']))
+            if updated.rowcount!=1:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_CONFLICT'})
+            payload['Approval #']=number
         if module=='booking' and action=='submit-rfa':
             new_status='RFA'
         elif action=='advance':
