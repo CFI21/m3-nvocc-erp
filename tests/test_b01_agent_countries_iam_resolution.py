@@ -326,3 +326,28 @@ def test_duplicate_legacy_pol_coverage_projects_once(country_db):
         "SELECT COUNT(*) FROM md_records WHERE domain='configuration' AND status='ACTIVE'"
     ).fetchone()[0]==2
     c.close()
+
+
+def test_pol_projection_dedup_keeps_distinct_ports(country_db):
+    """Deduplication is scoped to a port, never to the whole Agent/Country."""
+    c=country_db()
+    for port in ("NLRTM","NLAMS"):
+        c.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES ('port',?,?, 'ACTIVE','now','now')",
+            (port,json.dumps({"unlocode":port})),
+        )
+    for key, port in (("POL-RTM-1","NLRTM"),("POL-RTM-2","NLRTM"),("POL-AMS","NLAMS")):
+        coverage={
+            "config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE",
+            "scope":"POL","agent_code":"UAT-AGENT-001",
+            "office_code":"RTM","port_code":port,
+        }
+        c.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES ('configuration',?,?, 'ACTIVE','now','now')",
+            (key,json.dumps(coverage)),
+        )
+    c.close()
+    rows=[r for r in masterdata.agent_office_countries("valid") if r["source"]=="POL"]
+    assert sorted(r["port_code"] for r in rows)==["NLAMS","NLRTM"]
