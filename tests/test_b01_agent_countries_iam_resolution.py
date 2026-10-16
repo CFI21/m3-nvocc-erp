@@ -365,3 +365,15 @@ def test_agent_country_projection_has_stable_display_order(country_db):
     assert [(row["country_code"],row["office_code"]) for row in rows]==[
         ("DE","HAM"),("NL","RTM")
     ]
+
+
+def test_country_projection_excludes_inactive_office_while_other_remains(country_db):
+    """An inactive IAM office must not hide another approved active office."""
+    c=country_db()
+    c.execute("INSERT INTO iam_countries VALUES (2,'DE','Germany','ACTIVE')")
+    c.execute("INSERT INTO iam_offices VALUES (2,'HAM',2,'INACTIVE')")
+    c.close()
+    assign(country_db,key="OFFICE-RTM",office="RTM")
+    assign(country_db,key="OFFICE-HAM",office="HAM")
+    rows=masterdata.agent_office_countries("valid")
+    assert [(row["country_code"],row["office_code"]) for row in rows]==[("NL","RTM")]
