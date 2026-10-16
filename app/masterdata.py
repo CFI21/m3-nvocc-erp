@@ -291,6 +291,30 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
             p=json.loads(item['payload_json'] or '{}')
             if all(str(p.get(k) or '').upper()==str(candidate.get(k) or '').upper() for k in fields):
                 c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP'})
+    # Reject Agent Email / Office UPDATE collisions before creating a pending
+    # change. Checker approval independently rechecks the same identities.
+    if b.domain=='configuration' and b.operation=='UPDATE':
+        candidate={**existing_payload,**b.payload}
+        kind=str(candidate.get('config_type') or '').strip().upper()
+        if kind in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'):
+            agent=str(candidate.get('agent_code') or '').strip().upper()
+            office=str(candidate.get('office_code') or '').strip().upper()
+            port=str(candidate.get('port_code') or '').strip().upper()
+            email=str(candidate.get('email') or '').strip().lower()
+            for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if row['record_key']==b.record_key:
+                    continue
+                other=json.loads(row['payload_json'] or '{}')
+                if (str(other.get('config_type') or '').strip().upper()!=kind or
+                    str(other.get('agent_code') or '').strip().upper()!=agent):
+                    continue
+                collision=(bool(office) and str(other.get('office_code') or '').strip().upper()==office) if kind=='AGENT_OFFICE_ASSIGNMENT' else (
+                    bool(port) and bool(email) and
+                    str(other.get('port_code') or '').strip().upper()==port and
+                    str(other.get('email') or '').strip().lower()==email)
+                if collision:
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     errs=validate_payload(b.domain,b.payload,existing_payload) if b.operation in ('CREATE','UPDATE') else []
     if b.operation in ('CREATE','UPDATE'): errs+=reference_errors(c,b.domain,{**existing_payload,**b.payload})
     if b.operation=='DEACTIVATE' and usage_count(c,b.domain,b.record_key)>0:
