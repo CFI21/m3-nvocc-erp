@@ -4456,6 +4456,10 @@ async function routeFromLocation(historyMode='none'){
   const raw=location.hash||'';
   const eq=decodeURIComponent((raw.match(/equipment=([^&]+)/)||[])[1]||'');
   if(eq){await showEquipmentWorkspace(eq,historyMode);return}
+  const governed=decodeURIComponent((raw.match(/ho-setup=([^&]+)/)||[])[1]||'');
+  if(governed==='agent-master'&&['MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)){
+    await openHoGovernedSetup('agent-master','Agent','master-data::agents');return;
+  }
   const screen=decodeURIComponent((raw.match(/screen=([^&]+)/)||[])[1]||'');
   if(screen&&state.byId[screen])await openScreen(screen,null,historyMode);else await showExecutiveHome();
 }
