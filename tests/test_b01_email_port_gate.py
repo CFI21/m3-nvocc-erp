@@ -244,3 +244,71 @@ def test_checker_approval_rechecks_email_uniqueness(tmp_path, monkeypatch):
         "SELECT COUNT(*) FROM md_records WHERE domain='configuration' AND status='ACTIVE'"
     ).fetchone()[0] == 1
     c.close()
+
+
+def test_checker_revalidates_port_after_submission(tmp_path, monkeypatch):
+    """A Port retired after submission must block final Email approval."""
+    import json
+    import pytest
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "email_port_revocation.sqlite3")
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, token: (
+            {"user_ref": "email-maker" if token == "maker" else "email-checker"},
+            {"MASTER_DATA"} if token == "maker" else {"MASTER_DATA_MANAGER"},
+        ),
+    )
+    db = connect()
+    for domain, key in (("agent", "UAT-AGENT-001"), ("port", "NLRTM")):
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES (?,?,?,'ACTIVE','now','now')",
+            (domain, key, json.dumps({"unlocode": key} if domain == "port" else {"name": "UAT Agent"})),
+        )
+    db.close()
+
+    request = masterdata.create_change(
+        masterdata.Change(
+            domain="configuration",
+            record_key="EMAIL-REVOKED-PORT",
+            operation="CREATE",
+            payload=_email(),
+            reason="Reference lifecycle test",
+        ),
+        "maker",
+    )
+    assert request["status"] == "PENDING"
+
+    db = connect()
+    db.execute("UPDATE md_records SET status='INACTIVE' WHERE domain='port' AND record_key='NLRTM'")
+    db.close()
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide(
+            request["change_ref"],
+            masterdata.Decision(decision="APPROVE", comment="independent review"),
+            "checker",
+        )
+    assert error.value.status_code == 422
+    assert "AGENT_EMAIL_PORT_REFERENCE_NOT_ACTIVE" in error.value.detail["codes"]
+
+    db = connect()
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_records "
+        "WHERE domain='configuration' AND record_key='EMAIL-REVOKED-PORT'"
+    ).fetchone()[0] == 0
+    assert db.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref=?",
+        (request["change_ref"],),
+    ).fetchone()["status"] == "PENDING"
+    db.close()
