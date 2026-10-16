@@ -816,9 +816,10 @@ function m3AgentPaint(){
  const identityLabel=m3AgentIdentity?'<div class="equipNote"><b>Authenticated IAM user:</b> '+esc(m3AgentIdentity.username)+' · '+esc(m3AgentIdentity.user_ref)+' · '+esc((m3AgentIdentity.roles||[]).join(', '))+'<div class="muted">Role selector is display-only; backend compares user references for four-eyes approval.</div></div>':'<div class="equipNote badtext">IAM identity could not be verified. Do not approve changes until signed in.</div>';
  const pendingCreatePanel=pendingCreates.length?'<div class="equipNote"><b>New Agents awaiting approval</b>'+pendingCreates.map(x=>'<div>'+esc(x.record_key)+' · '+esc(x.payload?.name||'Pending new Agent')+' · '+esc(x.change_ref||'')+' · Maker: '+esc(x.maker||'Unknown')+' · '+(m3AgentIdentity&&x.maker===m3AgentIdentity.user_ref?'Same IAM identity: independent checker required': 'Checker identity must differ')+(canApprove&&m3AgentIdentity&&x.maker!==m3AgentIdentity.user_ref?' <button class="btn" data-agent-create-decision="APPROVE" data-agent-create-ref="'+esc(x.change_ref)+'">Approve</button> <button class="btn" data-agent-create-decision="REJECT" data-agent-create-ref="'+esc(x.change_ref)+'">Reject</button>':' · Checker approval required')+'</div>').join('')+'</div>':'';
  const relatedPending=m3AgentPending.filter(x=>x.domain==='configuration'&&x.status==='PENDING'&&String(x.payload?.agent_code||'')===String(row?.record_key||''));
+ const relatedDecisionPanel=relatedPending.length?'<div class="equipNote"><b>Agent relationship requests awaiting approval</b>'+relatedPending.map(x=>'<div>'+esc(x.change_ref)+' · '+esc(x.payload?.config_type||'Configuration')+' · '+esc(x.record_key)+' · Maker: '+esc(x.maker||'Unknown')+(m3AgentIdentity&&x.maker===m3AgentIdentity.user_ref?' · Your own request: withdrawal only':canApprove&&m3AgentIdentity?' <button class="btn" data-agent-related-decision="APPROVE" data-agent-related-ref="'+esc(x.change_ref)+'">Approve</button> <button class="btn" data-agent-related-decision="REJECT" data-agent-related-ref="'+esc(x.change_ref)+'">Reject</button>':' · Independent checker required')+(m3AgentIdentity&&x.maker===m3AgentIdentity.user_ref?' <button class="btn" data-agent-related-withdraw="'+esc(x.change_ref)+'">Withdraw</button>':'')+'</div>').join('')+'</div>':'';
  const pendingNotice=pending?'<span class="muted">Pending change '+esc(pending.change_ref||'')+' · independent checker required</span>':'';
  const relatedNotice=relatedPending.length?'<span class="muted">'+relatedPending.length+' relationship change(s) awaiting approval</span>':'';
- $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+relatedNotice+checkerActions+withdrawAction+newAgentButton+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+identityLabel+pendingCreatePanel+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
+ $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>Agent Master</b><span class="muted">Existing governed master records</span><span class="grow"></span>'+pendingNotice+relatedNotice+checkerActions+withdrawAction+newAgentButton+editor+save+'<button class="btn" id="m3AgentReload">Refresh</button></div><div class="toolbar" style="flex-wrap:wrap">'+buttons+'</div><div class="toolbar" style="flex-wrap:wrap">'+tabs+'</div>'+identityLabel+pendingCreatePanel+relatedDecisionPanel+(row?header+'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px">'+fields+'</div><p class="muted">Updates enter the existing Master Data approval queue. Related IAM memberships and attachments remain separately governed.</p>':'<p>No Agent records returned.</p>')+'</div>';
  document.querySelectorAll('[data-agent-tab]').forEach(el=>el.addEventListener('click',()=>m3AgentSelectTab(el.dataset.agentTab)));
  document.getElementById('m3AgentReload')?.addEventListener('click',()=>{if(m3AgentEditing){m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])&&!confirm('Discard unsaved Agent edits and refresh?'))return}renderHoAgentMasterWorkspace()});
  document.getElementById('m3AgentNew')?.addEventListener('click',()=>{if(m3AgentEditing){m3AgentCaptureDraft();if(m3AgentHasChanges(m3AgentRows[m3AgentIndex])&&!confirm('Discard unsaved Agent edits and create a new Agent?'))return}m3AgentCreate()});
@@ -827,9 +828,27 @@ function m3AgentPaint(){
  document.getElementById('m3AgentSave')?.addEventListener('click',m3AgentSubmit);
  document.getElementById('m3AgentWithdraw')?.addEventListener('click',m3AgentWithdraw);
  document.getElementById('m3AgentRelatedAdd')?.addEventListener('click',m3AgentRelatedCreate);
+ document.querySelectorAll('[data-agent-related-decision]').forEach(el=>el.addEventListener('click',()=>m3AgentRelatedDecide(el.dataset.agentRelatedDecision,el.dataset.agentRelatedRef)));
+ document.querySelectorAll('[data-agent-related-withdraw]').forEach(el=>el.addEventListener('click',()=>m3AgentRelatedWithdraw(el.dataset.agentRelatedWithdraw)));
  document.querySelectorAll('[data-agent-remove]').forEach(el=>el.addEventListener('click',()=>m3AgentRelatedRemove(el.dataset.agentRemove)));
  document.getElementById('m3AgentApprove')?.addEventListener('click',()=>m3AgentDecide('APPROVE'));
  document.getElementById('m3AgentReject')?.addEventListener('click',()=>m3AgentDecide('REJECT'));
+}
+async function m3AgentRelatedDecide(decision,ref){
+ const request=m3AgentPending.find(x=>x.change_ref===ref&&x.domain==='configuration'&&x.status==='PENDING');
+ if(!request||!m3AgentIdentity||request.maker===m3AgentIdentity.user_ref||!['MASTER_DATA_MANAGER','ADMIN','SUPER_ADMIN'].includes(state.role))return alert('Independent checker required.');
+ if(!confirm(decision+' related Agent configuration '+ref+'?'))return;
+ const comment=prompt('Audited decision comment (required):');if(!comment||!comment.trim())return;
+ try{await api('/api/masterdata/changes/'+encodeURIComponent(ref)+'/decision',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({decision,comment:comment.trim()})});await renderHoAgentMasterWorkspace();alert('Related configuration '+decision.toLowerCase()+'d.')}
+ catch(e){alert('Decision failed: '+e.message)}
+}
+async function m3AgentRelatedWithdraw(ref){
+ const request=m3AgentPending.find(x=>x.change_ref===ref&&x.domain==='configuration'&&x.status==='PENDING');
+ if(!request||!m3AgentIdentity||request.maker!==m3AgentIdentity.user_ref)return alert('Only the original maker can withdraw.');
+ if(!confirm('Withdraw pending related configuration '+ref+'?'))return;
+ const reason=prompt('Withdrawal reason (required):');if(!reason||reason.trim().length<3)return;
+ try{await api('/api/masterdata/changes/'+encodeURIComponent(ref)+'/withdraw',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({reason:reason.trim()})});await renderHoAgentMasterWorkspace();alert('Related configuration withdrawn.')}
+ catch(e){alert('Withdrawal failed: '+e.message)}
 }
 async function m3AgentRelatedRemove(key){
  const row=m3AgentRows[m3AgentIndex];const rel=m3AgentConfigs.find(x=>x.record_key===key&&m3AgentConfigMatches(x,row));
