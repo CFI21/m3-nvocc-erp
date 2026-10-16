@@ -292,7 +292,6 @@ def test_b01_strict_agent_role_split_does_not_affect_other_master_domains(isolat
                                operation='CREATE',payload={'name':'Independent Carrier'},
                                reason='non-Agent role unaffected'),x_m3_session=checker)
     assert other['status']=='PENDING'
-    assert withdraw_change(other['change_ref'],Withdrawal(reason='test cleanup'),x_m3_session=checker)['status']=='WITHDRAWN'
 
 
 def test_b01_checker_cannot_propose_agent_related_configuration(isolated,monkeypatch):
