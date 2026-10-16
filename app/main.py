@@ -677,6 +677,10 @@ def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Head
 @app.post('/api/v1/{module}/{tid}/actions/{action}')
 def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); action=action.lower()
+    if action=='submit-rfa' and module!='booking':
+        raise HTTPException(422,{'code':'BOOKING_RFA_ACTION_ONLY'})
+    if module=='booking' and action not in {'submit-rfa','approve','hold','cancel','amend'}:
+        raise HTTPException(422,{'code':'BOOKING_ACTION_NOT_SUPPORTED'})
     if action=='release' and module not in RELEASE_MODULES: raise HTTPException(422,{'code':'MODULE_NOT_RELEASABLE'})
     conn=connect(); tx(conn)
     try:

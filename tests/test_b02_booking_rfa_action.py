@@ -34,3 +34,23 @@ def test_rfa_prevents_unsaved_browser_values():
     assert "Unsaved Booking fields detected. Save Draft before Submit RFA." in fn
     assert "clx81BookingDraft?.values" in fn
     assert fn.index("const dirty=")<fn.index("/actions/submit-rfa")
+
+
+def test_rfa_action_rejects_non_booking_modules_before_database_access():
+    import pytest
+    from fastapi import HTTPException
+    from app.main import ActionBody
+    with pytest.raises(HTTPException) as error:
+        action_record('bl',1,'submit-rfa',ActionBody(version=1))
+    assert error.value.status_code==422
+    assert error.value.detail['code']=='BOOKING_RFA_ACTION_ONLY'
+
+
+def test_booking_unknown_action_rejected_before_database_access():
+    import pytest
+    from fastapi import HTTPException
+    from app.main import ActionBody
+    with pytest.raises(HTTPException) as error:
+        action_record('booking',1,'arbitrary-action',ActionBody(version=1))
+    assert error.value.status_code==422
+    assert error.value.detail['code']=='BOOKING_ACTION_NOT_SUPPORTED'
