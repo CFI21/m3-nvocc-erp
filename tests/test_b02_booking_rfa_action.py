@@ -171,3 +171,10 @@ def test_booking_approval_fails_closed_without_masterdata_sequence_table():
     assert "sqlite_master WHERE type='table' AND name='md_sequences'" in source
     assert source.index("if not sequence_table:")<source.index("SELECT id,prefix,next_number,width FROM md_sequences")
     assert "BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED" in source
+
+
+def test_booking_approval_revalidates_before_sequence_allocation():
+    approval=inspect.getsource(action_record).split("if module=='booking' and action=='approve':",1)[1].split("if module=='booking' and action=='submit-rfa':",1)[0]
+    assert 'approval_errors=validate_fields(module,ctx,payload)' in approval
+    assert 'assert_booking_rules(conn,ctx,payload,tid)' in approval
+    assert approval.index('assert_booking_rules(conn,ctx,payload,tid)') < approval.index('UPDATE md_sequences SET next_number')

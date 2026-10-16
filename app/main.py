@@ -740,6 +740,10 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
                 raise HTTPException(409,{'code':'BOOKING_RFA_MAKER_IDENTITY_REQUIRED'})
             if not checker_user or submitting_user==checker_user:
                 raise HTTPException(403,{'code':'BOOKING_FOUR_EYES_VIOLATION'})
+            approval_errors=validate_fields(module,ctx,payload)
+            if approval_errors:
+                raise HTTPException(422,{'codes':approval_errors})
+            assert_booking_rules(conn,ctx,payload,tid)
             if any(str(payload.get(k) or '').strip() for k in ('Approval #','Approval Ref','Approval Reference')):
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ALREADY_SET'})
             # Legacy standalone UAT databases may not have Master Data schema yet.
