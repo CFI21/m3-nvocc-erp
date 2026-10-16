@@ -200,7 +200,9 @@ def test_booking_approval_requires_iam_before_transaction_access():
     assert "action in {'submit-rfa','approve'}" in code
 
 
-def test_closed_booking_job_blocks_approval_before_sequence():
+def test_closed_booking_job_uses_existing_audited_guard():
     code=inspect.getsource(action_record)
-    assert "BOOKING_JOB_CLOSED" in code
-    assert code.index("BOOKING_JOB_CLOSED") < code.index("sequence_code='BOOKING_APPROVAL'")
+    assert "CLOSED_JOB_BLOCKED" in code
+    assert "JOB_CLOSED" in code
+    assert code.index("CLOSED_JOB_BLOCKED")<code.index("sequence_code='BOOKING_APPROVAL'")
+

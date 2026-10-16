@@ -733,8 +733,6 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
                     raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
                 booking_validate_authorized_ports(
                     payload,booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
-        if module=='booking' and action in {'submit-rfa','approve'} and ctx['closed']:
-            raise HTTPException(422,{'code':'BOOKING_JOB_CLOSED'})
         if module=='booking' and action=='approve' and str(r['status']).strip().lower()!='rfa':
             raise HTTPException(409,{'code':'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL'})
         if module=='booking' and action=='approve':
