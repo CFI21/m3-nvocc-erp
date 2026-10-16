@@ -191,6 +191,16 @@ def agent_office_countries(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
             seen.add(key)
             result.append({'agent_code':agent,'office_code':resolved['office_code'],
                            'country_code':resolved['country_code'],'country_name':resolved['country_name']})
+        for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+            p=json.loads(rec['payload_json'] or '{}')
+            if p.get('config_type')!='AGENT_NETWORK' or p.get('network_type')!='PORT_COVERAGE' or p.get('scope')!='POL': continue
+            agent=p.get('agent_code'); office=p.get('office_code'); port=p.get('port_code')
+            if not agent or not office or not port or not active_master(c,'agent',agent): continue
+            master=c.execute("SELECT 1 FROM md_records WHERE domain='port' AND record_key=? AND status='ACTIVE'",(port,)).fetchone()
+            if not master: continue
+            country=c.execute("SELECT co.country_code,co.name FROM iam_offices o JOIN iam_countries co ON co.id=o.country_id WHERE o.office_code=? AND o.status='ACTIVE' AND co.status='ACTIVE'",(office,)).fetchone()
+            if not country or country['country_code']!=port[:2]: continue
+            result.append({'agent_code':agent,'office_code':office,'port_code':port,'source':'POL','record_key':rec['record_key'],'country_code':country['country_code'],'country_name':country['name']})
         return result
     finally:
         c.close()
