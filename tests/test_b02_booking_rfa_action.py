@@ -61,3 +61,14 @@ def test_closed_job_blocks_booking_rfa():
     code=inspect.getsource(action_record)
     assert "if ctx['closed'] and action in {'submit-rfa','approve'" in code
     assert code.index("if ctx['closed'] and action") < code.index("if module=='booking' and action=='submit-rfa':")
+
+
+def test_booking_edits_locked_after_rfa():
+    from app.main import update_record
+    source=inspect.getsource(update_record)
+    assert "BOOKING_DRAFT_ONLY_EDIT" in source
+    assert source.index("BOOKING_DRAFT_ONLY_EDIT")<source.index("payload.update(body.fields)")
+    from pathlib import Path
+    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    booking=html.split('async function clx49RenderBooking(tab){',1)[1].split("if(tab==='Booking Info')",1)[0]
+    assert "String(r.status||p.Status||'').toLowerCase()==='draft'" in booking

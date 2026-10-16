@@ -627,6 +627,8 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
             if not role_ok(role,'edit'): raise HTTPException(403,'Role cannot edit')
             r=get_tx(conn,module,tid,role,ascope,cscope)
         before=serialize_tx(r); ctx=job_context(conn,r['job_ref'])
+        if module=='booking' and str(r['status']).strip().lower()!='draft':
+            raise HTTPException(409,{'code':'BOOKING_DRAFT_ONLY_EDIT','current_status':r['status']})
         if module=='booking' and bulk_permission_enabled() and role=='AGENT' and not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
             raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
         if module=='booking' and bulk_permission_enabled() and role=='AGENT':
