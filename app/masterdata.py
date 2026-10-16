@@ -122,7 +122,7 @@ def reference_errors(c,domain,payload):
                     errs.append('AGENT_OFFICE_REFERENCE_NOT_ACTIVE')
                 elif payload.get('country_code') and str(payload['country_code']).upper()!=str(office['country_code']).upper():
                     errs.append('AGENT_OFFICE_COUNTRY_MISMATCH')
-        if kind=='AGENT_NETWORK' and str(payload.get('network_type') or '').upper()=='PORT_COVERAGE':
+        if kind=='AGENT_NETWORK' and str(payload.get('network_type') or '').upper()=='PORT_COVERAGE' and str(payload.get('scope') or '').upper()=='POL':
             office=str(payload.get('office_code') or '').strip()
             port=str(payload.get('port_code') or '').strip().upper()
             location=c.execute("SELECT co.country_code FROM iam_offices o JOIN iam_countries co ON co.id=o.country_id WHERE o.office_code=? AND o.status='ACTIVE' AND co.status='ACTIVE'",(office,)).fetchone()
