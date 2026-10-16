@@ -267,3 +267,27 @@ def test_governed_pol_edit_requires_second_identity(country_db, monkeypatch):
     after=masterdata.agent_office_countries('checker')
     assert any(x.get('port_code')=='NLAMS' for x in after)
     assert not any(x.get('port_code')=='NLRTM' for x in after)
+
+
+def test_governed_pol_edit_duplicate_is_denied(country_db, monkeypatch):
+    c=country_db()
+    for code in ('NLRTM','NLAMS'):
+        c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port',?,?,'ACTIVE','now','now')",(code,json.dumps({'unlocode':code})))
+    for key,port in (('POL-ONE','NLRTM'),('POL-TWO','NLAMS')):
+        data={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':port}
+        c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) VALUES ('configuration',?,?,'ACTIVE',1,'now','now')",(key,json.dumps(data)))
+    c.close()
+    monkeypatch.setattr(masterdata,'authenticated_actor',lambda _c,t:({'user_ref':'maker','username':'md.maker'},{'MASTER_DATA'}))
+    with pytest.raises(HTTPException) as blocked:
+        masterdata.create_change(masterdata.Change(domain='configuration',record_key='POL-ONE',operation='UPDATE',payload={'port_code':'NLAMS'},reason='Duplicate test'),'maker')
+    assert blocked.value.status_code==409
+    c=country_db()
+    assert c.execute("SELECT COUNT(*) FROM md_change_requests WHERE status='PENDING'").fetchone()[0]==0
+    c.close()
+
+
+def test_removal_checker_panel_labels_empty_payload():
+    from pathlib import Path
+    source=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    assert "m3AgentConfigs.find(c=>c.record_key===x.record_key)?.payload?.config_type" in source
+    assert "esc(x.operation||'CHANGE')" in source

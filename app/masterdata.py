@@ -363,6 +363,7 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     current=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(ch['domain'],ch['record_key'])).fetchone()
     if current and current['version']!=ch['base_version']:c.close();raise HTTPException(409,{'code':'MASTER_VERSION_CONFLICT','current_version':current['version'],'base_version':ch['base_version']})
     payload=json.loads(ch['payload_json']);ts=now();before=dict(current) if current else None
+    # Final independent-checker uniqueness barrier protects against competing pending requests.
     if ch['domain']=='configuration' and ch['operation'] in ('CREATE','UPDATE'):
         proposed={**(json.loads(current['payload_json']) if current else {}),**payload}
         if proposed.get('config_type')=='AGENT_NETWORK' and proposed.get('network_type')=='PORT_COVERAGE':
