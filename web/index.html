@@ -3168,6 +3168,16 @@ async function clx81SubmitBookingRfa(id,version){
   if(!w?.booking||String(w.booking.status||w.booking.fields?.Status||'').toLowerCase()!=='draft'){
     alert('Only a saved Draft can be submitted for approval.');return;
   }
+  // Fail closed: do not submit outdated server data while unsaved fields remain on screen.
+  const dirty=[...document.querySelectorAll('.clx78Workspace [data-clx49-field]')].some(el=>{
+    const key=el.dataset.clx49Field;
+    const shown=el.type==='checkbox'?(el.checked?'true':'false'):String(el.value??'');
+    const original=String(w.booking.fields?.[key]??'');
+    return shown!==original;
+  });
+  if(dirty||clx81BookingDraft?.values&&Object.keys(clx81BookingDraft.values).length){
+    alert('Unsaved Booking fields detected. Save Draft before Submit RFA.');return;
+  }
   if(!confirm('Submit this saved Booking Draft for independent approval?'))return;
   try{
     const headers={'Content-Type':'application/json',...clx49Headers(w)};
