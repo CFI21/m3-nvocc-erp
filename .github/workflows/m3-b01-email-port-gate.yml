@@ -1,0 +1,26 @@
+name: M3 B01 Email Port Gate
+on:
+  push:
+    branches: [preview-pr124-booking-isolated]
+    paths:
+      - 'app/masterdata.py'
+      - 'tests/test_b01_email_port_gate.py'
+      - '.github/workflows/m3-b01-email-port-gate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  b01-email-port-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Validate email reference and maker-checker regressions
+        run: python -m pytest -q tests/test_b01_email_port_gate.py tests/test_b01_agent_countries_iam_resolution.py
+      - name: Compile backend
+        run: python -m compileall -q app
