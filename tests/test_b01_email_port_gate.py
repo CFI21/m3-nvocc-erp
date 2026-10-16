@@ -312,3 +312,66 @@ def test_checker_revalidates_port_after_submission(tmp_path, monkeypatch):
         (request["change_ref"],),
     ).fetchone()["status"] == "PENDING"
     db.close()
+
+
+def test_maker_rejects_duplicate_agent_email_update_before_queue(tmp_path, monkeypatch):
+    """Normalized case and whitespace must not bypass the Email uniqueness gate."""
+    import json
+    import pytest
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "email_update_duplicate.sqlite3")
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": "email-maker"}, {"MASTER_DATA"}),
+    )
+
+    db = connect()
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('agent','UAT-AGENT-001','{}','ACTIVE','now','now')"
+    )
+    for port in ("NLRTM", "NLAMS"):
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES ('port',?,'{}','ACTIVE','now','now')", (port,)
+        )
+    for key, port, email in (
+        ("EMAIL-EXISTING", "NLRTM", "ops@example.org"),
+        ("EMAIL-CHANGING", "NLAMS", "other@example.org"),
+    ):
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+            "VALUES ('configuration',?,?,'ACTIVE',1,'now','now')",
+            (key,json.dumps({**_email(port), "email":email})),
+        )
+    db.close()
+
+    with pytest.raises(HTTPException) as err:
+        masterdata.create_change(
+            masterdata.Change(
+                domain="configuration",
+                record_key="EMAIL-CHANGING",
+                operation="UPDATE",
+                payload={"port_code":"nlrtm", "email":" OPS@EXAMPLE.ORG "},
+                reason="Duplicate email update",
+            ),
+            "maker",
+        )
+    assert err.value.status_code == 409
+    assert err.value.detail["code"] == "DUPLICATE_AGENT_RELATIONSHIP"
+
+    db = connect()
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_change_requests WHERE record_key='EMAIL-CHANGING'"
+    ).fetchone()[0] == 0
+    db.close()
