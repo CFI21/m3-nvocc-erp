@@ -179,3 +179,10 @@ def test_preview_identity_fallback_never_stores_session_token_in_identity():
     assert "sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles:result.roles||[]}))" in source
     assert "identity||JSON.parse(sessionStorage.getItem('M3_IAM_IDENTITY')||'null')" in source
     assert "sessionStorage.removeItem('M3_IAM_IDENTITY')" in source
+
+
+def test_governed_agent_route_restored_after_refresh():
+    source = agent_source()
+    assert "const governed=decodeURIComponent((raw.match(/ho-setup=([^&]+)/)||[])[1]||'');" in source
+    assert "if(governed==='agent-master'&&['MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role))" in source
+    assert "await openHoGovernedSetup('agent-master','Agent','master-data::agents');return;" in source
