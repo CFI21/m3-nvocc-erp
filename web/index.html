@@ -803,7 +803,7 @@ function m3AgentPaint(){
  if(row&&m3AgentTab==='CRO Detail'){
   fields+='<div style="grid-column:1/-1" class="muted">CRO values are governed Agent Master fields, not a separate duplicated operational record.</div>';
  }
- const canEdit=['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role);
+ const canEdit=['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)&&m3AgentIdentity?.username!=='md.checker';
  const pending=m3AgentPending.find(x=>x.domain==='agent'&&x.record_key===row?.record_key&&x.status==='PENDING');
  const editable=canEdit&&!pending;
  const newAgentButton=canEdit?'<button class="btn" id="m3AgentNew">New Agent</button>':'';
@@ -897,6 +897,7 @@ async function m3AgentWithdraw(){
  }catch(e){alert('Withdrawal failed: '+e.message)}
 }
 async function m3AgentCreate(){
+ if(m3AgentIdentity?.username==='md.checker')return alert('B01 UAT: checker cannot create an Agent.');
  if(!['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role))return;
  const code=String(prompt('New Agent Code (unique letters, numbers, _ or -):')||'').trim().toUpperCase();
  if(!code)return;
@@ -913,6 +914,7 @@ async function m3AgentCreate(){
 }
 async function m3AgentSubmit(){
  const row=m3AgentRows[m3AgentIndex];if(!row)return;
+ if(m3AgentIdentity?.username==='md.checker'){alert('B01 UAT segregation: checker cannot submit Agent changes. Switch to md.maker.');return}
  if(!['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)){alert('Master Data edit permission required');return}
  m3AgentCaptureDraft();
  const combined={...row.payload,...m3AgentDraft};
