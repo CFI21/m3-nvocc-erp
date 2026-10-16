@@ -191,7 +191,7 @@ def agent_office_countries(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
             if key in seen: continue
             seen.add(key)
             result.append({'agent_code':agent,'office_code':resolved['office_code'],
-                           'country_code':resolved['country_code'],'country_name':resolved['country_name']})
+                           'source':'OFFICE','country_code':resolved['country_code'],'country_name':resolved['country_name']})
         for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
             p=json.loads(rec['payload_json'] or '{}')
             if p.get('config_type')!='AGENT_NETWORK' or p.get('network_type')!='PORT_COVERAGE' or p.get('scope')!='POL': continue
