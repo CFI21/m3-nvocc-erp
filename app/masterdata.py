@@ -178,6 +178,14 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
     if b.domain not in DOMAINS:c.close();raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
     if not can_make_roles(roles):c.close();raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+    # Dedicated isolated B01 UAT only: enforce strict two-account separation.
+    # This does not change other domains, identities, or production policies.
+    import os
+    if (b.domain=='agent' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='ON'
+        and os.getenv('M3_B01_STRICT_MAKER_CHECKER','false').lower()=='true'
+        and sess['username']=='md.checker'):
+        c.close();raise HTTPException(403,{'code':'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
+
     existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
     if b.operation=='CREATE' and existing:c.close();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
     if b.operation!='CREATE' and not existing:c.close();raise HTTPException(404,{'code':'MASTER_RECORD_NOT_FOUND'})
