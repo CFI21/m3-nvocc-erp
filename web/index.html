@@ -3196,7 +3196,7 @@ async function clx81SubmitBookingRfa(id,version){
     return shown!==original;
   });
   const draftKey=String(w.context?.job_ref||'')+':'+String(w.booking.id||'');
-  const pendingGridEdits=clx81BookingDraft?.key===draftKey&&Object.keys(clx81BookingDraft.values||{}).length>0;
+  const pendingGridEdits=clx81BookingDraft?.key===draftKey&&Object.entries(clx81BookingDraft.values||{}).some(([key,value])=>String(value??'')!==String(w.booking.fields?.[key]??''));
   if(dirty||pendingGridEdits){
     alert('Unsaved Booking fields detected. Save Draft before Submit RFA.');return;
   }
