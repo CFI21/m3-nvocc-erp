@@ -178,3 +178,10 @@ def test_booking_approval_revalidates_before_sequence_allocation():
     assert 'approval_errors=validate_fields(module,ctx,payload)' in approval
     assert 'assert_booking_rules(conn,ctx,payload,tid)' in approval
     assert approval.index('assert_booking_rules(conn,ctx,payload,tid)') < approval.index('UPDATE md_sequences SET next_number')
+
+
+def test_booking_hold_cancel_cannot_mutate_approved_or_terminal_records():
+    source=inspect.getsource(action_record)
+    assert "action in {'hold','cancel'}" in source
+    assert "BOOKING_TERMINAL_STATUS_LOCK" in source
+    assert source.index("BOOKING_TERMINAL_STATUS_LOCK")<source.index("elif action=='cancel':")
