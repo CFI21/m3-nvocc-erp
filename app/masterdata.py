@@ -363,6 +363,15 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     current=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(ch['domain'],ch['record_key'])).fetchone()
     if current and current['version']!=ch['base_version']:c.close();raise HTTPException(409,{'code':'MASTER_VERSION_CONFLICT','current_version':current['version'],'base_version':ch['base_version']})
     payload=json.loads(ch['payload_json']);ts=now();before=dict(current) if current else None
+    if ch['domain']=='configuration' and ch['operation'] in ('CREATE','UPDATE'):
+        proposed={**(json.loads(current['payload_json']) if current else {}),**payload}
+        if proposed.get('config_type')=='AGENT_NETWORK' and proposed.get('network_type')=='PORT_COVERAGE':
+            fields=('config_type','network_type','agent_code','office_code','scope','port_code')
+            for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if rec['record_key']==ch['record_key']: continue
+                existing_values=json.loads(rec['payload_json'] or '{}')
+                if all(str(existing_values.get(k) or '').upper()==str(proposed.get(k) or '').upper() for k in fields):
+                    c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP'})
     if ch['operation']=='CREATE':
         errs=validate_payload(ch['domain'],payload,{})+reference_errors(c,ch['domain'],payload)
         dup=duplicate_name(c,ch['domain'],payload.get('name') or payload.get('display_name'),ch['record_key'])
