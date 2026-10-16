@@ -33,7 +33,9 @@ def test_rfa_prevents_unsaved_browser_values():
     ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
     fn=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('async function clx49RenderBooking(tab){',1)[0]
     assert "Unsaved Booking fields detected. Save Draft before Submit RFA." in fn
-    assert "clx81BookingDraft?.values" in fn
+    assert "clx81BookingDraft?.key===draftKey" in fn
+    assert "Object.entries(clx81BookingDraft.values||{}).some" in fn
+    assert "if(dirty||gridDirty||pendingGridEdits)" in fn
     assert fn.index("const dirty=")<fn.index("/actions/submit-rfa")
 
 
