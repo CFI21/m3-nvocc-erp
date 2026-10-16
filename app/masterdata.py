@@ -366,6 +366,32 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     # Final independent-checker uniqueness barrier protects against competing pending requests.
     if ch['domain']=='configuration' and ch['operation'] in ('CREATE','UPDATE'):
         proposed={**(json.loads(current['payload_json']) if current else {}),**payload}
+        # Revalidate related-record semantic uniqueness at approval time.
+        # Two different pending keys may have been submitted concurrently; only
+        # the first checker-approved relationship may become authoritative.
+        kind=str(proposed.get('config_type') or '').strip().upper()
+        if kind in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'):
+            agent=str(proposed.get('agent_code') or '').strip().upper()
+            office=str(proposed.get('office_code') or '').strip().upper()
+            port=str(proposed.get('port_code') or '').strip().upper()
+            email=str(proposed.get('email') or '').strip().lower()
+            for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if rec['record_key']==ch['record_key']:
+                    continue
+                prev=json.loads(rec['payload_json'] or '{}')
+                if str(prev.get('config_type') or '').strip().upper()!=kind:
+                    continue
+                if str(prev.get('agent_code') or '').strip().upper()!=agent:
+                    continue
+                if kind=='AGENT_OFFICE_ASSIGNMENT':
+                    duplicate=bool(office) and str(prev.get('office_code') or '').strip().upper()==office
+                else:
+                    duplicate=(bool(port) and bool(email)
+                        and str(prev.get('port_code') or '').strip().upper()==port
+                        and str(prev.get('email') or '').strip().lower()==email)
+                if duplicate:
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':rec['record_key']})
         if proposed.get('config_type')=='AGENT_NETWORK' and proposed.get('network_type')=='PORT_COVERAGE':
             fields=('config_type','network_type','agent_code','office_code','scope','port_code')
             for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
