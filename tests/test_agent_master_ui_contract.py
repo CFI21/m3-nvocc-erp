@@ -67,7 +67,7 @@ def test_pending_new_agents_have_checker_decision_controls():
     assert "data-agent-create-ref" in source
     assert "async function m3AgentDecide(decision,changeRef)" in source
     assert "changeRef?x.change_ref===changeRef" in source
-    assert "canApprove?" in source
+    assert "canApprove&&m3AgentIdentity&&x.maker!==m3AgentIdentity.user_ref" in source
 
 
 def test_agent_master_ui_roles_align_with_authorized_master_reads():
@@ -130,7 +130,7 @@ def test_agent_cro_and_bl_use_existing_master_values():
 
 def test_agent_relationship_requests_use_governed_change_approval():
     source = agent_source()
-    related = source.split("async function m3AgentRelatedCreate()", 1)[1].split(
+    related = source.split("async function m3AgentRelatedSubmit(event)", 1)[1].split(
         "async function m3AgentDecide(", 1
     )[0]
     assert "AGENT_EMAIL" in related
@@ -203,7 +203,8 @@ def test_agent_related_requests_have_governed_checker_and_maker_actions():
 
 def test_agent_country_is_derived_from_authoritative_iam_offices():
     source=agent_source()
-    assert "api('/api/admin/offices')" in source
+    assert "api('/api/masterdata/agent-office-countries')" in source
+    assert "api('/api/admin/offices')" not in source
     assert 'function m3AgentOfficeCountry(officeCode)' in source
     assert 'derived_country:m3AgentOfficeCountry(x.payload?.office_code)' in source
     assert "esc(m3AgentOfficeCountry(x.payload?.office_code)||'Unresolved')" in source
