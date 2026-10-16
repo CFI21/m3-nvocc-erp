@@ -313,3 +313,27 @@ def test_b01_checker_cannot_propose_agent_related_configuration(isolated,monkeyp
     assert other['status']=='PENDING'
     assert withdraw_change(other['change_ref'],Withdrawal(reason='clean up test'),x_m3_session=checker)['status']=='WITHDRAWN'
 
+
+
+def test_b01_rejects_semantic_duplicate_agent_office_pending_and_active(isolated):
+    maker=maker_session()
+    first=Change(domain='configuration',record_key='AGCFG-OFFICE-A',operation='CREATE',
+                 payload={'config_type':'AGENT_OFFICE_ASSIGNMENT','agent_code':'CLX-AGENT-001',
+                          'office_code':'RTM','address':'UAT address'},reason='Office test')
+    # The target Agent must first exist and be approved for reference integrity.
+    a=create_change(Change(domain='agent',record_key='CLX-AGENT-001',operation='CREATE',
+                  payload={'name':'Cycle 2 UAT agent','short_name':'C2'},reason='prepare test'),
+                  x_m3_session=maker)
+    decide(a['change_ref'],Decision(decision='APPROVE',comment='checker'),x_m3_session=checker_session())
+    created=create_change(first,x_m3_session=maker)
+    same=Change(domain='configuration',record_key='AGCFG-OFFICE-B',operation='CREATE',
+                 payload=dict(first.payload),reason='Should be blocked')
+    with pytest.raises(HTTPException) as pending:
+        create_change(same,x_m3_session=maker)
+    assert pending.value.status_code==409
+    assert pending.value.detail['code']=='DUPLICATE_AGENT_RELATIONSHIP'
+    decide(created['change_ref'],Decision(decision='APPROVE',comment='independent approval'),
+           x_m3_session=checker_session())
+    with pytest.raises(HTTPException) as active:
+        create_change(same,x_m3_session=maker)
+    assert active.value.detail['code']=='DUPLICATE_AGENT_RELATIONSHIP'
