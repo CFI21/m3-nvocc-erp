@@ -109,3 +109,12 @@ def test_booking_rfa_records_trusted_maker_and_approval_enforces_four_eyes():
     assert "BOOKING_FOUR_EYES_VIOLATION" in source
     assert "submitting_user==checker_user" in source
     assert source.index("BOOKING_FOUR_EYES_VIOLATION")<source.index("payload['Approval #']=number")
+
+
+def test_booking_rfa_checker_approval_ui_wired_to_existing_api():
+    from pathlib import Path
+    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    assert 'async function clx81ApproveBookingRfa(id,version)' in html
+    assert '/api/v1/booking/' in html
+    assert "['ADMIN','SUPER_ADMIN'].includes(state.role)" in html
+    assert 'Approve RFA</button>' in html
