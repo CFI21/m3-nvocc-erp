@@ -185,3 +185,62 @@ def test_checker_rejects_email_and_preserves_no_active_record(tmp_path, monkeypa
         (pending["change_ref"],),
     ).fetchone()["status"] == "REJECTED"
     c.close()
+
+
+def test_checker_approval_rechecks_email_uniqueness(tmp_path, monkeypatch):
+    """Concurrent pending requests cannot activate duplicate email routes."""
+    import json
+    import pytest
+    from fastapi import HTTPException
+
+    dbfile = str(tmp_path / "b01_email_approval_race.sqlite3")
+
+    def connection():
+        c = sqlite3.connect(dbfile, isolation_level=None)
+        c.row_factory = sqlite3.Row
+        masterdata.init_schema(c)
+        return c
+
+    monkeypatch.setattr(masterdata, "connect", connection)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _c, token: (
+            {"user_ref": "maker" if token == "maker" else "checker"},
+            {"MASTER_DATA"} if token == "maker" else {"MASTER_DATA_MANAGER"},
+        ),
+    )
+    c = connection()
+    for domain, key in (("agent", "UAT-AGENT-001"), ("port", "NLRTM")):
+        c.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES (?,?,?,'ACTIVE','now','now')",
+            (domain, key, json.dumps({"unlocode": key} if domain == "port" else {"name": "UAT Agent"})),
+        )
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-ACTIVE',?,'ACTIVE','now','now')",
+        (json.dumps(_email()),),
+    )
+    c.execute(
+        "INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-TEST-DUP','configuration','EMAIL-DUP','CREATE',?,'concurrent','maker','now',0)",
+        (json.dumps(_email()),),
+    )
+    c.close()
+    with pytest.raises(HTTPException) as exc:
+        masterdata.decide(
+            "MDC-TEST-DUP",
+            masterdata.Decision(decision="APPROVE", comment="check"),
+            "checker",
+        )
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "DUPLICATE_AGENT_RELATIONSHIP"
+    c = connection()
+    assert c.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref='MDC-TEST-DUP'"
+    ).fetchone()["status"] == "PENDING"
+    assert c.execute(
+        "SELECT COUNT(*) FROM md_records WHERE domain='configuration' AND status='ACTIVE'"
+    ).fetchone()[0] == 1
+    c.close()
