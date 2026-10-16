@@ -712,8 +712,6 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             return JSONResponse({'detail':{'code':'JOB_CLOSED','action':action}},status_code=422)
         if module=='booking' and action in {'hold','cancel'} and str(r['status']).strip().lower() not in {'draft','rfa'}:
             raise HTTPException(409,{'code':'BOOKING_TERMINAL_STATUS_LOCK','current_status':r['status']})
-        if module=='booking' and action=='submit-rfa' and not bulk_permission_enabled():
-            raise HTTPException(403,{'code':'BOOKING_RFA_REQUIRES_IAM_SESSION'})
         if module=='booking' and action=='submit-rfa':
             if str(r['status']).strip().lower()!='draft':
                 raise HTTPException(409,{'code':'BOOKING_DRAFT_REQUIRED_FOR_RFA'})
