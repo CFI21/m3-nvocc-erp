@@ -758,7 +758,12 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             seq=conn.execute("SELECT id,prefix,next_number,width FROM md_sequences WHERE sequence_code='BOOKING_APPROVAL' AND status='ACTIVE'").fetchone()
             if not seq:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED'})
-            number=str(seq['prefix'])+f"{seq['next_number']:0{seq['width']}d}"
+            prefix=str(seq['prefix'] or '').strip()
+            next_number=seq['next_number']
+            width=seq['width']
+            if not prefix or not isinstance(next_number,int) or next_number<1 or not isinstance(width,int) or not (1<=width<=12) or len(str(next_number))>width:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_INVALID'})
+            number=prefix+f"{next_number:0{width}d}"
             updated=conn.execute("UPDATE md_sequences SET next_number=next_number+1,version=version+1 WHERE id=? AND next_number=?",(seq['id'],seq['next_number']))
             if updated.rowcount!=1:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_CONFLICT'})

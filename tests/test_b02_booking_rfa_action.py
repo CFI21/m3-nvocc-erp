@@ -213,3 +213,10 @@ def test_booking_draft_create_rejects_client_supplied_approval_and_maker_fields(
     assert "('Approval #','Approval Ref','Approval Reference','Approved By','Approved At','RFA Submitted By')" in source
     assert "if any(k in body.fields" in source
     assert "BOOKING_APPROVAL_REFERENCE_ACTION_REQUIRED" in source
+
+
+def test_booking_approval_rejects_invalid_sequence_config_before_increment():
+    approval=inspect.getsource(action_record)
+    assert "BOOKING_APPROVAL_SEQUENCE_INVALID" in approval
+    assert "len(str(next_number))>width" in approval
+    assert approval.index("BOOKING_APPROVAL_SEQUENCE_INVALID")<approval.index("UPDATE md_sequences SET next_number")
