@@ -4562,7 +4562,7 @@ async function m3EnsureIamLogin(){
       event.preventDefault();submit.disabled=true;message.textContent='';
       try{
         const res=await fetch('/api/admin/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username.value.trim(),password:password.value,mfa_code:mfa.value.trim()||null})});
-        if(!res.ok)throw Error(res.status===401?'Sign-in rejected (401). Enter the md.maker or md.checker account password as well as the MFA code. The admin account is not provisioned in this isolated UAT.':'Sign-in failed (HTTP '+res.status+'). Verify UAT access and MFA requirements.');
+        if(!res.ok){let reason='';try{const body=await res.json();reason=String(body?.detail?.code||body?.detail?.reason||'')}catch(_error){}const attempted=username.value.trim();const hint=reason==='INVALID_CREDENTIALS'?'Account password was rejected.':reason==='MFA_REQUIRED'?'MFA verification was rejected.':'Check credentials and UAT API status.';throw Error('Sign-in failed for '+attempted+' (HTTP '+res.status+(reason?', '+reason:'')+'). '+hint+' Confirm that the username is md.checker for independent approval.');}
         const result=await res.json();
         if(!result.session_token)throw Error('Login returned no IAM session');
         sessionStorage.setItem('M3_SESSION',result.session_token);
