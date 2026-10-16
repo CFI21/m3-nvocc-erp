@@ -89,3 +89,50 @@ def test_checker_rejects_competing_office_assignment(office_database):
         "SELECT status FROM md_change_requests WHERE change_ref='MDC-OFFICE-RACE'"
     ).fetchone()["status"] == "PENDING"
     db.close()
+
+
+def test_office_update_cannot_take_existing_agent_office(office_database):
+    """Checker must reject an UPDATE converging onto another approved Office key."""
+    db = office_database()
+    old = {
+        "config_type": "AGENT_OFFICE_ASSIGNMENT",
+        "agent_code": "UAT-AGENT-001",
+        "office_code": "AMS",
+        "address": "Amsterdam",
+    }
+    approved = dict(old, office_code="RTM", address="Rotterdam")
+    for key, payload in (("OFFICE-EXISTING", approved), ("OFFICE-UPDATE", old)):
+        db.execute(
+            "INSERT INTO md_records"
+            "(domain,record_key,payload_json,status,version,created_at,updated_at) "
+            "VALUES ('configuration',?,?,'ACTIVE',1,'now','now')",
+            (key, json.dumps(payload)),
+        )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-OFFICE-UPDATE','configuration','OFFICE-UPDATE','UPDATE',?,'review','office-maker','now',1)",
+        (json.dumps({"office_code": "rtm"}),),
+    )
+    db.close()
+
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide(
+            "MDC-OFFICE-UPDATE",
+            masterdata.Decision(decision="APPROVE", comment="independent review"),
+            "checker",
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "DUPLICATE_AGENT_RELATIONSHIP"
+
+    db = office_database()
+    unchanged = db.execute(
+        "SELECT payload_json,version FROM md_records "
+        "WHERE domain='configuration' AND record_key='OFFICE-UPDATE'"
+    ).fetchone()
+    assert json.loads(unchanged["payload_json"]) == old
+    assert unchanged["version"] == 1
+    assert db.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref='MDC-OFFICE-UPDATE'"
+    ).fetchone()["status"] == "PENDING"
+    db.close()
