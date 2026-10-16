@@ -739,7 +739,7 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             if role not in {'ADMIN','SUPER_ADMIN'} or not bulk_permission_enabled():
                 raise HTTPException(403,{'code':'BOOKING_INDEPENDENT_APPROVER_REQUIRED'})
             submitting_user=str(payload.get('RFA Submitted By') or '').strip()
-            checker_user=str(ga['session']['user_ref'] or '').strip()
+            checker_user=str(ga['session'].get('user_ref') or '').strip()
             if not submitting_user:
                 raise HTTPException(409,{'code':'BOOKING_RFA_MAKER_IDENTITY_REQUIRED'})
             if not checker_user or submitting_user==checker_user:
@@ -779,6 +779,8 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
         if module=='booking' and action=='submit-rfa':
             if not bulk_permission_enabled():
                 raise HTTPException(403,{'code':'BOOKING_RFA_REQUIRES_IAM_SESSION'})
+            if not str(ga['session'].get('user_ref') or '').strip():
+                raise HTTPException(403,{'code':'BOOKING_RFA_MAKER_IDENTITY_MISSING'})
             payload['RFA Submitted By']=ga['session']['user_ref']
             new_status='RFA'
         elif action=='advance':

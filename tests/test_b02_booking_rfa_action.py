@@ -242,3 +242,10 @@ def test_duplicate_approval_check_handles_invalid_legacy_json_safely():
     row=db.execute(sql,(3,'BA00001')).fetchone()
     assert row==(2,)
     assert db.execute(sql,(3,'BA99999')).fetchone() is None
+
+
+def test_booking_rfa_missing_session_identity_fails_closed():
+    source=inspect.getsource(action_record)
+    assert "BOOKING_RFA_MAKER_IDENTITY_MISSING" in source
+    assert "ga['session'].get('user_ref')" in source
+    assert source.index("BOOKING_RFA_MAKER_IDENTITY_MISSING")<source.index("payload['RFA Submitted By']=ga['session']['user_ref']")
