@@ -3092,6 +3092,7 @@ function clx81CalculateOogKillSlots(){
 function clx81CaptureCargoDetails(){
   if(viewerReadOnly())return;
   const w=clx49Workspace,r=w?.booking;if(!r)return;
+  if(String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft')return;
   const key=String(w.context?.job_ref||'')+':'+String(r.id||'');
   if(clx81BookingDraft?.key!==key)clx81BookingDraft={key,values:{}};
   document.querySelectorAll('[data-clx81-cargo]').forEach(el=>{clx81BookingDraft.values[el.dataset.clx81Cargo]=el.value;});

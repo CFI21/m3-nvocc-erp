@@ -285,3 +285,11 @@ def test_booking_cargo_popup_is_readonly_after_draft():
     assert "const cargoLocked=viewerReadOnly()||String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in cargo
     assert "(cargoLocked?' disabled':'')" in cargo
     assert "(viewerReadOnly()?' disabled':'')" not in cargo
+
+
+def test_cargo_capture_handler_rejects_non_draft_booking():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    fn=ui.split('function clx81CaptureCargoDetails(){',1)[1].split('\nfunction ',1)[0]
+    assert "String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in fn
+    assert fn.index("!=='draft'")<fn.index("clx81BookingDraft.values[el.dataset.clx81Cargo]")
