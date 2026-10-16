@@ -470,3 +470,60 @@ def test_checker_rejects_missing_master_for_noncreate(tmp_path, monkeypatch, ope
         ("MDC-MISSING-" + operation,),
     ).fetchone()["status"] == "PENDING"
     db.close()
+
+
+def test_same_email_port_allowed_for_different_agents(tmp_path, monkeypatch):
+    """Semantic duplicate protection is Agent-scoped, not globally email-scoped."""
+    import json
+
+    filename = str(tmp_path / "email_cross_agent.sqlite3")
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": "email-maker"}, {"MASTER_DATA"}),
+    )
+    db = connect()
+    for agent in ("UAT-AGENT-001", "UAT-AGENT-002"):
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES ('agent',?,?,'ACTIVE','now','now')",
+            (agent, json.dumps({"name": agent})),
+        )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM','{}','ACTIVE','now','now')"
+    )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-AGENT-001',?,'ACTIVE','now','now')",
+        (json.dumps(_email()),),
+    )
+    db.close()
+    payload = {**_email(), "agent_code": "UAT-AGENT-002"}
+    pending = masterdata.create_change(
+        masterdata.Change(
+            domain="configuration",
+            record_key="EMAIL-AGENT-002",
+            operation="CREATE",
+            payload=payload,
+            reason="Distinct agent route",
+        ),
+        "maker",
+    )
+    assert pending["status"] == "PENDING"
+    db = connect()
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_records WHERE domain='configuration' AND status='ACTIVE'"
+    ).fetchone()[0] == 1
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_change_requests WHERE record_key='EMAIL-AGENT-002' AND status='PENDING'"
+    ).fetchone()[0] == 1
+    db.close()
