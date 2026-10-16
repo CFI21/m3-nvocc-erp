@@ -217,7 +217,8 @@ def booking_agent_port_grants(conn,user_id,agent_code):
     identify the agent, a verified operating office, a scope and an exact port.
     """
     from .admin import _assigned_agent_offices
-    offices={x['office_code'] for x in _assigned_agent_offices(conn,user_id,agent_code)}
+    assigned=_assigned_agent_offices(conn,user_id,agent_code)
+    offices={str(x['office_code']).strip().upper():str(x['country_code']).strip().upper() for x in assigned}
     grants={scope:{'ports':set(),'all_ports':False} for scope in ('POL','POD','TS')}
     if not offices:
         return grants
@@ -238,8 +239,24 @@ def booking_agent_port_grants(conn,user_id,agent_code):
             continue
         scope=str(config.get('scope') or '').upper()
         port=str(config.get('port_code') or '').strip().upper()
-        if scope in grants and re.fullmatch(r'[A-Z0-9]{3,8}',port):
-            grants[scope]['ports'].add(port)
+        office_code=str(config.get('office_code') or '').strip().upper()
+        # Network configuration never grants rights without a matching active
+        # IAM country/office and a separately approved, active Port Master.
+        if scope not in grants or not re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}',port):
+            continue
+        if offices.get(office_code)!=port[:2]:
+            continue
+        master=conn.execute("""SELECT payload_json FROM md_records
+            WHERE domain='port' AND record_key=? AND status='ACTIVE'""",(port,)).fetchone()
+        if not master:
+            continue
+        try:
+            code=str(json.loads(master['payload_json'] or '{}').get('unlocode') or '').strip().upper()
+        except (ValueError,TypeError):
+            continue
+        if code!=port:
+            continue
+        grants[scope]['ports'].add(port)
     return grants
 
 

@@ -28,7 +28,7 @@ jobs:
       - name: Install test dependencies
         run: python -m pip install -r requirements.txt
       - name: Focused B01 maker checker and countries
-        run: python -m pytest -q -ra --tb=short tests/test_b01_agent_countries_iam_resolution.py
+        run: python -m pytest -q -ra --tb=short tests/test_b01_agent_countries_iam_resolution.py tests/test_b02_booking_port_authorization.py
       - name: Wider regression in disposable runner
         run: |
           set -o pipefail
