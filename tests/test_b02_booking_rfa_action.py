@@ -249,3 +249,14 @@ def test_booking_rfa_missing_session_identity_fails_closed():
     assert "BOOKING_RFA_MAKER_IDENTITY_MISSING" in source
     assert "ga['session'].get('user_ref')" in source
     assert source.index("BOOKING_RFA_MAKER_IDENTITY_MISSING")<source.index("payload['RFA Submitted By']=maker_user")
+
+
+def test_approved_booking_readonly_audit_visible_in_reference_workspace():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    grid=ui.split('function clx81BookingReferenceGrid(w,r){',1)[1].split('\nfunction ',1)[0]
+    assert 'const approvalAudit=approved?' in grid
+    for key in ('Approval #','Approved By','Approved At'):
+        assert f"val('{key}')" in grid
+    assert 'approvalAudit+' in grid
+    assert 'input readonly' in grid
