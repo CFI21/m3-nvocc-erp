@@ -283,6 +283,14 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     if b.operation!='CREATE' and not existing:c.close();raise HTTPException(404,{'code':'MASTER_RECORD_NOT_FOUND'})
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
+    if b.domain=='configuration' and b.operation=='UPDATE' and existing_payload.get('config_type')=='AGENT_NETWORK':
+        candidate={**existing_payload,**b.payload}
+        fields=('config_type','network_type','agent_code','office_code','scope','port_code')
+        for item in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+            if item['record_key']==b.record_key: continue
+            p=json.loads(item['payload_json'] or '{}')
+            if all(str(p.get(k) or '').upper()==str(candidate.get(k) or '').upper() for k in fields):
+                c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP'})
     errs=validate_payload(b.domain,b.payload,existing_payload) if b.operation in ('CREATE','UPDATE') else []
     if b.operation in ('CREATE','UPDATE'): errs+=reference_errors(c,b.domain,{**existing_payload,**b.payload})
     if b.operation=='DEACTIVATE' and usage_count(c,b.domain,b.record_key)>0:
