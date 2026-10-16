@@ -291,3 +291,38 @@ def test_removal_checker_panel_labels_empty_payload():
     source=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
     assert "m3AgentConfigs.find(c=>c.record_key===x.record_key)?.payload?.config_type" in source
     assert "esc(x.operation||'CHANGE')" in source
+
+
+def test_duplicate_legacy_pol_coverage_projects_once(country_db):
+    """Legacy duplicate approved coverage never creates repeated Countries rows."""
+    c = country_db()
+    coverage = {
+        "config_type": "AGENT_NETWORK",
+        "network_type": "PORT_COVERAGE",
+        "scope": "POL",
+        "agent_code": "UAT-AGENT-001",
+        "office_code": "RTM",
+        "port_code": "NLRTM",
+    }
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM',?,'ACTIVE','now','now')",
+        (json.dumps({"unlocode":"NLRTM"}),),
+    )
+    for key in ("POL-LEGACY-1","POL-LEGACY-2"):
+        c.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES ('configuration',?,?,'ACTIVE','now','now')",
+            (key,json.dumps(coverage)),
+        )
+    c.close()
+
+    rows=masterdata.agent_office_countries("valid")
+    assert len(rows)==1
+    assert rows[0]["source"]=="POL"
+    assert rows[0]["country_code"]=="NL"
+    c=country_db()
+    assert c.execute(
+        "SELECT COUNT(*) FROM md_records WHERE domain='configuration' AND status='ACTIVE'"
+    ).fetchone()[0]==2
+    c.close()
