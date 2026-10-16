@@ -39,7 +39,7 @@ def assign(connect, key="AGCFG-1", agent="UAT-AGENT-001", office="RTM", status="
 def test_approved_rtm_resolves_nl_without_country_copy(country_db):
     assign(country_db)
     result = masterdata.agent_office_countries("valid")
-    assert result == [{"agent_code":"UAT-AGENT-001","office_code":"RTM","country_code":"NL","country_name":"Netherlands"}]
+    assert result == [{"agent_code":"UAT-AGENT-001","office_code":"RTM","source":"OFFICE","country_code":"NL","country_name":"Netherlands"}]
     c = country_db()
     p = json.loads(c.execute("SELECT payload_json FROM md_records WHERE record_key='AGCFG-1'").fetchone()[0])
     assert "country_code" not in p
@@ -126,3 +126,18 @@ def test_country_actions_keep_existing_maker_checker_endpoint():
     assert "m3CountryChange(key?'UPDATE':'CREATE'" in ui
     assert "'/api/masterdata/changes'" in ui
     assert 'm3AgentIdentity?.username' in ui
+
+
+def test_pol_cross_country_office_is_denied(country_db):
+    c=country_db()
+    coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'DEHAM'}
+    errors=masterdata.reference_errors(c,'configuration',coverage)
+    assert 'AGENT_NETWORK_OFFICE_COUNTRY_MISMATCH' in errors
+    c.close()
+
+
+def test_countries_tab_preserves_six_tabs():
+    from pathlib import Path
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    assert "['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template']" in ui
+    assert "m3CountryChange('DEACTIVATE'" in ui
