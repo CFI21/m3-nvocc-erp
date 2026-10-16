@@ -871,6 +871,26 @@ async function m3AgentRelatedRemove(key){
  const reason=prompt('Reason for relationship removal (required):');if(!reason||!reason.trim())return;
  try{await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'configuration',record_key:key,operation:'DEACTIVATE',payload:{},reason:reason.trim()})});alert('Removal submitted for independent approval.');await renderHoAgentMasterWorkspace()}catch(e){alert('Relationship removal failed: '+e.message)}
 }
+async function m3CountryChange(operation,key,form){
+ const agent=m3AgentRows[m3AgentIndex];
+ if(!agent||m3AgentIdentity?.username==='md.checker'||!['ADMIN','SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role))return;
+ const existing=m3AgentConfigs.find(x=>x.record_key===key&&x.status==='ACTIVE'&&x.payload?.config_type==='AGENT_NETWORK'&&x.payload?.network_type==='PORT_COVERAGE'&&x.payload?.scope==='POL'&&x.payload?.agent_code===agent.record_key);
+ if(operation!=='CREATE'&&!existing)return alert('Active governed POL coverage not found');
+ const office=operation==='DEACTIVATE'?existing.payload.office_code:form.elements.namedItem('office').value.trim().toUpperCase();
+ const port=operation==='DEACTIVATE'?existing.payload.port_code:form.elements.namedItem('port').value.trim().toUpperCase();
+ const reason=operation==='DEACTIVATE'?prompt('Reason for removal (checker approval required):'):form.elements.namedItem('reason').value.trim();
+ if(!reason||!reason.trim())return;
+ if(!/^[A-Z]{2}[A-Z0-9]{3}$/.test(port)||!office)return alert('Active Office and valid 5-character POL required');
+ if(m3AgentPending.some(x=>x.domain==='configuration'&&x.status==='PENDING'&&x.record_key===key))return alert('This record already awaits checker approval');
+ const duplicate=[...m3AgentConfigs,...m3AgentPending].some(x=>x.record_key!==key&&(x.status==='ACTIVE'||x.status==='PENDING')&&x.payload?.config_type==='AGENT_NETWORK'&&x.payload?.network_type==='PORT_COVERAGE'&&x.payload?.scope==='POL'&&x.payload?.agent_code===agent.record_key&&x.payload?.office_code===office&&x.payload?.port_code===port);
+ if(operation==='CREATE'&&duplicate)return alert('Existing or pending POL country coverage already found');
+ const record_key=operation==='CREATE'?'AGCFG-POL-'+Date.now().toString(36).toUpperCase():key;
+ const payload=operation==='DEACTIVATE'?{}:{config_type:'AGENT_NETWORK',network_type:'PORT_COVERAGE',scope:'POL',agent_code:agent.record_key,office_code:office,port_code:port};
+ try{
+   await api('/api/masterdata/changes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'configuration',record_key,operation,payload,reason:reason.trim()})});
+   await renderHoAgentMasterWorkspace();alert('Submitted to independent checker approval queue');
+ }catch(e){if(form)form.querySelector('[data-country-error]').textContent='Submission failed: '+e.message;else alert('Submission failed: '+e.message)}
+}
 let m3RelatedDrafts={Emails:{},Offices:{}};
 function m3AgentRelatedCreate(){
  const form=document.getElementById('m3AgentRelatedForm');
