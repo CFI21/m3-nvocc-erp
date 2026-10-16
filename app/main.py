@@ -684,10 +684,10 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             mw,margs=module_where(module)
             r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
             if not r: raise HTTPException(404,'Transaction not found')
-            ga=governed_job_actor(conn,x_m3_session,r['job_ref'],action); role=ga['role'];ascope=cscope=None
+            ga=governed_job_actor(conn,x_m3_session,r['job_ref'],'edit' if module=='booking' and action=='submit-rfa' else action); role=ga['role'];ascope=cscope=None
         else:
             role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
-            if not role_ok(role,action): raise HTTPException(403,f'Role cannot {action}')
+            if not role_ok(role,'edit' if module=='booking' and action=='submit-rfa' else action): raise HTTPException(403,f'Role cannot {action}')
             r=get_tx(conn,module,tid,role,ascope,cscope)
         before=serialize_tx(r)
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES and action in {'amend','reissue','cancel','reverse'}:
@@ -698,11 +698,24 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             audit(conn,role,ascope or cscope,'CLOSED_JOB_BLOCKED',module,tid,r['job_id'],before,before,{'attempted_action':action})
             conn.execute('COMMIT')
             return JSONResponse({'detail':{'code':'JOB_CLOSED','action':action}},status_code=422)
+        if module=='booking' and action=='submit-rfa':
+            if str(r['status']).strip().lower()!='draft':
+                raise HTTPException(409,{'code':'BOOKING_DRAFT_REQUIRED_FOR_RFA'})
+            if bulk_permission_enabled() and role=='AGENT':
+                if not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
+                    raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+                booking_validate_authorized_ports(
+                    payload,booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
+            errs=validate_fields(module,ctx,payload)
+            if errs: raise HTTPException(422,{'codes':errs})
+            assert_booking_rules(conn,ctx,payload,tid)
         if module=='booking' and action=='approve' and str(r['status']).strip().lower()!='rfa':
             raise HTTPException(409,{'code':'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL'})
         if module=='booking' and action=='approve':
             raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ISSUANCE_NOT_READY'})
-        if action=='advance':
+        if module=='booking' and action=='submit-rfa':
+            new_status='RFA'
+        elif action=='advance':
             if module!='special-rates-request': raise HTTPException(422,{'code':'ADVANCE_ONLY_SPECIAL_RATE'})
             stages=['Requested','Pricing Review','Carrier Response','Approved','Linked']; curstage=payload.get('Stage','Requested'); idx=stages.index(curstage) if curstage in stages else 0; nextstage=stages[min(idx+1,len(stages)-1)]
             if nextstage in ('Approved','Linked') and not payload.get('Approved Rate'): raise HTTPException(422,{'code':'APPROVED_RATE_REQUIRED'})
