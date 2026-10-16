@@ -149,3 +149,11 @@ def test_pol_update_duplicate_guard_is_present():
     assert "b.domain=='configuration' and b.operation=='UPDATE'" in source
     assert "candidate={**existing_payload,**b.payload}" in source
     assert "DUPLICATE_AGENT_RELATIONSHIP" in source
+
+
+def test_checker_revalidates_pol_uniqueness():
+    from pathlib import Path
+    source=(Path(__file__).resolve().parents[1]/'app'/'masterdata.py').read_text()
+    decision=source.split('def decide(change_ref:',1)[1]
+    assert "ch['domain']=='configuration' and ch['operation'] in ('CREATE','UPDATE')" in decision
+    assert "DUPLICATE_AGENT_RELATIONSHIP" in decision
