@@ -205,7 +205,9 @@ def agent_office_countries(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
             if key in seen: continue
             seen.add(key)
             result.append({'agent_code':agent,'office_code':office,'port_code':port,'source':'POL','record_key':rec['record_key'],'country_code':country['country_code'],'country_name':country['name']})
-        return result
+        # Deterministic display order independent of database scan order.
+        # Do not alter source configurations or IAM membership.
+        return sorted(result,key=lambda row:(str(row['agent_code']).upper(),str(row['country_code']).upper(),str(row['office_code']).upper(),str(row['source']).upper(),str(row.get('port_code') or '').upper()))
     finally:
         c.close()
 
