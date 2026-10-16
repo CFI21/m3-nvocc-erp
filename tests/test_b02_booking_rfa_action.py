@@ -238,7 +238,7 @@ def test_duplicate_approval_check_handles_invalid_legacy_json_safely():
         (2,'booking','{"Approval #":"BA00001"}'),
         (3,'booking','{"Approval #":"BA00002"}'),
     ])
-    sql="SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.\\\"Approval #\\\"') ELSE NULL END = ? LIMIT 1"
+    sql="SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$."Approval #"') ELSE NULL END = ? LIMIT 1"
     row=db.execute(sql,(3,'BA00001')).fetchone()
     assert row==(2,)
     assert db.execute(sql,(3,'BA99999')).fetchone() is None
