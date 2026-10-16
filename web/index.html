@@ -746,7 +746,7 @@ function m3AgentField(k,p){
  return '<div style="min-width:0;padding:5px;border-bottom:1px solid #dce3e0"><label class="muted">'+label+'</label><div>'+widget+'</div></div>';
 }
 let m3IamOffices=[];
-function m3AgentOfficeCountry(officeCode){const office=m3IamOffices.find(o=>o.office_code===officeCode&&o.status==='ACTIVE');return office?.country_code||'';}
+function m3AgentOfficeCountry(officeCode){const agent=m3AgentRows[m3AgentIndex]?.record_key;const office=m3IamOffices.find(o=>o.agent_code===agent&&o.office_code===officeCode);return office?.country_code||'';}
 function m3AgentRelevantRows(row,kind){return m3AgentConfigs.filter(x=>x.status==='ACTIVE'&&m3AgentConfigMatches(x,row)&&String(x.payload?.config_type||'').toUpperCase()===kind)}
 
 const m3AgentTabs=['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template'];
@@ -787,7 +787,7 @@ function m3AgentPaint(){
   const emailTab=m3AgentTab==='Emails',countryTab=m3AgentTab==='Countries';
   const rows=m3AgentRelevantRows(row,emailTab?'AGENT_EMAIL':'AGENT_OFFICE_ASSIGNMENT');
   const countries=[...new Map(rows.map(x=>({...x,derived_country:m3AgentOfficeCountry(x.payload?.office_code)})).filter(x=>x.derived_country).map(x=>[x.derived_country,x])).values()];
-  const view=countryTab?countries.map(x=>'<tr><td>'+esc(x.derived_country)+'</td><td>'+esc(x.payload.country_name||'Country name resolved through IAM')+'</td><td>'+esc(x.payload.office_code||'—')+'</td></tr>').join(''):
+  const view=countryTab?countries.map(x=>'<tr><td>'+esc(x.derived_country)+'</td><td>'+esc(m3IamOffices.find(o=>o.agent_code===row.record_key&&o.office_code===x.payload.office_code)?.country_name||'—')+'</td><td>'+esc(x.payload.office_code||'—')+'</td></tr>').join(''):
    emailTab?rows.map(x=>'<tr><td>'+esc(x.payload?.port_code||'—')+'</td><td>'+esc(x.payload?.email||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join(''):
     rows.map(x=>'<tr><td>'+esc(x.payload?.office_code||'—')+'</td><td>'+esc(m3AgentOfficeCountry(x.payload?.office_code)||'Unresolved')+'</td><td>'+esc(x.payload?.address||'—')+'</td><td>'+(allowed?'<button class="btn" data-agent-remove="'+esc(x.record_key)+'">Remove</button>':'')+'</td></tr>').join('');
   fields+='<div style="grid-column:1/-1"><b>'+esc(m3AgentTab)+' records</b><table class="table"><thead><tr>'+(emailTab?'<th>Port</th><th>Email</th><th>Action</th>':(countryTab?'<th>Country code</th><th>Country</th><th>Office</th>':'<th>Office / Port</th><th>Country</th><th>Address</th><th>Action</th>'))+'</tr></thead><tbody>'+view+'</tbody></table>'+
@@ -970,8 +970,8 @@ async function m3AgentSubmit(){
 }
 async function renderHoAgentMasterWorkspace(){
  try{
-  const [rows,configs,pending,identity,offices]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration'),api('/api/masterdata/changes?status=PENDING'),api('/api/admin/auth/whoami').catch(()=>null),api('/api/admin/offices')]);
-  m3IamOffices=Array.isArray(offices)?offices:[];
+  const [rows,configs,pending,identity,offices]=await Promise.all([api('/api/masterdata/records/agent'),api('/api/masterdata/records/configuration'),api('/api/masterdata/changes?status=PENDING'),api('/api/admin/auth/whoami').catch(()=>null),api('/api/masterdata/agent-office-countries')]);
+  m3IamOffices=Array.isArray(offices)?offices.filter(o=>o&&o.agent_code&&o.office_code&&o.country_code):[];
   m3AgentIdentity=identity||JSON.parse(sessionStorage.getItem('M3_IAM_IDENTITY')||'null');
   const selected=m3AgentFocusCode||m3AgentRows[m3AgentIndex]?.record_key;
   m3AgentRows=Array.isArray(rows)?rows:rows.records||[];
