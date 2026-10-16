@@ -293,3 +293,24 @@ def test_b01_strict_agent_role_split_does_not_affect_other_master_domains(isolat
                                reason='non-Agent role unaffected'),x_m3_session=checker)
     assert other['status']=='PENDING'
     assert withdraw_change(other['change_ref'],Withdrawal(reason='test cleanup'),x_m3_session=checker)['status']=='WITHDRAWN'
+
+
+def test_b01_checker_cannot_propose_agent_related_configuration(isolated,monkeypatch):
+    monkeypatch.setenv('M3_PRODUCTION_TRAFFIC','OFF')
+    monkeypatch.setenv('M3_B01_STRICT_MAKER_CHECKER','true')
+    checker=checker_session()
+    from app.masterdata import Withdrawal,withdraw_change
+    for config_type in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK'):
+        with pytest.raises(HTTPException) as exc:
+            create_change(Change(domain='configuration',record_key='B01-'+config_type,
+                    operation='CREATE',payload={'config_type':config_type,'agent_code':'B01-NO-AGENT'},
+                    reason='check segregation before any reference validation'),x_m3_session=checker)
+        assert exc.value.status_code==403
+        assert exc.value.detail['code']=='B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'
+    # Unrelated configuration is unaffected by the Agent-only B01 policy.
+    other=create_change(Change(domain='configuration',record_key='B01-UNRELATED-CONFIG',
+                    operation='CREATE',payload={'name':'Unrelated UAT configuration','config_type':'GENERAL'},
+                    reason='preserve unrelated workflows'),x_m3_session=checker)
+    assert other['status']=='PENDING'
+    assert withdraw_change(other['change_ref'],Withdrawal(reason='clean up test'),x_m3_session=checker)['status']=='WITHDRAWN'
+
