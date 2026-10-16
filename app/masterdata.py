@@ -152,6 +152,38 @@ def usage_count(c,domain,key):
     elif domain=='voyage': n+=c.execute('SELECT COUNT(*) n FROM jobs j JOIN voyages v ON v.id=j.voyage_id WHERE v.voyage_no=?',(key,)).fetchone()['n']
     return n
 
+@router.get('/agent-office-countries')
+def agent_office_countries(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Read-only countries for approved Agent office assignments; never grants IAM membership."""
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_READ_SCOPE_NOT_AUTHORIZED'})
+        result=[]
+        seen=set()
+        for r in c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+            p=json.loads(r['payload_json'] or '{}')
+            if str(p.get('config_type') or '').upper()!='AGENT_OFFICE_ASSIGNMENT':
+                continue
+            agent=str(p.get('agent_code') or '').strip()
+            office=str(p.get('office_code') or '').strip()
+            if not agent or not office or not active_master(c,'agent',agent):
+                continue
+            resolved=c.execute("""SELECT o.office_code,country.country_code,country.name AS country_name
+                FROM iam_offices o JOIN iam_countries country ON country.id=o.country_id
+                WHERE o.office_code=? AND o.status='ACTIVE' AND country.status='ACTIVE'""",(office,)).fetchone()
+            if not resolved: continue
+            key=(agent,resolved['office_code'],resolved['country_code'])
+            if key in seen: continue
+            seen.add(key)
+            result.append({'agent_code':agent,'office_code':resolved['office_code'],
+                           'country_code':resolved['country_code'],'country_name':resolved['country_name']})
+        return result
+    finally:
+        c.close()
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','domains':DOMAINS,'domain_count':len(DOMAINS),'screens':SCREENS,'screen_count':len(SCREENS),'governance':'MAKER_CHECKER_VERSIONED','delete_mode':'PROTECTED_NO_HARD_DELETE'}
 @router.get('/overview')
