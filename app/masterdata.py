@@ -181,10 +181,22 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     # Dedicated isolated B01 UAT only: enforce strict two-account separation.
     # This does not change other domains, identities, or production policies.
     import os
-    if (b.domain=='agent' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='ON'
+    if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='ON'
         and os.getenv('M3_B01_STRICT_MAKER_CHECKER','false').lower()=='true'
         and sess['username']=='md.checker'):
-        c.close();raise HTTPException(403,{'code':'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
+        agent_configuration=False
+        if b.domain=='configuration':
+            if b.operation=='CREATE':
+                agent_configuration=str(b.payload.get('config_type') or '').upper() in (
+                    'AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK')
+            else:
+                prior=c.execute('SELECT payload_json FROM md_records WHERE domain=? AND record_key=?',
+                                ('configuration',b.record_key)).fetchone()
+                if prior:
+                    agent_configuration=str(json.loads(prior['payload_json']).get('config_type') or '').upper() in (
+                        'AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK')
+        if b.domain=='agent' or agent_configuration:
+            c.close();raise HTTPException(403,{'code':'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
 
     existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
     if b.operation=='CREATE' and existing:c.close();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
