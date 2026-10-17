@@ -204,7 +204,7 @@ def booking_validate_authorized_ports(fields, grants):
         value=fields.get(field)
         if value is None or value=='':
             continue
-        if not isinstance(value,str) or not value.strip():
+        if not isinstance(value,str) or not value.strip() or not re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}',value.strip().upper()):
             raise HTTPException(422,{'code':'BOOKING_PORT_INVALID','field':field})
         rule=grants.get(scope)
         if not isinstance(rule,dict) or not booking_port_allowed(
