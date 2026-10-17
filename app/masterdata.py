@@ -405,6 +405,12 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     if ch['operation']=='REACTIVATE' and current and current['status']!='INACTIVE':
         c.close()
         raise HTTPException(409,{'code':'MASTER_RECORD_NOT_INACTIVE','record_key':ch['record_key']})
+    if ch['operation']=='REACTIVATE' and current and ch['domain']=='configuration':
+        restored=json.loads(current['payload_json'] or '{}')
+        errors=validate_payload(ch['domain'],{},restored)+reference_errors(c,ch['domain'],restored)
+        if errors:
+            c.close()
+            raise HTTPException(422,{'codes':sorted(set(errors))})
     if current and current['version']!=ch['base_version']:c.close();raise HTTPException(409,{'code':'MASTER_VERSION_CONFLICT','current_version':current['version'],'base_version':ch['base_version']})
     payload=json.loads(ch['payload_json']);ts=now();before=dict(current) if current else None
     # Final independent-checker uniqueness barrier protects against competing pending requests.
