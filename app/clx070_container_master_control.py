@@ -62,7 +62,7 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
             ).fetchall()
             if len(grants) != 1:
                 raise HTTPException(403, {"code": "EQUIPMENT_AMBIGUOUS_AGENT_GRANTS"})
-            agent=str(grants[0]["party_key"] or "").strip()
+            agent=_trusted_scope(grants[0]["party_key"], "EQUIPMENT_TRUSTED_SCOPE_REQUIRED")
             if not agent:
                 raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
             from .admin import _assigned_agent_offices
@@ -78,7 +78,7 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
             ).fetchall()
             if len(grants) != 1:
                 raise HTTPException(403, {"code": "EQUIPMENT_AMBIGUOUS_DEPOT_GRANTS"})
-            depot=str(grants[0]["party_key"] or "").strip()
+            depot=_trusted_scope(grants[0]["party_key"], "EQUIPMENT_TRUSTED_SCOPE_REQUIRED")
             if not depot:
                 raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
         return {"role":role,"roles":rs,"user":s["user_ref"],"office":s["office_code"],
