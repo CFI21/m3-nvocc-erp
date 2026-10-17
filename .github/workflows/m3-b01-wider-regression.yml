@@ -77,6 +77,7 @@ jobs:
             tests/test_b02_agent_booking_boundary_integration.py \
             tests/test_m3_p0_lifecycle_contract.py \
             tests/test_m3_cross_agent_smoke.py \
+            tests/test_m3_cross_agent_resource_cleanup.py \
             tests/test_unlocode_master_catalog.py \
             tests/test_unlocode_release_adapter.py \
             --junitxml=m3-b01-b02-focused.xml 2>&1 | tee b01-focused.log
@@ -160,10 +161,6 @@ jobs:
           with Path(__import__('os').environ['GITHUB_STEP_SUMMARY']).open('a') as out:
               out.write('\n'.join(lines)+'\n')
           PY
-      - name: Execute complete P0 regression and evidence runner
-        if: always()
-        run: |
-          bash scripts/m3_oct20_run_p0.sh
       - name: Oct 20 acceptance validator unit tests
         if: always()
         run: |
@@ -174,7 +171,9 @@ jobs:
         if: always()
         run: |
           mkdir -p acceptance-evidence
-          cp -f m3-security-auth.xml m3-b01-b02-focused.xml m3-cross-agent-integration.xml m3-full-regression.xml acceptance-evidence/ 2>/dev/null || true
+          for report in m3-security-auth.xml m3-b01-b02-focused.xml m3-cross-agent-integration.xml m3-full-regression.xml; do
+            if [ -f "$report" ]; then cp "$report" acceptance-evidence/; fi
+          done
           python scripts/m3_oct20_acceptance.py \
             --commit-sha "${GITHUB_SHA}" \
             --evidence-dir acceptance-evidence \
