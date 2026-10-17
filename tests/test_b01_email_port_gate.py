@@ -577,3 +577,55 @@ def test_same_agent_different_email_routes_are_distinct(tmp_path, monkeypatch):
         "SELECT COUNT(*) FROM md_change_requests WHERE record_key='EMAIL-CONTACT-B' AND status='PENDING'"
     ).fetchone()[0] == 1
     db.close()
+
+
+def test_same_agent_same_email_different_ports_are_distinct(tmp_path, monkeypatch):
+    """Agent Email identities include the Port, not only the email address."""
+    import json
+
+    filename = str(tmp_path / "email_distinct_ports.sqlite3")
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": "email-maker"}, {"MASTER_DATA"}),
+    )
+    db = connect()
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('agent','UAT-AGENT-001','{}','ACTIVE','now','now')"
+    )
+    for port in ("NLRTM", "NLAMS"):
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES ('port',?,'{}','ACTIVE','now','now')",
+            (port,),
+        )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-PORT-RTM',?,'ACTIVE','now','now')",
+        (json.dumps(_email("NLRTM")),),
+    )
+    db.close()
+    request = masterdata.create_change(
+        masterdata.Change(
+            domain="configuration",
+            record_key="EMAIL-PORT-AMS",
+            operation="CREATE",
+            payload=_email("NLAMS"),
+            reason="Distinct approved Port",
+        ),
+        "maker",
+    )
+    assert request["status"] == "PENDING"
+    db = connect()
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_change_requests WHERE record_key='EMAIL-PORT-AMS' AND status='PENDING'"
+    ).fetchone()[0] == 1
+    db.close()
