@@ -847,3 +847,60 @@ def test_checker_reactivation_rejects_duplicate_active_email(tmp_path, monkeypat
         "SELECT status FROM md_change_requests WHERE change_ref='MDC-EMAIL-COLLISION'"
     ).fetchone()["status"] == "PENDING"
     db.close()
+
+
+@pytest.mark.parametrize("operation", ["ACTIVATE", "REACTIVATE"])
+def test_maker_activation_rejects_inactive_port_before_queue(tmp_path, monkeypatch, operation):
+    """Retired Port references must fail at submission, not only checker approval."""
+    import json
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / ("maker_" + operation + ".sqlite3"))
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": "maker", "username": "md.maker"}, {"MASTER_DATA"}),
+    )
+
+    db = connect()
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('agent','UAT-AGENT-001','{}','ACTIVE','now','now')"
+    )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM','{}','INACTIVE','now','now')"
+    )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-MAKER-REACT',?,'INACTIVE',1,'now','now')",
+        (json.dumps(_email()),),
+    )
+    db.close()
+
+    with pytest.raises(HTTPException) as error:
+        masterdata.create_change(
+            masterdata.Change(
+                domain="configuration",
+                record_key="EMAIL-MAKER-REACT",
+                operation=operation,
+                payload={},
+                reason="Check retired Port",
+            ),
+            "maker",
+        )
+    assert error.value.status_code == 422
+    assert "AGENT_EMAIL_PORT_REFERENCE_NOT_ACTIVE" in error.value.detail["codes"]
+    db = connect()
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_change_requests WHERE record_key='EMAIL-MAKER-REACT'"
+    ).fetchone()[0] == 0
+    db.close()
