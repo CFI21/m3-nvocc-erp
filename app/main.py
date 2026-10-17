@@ -218,6 +218,7 @@ def booking_agent_port_grants(conn,user_id,agent_code):
     """
     from .admin import _assigned_agent_offices
     assigned=_assigned_agent_offices(conn,user_id,agent_code)
+    # Conflicting IAM country assignments must never be silently overwritten.
     offices={
         str(x['office_code']).strip().upper():str(x['country_code']).strip().upper()
         for x in (assigned or ())
