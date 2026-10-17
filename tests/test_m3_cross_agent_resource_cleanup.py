@@ -1,5 +1,6 @@
 """Denied cross-agent reads must close their database connection."""
 import pytest
+import asyncio
 from fastapi import HTTPException
 from app import main
 
@@ -61,8 +62,7 @@ def test_list_invalid_session_closes_connection(monkeypatch):
     assert conn.closed
 
 
-@pytest.mark.asyncio
-async def test_create_denied_identity_closes_connection(monkeypatch):
+def test_create_denied_identity_closes_connection(monkeypatch):
     conn=Connection()
     monkeypatch.setattr(main,"connect",lambda:conn)
     monkeypatch.setattr(main,"bulk_permission_enabled",lambda:True)
@@ -72,7 +72,7 @@ async def test_create_denied_identity_closes_connection(monkeypatch):
     class Request:
         async def body(self): return b'{}'
     with pytest.raises(HTTPException) as exc:
-        await main.create_record("booking",main.CreateBody(job_ref="00001"),
-                                 Request(),x_m3_session="session")
+        asyncio.run(main.create_record("booking",main.CreateBody(job_ref="00001"),
+                                       Request(),x_m3_session="session"))
     assert exc.value.status_code==403
     assert conn.closed
