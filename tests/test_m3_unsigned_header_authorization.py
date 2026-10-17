@@ -550,3 +550,15 @@ def test_equipment_rejects_invalid_iam_roles(monkeypatch, bad_roles):
         equipment.actor(None, "valid", "ADMIN", "FAKE", "FAKE", "FAKE")
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_IAM_ROLE_REQUIRED"
+
+
+@pytest.mark.parametrize("invalid_rows", [[None], [{}], ["invalid"], [{"wrong_key": "FINANCE"}]])
+def test_mrg_invalid_iam_role_rows_return_role_denial(monkeypatch, invalid_rows):
+    monkeypatch.setattr(mrg, "iam_session", lambda _c, _t: {
+        "user_id": 7, "user_ref": "valid-user",
+    })
+    monkeypatch.setattr(mrg, "iam_roles_for", lambda _c, _u: invalid_rows)
+    with pytest.raises(HTTPException) as exc:
+        mrg.actor(None, "valid", "ADMIN")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "MRG_IAM_ROLE_NOT_AUTHORIZED"
