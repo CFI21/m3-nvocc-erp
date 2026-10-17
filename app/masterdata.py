@@ -247,6 +247,9 @@ def unlocode_catalog(q:str='',country:str='',limit:int=100,
 @router.post('/unlocode/stage/{code}')
 def unlocode_stage(code:str,reason:str='UNLOCODE catalog onboarding',
                    x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    import re
+    if not isinstance(code,str) or not re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}',code.strip().upper()):
+        raise HTTPException(422,{'code':'UNLOCODE_INVALID'})
     key=code.strip().upper()
     matches=[row for row in _unlocode_catalog() if row['unlocode']==key]
     if len(matches)!=1:
