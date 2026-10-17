@@ -93,6 +93,14 @@ def require_action(a,action):
     if action=="approve" and role in APPROVE_ROLES:return
     raise HTTPException(403,{"code":"EQUIPMENT_POLICY_DENIED","role":role,"action":action})
 
+def _trusted_scope(value, code):
+    # Whitespace-only values must never produce a broad or unusable scope.
+    scoped = str(value or "").strip()
+    if not scoped:
+        raise HTTPException(403, {"code": code})
+    return scoped
+
+
 def scope_clause(a,alias="c"):
     # Alias is SQL syntax, never accept arbitrary caller-controlled fragments.
     if alias not in {"c", "container", "containers"}:
@@ -100,15 +108,11 @@ def scope_clause(a,alias="c"):
     role=a.get("role")
     if role in GLOBAL_ROLES or role in {"FINANCE","EQUIPMENT_MANAGER"}: return "",[]
     if role=="AGENT":
-        if not a.get("agent"):raise HTTPException(403,{"code":"AGENT_SCOPE_REQUIRED"})
-        return f" AND {alias}.agent_code=?", [str(a["agent"]).strip()]
+        return f" AND {alias}.agent_code=?", [_trusted_scope(a.get("agent"), "AGENT_SCOPE_REQUIRED")]
     if role=="DEPOT":
-        if not a.get("depot"):raise HTTPException(403,{"code":"DEPOT_SCOPE_REQUIRED"})
-        return f" AND {alias}.depot_code=?", [str(a["depot"]).strip()]
+        return f" AND {alias}.depot_code=?", [_trusted_scope(a.get("depot"), "DEPOT_SCOPE_REQUIRED")]
     if role in {"OPS","BRANCH_OPS","DOCS","EQUIPMENT_CONTROLLER"}:
-        if not a.get("branch"):
-            raise HTTPException(403, {"code": "EQUIPMENT_BRANCH_SCOPE_REQUIRED"})
-        return f" AND {alias}.branch_code=?", [str(a["branch"]).strip()]
+        return f" AND {alias}.branch_code=?", [_trusted_scope(a.get("branch"), "EQUIPMENT_BRANCH_SCOPE_REQUIRED")]
     raise HTTPException(403, {"code": "EQUIPMENT_ROLE_SCOPE_DENIED"})
 
 def audit(conn,a,action,container_id=None,job_id=None,before=None,after=None,meta=None):
