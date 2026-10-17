@@ -292,6 +292,12 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     if existing and b.operation in ('ACTIVATE','REACTIVATE') and existing['status']!='INACTIVE':
         c.close()
         raise HTTPException(409,{'code':'MASTER_RECORD_NOT_INACTIVE','record_key':b.record_key})
+    if existing and b.operation in ('ACTIVATE','REACTIVATE') and b.domain=='configuration':
+        restored=json.loads(existing['payload_json'] or '{}')
+        errors=validate_payload(b.domain,{},restored)+reference_errors(c,b.domain,restored)
+        if errors:
+            c.close()
+            raise HTTPException(422,{'codes':sorted(set(errors))})
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
     if b.domain=='configuration' and b.operation=='UPDATE' and existing_payload.get('config_type')=='AGENT_NETWORK':
