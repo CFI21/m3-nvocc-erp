@@ -43,6 +43,22 @@ jobs:
           assert 'EQUIPMENT_AMBIGUOUS_DEPOT_GRANTS' in equipment
           assert 'def _trusted_scope(' in equipment
           PY
+      - name: Validate IAM session row contracts before regression suite
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          admin=Path('app/admin.py').read_text()
+          equipment=Path('app/clx070_container_master_control.py').read_text()
+          mrg=Path('app/mrg.py').read_text()
+          assert 'def session(c,token)' in admin
+          assert 'fetchone()' in admin.split('def session(c,token)',1)[1].split('@router.get',1)[0]
+          for source in (equipment,mrg):
+              assert 'hasattr(s, "keys")' in source
+              assert '"user_id" not in s.keys()' in source
+          test=Path('tests/test_m3_unsigned_header_authorization.py').read_text()
+          assert 'def test_mrg_sqlite_session_row(' in test
+          assert 'def test_equipment_sqlite_session_row(' in test
+          PY
       - name: Unsigned role and equipment scope security regressions
         run: |
           set -o pipefail
