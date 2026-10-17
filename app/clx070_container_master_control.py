@@ -56,6 +56,9 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
             (s["user_id"], s["home_office_id"])
         ).fetchone()
         branch=_trusted_scope(br["branch_code"], "EQUIPMENT_BRANCH_SCOPE_REQUIRED") if br else None
+        if role in {"AGENT", "DEPOT"} and not branch:
+            # Active office membership is mandatory for restricted equipment users.
+            raise HTTPException(403, {"code": "EQUIPMENT_ACTIVE_OFFICE_REQUIRED"})
         if role in {"OPS", "BRANCH_OPS", "DOCS", "EQUIPMENT_CONTROLLER"} and not branch:
             raise HTTPException(403, {"code": "EQUIPMENT_BRANCH_SCOPE_REQUIRED"})
         agent=None
