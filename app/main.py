@@ -208,7 +208,7 @@ def booking_validate_authorized_ports(fields, grants):
             raise HTTPException(422,{'code':'BOOKING_PORT_INVALID','field':field})
         rule=grants.get(scope)
         if not isinstance(rule,dict) or not booking_port_allowed(
-            value,rule.get('ports'),all_ports_granted=rule.get('all_ports') is True
+            value.strip().upper(),rule.get('ports'),all_ports_granted=rule.get('all_ports') is True
         ):
             raise HTTPException(403,{'code':'BOOKING_PORT_NOT_AUTHORIZED','field':field})
     return True
