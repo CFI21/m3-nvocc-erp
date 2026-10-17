@@ -55,9 +55,7 @@ def actor(c,token,x_role):
         roles={str(r["role_code"]).upper() for r in rs}
         role=next(iter(roles), "VIEWER")
         return {"user":s["user_ref"],"role":role,"roles":roles}
-    role=(x_role or "VIEWER").upper()
-    if role=="SUPER_ADMIN": role="ADMIN"
-    return {"user":"header-"+role,"role":role,"roles":{role}}
+    raise HTTPException(401, {"code": "MRG_SESSION_REQUIRED"})
 
 def require(a,allowed):
     if not (a["roles"]&allowed): raise HTTPException(403,{"code":"MRG_ROLE_DENIED"})
