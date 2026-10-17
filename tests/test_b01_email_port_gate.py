@@ -1105,3 +1105,46 @@ def test_isolated_checker_cannot_submit_agent_config(
         "SELECT COUNT(*) FROM md_change_requests WHERE record_key='B01-GUARD'"
     ).fetchone()[0] == 0
     db.close()
+
+
+@pytest.mark.parametrize("flow", ["maker", "checker"])
+def test_missing_session_username_fails_closed(tmp_path, monkeypatch, flow):
+    """Neither approval nor submission may proceed without a session username."""
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "no_username.sqlite3")
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: (
+            {"user_ref": "uat-user"},
+            {"MASTER_DATA", "MASTER_DATA_MANAGER"},
+        ),
+    )
+    with pytest.raises(HTTPException) as error:
+        if flow == "maker":
+            masterdata.create_change(
+                masterdata.Change(
+                    domain="configuration", record_key="B01-NO-USERNAME",
+                    operation="CREATE", payload={}, reason="Identity gate",
+                ),
+                "valid",
+            )
+        else:
+            masterdata.decide(
+                "MDC-NOT-FOUND",
+                masterdata.Decision(decision="APPROVE"),
+                "valid",
+            )
+    assert error.value.status_code == 403
+    assert error.value.detail["code"] == (
+        "MAKER_SESSION_USERNAME_REQUIRED" if flow == "maker"
+        else "CHECKER_SESSION_USERNAME_REQUIRED"
+    )
