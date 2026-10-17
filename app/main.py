@@ -179,7 +179,7 @@ def booking_port_allowed(port_code, allowed_ports, *, all_ports_granted=False):
 
 def booking_iam_agent_granted(conn, user_id, agent_code):
     """Verify an active agent-party assignment; no implicit global grant."""
-    if not isinstance(user_id,int) or isinstance(user_id,bool):
+    if not isinstance(user_id,int) or isinstance(user_id,bool) or user_id<=0:
         return False
     if not isinstance(agent_code,str):
         return False
