@@ -237,7 +237,7 @@ def booking_agent_port_grants(conn,user_id,agent_code):
         active_day=datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         if not (str(config.get('effective_from') or '0000-01-01')<=active_day<=str(config.get('effective_to') or '9999-12-31')):
             continue
-        scope=str(config.get('scope') or '').upper()
+        scope=str(config.get('scope') or '').strip().upper()
         port=str(config.get('port_code') or '').strip().upper()
         office_code=str(config.get('office_code') or '').strip().upper()
         # Network configuration never grants rights without a matching active
