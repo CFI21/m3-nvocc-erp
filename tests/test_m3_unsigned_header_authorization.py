@@ -195,3 +195,15 @@ def test_equipment_whitespace_only_scope_fails_closed(role, key, code):
         equipment.scope_clause({"role": role, key: "   "})
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == code
+
+
+@pytest.mark.parametrize("role,key,value,code", [
+    ("AGENT", "agent", 123, "AGENT_SCOPE_REQUIRED"),
+    ("DEPOT", "depot", ["D1"], "DEPOT_SCOPE_REQUIRED"),
+    ("OPS", "branch", {"id": "NLRTM"}, "EQUIPMENT_BRANCH_SCOPE_REQUIRED"),
+])
+def test_equipment_rejects_non_string_scope_values(role, key, value, code):
+    with pytest.raises(HTTPException) as exc:
+        equipment.scope_clause({"role": role, key: value})
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == code
