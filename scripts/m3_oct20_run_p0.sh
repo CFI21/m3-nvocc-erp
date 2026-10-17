@@ -5,7 +5,7 @@ export M3_PRODUCTION_TRAFFIC=OFF
 export M3_B01_STRICT_MAKER_CHECKER=true
 mkdir -p acceptance-evidence
 # Prevent old JUnit files or acceptance reports from being mistaken for this run.
-find acceptance-evidence -maxdepth 1 -type f \( -name "*.xml" -o -name "*.log" -o -name "release-verdict.json" \) -delete
+find acceptance-evidence -maxdepth 1 -type f \( -name "*.xml" -o -name "*.log" -o -name "release-verdict.json" -o -name "agent_master_uat.json" -o -name "iam_security.json" -o -name "cross_agent_security.json" -o -name "booking_job_bl_e2e.json" -o -name "equipment_depot_uat.json" -o -name "finance_reconciliation.json" -o -name "screens_196_uat.json" -o -name "preview_deploys.json" \) -delete
 sha="$(git rev-parse HEAD)"
 printf '%s\n' "$sha" > acceptance-evidence/commit-sha.txt
 run_suite() {
