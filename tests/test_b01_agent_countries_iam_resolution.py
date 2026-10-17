@@ -18,7 +18,7 @@ def country_db(tmp_path, monkeypatch):
         return c
     monkeypatch.setattr(masterdata, "connect", connection)
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
-    monkeypatch.setattr(masterdata, "authenticated_actor", lambda c, token: ({"user_ref": "UAT-B01-MAKER"}, {"MASTER_DATA"}))
+    monkeypatch.setattr(masterdata, "authenticated_actor", lambda c, token: ({"user_ref": "UAT-B01-MAKER", "username": "uat.actor"}, {"MASTER_DATA"}))
     c = connection()
     c.execute("INSERT INTO iam_countries VALUES (1,'NL','Netherlands','ACTIVE')")
     c.execute("INSERT INTO iam_offices VALUES (1,'RTM',1,'ACTIVE')")
@@ -382,8 +382,8 @@ def test_country_projection_excludes_inactive_office_while_other_remains(country
 def test_checker_reactivation_rejects_duplicate_pol_coverage(country_db,monkeypatch):
     """Inactive POL relationship cannot revive over identical active coverage."""
     def identity(_c,token):
-        if token=="checker": return {"user_ref":"checker"},{"MASTER_DATA_MANAGER"}
-        return {"user_ref":"maker"},{"MASTER_DATA"}
+        if token=="checker": return {"user_ref": "checker", "username": "uat.actor"},{"MASTER_DATA_MANAGER"}
+        return {"user_ref": "maker", "username": "uat.actor"},{"MASTER_DATA"}
     monkeypatch.setattr(masterdata,"authenticated_actor",identity)
     c=country_db()
     c.execute(
@@ -415,7 +415,7 @@ def test_checker_reactivation_rejects_duplicate_pol_coverage(country_db,monkeypa
 def test_pol_reactivation_rejects_retired_port(country_db, monkeypatch):
     """No checker may restore POL coverage when its Port master is inactive."""
     monkeypatch.setattr(masterdata, "authenticated_actor",
-        lambda _c, _token: ({"user_ref":"checker"},{"MASTER_DATA_MANAGER"}))
+        lambda _c, _token: ({"user_ref": "checker", "username": "uat.actor"},{"MASTER_DATA_MANAGER"}))
     c=country_db()
     coverage={"config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE",
         "agent_code":"UAT-AGENT-001","office_code":"RTM",
@@ -446,7 +446,7 @@ def test_pol_reactivation_rejects_inactive_iam_country(country_db, monkeypatch):
     """Country authority is checked again by the independent checker."""
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _c, _token: ({"user_ref":"checker"},{"MASTER_DATA_MANAGER"}),
+        lambda _c, _token: ({"user_ref": "checker", "username": "uat.actor"},{"MASTER_DATA_MANAGER"}),
     )
     c=country_db()
     c.execute("UPDATE iam_countries SET status='INACTIVE' WHERE country_code='NL'")
