@@ -151,6 +151,24 @@ def check_list_scope(api_url, token_a, token_b, booking_a, booking_b):
     return results
 
 
+
+def check_unauthenticated(api_url, booking_a, booking_b):
+    """SEC-007/008: missing session cannot read either agent's booking."""
+    _validate_target(api_url)
+    results=[]
+    for sid, booking in (("SEC-007",booking_a),("SEC-008",booking_b)):
+        try:
+            response=request_json(api_url,"/api/v1/booking/"+booking,"")
+            status=response["status"]
+            valid=status==401
+            results.append({"id":sid,"http_status":status,
+                            "status":"PASS" if valid else "BLOCKED",
+                            "response_sha256":hashlib.sha256(response["body"].encode()).hexdigest()})
+        except (ValueError,TypeError,urllib.error.URLError,TimeoutError,OSError) as exc:
+            results.append({"id":sid,"status":"BLOCKED","error":type(exc).__name__})
+    return results
+
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--api-url",default=os.getenv("M3_UAT_API_URL",""))
@@ -166,6 +184,8 @@ def main():
                    args.booking_a,args.booking_b,args.commit_sha)
         result["tests"].extend(check_list_scope(
             args.api_url,token_a,token_b,args.booking_a,args.booking_b))
+        result["tests"].extend(check_unauthenticated(
+            args.api_url,args.booking_a,args.booking_b))
         result["status"]="PASS" if all(x["status"]=="PASS" for x in result["tests"]) else "BLOCKED"
     except ValueError as exc:
         result={"status":"BLOCKED","reason":str(exc)}
