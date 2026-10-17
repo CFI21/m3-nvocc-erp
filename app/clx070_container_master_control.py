@@ -48,8 +48,12 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
         role=_roles_priority(rs)
         # Never treat request-supplied scope headers as IAM grants.
         br=conn.execute(
-            "SELECT branch_code FROM iam_branches WHERE office_id=? ORDER BY id LIMIT 1",
-            (s["home_office_id"],)
+            "SELECT b.branch_code FROM iam_branches b "
+            "JOIN iam_offices o ON o.id=b.office_id AND o.status='ACTIVE' "
+            "JOIN iam_office_membership m ON m.office_id=o.id "
+            "AND m.user_id=? AND m.status='ACTIVE' "
+            "WHERE b.office_id=? ORDER BY b.id LIMIT 1",
+            (s["user_id"], s["home_office_id"])
         ).fetchone()
         branch=_trusted_scope(br["branch_code"], "EQUIPMENT_BRANCH_SCOPE_REQUIRED") if br else None
         if role in {"OPS", "BRANCH_OPS", "DOCS", "EQUIPMENT_CONTROLLER"} and not branch:
