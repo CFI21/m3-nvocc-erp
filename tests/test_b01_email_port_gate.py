@@ -954,3 +954,44 @@ def test_checker_rejects_unknown_stored_operation(tmp_path, monkeypatch):
         "SELECT status FROM md_change_requests WHERE change_ref='MDC-INVALID-OP'"
     ).fetchone()["status"] == "PENDING"
     db.close()
+
+
+def test_checker_can_reject_unknown_stored_operation(tmp_path, monkeypatch):
+    """Malformed legacy requests remain rejectable by an independent checker."""
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "reject_invalid_stored_operation.sqlite3")
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}),
+    )
+    db = connect()
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-INVALID-REJECT','configuration','BAD-REQUEST','DELETE','{}','invalid','maker','now',0)"
+    )
+    db.close()
+
+    response = masterdata.decide(
+        "MDC-INVALID-REJECT",
+        masterdata.Decision(decision="REJECT", comment="Unsupported operation"),
+        "checker",
+    )
+    assert response["status"] == "REJECTED"
+    db = connect()
+    row = db.execute(
+        "SELECT status,checker FROM md_change_requests WHERE change_ref='MDC-INVALID-REJECT'"
+    ).fetchone()
+    assert row["status"] == "REJECTED"
+    assert row["checker"] == "checker"
+    db.close()
