@@ -526,3 +526,27 @@ def test_equipment_sqlite_session_row(monkeypatch):
     assert result["agent"] == "REAL-AGENT"
     assert result["branch"] == "NLRTM"
     db.close()
+
+
+@pytest.mark.parametrize("bad_session", [None, {}, {"user_id": None}, {"user_id": 0}])
+def test_equipment_rejects_invalid_iam_session_before_role_query(monkeypatch, bad_session):
+    monkeypatch.setattr(equipment, "iam_session", lambda c, token: bad_session)
+    monkeypatch.setattr(equipment, "roles_for",
+                        lambda c, user: pytest.fail("invalid session queried roles"))
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(None, "valid", "ADMIN", "FAKE", "FAKE", "FAKE")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_IAM_IDENTITY_REQUIRED"
+
+
+@pytest.mark.parametrize("bad_roles", [None, [], [None], ["corrupt"], [{}]])
+def test_equipment_rejects_invalid_iam_roles(monkeypatch, bad_roles):
+    monkeypatch.setattr(equipment, "iam_session", lambda c, token: {
+        "user_id": 7, "user_ref": "tester", "home_office_id": 1,
+        "office_code": "RTM",
+    })
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: bad_roles)
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(None, "valid", "ADMIN", "FAKE", "FAKE", "FAKE")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_IAM_ROLE_REQUIRED"
