@@ -236,7 +236,7 @@ def unlocode_catalog(q:str='',country:str='',limit:int=100,
         matches=[
             item for item in _unlocode_catalog()
             if (not country or item['country_code']==country)
-            and (not needle or needle in (' '.join(item.values())).upper())
+            and (not needle or needle in (' '.join(str(value) for value in item.values())).upper())
         ]
         sources={str(item.get('source') or 'uploaded_unlocode_reference') for item in matches}
         return {'total':len(matches),'items':matches[:limit],
