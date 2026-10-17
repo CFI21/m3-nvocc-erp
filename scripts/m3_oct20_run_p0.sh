@@ -30,6 +30,7 @@ run_suite m3-b01-b02-focused \
   tests/test_b02_agent_booking_boundary_integration.py \
   tests/test_m3_p0_lifecycle_contract.py \
   tests/test_m3_cross_agent_smoke.py \
+  tests/test_m3_cross_agent_resource_cleanup.py \
   tests/test_unlocode_master_catalog.py \
   tests/test_unlocode_release_adapter.py || failed=1
 run_suite m3-cross-agent-integration tests/test_b02_agent_booking_boundary_integration.py || failed=1
