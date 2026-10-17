@@ -70,6 +70,17 @@ def run(api_url, token_a, token_b, own_id, other_id, target_sha):
             result=request_json(api_url,path,token)
             status=result["status"]
             allowed=status in expected
+            # A denied cross-agent request must not return a response containing
+            # another agent's data. A 403/404 with embedded records is leakage.
+            if allowed and status in (403, 404):
+                try:
+                    denied=json.loads(result["body"])
+                except (ValueError,TypeError):
+                    denied=None
+                if isinstance(denied,dict) and any(key in denied for key in (
+                        "job_ref","agent_code","customer_name","fields","records",
+                        "payload_json","booking_ref")):
+                    allowed=False
             # Own-resource success must identify the requested transaction.
             # A generic 200/login page is not evidence of successful scoped access.
             if allowed and 200 <= status < 300:
