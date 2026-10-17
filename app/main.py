@@ -621,12 +621,16 @@ def get_record(module:str,tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Opti
 @app.post('/api/v1/{module}',status_code=201)
 async def create_record(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); conn=connect()
-    if bulk_permission_enabled():
-        ga=governed_job_actor(conn,x_m3_session,body.job_ref,'create'); role=ga['role'];ascope=cscope=None
-    else:
-        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
-        if not role_ok(role,'create'): conn.close(); raise HTTPException(403,'Role cannot create')
-    raw=await request.body(); rh=hashlib.sha256(raw).hexdigest(); tx(conn)
+    try:
+        if bulk_permission_enabled():
+            ga=governed_job_actor(conn,x_m3_session,body.job_ref,'create'); role=ga['role'];ascope=cscope=None
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            if not role_ok(role,'create'): raise HTTPException(403,'Role cannot create')
+        raw=await request.body(); rh=hashlib.sha256(raw).hexdigest(); tx(conn)
+    except BaseException:
+        conn.close()
+        raise
     try:
         # Revoked agent/port access must also block idempotent create replays.
         if module=='booking' and bulk_permission_enabled() and role=='AGENT':
