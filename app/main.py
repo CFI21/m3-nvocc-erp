@@ -232,8 +232,11 @@ def booking_agent_port_grants(conn,user_id,agent_code):
         country=country.strip().upper()
         if not office or not re.fullmatch(r'[A-Z]{2}',country):
             continue
+        if office in ambiguous_offices:
+            continue
         if office in offices and offices[office]!=country:
             ambiguous_offices.add(office)
+            offices.pop(office,None)
         else:
             offices[office]=country
     for office in ambiguous_offices:
