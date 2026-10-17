@@ -84,6 +84,20 @@ def evaluate(root, sha):
         report["modules"][name] = {"status": status, "ci": ci,
                                     "evidence": proof}
     report["preview"] = _artifact(root / "preview_deploys.json", sha)
+    if report["preview"]["status"] == "PASS":
+        try:
+            deploy = json.loads((root / "preview_deploys.json").read_text(encoding="utf-8"))
+            web = deploy.get("web", {})
+            api = deploy.get("api", {})
+            for target in (web, api):
+                if not isinstance(target, dict) or target.get("commit_sha", "").lower() != sha:
+                    raise ValueError("DEPLOY_SHA_MISMATCH")
+                if not str(target.get("deployment_id", "")).strip():
+                    raise ValueError("DEPLOY_ID_MISSING")
+            if web["deployment_id"] == api["deployment_id"]:
+                raise ValueError("DEPLOY_IDENTITIES_NOT_DISTINCT")
+        except (ValueError, OSError, AttributeError, KeyError) as exc:
+            report["preview"] = {"status": "BLOCKED", "reason": str(exc)}
     report["release"] = ("PASS" if all(x["status"] == "PASS"
                           for x in report["modules"].values())
                           and report["preview"]["status"] == "PASS" else "BLOCKED")
