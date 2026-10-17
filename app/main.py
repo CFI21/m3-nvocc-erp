@@ -196,6 +196,8 @@ def booking_validate_authorized_ports(fields, grants):
     trusted Boolean True for that field.
     """
     mapping={'POL':'POL','POD':'POD','POT (1)':'TS','POT (2)':'TS'}
+    if not isinstance(fields,dict):
+        raise HTTPException(422,{'code':'BOOKING_FIELDS_INVALID'})
     if not isinstance(grants,dict):
         raise HTTPException(403,{'code':'BOOKING_PORT_PERMISSION_MISSING'})
     for field,scope in mapping.items():
