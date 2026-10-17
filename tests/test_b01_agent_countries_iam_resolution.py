@@ -527,3 +527,43 @@ def test_maker_cannot_queue_duplicate_pol_activation(country_db, monkeypatch, op
         "SELECT status FROM md_records WHERE record_key='POL-REACTIVATE'"
     ).fetchone()["status"] == "INACTIVE"
     c.close()
+
+
+@pytest.mark.parametrize("network_type", ["PORT_COVERAGE", " port_coverage "])
+def test_maker_pol_update_blocks_normalized_duplicate(country_db, network_type):
+    """An UPDATE must not create a second active POL relationship."""
+    c = country_db()
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM','{}','ACTIVE','now','now')"
+    )
+    base = {
+        "config_type": "AGENT_NETWORK", "network_type": "PORT_COVERAGE",
+        "agent_code": "UAT-AGENT-001", "office_code": "RTM",
+        "scope": "POL", "port_code": "NLRTM",
+    }
+    other = {**base, "scope": "POD"}
+    for key, payload in (("POL-EXISTING", base), ("POL-UPDATE", other)):
+        c.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+            "VALUES ('configuration',?,?,'ACTIVE',1,'now','now')",
+            (key, json.dumps(payload)),
+        )
+    c.close()
+    with pytest.raises(HTTPException) as exc:
+        masterdata.create_change(
+            masterdata.Change(
+                domain="configuration", record_key="POL-UPDATE",
+                operation="UPDATE",
+                payload={"scope": " pol ", "network_type": network_type},
+                reason="Must reject duplicate coverage",
+            ),
+            "valid",
+        )
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "DUPLICATE_AGENT_RELATIONSHIP"
+    c = country_db()
+    assert c.execute(
+        "SELECT COUNT(*) FROM md_change_requests WHERE record_key='POL-UPDATE'"
+    ).fetchone()[0] == 0
+    c.close()
