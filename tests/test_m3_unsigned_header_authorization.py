@@ -22,3 +22,64 @@ def test_equipment_rejects_unsigned_header_role_and_scope(header_role):
         equipment.actor(None, None, header_role, "ANY-AGENT", "ANY-BRANCH", "ANY-DEPOT")
     assert exc.value.status_code == 401
     assert exc.value.detail["code"] == "EQUIPMENT_SESSION_REQUIRED"
+
+
+class _GrantConn:
+    def __init__(self, grants):
+        self.grants = grants
+
+    def execute(self, sql, params):
+        if "iam_branches" in sql:
+            return _Results([])
+        if "iam_party_access" in sql:
+            return _Results([{"party_key": key} for key in self.grants])
+        raise AssertionError("Unexpected IAM SQL")
+
+
+class _Results:
+    def __init__(self, rows):
+        self.rows = rows
+
+    def fetchone(self):
+        return self.rows[0] if self.rows else None
+
+    def fetchall(self):
+        return self.rows
+
+
+@pytest.mark.parametrize("grants", [[], ["AGENT-A", "AGENT-B"], [""]])
+def test_equipment_agent_requires_unambiguous_trusted_grant(monkeypatch, grants):
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "agent-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": "AGENT"}])
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(
+            _GrantConn(grants), "valid", "ADMIN", "SPOOFED",
+            "SPOOFED-BRANCH", "SPOOFED-DEPOT",
+        )
+    assert exc.value.status_code == 403
+
+
+def test_equipment_agent_scope_uses_iam_not_headers(monkeypatch):
+    from app import admin
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "agent-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": "AGENT"}])
+    monkeypatch.setattr(
+        admin, "_assigned_agent_offices",
+        lambda conn, user, agent: [{"office_code": "RTM"}],
+    )
+    actor = equipment.actor(
+        _GrantConn(["REAL-AGENT"]), "valid", "ADMIN",
+        "SPOOFED-AGENT", "SPOOFED-BRANCH", "SPOOFED-DEPOT",
+    )
+    assert actor["role"] == "AGENT"
+    assert actor["agent"] == "REAL-AGENT"
+    assert actor["branch"] is None
+    assert actor["depot"] is None
