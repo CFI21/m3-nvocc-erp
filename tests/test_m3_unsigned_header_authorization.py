@@ -142,3 +142,11 @@ def test_equipment_unknown_role_denied_even_for_read():
         equipment.scope_clause({"role": "UNRECOGNIZED", "branch": "NLRTM"})
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_ROLE_SCOPE_DENIED"
+
+
+@pytest.mark.parametrize("alias", ["unknown_alias", "unexpected", "", "legacy"])
+def test_equipment_rejects_untrusted_sql_scope_alias(alias):
+    with pytest.raises(HTTPException) as exc:
+        equipment.scope_clause({"role": "AGENT", "agent": "A1"}, alias=alias)
+    assert exc.value.status_code == 400
+    assert exc.value.detail["code"] == "EQUIPMENT_INVALID_SQL_ALIAS"
