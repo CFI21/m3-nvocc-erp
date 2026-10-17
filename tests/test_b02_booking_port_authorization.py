@@ -426,3 +426,21 @@ def test_booking_direct_port_grant_accepts_canonical_valid_unlocode(port):
 def test_booking_direct_port_grant_denies_nonstring_values_before_global_permission(port):
     assert main.booking_port_allowed(port, {"NLRTM"}, all_ports_granted=True) is False
     assert main.booking_port_allowed(port, {"NLRTM"}, all_ports_granted=False) is False
+
+
+@pytest.mark.parametrize("allowlist", [
+    [" NLRTM ", None, 123, "BAD", "DEHAM"],
+    ("nlrtm", "NLRTM1"),
+    {"NLRTM", "", "NL RTM"},
+])
+def test_booking_allowlist_filters_invalid_entries_without_revoking_valid_port(allowlist):
+    assert main.booking_port_allowed("NLRTM",allowlist) is True
+
+
+@pytest.mark.parametrize("allowlist", [
+    ["NLRTM1", "12345", None, 17],
+    {"BAD", "NL RTM", ""},
+    ["NLRTM"],
+])
+def test_booking_allowlist_never_grants_unlisted_port(allowlist):
+    assert main.booking_port_allowed("DEHAM",allowlist) is False
