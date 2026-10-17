@@ -218,7 +218,13 @@ def booking_agent_port_grants(conn,user_id,agent_code):
     """
     from .admin import _assigned_agent_offices
     assigned=_assigned_agent_offices(conn,user_id,agent_code)
-    offices={str(x['office_code']).strip().upper():str(x['country_code']).strip().upper() for x in assigned}
+    offices={
+        str(x['office_code']).strip().upper():str(x['country_code']).strip().upper()
+        for x in (assigned or ())
+        if hasattr(x,'keys') and 'office_code' in x.keys() and 'country_code' in x.keys()
+        and isinstance(x['office_code'],str) and isinstance(x['country_code'],str)
+        and x['office_code'].strip() and re.fullmatch(r'[A-Z]{2}',x['country_code'].strip().upper())
+    }
     grants={scope:{'ports':set(),'all_ports':False} for scope in ('POL','POD','TS')}
     if not offices:
         return grants
@@ -228,6 +234,8 @@ def booking_agent_port_grants(conn,user_id,agent_code):
         try:
             config=json.loads(row['payload_json'] or '{}')
         except (ValueError,TypeError):
+            continue
+        if not isinstance(config,dict):
             continue
         if (str(config.get('config_type') or '').strip().upper()!='AGENT_NETWORK'
                 or str(config.get('network_type') or '').strip().upper()!='PORT_COVERAGE'
@@ -252,7 +260,7 @@ def booking_agent_port_grants(conn,user_id,agent_code):
             continue
         try:
             code=str(json.loads(master['payload_json'] or '{}').get('unlocode') or '').strip().upper()
-        except (ValueError,TypeError):
+        except (ValueError,TypeError,AttributeError):
             continue
         if code!=port:
             continue
