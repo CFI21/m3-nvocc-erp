@@ -4,6 +4,8 @@ set -Eeuo pipefail
 export M3_PRODUCTION_TRAFFIC=OFF
 export M3_B01_STRICT_MAKER_CHECKER=true
 mkdir -p acceptance-evidence
+# Prevent old JUnit files or acceptance reports from being mistaken for this run.
+find acceptance-evidence -maxdepth 1 -type f \( -name "*.xml" -o -name "*.log" -o -name "release-verdict.json" \) -delete
 sha="$(git rev-parse HEAD)"
 printf '%s\n' "$sha" > acceptance-evidence/commit-sha.txt
 run_suite() {
