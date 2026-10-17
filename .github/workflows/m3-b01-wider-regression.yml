@@ -179,6 +179,11 @@ jobs:
             --evidence-dir acceptance-evidence \
             --output m3-oct20-acceptance.json \
             || echo "Release verdict: BLOCKED pending full evidence"
+      - name: Summarize failed tests without exposing response contents
+        if: always()
+        run: |
+          python -m pytest -q tests/test_m3_ci_triage.py --junitxml=m3-ci-triage-tests.xml
+          python scripts/m3_ci_triage.py --dir . --output m3-ci-triage.json || true
       - name: Preserve B01/B02 and full regression evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -196,6 +201,8 @@ jobs:
             m3-b02-collection.log
             m3-oct20-evidence.md
             m3-oct20-acceptance.json
+            m3-ci-triage.json
+            m3-ci-triage-tests.xml
             acceptance-evidence/**
             m3-acceptance-validator.xml
             m3-acceptance-validator.log
