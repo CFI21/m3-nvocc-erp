@@ -410,3 +410,13 @@ def test_booking_agent_iam_grant_uses_parameterized_exact_party_key():
         def fetchone(self):
             return (1,)
     assert main.booking_iam_agent_granted(ExactSql(), 7, " A1 ") is True
+
+
+@pytest.mark.parametrize("port", ["12345", "NLRT", "NLRTMM", "N!RTM", "NL RTM", "", None])
+def test_booking_direct_port_grant_rejects_malformed_unlocode_even_when_global(port):
+    assert main.booking_port_allowed(port, {"NLRTM"}, all_ports_granted=True) is False
+
+
+@pytest.mark.parametrize("port", ["nlrtm", " NLRTM ", "NlRtM"])
+def test_booking_direct_port_grant_accepts_canonical_valid_unlocode(port):
+    assert main.booking_port_allowed(port, {"NLRTM"}) is True
