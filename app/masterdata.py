@@ -237,6 +237,9 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
     if b.domain not in DOMAINS:c.close();raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
     if not can_make_roles(roles):c.close();raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+    if not str(user or '').strip():
+        c.close()
+        raise HTTPException(403,{'code':'MAKER_IDENTITY_REQUIRED'})
     # Dedicated isolated B01 UAT only: enforce strict two-account separation.
     # This does not change other domains, identities, or production policies.
     import os
