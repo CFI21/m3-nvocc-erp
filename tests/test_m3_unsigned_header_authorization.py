@@ -491,3 +491,18 @@ def test_mrg_accepts_real_sqlite_row_iam_roles(monkeypatch):
     assert result["role"] == "FINANCE"
     assert result["roles"] == {"FINANCE"}
     db.close()
+
+
+def test_mrg_sqlite_session_row(monkeypatch):
+    import sqlite3
+    db=sqlite3.connect(":memory:")
+    db.row_factory=sqlite3.Row
+    db.execute("CREATE TABLE t(user_id INTEGER, user_ref TEXT)")
+    db.execute("INSERT INTO t VALUES (7, 'tester')")
+    session_row=db.execute("SELECT * FROM t").fetchone()
+    monkeypatch.setattr(mrg, "iam_session", lambda c, token: session_row)
+    monkeypatch.setattr(mrg, "iam_roles_for", lambda c, user: [{"role_code": "FINANCE"}])
+    result=mrg.actor(None, "valid", "VIEWER")
+    assert result["user"] == "tester"
+    assert result["role"] == "FINANCE"
+    db.close()
