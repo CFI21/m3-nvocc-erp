@@ -169,3 +169,14 @@ def test_equipment_missing_party_scope_denied_with_403(role, code):
         equipment.scope_clause({"role": role})
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == code
+
+
+@pytest.mark.parametrize("role,key,value", [
+    ("AGENT", "agent", " A1 "),
+    ("DEPOT", "depot", " D1 "),
+    ("OPS", "branch", " NLRTM "),
+])
+def test_equipment_scope_parameters_normalized(role, key, value):
+    clause, params = equipment.scope_clause({"role": role, key: value})
+    assert clause.endswith("=?")
+    assert params == [value.strip()]
