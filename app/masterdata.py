@@ -411,6 +411,22 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
         if errors:
             c.close()
             raise HTTPException(422,{'codes':sorted(set(errors))})
+    if ch['operation']=='REACTIVATE' and current and ch['domain']=='configuration':
+        restored=json.loads(current['payload_json'] or '{}')
+        kind=str(restored.get('config_type') or '').strip().upper()
+        if kind in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'):
+            agent=str(restored.get('agent_code') or '').strip().upper()
+            office=str(restored.get('office_code') or '').strip().upper()
+            port=str(restored.get('port_code') or '').strip().upper()
+            email=str(restored.get('email') or '').strip().lower()
+            for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if row['record_key']==ch['record_key']: continue
+                other=json.loads(row['payload_json'] or '{}')
+                if str(other.get('config_type') or '').strip().upper()!=kind or str(other.get('agent_code') or '').strip().upper()!=agent: continue
+                duplicate=(bool(office) and str(other.get('office_code') or '').strip().upper()==office) if kind=='AGENT_OFFICE_ASSIGNMENT' else (bool(port) and bool(email) and str(other.get('port_code') or '').strip().upper()==port and str(other.get('email') or '').strip().lower()==email)
+                if duplicate:
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if current and current['version']!=ch['base_version']:c.close();raise HTTPException(409,{'code':'MASTER_VERSION_CONFLICT','current_version':current['version'],'base_version':ch['base_version']})
     payload=json.loads(ch['payload_json']);ts=now();before=dict(current) if current else None
     # Final independent-checker uniqueness barrier protects against competing pending requests.
