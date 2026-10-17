@@ -153,3 +153,25 @@ def test_catalog_identifies_actual_unece_source_and_no_booking_grant(monkeypatch
     assert result["source"]=="unece_release"
     assert result["total"]==1
     assert result["booking_grant"] is False
+
+
+def test_official_catalog_search_supports_boolean_eligibility(monkeypatch):
+    class FakeDB:
+        def close(self): pass
+    monkeypatch.setattr(masterdata,"connect",lambda:FakeDB())
+    monkeypatch.setattr(masterdata,"using_postgres",lambda:True)
+    monkeypatch.setattr(masterdata,"authenticated_actor",lambda c,token:({},{"MASTER_DATA"}))
+    monkeypatch.setattr(masterdata,"_unlocode_catalog",lambda:[
+        {"unlocode":"NLRTM","country_code":"NL","port_code":"RTM",
+         "port_name":"Rotterdam","source":"unece_release",
+         "eligible_for_activation":True},
+        {"unlocode":"DEHAM","country_code":"DE","port_code":"HAM",
+         "port_name":"Hamburg","source":"unece_release",
+         "eligible_for_activation":False},
+    ])
+    result=masterdata.unlocode_catalog(q="ROTTERDAM",x_m3_session="token")
+    assert [item["unlocode"] for item in result["items"]]==["NLRTM"]
+    assert result["source"]=="unece_release"
+    result=masterdata.unlocode_catalog(q="HAMBURG",x_m3_session="token")
+    assert result["items"][0]["eligible_for_activation"] is False
+    assert result["booking_grant"] is False
