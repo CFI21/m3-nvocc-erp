@@ -995,3 +995,49 @@ def test_checker_can_reject_unknown_stored_operation(tmp_path, monkeypatch):
     assert row["status"] == "REJECTED"
     assert row["checker"] == "checker"
     db.close()
+
+
+@pytest.mark.parametrize("maker,checker", [
+    ("md.maker", "MD.MAKER"),
+    ("md.maker ", " md.maker"),
+])
+def test_checker_blocks_normalized_self_approval(tmp_path, monkeypatch, maker, checker):
+    """Four-eyes approval must reject case and surrounding-space aliases."""
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "four_eyes_alias.sqlite3")
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": checker}, {"MASTER_DATA_MANAGER"}),
+    )
+    db = connect()
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-FOUR-EYES','configuration','B01-FOUR-EYES','CREATE','{}','test',?,'now',0)",
+        (maker,),
+    )
+    db.close()
+
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide(
+            "MDC-FOUR-EYES",
+            masterdata.Decision(decision="APPROVE", comment="must fail"),
+            "checker",
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "FOUR_EYES_VIOLATION"
+    db = connect()
+    assert db.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref='MDC-FOUR-EYES'"
+    ).fetchone()["status"] == "PENDING"
+    db.close()
