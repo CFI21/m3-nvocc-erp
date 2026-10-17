@@ -277,7 +277,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                 for table,status_filter in (('md_records',"status='ACTIVE'"),('md_change_requests',"status='PENDING' AND operation='CREATE'")):
                     for prior in c.execute("SELECT record_key,payload_json FROM "+table+" WHERE domain='configuration' AND "+status_filter):
                         value=json.loads(prior['payload_json'] or '{}')
-                        if str(value.get('config_type') or '').upper()!=kind or str(value.get('agent_code') or '').strip().upper()!=agent:
+                        if str(value.get('config_type') or '').strip().upper()!=kind or str(value.get('agent_code') or '').strip().upper()!=agent:
                             continue
                         duplicate=(kind=='AGENT_OFFICE_ASSIGNMENT' and office and str(value.get('office_code') or '').strip().upper()==office) or (kind=='AGENT_EMAIL' and port and email and str(value.get('port_code') or '').strip().upper()==port and str(value.get('email') or '').strip().lower()==email)
                         if duplicate:
