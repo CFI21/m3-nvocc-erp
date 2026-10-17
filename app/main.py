@@ -202,8 +202,10 @@ def booking_validate_authorized_ports(fields, grants):
         raise HTTPException(403,{'code':'BOOKING_PORT_PERMISSION_MISSING'})
     for field,scope in mapping.items():
         value=fields.get(field)
-        if value in (None,''):
+        if value is None or value=='':
             continue
+        if not isinstance(value,str) or not value.strip():
+            raise HTTPException(422,{'code':'BOOKING_PORT_INVALID','field':field})
         rule=grants.get(scope)
         if not isinstance(rule,dict) or not booking_port_allowed(
             value,rule.get('ports'),all_ports_granted=rule.get('all_ports') is True
