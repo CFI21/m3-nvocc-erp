@@ -52,10 +52,27 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
             (s["home_office_id"],)
         ).fetchone()
         branch=br["branch_code"] if br else None
-        if role in {"AGENT", "DEPOT"}:
+        agent=None
+        if role == "AGENT":
+            # Fail closed for zero or multiple memberships: no caller-selected scope.
+            grants=conn.execute(
+                "SELECT DISTINCT party_key FROM iam_party_access "
+                "WHERE user_id=? AND party_type='AGENT' AND status='ACTIVE'",
+                (s["user_id"],)
+            ).fetchall()
+            if len(grants) != 1:
+                raise HTTPException(403, {"code": "EQUIPMENT_AMBIGUOUS_AGENT_GRANTS"})
+            agent=str(grants[0]["party_key"] or "").strip()
+            if not agent:
+                raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
+            from .admin import _assigned_agent_offices
+            offices=_assigned_agent_offices(conn,s["user_id"],agent)
+            if not offices:
+                raise HTTPException(403, {"code": "EQUIPMENT_AGENT_OFFICE_DENIED"})
+        if role == "DEPOT":
             raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
         return {"role":role,"roles":rs,"user":s["user_ref"],"office":s["office_code"],
-                "branch":branch,"agent":None,"depot":None}
+                "branch":branch,"agent":agent,"depot":None}
     raise HTTPException(401, {"code": "EQUIPMENT_SESSION_REQUIRED"})
 
 def require_action(a,action):
