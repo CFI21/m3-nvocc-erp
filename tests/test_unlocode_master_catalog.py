@@ -137,3 +137,19 @@ def test_unlocode_stage_retains_official_release_metadata(monkeypatch):
         "source":"unece_release","subdivision_code":"ZH","function":"1-------",
         "unlocode_status":"AA","iata_code":"RTM","coordinates":"5155N 00430E",
     }
+
+
+def test_catalog_identifies_actual_unece_source_and_no_booking_grant(monkeypatch):
+    class FakeDB:
+        def close(self): pass
+    monkeypatch.setattr(masterdata,"connect",lambda:FakeDB())
+    monkeypatch.setattr(masterdata,"using_postgres",lambda:True)
+    monkeypatch.setattr(masterdata,"authenticated_actor",lambda c,token:({},{"MASTER_DATA"}))
+    monkeypatch.setattr(masterdata,"_unlocode_catalog",lambda:[{
+        "unlocode":"NLRTM","country_code":"NL","port_code":"RTM",
+        "port_name":"Rotterdam","source":"unece_release","eligible_for_activation":True,
+    }])
+    result=masterdata.unlocode_catalog(country="NL",x_m3_session="token")
+    assert result["source"]=="unece_release"
+    assert result["total"]==1
+    assert result["booking_grant"] is False
