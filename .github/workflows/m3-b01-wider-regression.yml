@@ -81,6 +81,13 @@ jobs:
           python -m pytest -q -ra --tb=short \
             tests/test_b02_agent_booking_boundary_integration.py \
             --junitxml=m3-cross-agent-integration.xml 2>&1 | tee m3-cross-agent-integration.log
+      - name: Validate Python test discovery and collection
+        run: |
+          set -o pipefail
+          python -m pytest --collect-only -q \
+            tests/test_b02_booking_port_authorization.py \
+            tests/test_b02_agent_booking_boundary_integration.py \
+            2>&1 | tee m3-b02-collection.log
       - name: Wider regression in disposable runner
         run: |
           set -o pipefail
@@ -162,6 +169,7 @@ jobs:
             m3-full-regression.xml
             m3-cross-agent-integration.xml
             m3-cross-agent-integration.log
+            m3-b02-collection.log
             m3-oct20-evidence.md
           if-no-files-found: warn
           retention-days: 14
