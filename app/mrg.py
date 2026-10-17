@@ -54,7 +54,9 @@ def actor(c,token,x_role):
         if not isinstance(s,dict) or not s.get("user_id"):
             raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
         rs=iam_roles_for(c,s["user_id"])
-        roles={str(r["role_code"] or "").strip().upper() for r in rs}
+        if not isinstance(rs, (list, tuple)) or not rs:
+            raise HTTPException(403, {"code": "MRG_IAM_ROLE_NOT_AUTHORIZED"})
+        roles={str(r["role_code"] or "").strip().upper() for r in rs if r is not None}
         roles.discard("")
         if not roles or not str(s.get("user_ref") or "").strip():
             raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
