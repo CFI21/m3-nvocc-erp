@@ -49,17 +49,17 @@ def test_all_seven_modules_and_preview_required_for_release_pass(tmp_path):
         _xml(tmp_path/junit)
         (tmp_path/filename).write_text(json.dumps({
             "commit_sha":SHA,"status":"PASS",
-            "artifacts":["https://example.invalid/test-evidence"]}))
+            "artifacts":["https://github.com/CFI21/m3-nvocc-erp/actions/runs/123"]}))
     report=evaluate(tmp_path,SHA)
     assert all(v["status"]=="PASS" for v in report["modules"].values())
     assert report["release"]=="BLOCKED"
     (tmp_path/"preview_deploys.json").write_text(json.dumps({
         "commit_sha":SHA,"status":"PASS",
-        "artifacts":["https://example.invalid/deploy-evidence"]}))
+        "artifacts":["https://dashboard.render.com/web/srv-test/events"]}))
     assert evaluate(tmp_path,SHA)["release"]=="BLOCKED"
     (tmp_path/"preview_deploys.json").write_text(json.dumps({
         "commit_sha":SHA,"status":"PASS",
-        "artifacts":["https://example.invalid/deploy-evidence"],
+        "artifacts":["https://dashboard.render.com/web/srv-test/events"],
         "web":{"commit_sha":SHA,"deployment_id":"preview-web-1"},
         "api":{"commit_sha":SHA,"deployment_id":"preview-api-1"}}))
     assert evaluate(tmp_path,SHA)["release"]=="BLOCKED"
@@ -74,7 +74,7 @@ def test_all_seven_modules_and_preview_required_for_release_pass(tmp_path):
     for name,(_, filename) in MODULES.items():
         evidence={
             "commit_sha":SHA,"status":"PASS",
-            "artifacts":["https://example.invalid/test-evidence"],
+            "artifacts":["https://github.com/CFI21/m3-nvocc-erp/actions/runs/123"],
             "scenarios":{scenario:{"status":"PASS","artifacts":["run/123"]}
                          for scenario in required[name]},
         }
@@ -87,7 +87,7 @@ def test_all_seven_modules_and_preview_required_for_release_pass(tmp_path):
     assert evaluate(tmp_path,SHA)["release"]=="PASS"
     (tmp_path/"preview_deploys.json").write_text(json.dumps({
         "commit_sha":SHA,"status":"PASS",
-        "artifacts":["https://example.invalid/deploy-evidence"],
+        "artifacts":["https://dashboard.render.com/web/srv-test/events"],
         "web":{"commit_sha":SHA,"deployment_id":"preview-web-1"},
         "api":{"commit_sha":"e"*40,"deployment_id":"preview-api-1"}}))
     assert evaluate(tmp_path,SHA)["release"]=="BLOCKED"
@@ -126,3 +126,17 @@ def test_fake_empty_scenario_and_screen_proofs_cannot_pass(tmp_path):
     assert report["release"]=="BLOCKED"
     assert report["modules"]["Countries/Port Auth"]["status"]=="BLOCKED"
     assert report["modules"]["196-screen cross-module"]["status"]=="BLOCKED"
+
+
+def test_placeholder_evidence_is_rejected(tmp_path):
+    sample=tmp_path/"placeholder.json"
+    sample.write_text(json.dumps({
+        "commit_sha": SHA, "status": "PASS",
+        "artifacts": ["https://example.invalid/test-evidence"]
+    }))
+    assert _artifact(sample,SHA)["status"]=="BLOCKED"
+    sample.write_text(json.dumps({
+        "commit_sha": SHA, "status": "PASS",
+        "artifacts": ["placeholder-security-evidence"]
+    }))
+    assert _artifact(sample,SHA)["status"]=="BLOCKED"
