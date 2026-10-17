@@ -46,11 +46,16 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
         s=iam_session(conn,x_m3_session)
         rs=[r["role_code"] for r in roles_for(conn,s["user_id"])]
         role=_roles_priority(rs)
-        branch=x_branch_scope
-        if not branch:
-            br=conn.execute("SELECT branch_code FROM iam_branches WHERE office_id=? ORDER BY id LIMIT 1",(s["home_office_id"],)).fetchone()
-            branch=br["branch_code"] if br else None
-        return {"role":role,"roles":rs,"user":s["user_ref"],"office":s["office_code"],"branch":branch,"agent":x_agent_scope,"depot":x_depot_scope}
+        # Never treat request-supplied scope headers as IAM grants.
+        br=conn.execute(
+            "SELECT branch_code FROM iam_branches WHERE office_id=? ORDER BY id LIMIT 1",
+            (s["home_office_id"],)
+        ).fetchone()
+        branch=br["branch_code"] if br else None
+        if role in {"AGENT", "DEPOT"}:
+            raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
+        return {"role":role,"roles":rs,"user":s["user_ref"],"office":s["office_code"],
+                "branch":branch,"agent":None,"depot":None}
     raise HTTPException(401, {"code": "EQUIPMENT_SESSION_REQUIRED"})
 
 def require_action(a,action):
