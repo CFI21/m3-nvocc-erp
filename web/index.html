@@ -1791,12 +1791,51 @@ async function openPrincipalWorkspace(workspace,label,target,group){
   }catch(e){$('gridArea').innerHTML='<div class="card"><b class="badtext">Error loading extension workspace</b><pre class="pre">'+esc(e.message)+'</pre></div>'}
 }
 
+async function renderUnlocodeMasterScreen(id,navContext=null,historyMode='push'){
+  const screen=state.byId[id];if(!screen)return;
+  state.current=screen;state.navContext=navContext;state.selected=null;
+  $('drawer').classList.remove('open');$('fabWrap').classList.remove('open');
+  renderNav();renderBreadcrumb();renderFlow();
+  if(historyMode==='push')history.pushState(null,'','#screen='+encodeURIComponent(id));
+  $('gridArea').innerHTML='<div class="card"><div class="toolbar"><b>UN/LOCODE Master Data</b><span class="grow"></span><span class="muted">Reference catalog · approval required</span></div>'+
+    '<div class="toolbar"><input id="unlocodeQuery" placeholder="Search code, country or location" aria-label="Search UN/LOCODE">'+
+    '<input id="unlocodeCountry" maxlength="2" placeholder="Country (e.g. NL)" aria-label="Country code">'+
+    '<button class="btn primary" onclick="unlocodeMasterSearch()">Search</button></div>'+
+    '<div id="unlocodeResults" class="tablewrap">Enter a search or country.</div></div>';
+  await unlocodeMasterSearch();
+}
+async function unlocodeMasterSearch(){
+  const q=($('unlocodeQuery')?.value||'').trim();
+  const country=($('unlocodeCountry')?.value||'').trim().toUpperCase();
+  const area=$('unlocodeResults');if(!area)return;
+  area.textContent='Loading catalog…';
+  try{
+    const result=await api('/api/masterdata/unlocode/catalog?q='+encodeURIComponent(q)+'&country='+encodeURIComponent(country)+'&limit=100');
+    if(!$('unlocodeResults'))return;
+    const rows=result.items||[];
+    area.innerHTML='<div class="muted">'+esc(result.total)+' matching locations · Showing up to 100 · Catalog entries are not active ports until approved</div>'+
+      '<table><thead><tr><th>UN/LOCODE</th><th>Country</th><th>Country Name</th><th>Location Code</th><th>Location Name</th><th>Action</th></tr></thead><tbody>'+
+      rows.map(r=>'<tr><td><b>'+esc(r.unlocode)+'</b></td><td>'+esc(r.country_code)+'</td><td>'+esc(r.country_name)+'</td><td>'+esc(r.port_code)+'</td><td>'+esc(r.port_name)+'</td><td><button class="btn" onclick="unlocodeMasterStage(\''+esc(r.unlocode)+'\')">Submit for approval</button></td></tr>').join('')+
+      '</tbody></table>';
+  }catch(e){area.textContent='Catalog unavailable: '+e.message}
+}
+async function unlocodeMasterStage(code){
+  if(!/^[A-Z]{2}[A-Z0-9]{3}$/.test(code))return;
+  try{
+    await api('/api/masterdata/unlocode/stage/'+encodeURIComponent(code),{method:'POST'});
+    alert(code+' submitted for maker/checker approval. It is not yet active.');
+  }catch(e){alert('Approval submission failed: '+e.message)}
+}
+
 async function openScreen(id,navContext=null,historyMode='push'){
   // B01: governed Master Data operators must land in the actual six-tab Agent
   // workflow, including pending independent approvals, from every Agent alias.
   // Backend IAM remains authoritative for all mutations and approvals.
   if(id==='master-data::agents'&&['MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)){
     return openHoGovernedSetup('agent-master','Agent','master-data::agents');
+  }
+  if(id==='master-data::ports'&&['SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'].includes(state.role)){
+    return renderUnlocodeMasterScreen(id,navContext,historyMode);
   }
   let s=state.byId[id];if(!s)return;
   const epoch=++state.viewEpoch,role=state.role;
