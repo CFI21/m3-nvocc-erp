@@ -65,9 +65,21 @@ def run(api_url, token_a, token_b, own_id, other_id, target_sha):
         try:
             result=request_json(api_url,path,token)
             status=result["status"]
-            # Never store response payloads: customer data may be sensitive.
+            allowed=status in expected
+            # Own-resource success must identify the requested transaction.
+            # A generic 200/login page is not evidence of successful scoped access.
+            if allowed and 200 <= status < 300:
+                try:
+                    payload=json.loads(result["body"])
+                    requested_id=int(path.rsplit("/",1)[-1])
+                    allowed=(isinstance(payload,dict)
+                             and payload.get("id")==requested_id
+                             and payload.get("module")=="booking")
+                except (ValueError,TypeError):
+                    allowed=False
+            # Never persist customer fields or session tokens in evidence.
             results.append({"id":cid,"scenario":label,"http_status":status,
-                            "status":"PASS" if status in expected else "BLOCKED",
+                            "status":"PASS" if allowed else "BLOCKED",
                             "response_sha256":hashlib.sha256(result["body"].encode()).hexdigest()})
         except (urllib.error.URLError,TimeoutError,OSError) as exc:
             results.append({"id":cid,"scenario":label,"status":"BLOCKED",
