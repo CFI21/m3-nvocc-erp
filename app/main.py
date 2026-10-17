@@ -165,7 +165,9 @@ def booking_port_allowed(port_code, allowed_ports, *, all_ports_granted=False):
     Caller must obtain allowed_ports/all_ports_granted from authoritative IAM,
     not from submitted Booking payloads or caller-supplied headers.
     """
-    port=str(port_code or '').strip().upper()
+    if not isinstance(port_code,str):
+        return False
+    port=port_code.strip().upper()
     if not port or not re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}', port):
         return False
     if all_ports_granted is True:
