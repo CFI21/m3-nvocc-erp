@@ -98,6 +98,41 @@ def evaluate(root, sha):
                 raise ValueError("DEPLOY_IDENTITIES_NOT_DISTINCT")
         except (ValueError, OSError, AttributeError, KeyError) as exc:
             report["preview"] = {"status": "BLOCKED", "reason": str(exc)}
+    # Release promotion requires explicit authenticated E2E, cross-agent,
+    # finance and full UI evidence: an arbitrary PASS document is not enough.
+    scopes = {
+        "Countries/Port Auth": ("SEC-001", "SEC-002", "SEC-003", "SEC-004",
+                                "SEC-005", "SEC-006", "SEC-007", "SEC-008",
+                                "SEC-009", "SEC-010", "SEC-011", "SEC-012"),
+        "Booking Workflow": ("E2E-001", "E2E-002", "E2E-003", "E2E-004"),
+        "Agent Master": ("UAT-001", "UAT-002"),
+        "IAM": ("UAT-003",),
+        "Equipment/Depot": ("UAT-007",),
+        "Finance": ("UAT-008",),
+        "196-screen cross-module": ("UAT-010",),
+    }
+    for name, required in scopes.items():
+        if report["modules"][name]["status"] != "PASS":
+            continue
+        filename = MODULES[name][1]
+        try:
+            document = json.loads((root / filename).read_text(encoding="utf-8"))
+            scenarios = document.get("scenarios", {})
+            if (not isinstance(scenarios, dict)
+                    or any(not isinstance(scenarios.get(sid), dict)
+                           or scenarios[sid].get("status") != "PASS"
+                           or not scenarios[sid].get("artifacts") for sid in required)):
+                raise ValueError("MANDATORY_SCENARIOS_MISSING")
+            if name == "196-screen cross-module":
+                screens = document.get("screens", {})
+                if (not isinstance(screens, dict) or len(screens) != 196
+                        or any(v.get("status") != "PASS" or not v.get("artifacts")
+                               for v in screens.values() if isinstance(v, dict))
+                        or any(not isinstance(v, dict) for v in screens.values())):
+                    raise ValueError("SCREENS_196_NOT_VERIFIED")
+        except (OSError, ValueError, AttributeError, KeyError) as error:
+            report["modules"][name]["status"] = "BLOCKED"
+            report["modules"][name]["reason"] = str(error)
     report["release"] = ("PASS" if all(x["status"] == "PASS"
                           for x in report["modules"].values())
                           and report["preview"]["status"] == "PASS" else "BLOCKED")
