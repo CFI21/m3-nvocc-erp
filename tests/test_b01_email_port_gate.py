@@ -734,3 +734,56 @@ def test_checker_rejects_invalid_state_transition(tmp_path,monkeypatch,operation
         ("MDC-STATE-"+operation,),
     ).fetchone()["status"]=="PENDING"
     db.close()
+
+
+def test_checker_reactivation_revalidates_retired_port(tmp_path,monkeypatch):
+    """An inactive Email cannot reactivate after its referenced Port retires."""
+    import json
+    from fastapi import HTTPException
+
+    filename=str(tmp_path/"reactivate_retired_port.sqlite3")
+    def connect():
+        db=sqlite3.connect(filename,isolation_level=None)
+        db.row_factory=sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata,"connect",connect)
+    monkeypatch.setattr(masterdata,"using_postgres",lambda:False)
+    monkeypatch.setattr(
+        masterdata,"authenticated_actor",
+        lambda _db,_token:({"user_ref":"checker"},{"MASTER_DATA_MANAGER"}),
+    )
+    db=connect()
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('agent','UAT-AGENT-001','{}','ACTIVE','now','now')"
+    )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM','{}','INACTIVE','now','now')"
+    )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-REACTIVATE',?,'INACTIVE',1,'now','now')",
+        (json.dumps(_email()),),
+    )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-REACTIVATE-PORT','configuration','EMAIL-REACTIVATE','REACTIVATE','{}','review','maker','now',1)"
+    )
+    db.close()
+    with pytest.raises(HTTPException) as err:
+        masterdata.decide(
+            "MDC-REACTIVATE-PORT",
+            masterdata.Decision(decision="APPROVE",comment="review"),
+            "checker",
+        )
+    assert err.value.status_code==422
+    assert "AGENT_EMAIL_PORT_REFERENCE_NOT_ACTIVE" in err.value.detail["codes"]
+    db=connect()
+    assert db.execute(
+        "SELECT status FROM md_records WHERE record_key='EMAIL-REACTIVATE'"
+    ).fetchone()["status"]=="INACTIVE"
+    db.close()
