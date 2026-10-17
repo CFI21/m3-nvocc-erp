@@ -400,3 +400,17 @@ def test_mrg_rejects_unrecognized_authenticated_roles(monkeypatch, roles):
         mrg.actor(None, "valid", "ADMIN")
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "MRG_IAM_ROLE_NOT_AUTHORIZED"
+
+
+def test_mrg_filters_unrecognized_roles_from_authorization_set(monkeypatch):
+    monkeypatch.setattr(mrg, "iam_session", lambda c, t: {
+        "user_id": 7, "user_ref": "mrg-user",
+    })
+    monkeypatch.setattr(
+        mrg, "iam_roles_for",
+        lambda c, uid: [{"role_code": "FINANCE"}, {"role_code": "UNRECOGNIZED"}],
+    )
+    result = mrg.actor(None, "valid", "ADMIN")
+    assert result["role"] == "FINANCE"
+    assert result["roles"] == {"FINANCE"}
+    assert "UNRECOGNIZED" not in result["roles"]
