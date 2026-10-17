@@ -51,7 +51,7 @@ def ensure(c):
 def actor(c,token,x_role):
     if token:
         s=iam_session(c,token)
-        if not isinstance(s,dict) or not s.get("user_id"):
+        if not hasattr(s, "keys") or "user_id" not in s.keys() or not s["user_id"]:
             raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
         rs=iam_roles_for(c,s["user_id"])
         if not isinstance(rs, (list, tuple)) or not rs:
@@ -63,7 +63,7 @@ def actor(c,token,x_role):
             if hasattr(r, "keys") and "role_code" in r.keys()
         }
         roles.discard("")
-        if not roles or not str(s.get("user_ref") or "").strip():
+        if not roles or not str(s["user_ref"] or "").strip() if "user_ref" in s.keys() else "":
             raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
         # Stable audit identity when IAM assigns more than one approved role.
         priority=("ADMIN", "MASTER_DATA_MANAGER", "FINANCE", "GL_MANAGER",
