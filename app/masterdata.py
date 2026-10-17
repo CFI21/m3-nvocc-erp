@@ -434,7 +434,7 @@ def withdraw_change(change_ref:str,b:Withdrawal,x_m3_session:Optional[str]=Heade
 
 @router.post('/changes/{change_ref}/decision')
 def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess.get('user_ref') if isinstance(sess,dict) else None
     if not can_approve_roles(roles):c.close();raise HTTPException(403,{'code':'CHECKER_PERMISSION_DENIED'})
     ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
     if not ch:c.close();raise HTTPException(404,'Change not found')
