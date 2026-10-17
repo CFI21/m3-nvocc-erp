@@ -596,14 +596,19 @@ def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None
 @app.get('/api/v1/{module}/{tid}')
 def get_record(module:str,tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); conn=connect()
-    if bulk_permission_enabled():
-        mw,margs=module_where(module)
-        r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
-        if not r: conn.close(); raise HTTPException(404,'Transaction not found')
-        ga=governed_job_actor(conn,x_m3_session,r['job_ref'],'view'); role=ga['role'];ascope=cscope=None
-    else:
-        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); r=get_tx(conn,module,tid,role,ascope,cscope)
-    out=serialize_tx(r); conn.close(); return out
+    try:
+        if bulk_permission_enabled():
+            mw,margs=module_where(module)
+            r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
+            if not r:
+                raise HTTPException(404,'Transaction not found')
+            governed_job_actor(conn,x_m3_session,r['job_ref'],'view')
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            r=get_tx(conn,module,tid,role,ascope,cscope)
+        return serialize_tx(r)
+    finally:
+        conn.close()
 
 @app.post('/api/v1/{module}',status_code=201)
 async def create_record(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
