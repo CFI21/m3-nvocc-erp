@@ -43,6 +43,10 @@ def request_json(base, path, token, timeout=15):
             return {"status":response.status,"body":raw.decode("utf-8","replace")}
     except urllib.error.HTTPError as error:
         raw=error.read(262144)
+        # Redirects must never count as an authorization denial: a reverse
+        # proxy or sign-in redirect is not proof of object-level isolation.
+        if 300 <= error.code < 400:
+            raise ValueError("UNEXPECTED_AUTH_REDIRECT")
         return {"status":error.code,"body":raw.decode("utf-8","replace")}
 
 
@@ -81,7 +85,7 @@ def run(api_url, token_a, token_b, own_id, other_id, target_sha):
             results.append({"id":cid,"scenario":label,"http_status":status,
                             "status":"PASS" if allowed else "BLOCKED",
                             "response_sha256":hashlib.sha256(result["body"].encode()).hexdigest()})
-        except (urllib.error.URLError,TimeoutError,OSError) as exc:
+        except (urllib.error.URLError,TimeoutError,OSError,ValueError) as exc:
             results.append({"id":cid,"scenario":label,"status":"BLOCKED",
                             "error":type(exc).__name__})
     return {"commit_sha":target_sha.lower(),"target":urllib.parse.urlsplit(api_url).hostname,
