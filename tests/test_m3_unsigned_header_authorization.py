@@ -329,3 +329,20 @@ def test_equipment_missing_or_unknown_iam_roles_rejected(monkeypatch, roles):
         equipment.actor(None, "valid", "SUPER_ADMIN", "A1", "NLRTM", "D1")
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_IAM_ROLE_REQUIRED"
+
+
+@pytest.mark.parametrize("user_ref", [None, "", "   "])
+@pytest.mark.parametrize("iam_role", ["VIEWER", "ADMIN", "AGENT"])
+def test_equipment_missing_iam_user_reference_denied(monkeypatch, user_ref, iam_role):
+    # Identity validation happens before any scoped SQL query or party grant.
+    monkeypatch.setattr(equipment, "iam_session", lambda _c, _t: {
+        "user_id": 7, "user_ref": user_ref, "office_code": "RTM",
+        "home_office_id": 1,
+    })
+    monkeypatch.setattr(
+        equipment, "roles_for", lambda _c, _u: [{"role_code": iam_role}],
+    )
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(None, "valid", "SUPER_ADMIN", "A1", "NLRTM", "D1")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_IAM_IDENTITY_REQUIRED"
