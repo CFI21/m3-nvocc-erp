@@ -119,3 +119,26 @@ def test_equipment_depot_scope_from_iam_not_request_headers(monkeypatch):
     assert result["depot"] == "REAL-DEPOT"
     assert result["agent"] is None
     assert result["branch"] is None
+
+
+@pytest.mark.parametrize("role", ["OPS", "BRANCH_OPS", "DOCS", "EQUIPMENT_CONTROLLER"])
+def test_equipment_branch_role_requires_trusted_branch(role):
+    with pytest.raises(HTTPException) as exc:
+        equipment.scope_clause({"role": role, "branch": None})
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_BRANCH_SCOPE_REQUIRED"
+
+
+@pytest.mark.parametrize("role", ["OPS", "BRANCH_OPS", "DOCS", "EQUIPMENT_CONTROLLER"])
+def test_equipment_branch_role_filters_exact_branch(role):
+    clause, params = equipment.scope_clause({"role": role, "branch": "NLRTM"})
+    assert clause == " AND c.branch_code=?"
+    assert params == ["NLRTM"]
+    assert "IS NULL" not in clause
+
+
+def test_equipment_unknown_role_denied_even_for_read():
+    with pytest.raises(HTTPException) as exc:
+        equipment.scope_clause({"role": "UNRECOGNIZED", "branch": "NLRTM"})
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_ROLE_SCOPE_DENIED"
