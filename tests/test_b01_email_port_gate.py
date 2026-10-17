@@ -679,3 +679,58 @@ def test_checker_rejects_update_when_record_is_inactive(tmp_path, monkeypatch):
         "INACTIVE",1,"ops@example.org"
     )
     db.close()
+
+
+@pytest.mark.parametrize(
+    "operation,status,code",
+    [("DEACTIVATE","INACTIVE","MASTER_RECORD_NOT_ACTIVE"),
+     ("REACTIVATE","ACTIVE","MASTER_RECORD_NOT_INACTIVE")],
+)
+def test_checker_rejects_invalid_state_transition(tmp_path,monkeypatch,operation,status,code):
+    """Checker approval must respect the current master lifecycle state."""
+    import json
+    from fastapi import HTTPException
+
+    filename=str(tmp_path / (operation + "_invalid_state.sqlite3"))
+    def connect():
+        db=sqlite3.connect(filename,isolation_level=None)
+        db.row_factory=sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata,"connect",connect)
+    monkeypatch.setattr(masterdata,"using_postgres",lambda:False)
+    monkeypatch.setattr(
+        masterdata,"authenticated_actor",
+        lambda _db,_token:({"user_ref":"checker"},{"MASTER_DATA_MANAGER"}),
+    )
+    db=connect()
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-STATE',?,?,1,'now','now')",
+        (json.dumps(_email()),status),
+    )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES (?,?,?,?,?,'invalid transition','maker','now',1)",
+        ("MDC-STATE-"+operation,"configuration","EMAIL-STATE",operation,json.dumps({})),
+    )
+    db.close()
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide(
+            "MDC-STATE-"+operation,
+            masterdata.Decision(decision="APPROVE",comment="review"),
+            "checker",
+        )
+    assert error.value.status_code==409
+    assert error.value.detail["code"]==code
+    db=connect()
+    assert db.execute(
+        "SELECT status FROM md_records WHERE record_key='EMAIL-STATE'"
+    ).fetchone()["status"]==status
+    assert db.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref=?",
+        ("MDC-STATE-"+operation,),
+    ).fetchone()["status"]=="PENDING"
+    db.close()
