@@ -170,3 +170,23 @@ def test_bulk_list_foreign_ids_and_invalid_responses_block(monkeypatch,payload):
         "https://m3-pr124-booking-api-preview.onrender.com","a","b","1","2")
     assert any(x["status"]=="BLOCKED" for x in checks)
     assert all("body" not in x for x in checks)
+
+
+def test_unauthenticated_booking_reads_are_denied(monkeypatch):
+    def fake(base,path,token):
+        assert token==""
+        return {"status":401,"body":'{"detail":{"code":"SESSION_REQUIRED"}}'}
+    monkeypatch.setattr(smoke,"request_json",fake)
+    results=smoke.check_unauthenticated(
+        "https://m3-pr124-booking-api-preview.onrender.com","1","2")
+    assert [item["id"] for item in results]==["SEC-007","SEC-008"]
+    assert all(item["status"]=="PASS" for item in results)
+
+
+@pytest.mark.parametrize("status",[200,302,403,404,500])
+def test_missing_session_requires_401_not_just_non_200(monkeypatch,status):
+    monkeypatch.setattr(smoke,"request_json",
+                        lambda *_args:{"status":status,"body":"redacted"})
+    results=smoke.check_unauthenticated(
+        "https://m3-pr124-booking-api-preview.onrender.com","1","2")
+    assert all(item["status"]=="BLOCKED" for item in results)
