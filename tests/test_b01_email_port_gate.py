@@ -789,7 +789,8 @@ def test_checker_reactivation_revalidates_retired_port(tmp_path,monkeypatch):
     db.close()
 
 
-def test_checker_reactivation_rejects_duplicate_active_email(tmp_path, monkeypatch):
+@pytest.mark.parametrize("operation", ["ACTIVATE", "REACTIVATE"])
+def test_checker_reactivation_rejects_duplicate_active_email(tmp_path, monkeypatch, operation):
     """An inactive legacy email cannot revive over an approved active route."""
     import json
     from fastapi import HTTPException
@@ -825,7 +826,8 @@ def test_checker_reactivation_rejects_duplicate_active_email(tmp_path, monkeypat
     db.execute(
         "INSERT INTO md_change_requests"
         "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
-        "VALUES ('MDC-EMAIL-COLLISION','configuration','EMAIL-OLD','REACTIVATE','{}','review','maker','now',1)"
+        "VALUES ('MDC-EMAIL-COLLISION','configuration','EMAIL-OLD',?,'{}','review','maker','now',1)",
+        (operation,)
     )
     db.close()
 
