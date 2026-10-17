@@ -229,8 +229,8 @@ def booking_agent_port_grants(conn,user_id,agent_code):
             config=json.loads(row['payload_json'] or '{}')
         except (ValueError,TypeError):
             continue
-        if (str(config.get('config_type') or '').upper()!='AGENT_NETWORK'
-                or str(config.get('network_type') or '').upper()!='PORT_COVERAGE'
+        if (str(config.get('config_type') or '').strip().upper()!='AGENT_NETWORK'
+                or str(config.get('network_type') or '').strip().upper()!='PORT_COVERAGE'
                 or str(config.get('agent_code') or '').strip().upper()!=str(agent_code or '').strip().upper()
                 or str(config.get('office_code') or '').strip().upper() not in offices):
             continue
