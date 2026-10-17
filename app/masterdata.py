@@ -323,7 +323,9 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
             for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
                 if row['record_key']==b.record_key: continue
                 other=json.loads(row['payload_json'] or '{}')
-                if all(str(other.get(field) or '').strip().upper()==str(restored.get(field) or '').strip().upper() for field in fields):
+                if (str(other.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+                    str(other.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
+                    all(str(other.get(field) or '').strip().upper()==str(restored.get(field) or '').strip().upper() for field in fields)):
                     c.close()
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
