@@ -27,5 +27,27 @@ jobs:
         run: python -m compileall -q app tests/test_b01_email_port_gate.py tests/test_b01_office_approval_duplicate.py tests/test_b01_agent_countries_iam_resolution.py
       - name: Validate email reference and maker-checker regressions
         run: python -m pytest -q tests/test_b01_email_port_gate.py tests/test_b01_office_approval_duplicate.py tests/test_b01_agent_countries_iam_resolution.py
+      - name: Validate single masterdata router and model
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          source = Path('app/masterdata.py').read_text()
+          tree = ast.parse(source)
+          functions = [node.name for node in tree.body if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))]
+          for name in ('init_schema', 'create_change', 'decide', 'agent_office_countries'):
+              assert functions.count(name) == 1, f'{name}: {functions.count(name)} definitions'
+          assert source.count("class Change(BaseModel):") == 1
+          from app.masterdata import Change
+          from pydantic import ValidationError
+          for operation in ('CREATE', 'UPDATE', 'DEACTIVATE', 'ACTIVATE', 'REACTIVATE'):
+              Change(domain='configuration', record_key='B01-CI', operation=operation, reason='CI')
+          try:
+              Change(domain='configuration', record_key='B01-CI', operation='DELETE', reason='CI')
+          except ValidationError:
+              pass
+          else:
+              raise AssertionError('Invalid operation was accepted')
+          PY
       - name: Assert B01 test collection
         run: python -m pytest --collect-only -q tests/test_b01_email_port_gate.py tests/test_b01_office_approval_duplicate.py tests/test_b01_agent_countries_iam_resolution.py
