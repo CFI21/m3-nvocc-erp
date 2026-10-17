@@ -94,6 +94,9 @@ def require_action(a,action):
     raise HTTPException(403,{"code":"EQUIPMENT_POLICY_DENIED","role":role,"action":action})
 
 def scope_clause(a,alias="c"):
+    # Alias is SQL syntax, never accept arbitrary caller-controlled fragments.
+    if alias not in {"c", "container", "containers"}:
+        raise HTTPException(400, {"code": "EQUIPMENT_INVALID_SQL_ALIAS"})
     role=a["role"]
     if role in GLOBAL_ROLES or role in {"FINANCE","EQUIPMENT_MANAGER"}: return "",[]
     if role=="AGENT":
