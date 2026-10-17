@@ -385,3 +385,18 @@ def test_mrg_fails_closed_without_valid_iam_identity(monkeypatch, roles, user_re
         mrg.actor(None, "valid", "ADMIN")
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "MRG_IAM_IDENTITY_REQUIRED"
+
+
+@pytest.mark.parametrize("roles", [["UNKNOWN"], ["FAKE_ADMIN", "CUSTOM_ROLE"]])
+def test_mrg_rejects_unrecognized_authenticated_roles(monkeypatch, roles):
+    monkeypatch.setattr(mrg, "iam_session", lambda c, t: {
+        "user_id": 7, "user_ref": "mrg-user",
+    })
+    monkeypatch.setattr(
+        mrg, "iam_roles_for",
+        lambda c, u: [{"role_code": code} for code in roles],
+    )
+    with pytest.raises(HTTPException) as exc:
+        mrg.actor(None, "valid", "ADMIN")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "MRG_IAM_ROLE_NOT_AUTHORIZED"
