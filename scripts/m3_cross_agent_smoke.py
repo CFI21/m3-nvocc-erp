@@ -77,9 +77,17 @@ def run(api_url, token_a, token_b, own_id, other_id, target_sha):
                     denied=json.loads(result["body"])
                 except (ValueError,TypeError):
                     denied=None
-                if isinstance(denied,dict) and any(key in denied for key in (
-                        "job_ref","agent_code","customer_name","fields","records",
-                        "payload_json","booking_ref")):
+                sensitive={"job_ref","agent_code","customer_name","fields",
+                           "records","payload_json","booking_ref","agent_id",
+                           "booking_id","customer_id","container_id"}
+                def contains_sensitive(value):
+                    if isinstance(value,dict):
+                        return (bool(sensitive.intersection(value))
+                                or any(contains_sensitive(v) for v in value.values()))
+                    if isinstance(value,list):
+                        return any(contains_sensitive(v) for v in value)
+                    return False
+                if contains_sensitive(denied):
                     allowed=False
             # Own-resource success must identify the requested transaction.
             # A generic 200/login page is not evidence of successful scoped access.
