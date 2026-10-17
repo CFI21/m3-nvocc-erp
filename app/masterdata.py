@@ -211,6 +211,59 @@ def agent_office_countries(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     finally:
         c.close()
 
+
+# Uploaded reference catalog is intentionally separate from approved Port Master.
+# Booking permissions continue to require approved ACTIVE md_records.
+def _unlocode_catalog():
+    import csv
+    from pathlib import Path
+    source=Path(__file__).resolve().parent.parent/'data'/'unlocode_source_2026_uploaded.csv'
+    with source.open(encoding='utf-8',newline='') as stream:
+        return list(csv.DictReader(stream))
+
+@router.get('/unlocode/catalog')
+def unlocode_catalog(q:str='',country:str='',limit:int=100,
+                   x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_READ_SCOPE_NOT_AUTHORIZED'})
+        if not 1<=limit<=200:
+            raise HTTPException(422,{'code':'UNLOCODE_LIMIT_INVALID'})
+        needle=q.strip().upper()
+        country=country.strip().upper()
+        if country and (len(country)!=2 or not country.isalpha()):
+            raise HTTPException(422,{'code':'UNLOCODE_COUNTRY_INVALID'})
+        matches=[
+            item for item in _unlocode_catalog()
+            if (not country or item['country_code']==country)
+            and (not needle or needle in (' '.join(item.values())).upper())
+        ]
+        return {'total':len(matches),'items':matches[:limit],
+                'source':'uploaded_unlocode_reference',
+                'booking_grant':False}
+    finally:
+        c.close()
+
+@router.post('/unlocode/stage/{code}')
+def unlocode_stage(code:str,reason:str='UNLOCODE catalog onboarding',
+                   x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    key=code.strip().upper()
+    matches=[row for row in _unlocode_catalog() if row['unlocode']==key]
+    if len(matches)!=1:
+        raise HTTPException(404,{'code':'UNLOCODE_NOT_FOUND'})
+    row=matches[0]
+    payload={'name':row['port_name'],'display_name':row['port_name'],
+             'unlocode':key,'country_code':row['country_code'],
+             'country_name':row['country_name'],'port_code':row['port_code'],
+             'source':'uploaded_unlocode_reference'}
+    # Use the existing authenticated maker/checker workflow, not direct DB writes.
+    return create_change(Change(domain='port',record_key=key,
+                                operation='CREATE',payload=payload,reason=reason),
+                         x_m3_session=x_m3_session)
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','domains':DOMAINS,'domain_count':len(DOMAINS),'screens':SCREENS,'screen_count':len(SCREENS),'governance':'MAKER_CHECKER_VERSIONED','delete_mode':'PROTECTED_NO_HARD_DELETE'}
 @router.get('/overview')
