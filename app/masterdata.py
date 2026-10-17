@@ -243,25 +243,31 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     if not isinstance(sess,dict) or not str(sess.get('username') or '').strip():
         c.close()
         raise HTTPException(403,{'code':'MAKER_SESSION_USERNAME_REQUIRED'})
-    # Dedicated isolated B01 UAT only: enforce strict two-account separation.
-    # This does not change other domains, identities, or production policies.
+    # Isolated B01 role separation: fail closed for checker-initiated Agent changes.
     import os
-    if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').strip().upper()!='ON'
-        and os.getenv('M3_B01_STRICT_MAKER_CHECKER','false').strip().casefold()=='true'
-        and str(sess.get('username') or '').strip().casefold()=='md.checker'):
-        agent_configuration=False
-        if b.domain=='configuration':
-            if b.operation=='CREATE':
-                agent_configuration=str(b.payload.get('config_type') or '').strip().upper() in (
-                    'AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK')
-            else:
-                prior=c.execute('SELECT payload_json FROM md_records WHERE domain=? AND record_key=?',
-                                ('configuration',b.record_key)).fetchone()
-                prior_type=str(json.loads(prior['payload_json']).get('config_type') or '').strip().upper() if prior else ''
-                requested_type=str(b.payload.get('config_type') or '').strip().upper()
-                agent_configuration=prior_type in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK') or requested_type in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK')
-        if b.domain=='agent' or agent_configuration:
-            c.close();raise HTTPException(403,{'code':'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
+    strict_b01 = (
+        os.getenv('M3_PRODUCTION_TRAFFIC', 'OFF').strip().upper() != 'ON'
+        and os.getenv('M3_B01_STRICT_MAKER_CHECKER', 'false').strip().casefold() == 'true'
+    )
+    if strict_b01 and str(sess.get('username') or '').strip().casefold() == 'md.checker':
+        protected_types = {'AGENT_EMAIL', 'AGENT_OFFICE_ASSIGNMENT', 'AGENT_NETWORK'}
+        agent_configuration = False
+        if b.domain == 'configuration':
+            requested_type = str(b.payload.get('config_type') or '').strip().upper()
+            prior_type = ''
+            if b.operation != 'CREATE':
+                prior = c.execute(
+                    'SELECT payload_json FROM md_records WHERE domain=? AND record_key=?',
+                    ('configuration', b.record_key),
+                ).fetchone()
+                if prior:
+                    prior_type = str(
+                        json.loads(prior['payload_json'] or '{}').get('config_type') or ''
+                    ).strip().upper()
+            agent_configuration = requested_type in protected_types or prior_type in protected_types
+        if b.domain == 'agent' or agent_configuration:
+            c.close()
+            raise HTTPException(403, {'code': 'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
 
     # Semantic identity guard: randomized AGCFG keys must not permit a second
     # Office assignment for the same Agent + Office (or identical Email route).
