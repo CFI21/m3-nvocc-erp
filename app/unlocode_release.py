@@ -51,8 +51,10 @@ def catalog():
         records={}
         for path in PARTS:
             for row in _release_rows(path):
-                # Identical duplicate keys may occur between parts; latest row
-                # cannot grant any rights and is only reference metadata.
+                # Never silently overwrite contradictory entries across release parts.
+                prior=records.get(row["unlocode"])
+                if prior is not None and prior!=row:
+                    raise RuntimeError("UNLOCODE_RELEASE_CONFLICT:"+row["unlocode"])
                 records[row["unlocode"]]=row
         if not records:
             raise RuntimeError("UNLOCODE_RELEASE_EMPTY")
