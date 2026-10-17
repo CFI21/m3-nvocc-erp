@@ -904,3 +904,53 @@ def test_maker_activation_rejects_inactive_port_before_queue(tmp_path, monkeypat
         "SELECT COUNT(*) FROM md_change_requests WHERE record_key='EMAIL-MAKER-REACT'"
     ).fetchone()[0] == 0
     db.close()
+
+
+def test_checker_rejects_unknown_stored_operation(tmp_path, monkeypatch):
+    """Legacy or corrupted pending requests cannot fall through to ACTIVATE."""
+    import json
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "invalid_stored_operation.sqlite3")
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}),
+    )
+    db = connect()
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-INVALID-OP',?,'INACTIVE',1,'now','now')",
+        (json.dumps(_email()),),
+    )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-INVALID-OP','configuration','EMAIL-INVALID-OP','DELETE','{}','invalid','maker','now',1)"
+    )
+    db.close()
+
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide(
+            "MDC-INVALID-OP",
+            masterdata.Decision(decision="APPROVE", comment="review"),
+            "checker",
+        )
+    assert error.value.status_code == 422
+    assert error.value.detail["code"] == "INVALID_MASTER_OPERATION"
+    db = connect()
+    assert db.execute(
+        "SELECT status FROM md_records WHERE record_key='EMAIL-INVALID-OP'"
+    ).fetchone()["status"] == "INACTIVE"
+    assert db.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref='MDC-INVALID-OP'"
+    ).fetchone()["status"] == "PENDING"
+    db.close()
