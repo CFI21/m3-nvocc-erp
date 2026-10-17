@@ -269,7 +269,7 @@ def booking_agent_port_grants(conn,user_id,agent_code):
             datetime.date.fromisoformat(end)
         except ValueError:
             continue
-        if not start<=active_day<=end:
+        if start>end or not start<=active_day<=end:
             continue
         scope=str(config.get('scope') or '').strip().upper()
         port=str(config.get('port_code') or '').strip().upper()
