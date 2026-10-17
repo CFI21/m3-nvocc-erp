@@ -476,13 +476,15 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if ch['operation'] in ('ACTIVATE','REACTIVATE') and current and ch['domain']=='configuration':
         restored=json.loads(current['payload_json'] or '{}')
-        if (str(restored.get('config_type') or '').upper()=='AGENT_NETWORK' and
-            str(restored.get('network_type') or '').upper()=='PORT_COVERAGE'):
+        if (str(restored.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+            str(restored.get('network_type') or '').strip().upper()=='PORT_COVERAGE'):
             fields=('config_type','network_type','agent_code','office_code','scope','port_code')
             for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
                 if row['record_key']==ch['record_key']: continue
                 other=json.loads(row['payload_json'] or '{}')
-                if all(str(other.get(k) or '').strip().upper()==str(restored.get(k) or '').strip().upper() for k in fields):
+                if (str(other.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+                    str(other.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
+                    all(str(other.get(k) or '').strip().upper()==str(restored.get(k) or '').strip().upper() for k in fields)):
                     c.close()
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if current and current['version']!=ch['base_version']:c.close();raise HTTPException(409,{'code':'MASTER_VERSION_CONFLICT','current_version':current['version'],'base_version':ch['base_version']})
