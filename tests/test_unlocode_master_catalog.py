@@ -69,3 +69,23 @@ def test_catalog_does_not_stage_missing_or_quarantined_codes(code,monkeypatch):
     with pytest.raises(HTTPException) as e:
         masterdata.unlocode_stage(code,x_m3_session="maker-session")
     assert e.value.status_code==404
+
+
+def test_master_data_ports_screen_is_wired_to_catalog_and_approval_api():
+    ui=(ROOT/"web"/"index.html").read_text(encoding="utf-8")
+    assert "renderUnlocodeMasterScreen(id,navContext,historyMode)" in ui
+    assert "id==='master-data::ports'" in ui
+    assert "/api/masterdata/unlocode/catalog?" in ui
+    assert "/api/masterdata/unlocode/stage/" in ui
+    assert "unlocodeMasterSearch()" in ui
+    assert "unlocodeMasterStage(code)" in ui
+
+
+def test_catalog_not_automatically_activated_in_port_master():
+    import inspect
+    source=inspect.getsource(masterdata.unlocode_catalog)
+    assert "INSERT INTO md_records" not in source
+    assert "UPDATE md_records" not in source
+    stage=inspect.getsource(masterdata.unlocode_stage)
+    assert "create_change(" in stage
+    assert "operation='CREATE'" in stage
