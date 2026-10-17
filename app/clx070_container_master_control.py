@@ -46,7 +46,7 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
         s=iam_session(conn,x_m3_session)
         rs=[str(r["role_code"] or "").strip().upper() for r in roles_for(conn,s["user_id"])]
         role=_roles_priority(rs)
-        if not str(s.get("user_ref") or "").strip():
+        if "user_ref" not in s.keys() or not str(s["user_ref"] or "").strip():
             raise HTTPException(403, {"code": "EQUIPMENT_IAM_IDENTITY_REQUIRED"})
         if role == "VIEWER" and "VIEWER" not in rs:
             raise HTTPException(403, {"code": "EQUIPMENT_IAM_ROLE_REQUIRED"})
