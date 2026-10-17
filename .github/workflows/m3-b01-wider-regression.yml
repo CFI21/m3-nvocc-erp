@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/m3-b01-wider-regression.yml'
       - 'app/**'
+      - 'scripts/**'
       - 'tests/**'
       - 'web/index.html'
   workflow_dispatch:
@@ -159,6 +160,10 @@ jobs:
           with Path(__import__('os').environ['GITHUB_STEP_SUMMARY']).open('a') as out:
               out.write('\n'.join(lines)+'\n')
           PY
+      - name: Execute complete P0 regression and evidence runner
+        if: always()
+        run: |
+          bash scripts/m3_oct20_run_p0.sh
       - name: Oct 20 acceptance validator unit tests
         if: always()
         run: |
@@ -192,6 +197,7 @@ jobs:
             m3-b02-collection.log
             m3-oct20-evidence.md
             m3-oct20-acceptance.json
+            acceptance-evidence/**
             m3-acceptance-validator.xml
             m3-acceptance-validator.log
           if-no-files-found: warn
