@@ -75,6 +75,7 @@ jobs:
             tests/test_b02_booking_port_authorization.py \
             tests/test_b02_agent_booking_boundary_integration.py \
             tests/test_m3_p0_lifecycle_contract.py \
+            tests/test_m3_cross_agent_smoke.py \
             tests/test_unlocode_master_catalog.py \
             tests/test_unlocode_release_adapter.py \
             --junitxml=m3-b01-b02-focused.xml 2>&1 | tee b01-focused.log
