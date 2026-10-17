@@ -410,3 +410,33 @@ def test_checker_reactivation_rejects_duplicate_pol_coverage(country_db,monkeypa
     c=country_db()
     assert c.execute("SELECT status FROM md_records WHERE record_key='POL-OLD'").fetchone()["status"]=="INACTIVE"
     c.close()
+
+
+def test_pol_reactivation_rejects_retired_port(country_db, monkeypatch):
+    """No checker may restore POL coverage when its Port master is inactive."""
+    monkeypatch.setattr(masterdata, "authenticated_actor",
+        lambda _c, _token: ({"user_ref":"checker"},{"MASTER_DATA_MANAGER"}))
+    c=country_db()
+    coverage={"config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE",
+        "agent_code":"UAT-AGENT-001","office_code":"RTM",
+        "scope":"POL","port_code":"NLRTM"}
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','POL-RETIRED',?,'INACTIVE',1,'now','now')",
+        (json.dumps(coverage),))
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM',?,'INACTIVE','now','now')",
+        (json.dumps({'unlocode':'NLRTM'}),))
+    c.execute(
+        "INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-POL-RETIRED','configuration','POL-RETIRED','REACTIVATE','{}','review','maker','now',1)")
+    c.close()
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide("MDC-POL-RETIRED",
+            masterdata.Decision(decision="APPROVE", comment="review"),"checker")
+    assert error.value.status_code==422
+    assert "AGENT_NETWORK_PORT_NOT_ACTIVE" in error.value.detail["codes"]
+    c=country_db()
+    assert c.execute("SELECT status FROM md_records WHERE record_key='POL-RETIRED'").fetchone()["status"]=="INACTIVE"
+    c.close()
