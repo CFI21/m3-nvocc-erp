@@ -506,3 +506,23 @@ def test_mrg_sqlite_session_row(monkeypatch):
     assert result["user"] == "tester"
     assert result["role"] == "FINANCE"
     db.close()
+
+
+def test_equipment_sqlite_session_row(monkeypatch):
+    import sqlite3
+    from app import admin
+    db=sqlite3.connect(":memory:")
+    db.row_factory=sqlite3.Row
+    db.execute("CREATE TABLE t(user_id INTEGER, user_ref TEXT, office_code TEXT, home_office_id INTEGER)")
+    db.execute("INSERT INTO t VALUES (7, 'tester', 'RTM', 1)")
+    row=db.execute("SELECT * FROM t").fetchone()
+    monkeypatch.setattr(equipment, "iam_session", lambda c, token: row)
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": "AGENT"}])
+    monkeypatch.setattr(admin, "_assigned_agent_offices", lambda c, user, agent: [{"office_code": "RTM"}])
+    result=equipment.actor(_GrantConn(["REAL-AGENT"]), "valid", "ADMIN",
+                           "FAKE-AGENT", "FAKE-BRANCH", "FAKE-DEPOT")
+    assert result["user"] == "tester"
+    assert result["role"] == "AGENT"
+    assert result["agent"] == "REAL-AGENT"
+    assert result["branch"] == "NLRTM"
+    db.close()
