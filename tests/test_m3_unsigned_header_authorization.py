@@ -414,3 +414,20 @@ def test_mrg_filters_unrecognized_roles_from_authorization_set(monkeypatch):
     assert result["role"] == "FINANCE"
     assert result["roles"] == {"FINANCE"}
     assert "UNRECOGNIZED" not in result["roles"]
+
+
+@pytest.mark.parametrize("iam_roles,expected", [
+    (["FINANCE", "UNRECOGNIZED"], "FINANCE"),
+    (["VIEWER", "UNRECOGNIZED"], "VIEWER"),
+    (["OPS", "FINANCE", "UNRECOGNIZED"], "FINANCE"),
+])
+def test_mrg_audit_role_from_effective_permissions(monkeypatch, iam_roles, expected):
+    monkeypatch.setattr(mrg, "iam_session", lambda c, token: {
+        "user_id": 7, "user_ref": "mrg-user",
+    })
+    monkeypatch.setattr(mrg, "iam_roles_for", lambda c, user: [
+        {"role_code": role} for role in iam_roles
+    ])
+    result = mrg.actor(None, "valid", "ADMIN")
+    assert result["role"] == expected
+    assert result["roles"] <= (mrg.MAKER | mrg.CHECKER | mrg.VIEW)
