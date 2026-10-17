@@ -52,8 +52,14 @@ def actor(c,token,x_role):
     if token:
         s=iam_session(c,token)
         rs=iam_roles_for(c,s["user_id"])
-        roles={str(r["role_code"]).upper() for r in rs}
-        role=next(iter(roles), "VIEWER")
+        roles={str(r["role_code"] or "").strip().upper() for r in rs}
+        roles.discard("")
+        if not roles or not str(s.get("user_ref") or "").strip():
+            raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
+        # Stable audit identity when IAM assigns more than one approved role.
+        priority=("ADMIN", "MASTER_DATA_MANAGER", "FINANCE", "GL_MANAGER",
+                  "EQUIPMENT_MANAGER", "OPS", "AUDITOR", "AGENT", "DOCS", "VIEWER")
+        role=next((name for name in priority if name in roles), sorted(roles)[0])
         return {"user":s["user_ref"],"role":role,"roles":roles}
     raise HTTPException(401, {"code": "MRG_SESSION_REQUIRED"})
 
