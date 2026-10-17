@@ -112,3 +112,28 @@ def test_unlocode_deleted_release_code_cannot_be_staged(monkeypatch):
         masterdata.unlocode_stage("NLRTM",x_m3_session="maker-session")
     assert error.value.status_code==409
     assert error.value.detail["code"]=="UNLOCODE_DELETED_NOT_ACTIVATABLE"
+
+
+def test_unlocode_stage_retains_official_release_metadata(monkeypatch):
+    monkeypatch.setattr(masterdata,"_unlocode_catalog",lambda:[{
+        "unlocode":"NLRTM","country_code":"NL","country_name":"",
+        "port_code":"RTM","port_name":"Rotterdam","source":"unece_release",
+        "subdivision_code":"ZH","function":"1-------","unlocode_status":"AA",
+        "iata_code":"RTM","coordinates":"5155N 00430E",
+        "eligible_for_activation":True,
+    }])
+    captured=[]
+    monkeypatch.setattr(masterdata,"create_change",
+                        lambda change,x_m3_session=None:captured.append(change) or {"status":"PENDING"})
+    result=masterdata.unlocode_stage("nlrtm",x_m3_session="maker-session")
+    assert result["status"]=="PENDING"
+    change=captured[0]
+    assert change.operation=="CREATE"
+    assert change.domain=="port"
+    assert change.record_key=="NLRTM"
+    assert {k:change.payload[k] for k in (
+        "source","subdivision_code","function","unlocode_status","iata_code","coordinates"
+    )}=={
+        "source":"unece_release","subdivision_code":"ZH","function":"1-------",
+        "unlocode_status":"AA","iata_code":"RTM","coordinates":"5155N 00430E",
+    }
