@@ -158,3 +158,14 @@ def test_equipment_missing_role_is_denied(context):
         equipment.scope_clause(context)
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_ROLE_SCOPE_DENIED"
+
+
+@pytest.mark.parametrize("role,code", [
+    ("AGENT", "AGENT_SCOPE_REQUIRED"),
+    ("DEPOT", "DEPOT_SCOPE_REQUIRED"),
+])
+def test_equipment_missing_party_scope_denied_with_403(role, code):
+    with pytest.raises(HTTPException) as exc:
+        equipment.scope_clause({"role": role})
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == code
