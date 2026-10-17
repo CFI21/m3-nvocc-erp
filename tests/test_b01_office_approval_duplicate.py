@@ -216,3 +216,39 @@ def test_maker_cannot_submit_colliding_office_update(office_database):
         "SELECT COUNT(*) FROM md_change_requests WHERE record_key='OFFICE-AMS'"
     ).fetchone()[0]==0
     db.close()
+
+
+def test_checker_reactivation_rejects_duplicate_active_office(office_database):
+    """Inactive Office configuration cannot revive over the same active assignment."""
+    db=office_database()
+    payload={
+        "config_type":"AGENT_OFFICE_ASSIGNMENT",
+        "agent_code":"UAT-AGENT-001",
+        "office_code":"RTM",
+        "address":"Rotterdam",
+    }
+    for key,status in (("OFFICE-LIVE","ACTIVE"),("OFFICE-OLD","INACTIVE")):
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+            "VALUES ('configuration',?,?,?,1,'now','now')",
+            (key,json.dumps(payload),status),
+        )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-OFFICE-REACTIVATE','configuration','OFFICE-OLD','REACTIVATE','{}','review','office-maker','now',1)"
+    )
+    db.close()
+
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide(
+            "MDC-OFFICE-REACTIVATE",
+            masterdata.Decision(decision="APPROVE",comment="review"),
+            "checker",
+        )
+    assert error.value.status_code==409
+    assert error.value.detail["code"]=="DUPLICATE_AGENT_RELATIONSHIP"
+    db=office_database()
+    assert db.execute("SELECT status FROM md_records WHERE record_key='OFFICE-OLD'").fetchone()["status"]=="INACTIVE"
+    assert db.execute("SELECT status FROM md_change_requests WHERE change_ref='MDC-OFFICE-REACTIVATE'").fetchone()["status"]=="PENDING"
+    db.close()
