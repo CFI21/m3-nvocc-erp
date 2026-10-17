@@ -65,7 +65,7 @@ def _artifact(path, expected_sha):
             return {"status": "BLOCKED", "reason": "EVIDENCE_NOT_PASS"}
         if not isinstance(obj.get("artifacts"), list) or not obj["artifacts"]:
             return {"status": "BLOCKED", "reason": "PROOF_LINKS_MISSING"}
-        if not all(isinstance(link, str) and link.strip() for link in obj["artifacts"]):
+        if not all(isinstance(link, str) and link.strip() and "example.invalid" not in link.lower() and "placeholder" not in link.lower() for link in obj["artifacts"]):
             return {"status": "BLOCKED", "reason": "PROOF_LINKS_INVALID"}
         return {"status": "PASS", "artifacts": obj["artifacts"]}
     except (ValueError, OSError, AttributeError):
@@ -124,6 +124,8 @@ def evaluate(root, sha):
                         and isinstance(record.get("artifacts"), list)
                         and bool(record["artifacts"])
                         and all(isinstance(link, str) and link.strip()
+                                and "example.invalid" not in link.lower()
+                                and "placeholder" not in link.lower()
                                 for link in record["artifacts"]))
             if (not isinstance(scenarios, dict)
                     or any(not has_valid_proof(scenarios.get(sid))
