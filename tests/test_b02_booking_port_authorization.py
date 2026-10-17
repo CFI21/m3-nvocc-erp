@@ -261,3 +261,27 @@ def test_booking_conflicted_office_never_regains_access(monkeypatch, countries):
         assert main.booking_agent_port_grants(c,1,'A1')['POL']['ports']==set()
     finally:
         c.close()
+
+
+@pytest.mark.parametrize("start,end", [
+    ("2026-99-01", "9999-12-31"),
+    ("not-a-date", "9999-12-31"),
+    ("2026-02-30", "9999-12-31"),
+    ("0000-01-01", "tomorrow"),
+    ("2026-10-20", "2026-10-19"),
+])
+def test_booking_rejects_invalid_agent_network_effective_period(monkeypatch,start,end):
+    c=_conn()
+    monkeypatch.setattr('app.admin._assigned_agent_offices',
+                        lambda conn,user,agent:[{'office_code':'RTM','country_code':'NL'}])
+    data={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+          'agent_code':'A1','office_code':'RTM','scope':'POL',
+          'port_code':'NLRTM','effective_from':start,'effective_to':end}
+    c.execute("INSERT INTO md_records VALUES ('configuration','COV',?,'ACTIVE')",
+              (json.dumps(data),))
+    c.execute("INSERT INTO md_records VALUES ('port','NLRTM',?,'ACTIVE')",
+              (json.dumps({'unlocode':'NLRTM'}),))
+    try:
+        assert main.booking_agent_port_grants(c,1,'A1')['POL']['ports']==set()
+    finally:
+        c.close()
