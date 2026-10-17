@@ -118,17 +118,21 @@ def evaluate(root, sha):
         try:
             document = json.loads((root / filename).read_text(encoding="utf-8"))
             scenarios = document.get("scenarios", {})
+            def has_valid_proof(record):
+                return (isinstance(record, dict)
+                        and record.get("status") == "PASS"
+                        and isinstance(record.get("artifacts"), list)
+                        and bool(record["artifacts"])
+                        and all(isinstance(link, str) and link.strip()
+                                for link in record["artifacts"]))
             if (not isinstance(scenarios, dict)
-                    or any(not isinstance(scenarios.get(sid), dict)
-                           or scenarios[sid].get("status") != "PASS"
-                           or not scenarios[sid].get("artifacts") for sid in required)):
+                    or any(not has_valid_proof(scenarios.get(sid))
+                           for sid in required)):
                 raise ValueError("MANDATORY_SCENARIOS_MISSING")
             if name == "196-screen cross-module":
                 screens = document.get("screens", {})
                 if (not isinstance(screens, dict) or len(screens) != 196
-                        or any(v.get("status") != "PASS" or not v.get("artifacts")
-                               for v in screens.values() if isinstance(v, dict))
-                        or any(not isinstance(v, dict) for v in screens.values())):
+                        or any(not has_valid_proof(v) for v in screens.values())):
                     raise ValueError("SCREENS_196_NOT_VERIFIED")
         except (OSError, ValueError, AttributeError, KeyError) as error:
             report["modules"][name]["status"] = "BLOCKED"
