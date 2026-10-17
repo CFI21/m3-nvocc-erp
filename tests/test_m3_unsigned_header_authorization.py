@@ -207,3 +207,28 @@ def test_equipment_rejects_non_string_scope_values(role, key, value, code):
         equipment.scope_clause({"role": role, key: value})
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == code
+
+
+@pytest.mark.parametrize("role,grant", [
+    ("AGENT", "  "),
+    ("AGENT", 123),
+    ("DEPOT", "  "),
+    ("DEPOT", ["D1"]),
+])
+def test_equipment_rejects_malformed_iam_party_grants(monkeypatch, role, grant):
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "uat-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(
+        equipment, "roles_for",
+        lambda c, user: [{"role_code": role}],
+    )
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(
+            _GrantConn([grant]), "valid", "ADMIN",
+            "SPOOFED-AGENT", "SPOOFED-BRANCH", "SPOOFED-DEPOT",
+        )
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"
