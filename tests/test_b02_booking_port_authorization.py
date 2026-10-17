@@ -42,3 +42,59 @@ def test_mismatched_port_master_unlocode_deny(monkeypatch):
     c.execute("INSERT INTO md_records VALUES ('port','NLRTM',?,'ACTIVE')",(json.dumps({'unlocode':'NLAMS'}),))
     assert not main.booking_agent_port_grants(c,1,'A1')['POL']['ports']
     c.close()
+
+
+@pytest.mark.parametrize("office_code,agent_code", [
+    ("rtm", "a1"),
+    (" RTM ", " A1 "),
+    ("RTM", "A1"),
+])
+def test_booking_port_coverage_normalizes_existing_master_identifiers(
+    monkeypatch, office_code, agent_code
+):
+    c=_conn()
+    monkeypatch.setattr(
+        'app.admin._assigned_agent_offices',
+        lambda conn,user,agent:[{'office_code':'RTM','country_code':'NL'}],
+    )
+    network={
+        'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+        'agent_code':agent_code,'office_code':office_code,
+        'scope':'POL','port_code':'NLRTM',
+    }
+    c.execute(
+        "INSERT INTO md_records VALUES ('configuration','COV',?,'ACTIVE')",
+        (json.dumps(network),),
+    )
+    c.execute(
+        "INSERT INTO md_records VALUES ('port','NLRTM',?,'ACTIVE')",
+        (json.dumps({'unlocode':'NLRTM'}),),
+    )
+    try:
+        assert main.booking_agent_port_grants(c,1,'A1')['POL']['ports']=={'NLRTM'}
+    finally:
+        c.close()
+
+
+def test_booking_port_coverage_rejects_unassigned_office(monkeypatch):
+    c=_conn()
+    monkeypatch.setattr(
+        'app.admin._assigned_agent_offices',
+        lambda conn,user,agent:[{'office_code':'RTM','country_code':'NL'}],
+    )
+    network={
+        'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+        'agent_code':'A1','office_code':'AMS','scope':'POL','port_code':'NLRTM',
+    }
+    c.execute(
+        "INSERT INTO md_records VALUES ('configuration','COV',?,'ACTIVE')",
+        (json.dumps(network),),
+    )
+    c.execute(
+        "INSERT INTO md_records VALUES ('port','NLRTM',?,'ACTIVE')",
+        (json.dumps({'unlocode':'NLRTM'}),),
+    )
+    try:
+        assert not main.booking_agent_port_grants(c,1,'A1')['POL']['ports']
+    finally:
+        c.close()
