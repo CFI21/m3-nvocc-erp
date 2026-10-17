@@ -62,6 +62,28 @@ def test_all_seven_modules_and_preview_required_for_release_pass(tmp_path):
         "artifacts":["https://example.invalid/deploy-evidence"],
         "web":{"commit_sha":SHA,"deployment_id":"preview-web-1"},
         "api":{"commit_sha":SHA,"deployment_id":"preview-api-1"}}))
+    assert evaluate(tmp_path,SHA)["release"]=="BLOCKED"
+    from scripts.m3_oct20_acceptance import MODULES
+    required={
+        "Countries/Port Auth":[f"SEC-{i:03d}" for i in range(1,13)],
+        "Booking Workflow":[f"E2E-{i:03d}" for i in range(1,5)],
+        "Agent Master":["UAT-001","UAT-002"],"IAM":["UAT-003"],
+        "Equipment/Depot":["UAT-007"],"Finance":["UAT-008"],
+        "196-screen cross-module":["UAT-010"],
+    }
+    for name,(_, filename) in MODULES.items():
+        evidence={
+            "commit_sha":SHA,"status":"PASS",
+            "artifacts":["https://example.invalid/test-evidence"],
+            "scenarios":{scenario:{"status":"PASS","artifacts":["run/123"]}
+                         for scenario in required[name]},
+        }
+        if name=="196-screen cross-module":
+            evidence["screens"]={
+                f"SCREEN-{i:03d}":{"status":"PASS","artifacts":["run/123"]}
+                for i in range(1,197)
+            }
+        (tmp_path/filename).write_text(json.dumps(evidence))
     assert evaluate(tmp_path,SHA)["release"]=="PASS"
     (tmp_path/"preview_deploys.json").write_text(json.dumps({
         "commit_sha":SHA,"status":"PASS",
