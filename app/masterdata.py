@@ -298,6 +298,23 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
         if errors:
             c.close()
             raise HTTPException(422,{'codes':sorted(set(errors))})
+    if existing and b.operation in ('ACTIVATE','REACTIVATE') and b.domain=='configuration':
+        restored=json.loads(existing['payload_json'] or '{}')
+        kind=str(restored.get('config_type') or '').strip().upper()
+        agent=str(restored.get('agent_code') or '').strip().upper()
+        office=str(restored.get('office_code') or '').strip().upper()
+        port=str(restored.get('port_code') or '').strip().upper()
+        email=str(restored.get('email') or '').strip().lower()
+        if kind in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'):
+            for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if row['record_key']==b.record_key: continue
+                other=json.loads(row['payload_json'] or '{}')
+                if str(other.get('config_type') or '').strip().upper()!=kind: continue
+                if str(other.get('agent_code') or '').strip().upper()!=agent: continue
+                match=(bool(office) and str(other.get('office_code') or '').strip().upper()==office) if kind=='AGENT_OFFICE_ASSIGNMENT' else (bool(port) and bool(email) and str(other.get('port_code') or '').strip().upper()==port and str(other.get('email') or '').strip().lower()==email)
+                if match:
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
     if b.domain=='configuration' and b.operation=='UPDATE' and existing_payload.get('config_type')=='AGENT_NETWORK':
