@@ -370,3 +370,23 @@ def test_booking_valid_unlocode_format_requires_actual_grant():
         main.booking_validate_authorized_ports({"POL":"NLRTM"}, {"POL":{"ports":set(),"all_ports":False}})
     assert exc.value.status_code==403
     assert exc.value.detail["code"]=="BOOKING_PORT_NOT_AUTHORIZED"
+
+
+@pytest.mark.parametrize("port", ["nlrtm", " NLRTM ", "NlRtM"])
+@pytest.mark.parametrize("field,scope", [
+    ("POL", "POL"), ("POD", "POD"), ("POT (1)", "TS"), ("POT (2)", "TS")
+])
+def test_booking_canonical_unlocode_matches_verified_iam_grant(port, field, scope):
+    grants={scope:{"ports":{"NLRTM"},"all_ports":False}}
+    assert main.booking_validate_authorized_ports({field:port},grants) is True
+
+
+@pytest.mark.parametrize("field,scope", [
+    ("POL", "POL"), ("POD", "POD"), ("POT (1)", "TS"), ("POT (2)", "TS")
+])
+def test_booking_canonical_unlocode_still_denies_missing_grant(field,scope):
+    grants={scope:{"ports":{"DEHAM"},"all_ports":False}}
+    with pytest.raises(HTTPException) as exc:
+        main.booking_validate_authorized_ports({field:" nlrtm "},grants)
+    assert exc.value.status_code==403
+    assert exc.value.detail["code"]=="BOOKING_PORT_NOT_AUTHORIZED"
