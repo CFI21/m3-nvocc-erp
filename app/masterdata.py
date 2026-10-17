@@ -261,12 +261,12 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     # Office assignment for the same Agent + Office (or identical Email route).
     if b.domain=='configuration' and b.operation=='CREATE':
         kind=str(b.payload.get('config_type') or '').strip().upper()
-        if kind=='AGENT_NETWORK' and b.payload.get('network_type')=='PORT_COVERAGE':
+        if kind=='AGENT_NETWORK' and str(b.payload.get('network_type') or '').strip().upper()=='PORT_COVERAGE':
             for table,extra in (('md_records',"status='ACTIVE'"),('md_change_requests',"status='PENDING' AND operation='CREATE'")):
                 for rec in c.execute("SELECT record_key,payload_json FROM "+table+" WHERE domain='configuration' AND "+extra):
                     prior=json.loads(rec['payload_json'] or '{}')
                     keys=('config_type','network_type','agent_code','office_code','scope','port_code')
-                    if all(str(prior.get(k) or '').upper()==str(b.payload.get(k) or '').upper() for k in keys):
+                    if all(str(prior.get(k) or '').strip().upper()==str(b.payload.get(k) or '').strip().upper() for k in keys):
                         c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':rec['record_key']})
         if kind in ('AGENT_OFFICE_ASSIGNMENT','AGENT_EMAIL'):
             agent=str(b.payload.get('agent_code') or '').strip().upper()
