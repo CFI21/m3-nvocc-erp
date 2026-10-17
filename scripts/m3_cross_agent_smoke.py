@@ -118,6 +118,39 @@ def run(api_url, token_a, token_b, own_id, other_id, target_sha):
             "note":"Read-only HTTP smoke evidence; this does not satisfy all 12 security cases."}
 
 
+
+def check_list_scope(api_url, token_a, token_b, booking_a, booking_b):
+    """Read-only bulk-list IDOR validation; verify own record and exclude foreign."""
+    _validate_target(api_url)
+    results=[]
+    for cid, token, own, foreign in (
+        ("SEC-005",token_a,int(booking_a),int(booking_b)),
+        ("SEC-006",token_b,int(booking_b),int(booking_a)),
+    ):
+        try:
+            response=request_json(api_url,"/api/v1/booking",token)
+            valid=False
+            if response["status"]==200:
+                body=json.loads(response["body"])
+                if (isinstance(body,dict) and body.get("module")=="booking"
+                        and isinstance(body.get("records"),list)
+                        and isinstance(body.get("count"),int)
+                        and body["count"]==len(body["records"])):
+                    records=body["records"]
+                    ids=[item.get("id") for item in records if isinstance(item,dict)]
+                    valid=(len(ids)==len(records) and own in ids
+                           and foreign not in ids
+                           and all(item.get("module")=="booking" for item in records))
+            results.append({
+                "id":cid,"status":"PASS" if valid else "BLOCKED",
+                "http_status":response["status"],
+                "response_sha256":hashlib.sha256(response["body"].encode()).hexdigest(),
+            })
+        except (ValueError,TypeError,urllib.error.URLError,TimeoutError,OSError) as exc:
+            results.append({"id":cid,"status":"BLOCKED","error":type(exc).__name__})
+    return results
+
+
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument("--api-url",default=os.getenv("M3_UAT_API_URL",""))
@@ -127,9 +160,13 @@ def main():
     parser.add_argument("--output",type=Path,default=Path("m3-cross-agent-smoke.json"))
     args=parser.parse_args()
     try:
-        result=run(args.api_url,os.getenv("M3_AGENT_A_SESSION",""),
-                   os.getenv("M3_AGENT_B_SESSION",""),
+        token_a=os.getenv("M3_AGENT_A_SESSION","")
+        token_b=os.getenv("M3_AGENT_B_SESSION","")
+        result=run(args.api_url,token_a,token_b,
                    args.booking_a,args.booking_b,args.commit_sha)
+        result["tests"].extend(check_list_scope(
+            args.api_url,token_a,token_b,args.booking_a,args.booking_b))
+        result["status"]="PASS" if all(x["status"]=="PASS" for x in result["tests"]) else "BLOCKED"
     except ValueError as exc:
         result={"status":"BLOCKED","reason":str(exc)}
     args.output.write_text(json.dumps(result,indent=2)+"\n",encoding="utf-8")
