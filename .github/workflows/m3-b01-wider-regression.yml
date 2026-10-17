@@ -73,6 +73,7 @@ jobs:
             tests/test_b01_office_approval_duplicate.py \
             tests/test_b01_agent_countries_iam_resolution.py \
             tests/test_b02_booking_port_authorization.py \
+            tests/test_b02_agent_booking_boundary_integration.py \
             --junitxml=m3-b01-b02-focused.xml 2>&1 | tee b01-focused.log
       - name: Wider regression in disposable runner
         run: |
