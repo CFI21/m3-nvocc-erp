@@ -440,3 +440,46 @@ def test_pol_reactivation_rejects_retired_port(country_db, monkeypatch):
     c=country_db()
     assert c.execute("SELECT status FROM md_records WHERE record_key='POL-RETIRED'").fetchone()["status"]=="INACTIVE"
     c.close()
+
+
+def test_pol_reactivation_rejects_inactive_iam_country(country_db, monkeypatch):
+    """Country authority is checked again by the independent checker."""
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _c, _token: ({"user_ref":"checker"},{"MASTER_DATA_MANAGER"}),
+    )
+    c=country_db()
+    c.execute("UPDATE iam_countries SET status='INACTIVE' WHERE country_code='NL'")
+    coverage={
+        "config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE",
+        "agent_code":"UAT-AGENT-001","office_code":"RTM",
+        "scope":"POL","port_code":"NLRTM",
+    }
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM',?,'ACTIVE','now','now')",
+        (json.dumps({"unlocode":"NLRTM"}),),
+    )
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','POL-INACTIVE-COUNTRY',?,'INACTIVE',1,'now','now')",
+        (json.dumps(coverage),),
+    )
+    c.execute(
+        "INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-POL-COUNTRY','configuration','POL-INACTIVE-COUNTRY','REACTIVATE','{}','review','maker','now',1)"
+    )
+    c.close()
+    with pytest.raises(HTTPException) as exc:
+        masterdata.decide(
+            "MDC-POL-COUNTRY",
+            masterdata.Decision(decision="APPROVE",comment="review"),
+            "checker",
+        )
+    assert exc.value.status_code==422
+    assert "AGENT_NETWORK_OFFICE_NOT_ACTIVE" in exc.value.detail["codes"]
+    c=country_db()
+    assert c.execute(
+        "SELECT status FROM md_records WHERE record_key='POL-INACTIVE-COUNTRY'"
+    ).fetchone()["status"]=="INACTIVE"
+    c.close()
