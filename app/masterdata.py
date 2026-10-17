@@ -215,11 +215,8 @@ def agent_office_countries(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
 # Uploaded reference catalog is intentionally separate from approved Port Master.
 # Booking permissions continue to require approved ACTIVE md_records.
 def _unlocode_catalog():
-    import csv
-    from pathlib import Path
-    source=Path(__file__).resolve().parent.parent/'data'/'unlocode_source_2026_uploaded.csv'
-    with source.open(encoding='utf-8',newline='') as stream:
-        return list(csv.DictReader(stream))
+    from .unlocode_release import catalog
+    return catalog()
 
 @router.get('/unlocode/catalog')
 def unlocode_catalog(q:str='',country:str='',limit:int=100,
