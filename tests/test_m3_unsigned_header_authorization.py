@@ -293,3 +293,25 @@ def test_restricted_equipment_actor_requires_active_office(monkeypatch, role):
         )
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_ACTIVE_OFFICE_REQUIRED"
+
+
+@pytest.mark.parametrize("iam_role", [" agent ", "Agent", "AGENT"])
+def test_equipment_normalizes_authenticated_iam_role(monkeypatch, iam_role):
+    class Conn:
+        def execute(self, sql, params):
+            if "iam_branches" in sql:
+                return _Results([{"branch_code": "NLRTM"}])
+            if "iam_party_access" in sql:
+                return _Results([{"party_key": "A1"}])
+            raise AssertionError("Unexpected SQL")
+    from app import admin
+    monkeypatch.setattr(equipment, "iam_session", lambda c, t: {
+        "user_id": 7, "user_ref": "agent", "office_code": "RTM",
+        "home_office_id": 1,
+    })
+    monkeypatch.setattr(equipment, "roles_for", lambda c, u: [{"role_code": iam_role}])
+    monkeypatch.setattr(admin, "_assigned_agent_offices",
+                        lambda c, u, a: [{"office_code": "RTM"}])
+    result = equipment.actor(Conn(), "valid", "ADMIN", "OTHER", "OTHER", "OTHER")
+    assert result["role"] == "AGENT"
+    assert result["agent"] == "A1"
