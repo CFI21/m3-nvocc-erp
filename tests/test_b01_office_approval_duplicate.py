@@ -27,7 +27,7 @@ def office_database(tmp_path, monkeypatch):
         masterdata,
         "authenticated_actor",
         lambda _db, token: (
-            {"user_ref": "office-maker" if token == "maker" else "office-checker"},
+            {"user_ref": "office-maker" if token == "maker" else "office-checker", "username": "uat.actor"},
             {"MASTER_DATA"} if token == "maker" else {"MASTER_DATA_MANAGER"},
         ),
     )
