@@ -27,20 +27,22 @@ jobs:
           python-version: '3.11'
       - name: Install test dependencies
         run: python -m pip install -r requirements.txt
-      - name: Focused B01 maker checker and countries
-        run: python -m pytest -q -ra --tb=short tests/test_b01_agent_countries_iam_resolution.py tests/test_b02_booking_port_authorization.py
+      - name: Compile backend and targeted regressions
+        run: python -m compileall -q app tests
+      - name: Focused B01 / B02 authorization and maker-checker gates
+        run: |
+          set -o pipefail
+          python -m pytest -q -ra --tb=short \
+            tests/test_b01_email_port_gate.py \
+            tests/test_b01_office_approval_duplicate.py \
+            tests/test_b01_agent_countries_iam_resolution.py \
+            tests/test_b02_booking_port_authorization.py \
+            --junitxml=m3-b01-b02-focused.xml 2>&1 | tee b01-focused.log
       - name: Wider regression in disposable runner
         run: |
           set -o pipefail
-          python -m pytest -q -ra --tb=short 2>&1 | tee b01-regression.log
-      - name: Preserve regression failure diagnostics
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: m3-b01-regression-failure-log
-          path: b01-regression.log
-          if-no-files-found: warn
-          retention-days: 7
+          python -m pytest -q -ra --tb=short --junitxml=m3-full-regression.xml 2>&1 | tee b01-regression.log
+
       - name: Verify structural contracts
         run: |
           python - <<'PY'
@@ -56,3 +58,16 @@ jobs:
           for forbidden in ('INSERT INTO', 'UPDATE iam_user_roles', 'DELETE FROM'):
               assert forbidden not in endpoint
           PY
+
+      - name: Preserve B01/B02 and full regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-b01-b02-regression-evidence
+          path: |
+            b01-focused.log
+            b01-regression.log
+            m3-b01-b02-focused.xml
+            m3-full-regression.xml
+          if-no-files-found: warn
+          retention-days: 14
