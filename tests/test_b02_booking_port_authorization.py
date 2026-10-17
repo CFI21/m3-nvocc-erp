@@ -452,3 +452,17 @@ def test_booking_iam_party_grant_rejects_invalid_user_ids_before_sql(user_id):
         def execute(self, *args, **kwargs):
             pytest.fail("Invalid user ID must not reach IAM SQL")
     assert main.booking_iam_agent_granted(NoSql(), user_id, "A1") is False
+
+
+@pytest.mark.parametrize("user_id,agent_code", [
+    (0,"A1"),(-1,"A1"),(True,"A1"),("7","A1"),
+    (7,None),(7,123),(7,""),(7,"  "),
+])
+def test_booking_port_grants_invalid_identity_skips_iam_lookup(monkeypatch,user_id,agent_code):
+    monkeypatch.setattr(
+        'app.admin._assigned_agent_offices',
+        lambda *_args: pytest.fail("Invalid IAM actor queried assignments"),
+    )
+    grants=main.booking_agent_port_grants(None,user_id,agent_code)
+    assert set(grants)=={'POL','POD','TS'}
+    assert all(not rule['ports'] and rule['all_ports'] is False for rule in grants.values())
