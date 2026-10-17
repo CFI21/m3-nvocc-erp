@@ -336,8 +336,10 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
         for item in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
             if item['record_key']==b.record_key: continue
             p=json.loads(item['payload_json'] or '{}')
-            if all(str(p.get(k) or '').strip().upper()==str(candidate.get(k) or '').strip().upper() for k in fields):
-                c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP'})
+            if (str(p.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+                str(p.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
+                all(str(p.get(k) or '').strip().upper()==str(candidate.get(k) or '').strip().upper() for k in fields)):
+                c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':item['record_key']})
     # Reject Agent Email / Office UPDATE collisions before creating a pending
     # change. Checker approval independently rechecks the same identities.
     if b.domain=='configuration' and b.operation=='UPDATE':
