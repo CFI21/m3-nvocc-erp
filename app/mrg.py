@@ -62,7 +62,10 @@ def actor(c,token,x_role):
         role=next((name for name in priority if name in roles), None)
         if role is None:
             raise HTTPException(403, {"code": "MRG_IAM_ROLE_NOT_AUTHORIZED"})
-        return {"user":s["user_ref"],"role":role,"roles":roles}
+        authorized_roles=roles & (MAKER | CHECKER | VIEW)
+        if not authorized_roles:
+            raise HTTPException(403, {"code": "MRG_IAM_ROLE_NOT_AUTHORIZED"})
+        return {"user":s["user_ref"],"role":role,"roles":authorized_roles}
     raise HTTPException(401, {"code": "MRG_SESSION_REQUIRED"})
 
 def require(a,allowed):
