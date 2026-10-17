@@ -102,9 +102,11 @@ def scope_clause(a,alias="c"):
     if role=="DEPOT":
         if not a["depot"]:raise HTTPException(403,{"code":"DEPOT_SCOPE_REQUIRED"})
         return f" AND {alias}.depot_code=?", [a["depot"]]
-    if role in {"OPS","BRANCH_OPS","DOCS","EQUIPMENT_CONTROLLER"} and a["branch"]:
-        return f" AND ({alias}.branch_code=? OR {alias}.branch_code IS NULL)",[a["branch"]]
-    return "",[]
+    if role in {"OPS","BRANCH_OPS","DOCS","EQUIPMENT_CONTROLLER"}:
+        if not a.get("branch"):
+            raise HTTPException(403, {"code": "EQUIPMENT_BRANCH_SCOPE_REQUIRED"})
+        return f" AND {alias}.branch_code=?", [a["branch"]]
+    raise HTTPException(403, {"code": "EQUIPMENT_ROLE_SCOPE_DENIED"})
 
 def audit(conn,a,action,container_id=None,job_id=None,before=None,after=None,meta=None):
     conn.execute("INSERT INTO audit_events(event_id,ts,actor_role,actor_scope,action,module,transaction_id,job_id,before_json,after_json,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
