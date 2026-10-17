@@ -252,6 +252,8 @@ def unlocode_stage(code:str,reason:str='UNLOCODE catalog onboarding',
     if len(matches)!=1:
         raise HTTPException(404,{'code':'UNLOCODE_NOT_FOUND'})
     row=matches[0]
+    if row.get('eligible_for_activation') is False:
+        raise HTTPException(409,{'code':'UNLOCODE_DELETED_NOT_ACTIVATABLE'})
     payload={'name':row['port_name'],'display_name':row['port_name'],
              'unlocode':key,'country_code':row['country_code'],
              'country_name':row['country_name'],'port_code':row['port_code'],
