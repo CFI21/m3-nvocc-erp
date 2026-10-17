@@ -35,7 +35,7 @@ def test_leakage_blocks_release_and_response_is_not_logged(monkeypatch):
     report=smoke.run("https://m3-pr124-booking-api-preview.onrender.com","a","b","1","2",SHA)
     assert report["status"]=="BLOCKED"
     assert "AGENT_B_SECRET" not in str(report)
-    assert {row["status"] for row in report["tests"]}=={"PASS","BLOCKED"}
+    assert all(row["status"]=="BLOCKED" for row in report["tests"])
 
 
 @pytest.mark.parametrize("url",[
