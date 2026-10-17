@@ -218,14 +218,26 @@ def booking_agent_port_grants(conn,user_id,agent_code):
     """
     from .admin import _assigned_agent_offices
     assigned=_assigned_agent_offices(conn,user_id,agent_code)
-    # Conflicting IAM country assignments must never be silently overwritten.
-    offices={
-        str(x['office_code']).strip().upper():str(x['country_code']).strip().upper()
-        for x in (assigned or ())
-        if hasattr(x,'keys') and 'office_code' in x.keys() and 'country_code' in x.keys()
-        and isinstance(x['office_code'],str) and isinstance(x['country_code'],str)
-        and x['office_code'].strip() and re.fullmatch(r'[A-Z]{2}',x['country_code'].strip().upper())
-    }
+    # Deny offices with conflicting country grants, regardless of row order.
+    offices={}
+    ambiguous_offices=set()
+    for item in (assigned or ()):
+        if not hasattr(item,'keys') or 'office_code' not in item.keys() or 'country_code' not in item.keys():
+            continue
+        office=item['office_code']
+        country=item['country_code']
+        if not isinstance(office,str) or not isinstance(country,str):
+            continue
+        office=office.strip().upper()
+        country=country.strip().upper()
+        if not office or not re.fullmatch(r'[A-Z]{2}',country):
+            continue
+        if office in offices and offices[office]!=country:
+            ambiguous_offices.add(office)
+        else:
+            offices[office]=country
+    for office in ambiguous_offices:
+        offices.pop(office,None)
     grants={scope:{'ports':set(),'all_ports':False} for scope in ('POL','POD','TS')}
     if not offices:
         return grants
