@@ -66,3 +66,28 @@ def test_generic_200_or_wrong_booking_is_not_success(monkeypatch):
                      "a","b","1","2",SHA)
     assert report["status"]=="BLOCKED"
     assert report["tests"][0]["status"]=="BLOCKED"
+
+
+def test_auth_redirect_cannot_be_mistaken_for_agent_isolation(monkeypatch):
+    import urllib.error
+    from io import BytesIO
+    class RedirectOpener:
+        def open(self, req, timeout):
+            raise urllib.error.HTTPError(req.full_url,302,"Found",
+                                         {"Location":"/login"},BytesIO(b""))
+    monkeypatch.setattr(smoke.urllib.request,"build_opener",
+                        lambda *_handlers:RedirectOpener())
+    with pytest.raises(ValueError,match="UNEXPECTED_AUTH_REDIRECT"):
+        smoke.request_json("https://m3-pr124-booking-api-preview.onrender.com",
+                           "/api/v1/booking/1","token")
+
+
+def test_redirect_failure_is_blocked_without_logging_session(monkeypatch):
+    def redirected(base,path,token):
+        raise ValueError("UNEXPECTED_AUTH_REDIRECT")
+    monkeypatch.setattr(smoke,"request_json",redirected)
+    result=smoke.run("https://m3-pr124-booking-api-preview.onrender.com",
+                     "sensitive-a","sensitive-b","1","2",SHA)
+    assert result["status"]=="BLOCKED"
+    assert all(item["status"]=="BLOCKED" for item in result["tests"])
+    assert "sensitive-a" not in str(result)
