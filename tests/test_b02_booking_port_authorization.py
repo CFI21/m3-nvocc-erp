@@ -315,3 +315,23 @@ def test_booking_agent_network_effective_window_boundaries(
         assert ('NLRTM' in ports) is expected
     finally:
         c.close()
+
+
+@pytest.mark.parametrize("fields", [None, [], "POL=NLRTM", 42, True])
+def test_booking_rejects_non_mapping_payload_before_port_authorization(fields):
+    grants={
+        'POL':{'ports':{'NLRTM'},'all_ports':False},
+        'POD':{'ports':set(),'all_ports':False},
+        'TS':{'ports':set(),'all_ports':False},
+    }
+    with pytest.raises(HTTPException) as exc:
+        main.booking_validate_authorized_ports(fields,grants)
+    assert exc.value.status_code==422
+    assert exc.value.detail['code']=='BOOKING_FIELDS_INVALID'
+
+
+def test_booking_port_grant_cannot_be_supplied_as_plain_string():
+    with pytest.raises(HTTPException) as exc:
+        main.booking_validate_authorized_ports({'POL':'NLRTM'}, {'POL':'NLRTM'})
+    assert exc.value.status_code==403
+    assert exc.value.detail['code']=='BOOKING_PORT_NOT_AUTHORIZED'
