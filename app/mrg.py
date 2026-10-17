@@ -63,7 +63,7 @@ def actor(c,token,x_role):
             if hasattr(r, "keys") and "role_code" in r.keys()
         }
         roles.discard("")
-        if not roles or not str(s["user_ref"] or "").strip() if "user_ref" in s.keys() else "":
+        if not roles or "user_ref" not in s.keys() or not str(s["user_ref"] or "").strip():
             raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
         # Stable audit identity when IAM assigns more than one approved role.
         priority=("ADMIN", "MASTER_DATA_MANAGER", "FINANCE", "GL_MANAGER",
