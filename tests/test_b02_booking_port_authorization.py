@@ -444,3 +444,11 @@ def test_booking_allowlist_filters_invalid_entries_without_revoking_valid_port(a
 ])
 def test_booking_allowlist_never_grants_unlisted_port(allowlist):
     assert main.booking_port_allowed("DEHAM",allowlist) is False
+
+
+@pytest.mark.parametrize("user_id", [0, -1, -99, True, False, "7", None, 7.0])
+def test_booking_iam_party_grant_rejects_invalid_user_ids_before_sql(user_id):
+    class NoSql:
+        def execute(self, *args, **kwargs):
+            pytest.fail("Invalid user ID must not reach IAM SQL")
+    assert main.booking_iam_agent_granted(NoSql(), user_id, "A1") is False
