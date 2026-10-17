@@ -1000,6 +1000,8 @@ def test_checker_can_reject_unknown_stored_operation(tmp_path, monkeypatch):
 @pytest.mark.parametrize("maker,checker", [
     ("md.maker", "MD.MAKER"),
     ("md.maker ", " md.maker"),
+    (" ", "md.checker"),
+    ("md.maker", " "),
 ])
 def test_checker_blocks_normalized_self_approval(tmp_path, monkeypatch, maker, checker):
     """Four-eyes approval must reject case and surrounding-space aliases."""
