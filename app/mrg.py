@@ -51,6 +51,8 @@ def ensure(c):
 def actor(c,token,x_role):
     if token:
         s=iam_session(c,token)
+        if not isinstance(s,dict) or not s.get("user_id"):
+            raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
         rs=iam_roles_for(c,s["user_id"])
         roles={str(r["role_code"] or "").strip().upper() for r in rs}
         roles.discard("")
