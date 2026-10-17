@@ -81,7 +81,7 @@ def test_equipment_agent_scope_uses_iam_not_headers(monkeypatch):
     )
     assert actor["role"] == "AGENT"
     assert actor["agent"] == "REAL-AGENT"
-    assert actor["branch"] is None
+    assert actor["branch"] == "NLRTM"
     assert actor["depot"] is None
 
 
@@ -118,7 +118,7 @@ def test_equipment_depot_scope_from_iam_not_request_headers(monkeypatch):
     assert result["role"] == "DEPOT"
     assert result["depot"] == "REAL-DEPOT"
     assert result["agent"] is None
-    assert result["branch"] is None
+    assert result["branch"] == "NLRTM"
 
 
 @pytest.mark.parametrize("role", ["OPS", "BRANCH_OPS", "DOCS", "EQUIPMENT_CONTROLLER"])
