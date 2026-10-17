@@ -174,7 +174,7 @@ def booking_port_allowed(port_code, allowed_ports, *, all_ports_granted=False):
         return True
     if not isinstance(allowed_ports,(set,list,tuple,frozenset)):
         return False
-    return port in {str(p).strip().upper() for p in allowed_ports if isinstance(p,str)}
+    return port in {p.strip().upper() for p in allowed_ports if isinstance(p,str) and re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}',p.strip().upper())}
 
 
 def booking_iam_agent_granted(conn, user_id, agent_code):
