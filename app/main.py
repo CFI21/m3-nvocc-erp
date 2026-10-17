@@ -225,6 +225,9 @@ def booking_agent_port_grants(conn,user_id,agent_code):
     identify the agent, a verified operating office, a scope and an exact port.
     """
     from .admin import _assigned_agent_offices
+    grants={scope:{'ports':set(),'all_ports':False} for scope in ('POL','POD','TS')}
+    if not isinstance(user_id,int) or isinstance(user_id,bool) or user_id<=0 or not isinstance(agent_code,str) or not agent_code.strip():
+        return grants
     assigned=_assigned_agent_offices(conn,user_id,agent_code)
     # Deny offices with conflicting country grants, regardless of row order.
     offices={}
@@ -249,7 +252,6 @@ def booking_agent_port_grants(conn,user_id,agent_code):
             offices[office]=country
     for office in ambiguous_offices:
         offices.pop(office,None)
-    grants={scope:{'ports':set(),'all_ports':False} for scope in ('POL','POD','TS')}
     if not offices:
         return grants
     rows=conn.execute("""SELECT payload_json FROM md_records
