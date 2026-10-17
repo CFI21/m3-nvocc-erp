@@ -444,3 +444,15 @@ def test_mrg_rejects_invalid_iam_session_before_role_lookup(monkeypatch, session
         mrg.actor(None, "valid", "SUPER_ADMIN")
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "MRG_IAM_IDENTITY_REQUIRED"
+
+
+@pytest.mark.parametrize("roles", [None, [], ()])
+def test_mrg_rejects_missing_iam_role_collection(monkeypatch, roles):
+    monkeypatch.setattr(mrg, "iam_session", lambda _c, _t: {
+        "user_id": 7, "user_ref": "mrg-user",
+    })
+    monkeypatch.setattr(mrg, "iam_roles_for", lambda _c, _u: roles)
+    with pytest.raises(HTTPException) as exc:
+        mrg.actor(None, "valid", "ADMIN")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "MRG_IAM_ROLE_NOT_AUTHORIZED"
