@@ -258,8 +258,9 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                 prior=c.execute('SELECT payload_json FROM md_records WHERE domain=? AND record_key=?',
                                 ('configuration',b.record_key)).fetchone()
                 if prior:
-                    agent_configuration=str(json.loads(prior['payload_json']).get('config_type') or '').strip().upper() in (
-                        'AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK')
+                    prior_type=str(json.loads(prior['payload_json']).get('config_type') or '').strip().upper()
+                    requested_type=str(b.payload.get('config_type') or '').strip().upper()
+                    agent_configuration=prior_type in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK') or requested_type in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT','AGENT_NETWORK')
         if b.domain=='agent' or agent_configuration:
             c.close();raise HTTPException(403,{'code':'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
 
