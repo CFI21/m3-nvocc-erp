@@ -353,3 +353,20 @@ def test_booking_rejects_invalid_populated_port_fields(value):
 def test_booking_authorized_port_is_accepted_with_explicit_scope_grant():
     grants={'POL':{'ports':{'NLRTM'},'all_ports':False}}
     assert main.booking_validate_authorized_ports({'POL':'NLRTM'},grants) is True
+
+
+@pytest.mark.parametrize("port", ["XX", "NLRTM1", "12345", "N!RTM", "NL RTM", "NLRT", "NLRTMM", " NL R TM "])
+def test_booking_rejects_invalid_unlocode_format_before_grant_check(port):
+    for field,scope in (("POL","POL"),("POD","POD"),("POT (1)","TS"),("POT (2)","TS")):
+        grants={scope:{"ports":{port},"all_ports":False}}
+        with pytest.raises(HTTPException) as exc:
+            main.booking_validate_authorized_ports({field:port},grants)
+        assert exc.value.status_code==422
+        assert exc.value.detail=={"code":"BOOKING_PORT_INVALID","field":field}
+
+
+def test_booking_valid_unlocode_format_requires_actual_grant():
+    with pytest.raises(HTTPException) as exc:
+        main.booking_validate_authorized_ports({"POL":"NLRTM"}, {"POL":{"ports":set(),"all_ports":False}})
+    assert exc.value.status_code==403
+    assert exc.value.detail["code"]=="BOOKING_PORT_NOT_AUTHORIZED"
