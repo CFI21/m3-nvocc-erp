@@ -238,8 +238,9 @@ def unlocode_catalog(q:str='',country:str='',limit:int=100,
             if (not country or item['country_code']==country)
             and (not needle or needle in (' '.join(item.values())).upper())
         ]
+        sources={str(item.get('source') or 'uploaded_unlocode_reference') for item in matches}
         return {'total':len(matches),'items':matches[:limit],
-                'source':'uploaded_unlocode_reference',
+                'source':next(iter(sources)) if len(sources)==1 else ('mixed' if sources else 'none'),
                 'booking_grant':False}
     finally:
         c.close()
