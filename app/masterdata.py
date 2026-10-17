@@ -246,8 +246,8 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     # Dedicated isolated B01 UAT only: enforce strict two-account separation.
     # This does not change other domains, identities, or production policies.
     import os
-    if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='ON'
-        and os.getenv('M3_B01_STRICT_MAKER_CHECKER','false').lower()=='true'
+    if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').strip().upper()!='ON'
+        and os.getenv('M3_B01_STRICT_MAKER_CHECKER','false').strip().casefold()=='true'
         and str(sess.get('username') or '').strip().casefold()=='md.checker'):
         agent_configuration=False
         if b.domain=='configuration':
