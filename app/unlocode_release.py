@@ -33,6 +33,9 @@ def _release_rows(path):
         name=(row[3] or row[4]).strip()
         if not name:
             continue
+        # UNECE release marks deleted locations with change indicator X.
+        # Keep them visible for reference, but do not stage as active masters.
+        change=(row[0] or "").strip().upper()
         yield {"unlocode":code,"country_code":country,
                "country_name":"","port_code":location,"port_name":name,
                "subdivision_code":row[5].strip() if len(row)>5 else "",
@@ -40,6 +43,8 @@ def _release_rows(path):
                "unlocode_status":row[7].strip() if len(row)>7 else "",
                "iata_code":row[9].strip() if len(row)>9 else "",
                "coordinates":row[10].strip() if len(row)>10 else "",
+               "change_indicator":change,
+               "eligible_for_activation":change!="X",
                "source":"unece_release"}
 
 
