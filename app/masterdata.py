@@ -260,7 +260,12 @@ def unlocode_stage(code:str,reason:str='UNLOCODE catalog onboarding',
     payload={'name':row['port_name'],'display_name':row['port_name'],
              'unlocode':key,'country_code':row['country_code'],
              'country_name':row['country_name'],'port_code':row['port_code'],
-             'source':'uploaded_unlocode_reference'}
+             'subdivision_code':row.get('subdivision_code') or '',
+             'function':row.get('function') or '',
+             'unlocode_status':row.get('unlocode_status') or '',
+             'iata_code':row.get('iata_code') or '',
+             'coordinates':row.get('coordinates') or '',
+             'source':row.get('source') or 'uploaded_unlocode_reference'}
     # Use the existing authenticated maker/checker workflow, not direct DB writes.
     return create_change(Change(domain='port',record_key=key,
                                 operation='CREATE',payload=payload,reason=reason),
