@@ -100,10 +100,10 @@ def scope_clause(a,alias="c"):
     role=a.get("role")
     if role in GLOBAL_ROLES or role in {"FINANCE","EQUIPMENT_MANAGER"}: return "",[]
     if role=="AGENT":
-        if not a["agent"]:raise HTTPException(403,{"code":"AGENT_SCOPE_REQUIRED"})
+        if not a.get("agent"):raise HTTPException(403,{"code":"AGENT_SCOPE_REQUIRED"})
         return f" AND {alias}.agent_code=?", [a["agent"]]
     if role=="DEPOT":
-        if not a["depot"]:raise HTTPException(403,{"code":"DEPOT_SCOPE_REQUIRED"})
+        if not a.get("depot"):raise HTTPException(403,{"code":"DEPOT_SCOPE_REQUIRED"})
         return f" AND {alias}.depot_code=?", [a["depot"]]
     if role in {"OPS","BRANCH_OPS","DOCS","EQUIPMENT_CONTROLLER"}:
         if not a.get("branch"):
