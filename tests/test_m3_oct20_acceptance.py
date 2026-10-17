@@ -56,7 +56,19 @@ def test_all_seven_modules_and_preview_required_for_release_pass(tmp_path):
     (tmp_path/"preview_deploys.json").write_text(json.dumps({
         "commit_sha":SHA,"status":"PASS",
         "artifacts":["https://example.invalid/deploy-evidence"]}))
+    assert evaluate(tmp_path,SHA)["release"]=="BLOCKED"
+    (tmp_path/"preview_deploys.json").write_text(json.dumps({
+        "commit_sha":SHA,"status":"PASS",
+        "artifacts":["https://example.invalid/deploy-evidence"],
+        "web":{"commit_sha":SHA,"deployment_id":"preview-web-1"},
+        "api":{"commit_sha":SHA,"deployment_id":"preview-api-1"}}))
     assert evaluate(tmp_path,SHA)["release"]=="PASS"
+    (tmp_path/"preview_deploys.json").write_text(json.dumps({
+        "commit_sha":SHA,"status":"PASS",
+        "artifacts":["https://example.invalid/deploy-evidence"],
+        "web":{"commit_sha":SHA,"deployment_id":"preview-web-1"},
+        "api":{"commit_sha":"e"*40,"deployment_id":"preview-api-1"}}))
+    assert evaluate(tmp_path,SHA)["release"]=="BLOCKED"
 
 
 def test_unknown_sha_is_blocked(tmp_path):
