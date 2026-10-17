@@ -95,7 +95,7 @@ def require_action(a,action):
 
 def _trusted_scope(value, code):
     # Whitespace-only values must never produce a broad or unusable scope.
-    scoped = str(value or "").strip()
+    scoped = value.strip() if isinstance(value, str) else ""
     if not scoped:
         raise HTTPException(403, {"code": code})
     return scoped
