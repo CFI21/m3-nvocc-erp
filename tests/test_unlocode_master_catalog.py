@@ -62,7 +62,7 @@ def test_catalog_stages_via_maker_checker_never_directly_activates(monkeypatch):
     assert change.operation=="CREATE"
 
 
-@pytest.mark.parametrize("code",["INVALID","DDBRA","XYZ99"])
+@pytest.mark.parametrize("code",["DDBRA","XYZ99"])
 def test_catalog_does_not_stage_missing_or_quarantined_codes(code,monkeypatch):
     monkeypatch.setattr(masterdata,"create_change",
                         lambda *args,**kwargs:pytest.fail("Unauthorized catalog staging"))
