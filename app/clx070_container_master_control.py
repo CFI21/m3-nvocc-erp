@@ -69,10 +69,20 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
             offices=_assigned_agent_offices(conn,s["user_id"],agent)
             if not offices:
                 raise HTTPException(403, {"code": "EQUIPMENT_AGENT_OFFICE_DENIED"})
+        depot=None
         if role == "DEPOT":
-            raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
+            grants=conn.execute(
+                "SELECT DISTINCT party_key FROM iam_party_access "
+                "WHERE user_id=? AND party_type='DEPOT' AND status='ACTIVE'",
+                (s["user_id"],)
+            ).fetchall()
+            if len(grants) != 1:
+                raise HTTPException(403, {"code": "EQUIPMENT_AMBIGUOUS_DEPOT_GRANTS"})
+            depot=str(grants[0]["party_key"] or "").strip()
+            if not depot:
+                raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
         return {"role":role,"roles":rs,"user":s["user_ref"],"office":s["office_code"],
-                "branch":branch,"agent":agent,"depot":None}
+                "branch":branch,"agent":agent,"depot":depot}
     raise HTTPException(401, {"code": "EQUIPMENT_SESSION_REQUIRED"})
 
 def require_action(a,action):
