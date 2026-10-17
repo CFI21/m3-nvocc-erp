@@ -433,7 +433,9 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
     if not ch:c.close();raise HTTPException(404,'Change not found')
     if ch['status']!='PENDING':c.close();raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
-    if ch['maker']==user:c.close();raise HTTPException(409,{'code':'FOUR_EYES_VIOLATION'})
+    if str(ch['maker'] or '').strip().casefold()==str(user or '').strip().casefold():
+        c.close()
+        raise HTTPException(409,{'code':'FOUR_EYES_VIOLATION'})
     if b.decision=='APPROVE' and ch['operation'] not in ('CREATE','UPDATE','DEACTIVATE','ACTIVATE','REACTIVATE'):
         c.close()
         raise HTTPException(422,{'code':'INVALID_MASTER_OPERATION','operation':ch['operation']})
