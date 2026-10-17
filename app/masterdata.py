@@ -439,6 +439,9 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     if not str(user or '').strip():
         c.close()
         raise HTTPException(403,{'code':'CHECKER_IDENTITY_REQUIRED'})
+    if not isinstance(sess,dict) or not str(sess.get('username') or '').strip():
+        c.close()
+        raise HTTPException(403,{'code':'CHECKER_SESSION_USERNAME_REQUIRED'})
     ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
     if not ch:c.close();raise HTTPException(404,'Change not found')
     if ch['status']!='PENDING':c.close();raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
