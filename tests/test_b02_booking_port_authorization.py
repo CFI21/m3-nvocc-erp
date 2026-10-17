@@ -130,3 +130,33 @@ def test_booking_agent_network_scope_whitespace_does_not_disable_authorized_port
         assert all(not value['ports'] for key,value in grants.items() if key!=normalized)
     finally:
         c.close()
+
+
+@pytest.mark.parametrize("configuration_type,network_type", [
+    (" agent_network ", " PORT_COVERAGE "),
+    ("Agent_Network", "Port_Coverage"),
+])
+def test_booking_coverage_config_type_normalization(monkeypatch, configuration_type, network_type):
+    c=_conn()
+    monkeypatch.setattr(
+        'app.admin._assigned_agent_offices',
+        lambda conn,user,agent:[{'office_code':'RTM','country_code':'NL'}],
+    )
+    record={
+        'config_type':configuration_type,
+        'network_type':network_type,
+        'agent_code':'A1','office_code':'RTM',
+        'scope':'POL','port_code':'NLRTM',
+    }
+    c.execute(
+        "INSERT INTO md_records VALUES ('configuration','TYPE',?,'ACTIVE')",
+        (json.dumps(record),),
+    )
+    c.execute(
+        "INSERT INTO md_records VALUES ('port','NLRTM',?,'ACTIVE')",
+        (json.dumps({'unlocode':'NLRTM'}),),
+    )
+    try:
+        assert main.booking_agent_port_grants(c,1,'A1')['POL']['ports']=={'NLRTM'}
+    finally:
+        c.close()
