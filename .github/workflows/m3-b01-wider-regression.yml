@@ -74,6 +74,7 @@ jobs:
             tests/test_b01_agent_countries_iam_resolution.py \
             tests/test_b02_booking_port_authorization.py \
             tests/test_b02_agent_booking_boundary_integration.py \
+            tests/test_unlocode_master_catalog.py \
             --junitxml=m3-b01-b02-focused.xml 2>&1 | tee b01-focused.log
       - name: Isolated cross-agent booking authorization gate
         run: |
