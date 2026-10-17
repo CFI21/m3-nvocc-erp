@@ -106,3 +106,22 @@ def test_denial_response_with_foreign_booking_fields_is_leakage(monkeypatch):
     assert [item["status"] for item in report["tests"]]==[
         "PASS","BLOCKED","BLOCKED","PASS"]
     assert "FOREIGN_AGENT" not in str(report)
+
+
+@pytest.mark.parametrize("denied_body", [
+    '{"detail":{"agent_id":7,"booking_id":92}}',
+    '{"detail":[{"booking_ref":"FOREIGN-BOOKING"}]}',
+    '{"errors":[{"context":{"customer_id":33}}]}',
+])
+def test_nested_denied_payload_leakage_is_blocked(monkeypatch,denied_body):
+    def fake_request(base,path,token):
+        own=(token=="a" and path.endswith("/1")) or (token=="b" and path.endswith("/2"))
+        if own:
+            return {"status":200,"body":'{"id":'+path.rsplit("/",1)[-1]+',"module":"booking"}'}
+        return {"status":404,"body":denied_body}
+    monkeypatch.setattr(smoke,"request_json",fake_request)
+    report=smoke.run("https://m3-pr124-booking-api-preview.onrender.com",
+                     "a","b","1","2",SHA)
+    assert report["status"]=="BLOCKED"
+    assert report["tests"][1]["status"]=="BLOCKED"
+    assert report["tests"][2]["status"]=="BLOCKED"
