@@ -160,3 +160,43 @@ def test_booking_coverage_config_type_normalization(monkeypatch, configuration_t
         assert main.booking_agent_port_grants(c,1,'A1')['POL']['ports']=={'NLRTM'}
     finally:
         c.close()
+
+
+@pytest.mark.parametrize("payload", ["[]", "null", '"bad"', "42", "{malformed"])
+def test_booking_ignores_invalid_agent_network_payload(monkeypatch, payload):
+    c=_conn()
+    monkeypatch.setattr('app.admin._assigned_agent_offices',
+                        lambda conn,user,agent:[{'office_code':'RTM','country_code':'NL'}])
+    c.execute("INSERT INTO md_records VALUES ('configuration','INVALID',?,'ACTIVE')",(payload,))
+    try:
+        grants=main.booking_agent_port_grants(c,1,'A1')
+        assert all(not entry['ports'] for entry in grants.values())
+    finally:
+        c.close()
+
+
+@pytest.mark.parametrize("payload", ["[]", "null", '"bad"', "42", "{malformed"])
+def test_booking_ignores_invalid_port_master_payload(monkeypatch, payload):
+    c=_conn()
+    monkeypatch.setattr('app.admin._assigned_agent_offices',
+                        lambda conn,user,agent:[{'office_code':'RTM','country_code':'NL'}])
+    cfg={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+         'agent_code':'A1','office_code':'RTM','scope':'POL','port_code':'NLRTM'}
+    c.execute("INSERT INTO md_records VALUES ('configuration','COV',?,'ACTIVE')",(json.dumps(cfg),))
+    c.execute("INSERT INTO md_records VALUES ('port','NLRTM',?,'ACTIVE')",(payload,))
+    try:
+        assert not main.booking_agent_port_grants(c,1,'A1')['POL']['ports']
+    finally:
+        c.close()
+
+
+@pytest.mark.parametrize("assignments", [None, [{}], [{'office_code':'RTM','country_code':'BAD'}],
+                                            [{'office_code':None,'country_code':'NL'}]])
+def test_booking_invalid_iam_office_assignment_denied(monkeypatch, assignments):
+    c=_conn()
+    monkeypatch.setattr('app.admin._assigned_agent_offices',
+                        lambda conn,user,agent:assignments)
+    try:
+        assert all(not item['ports'] for item in main.booking_agent_port_grants(c,1,'A1').values())
+    finally:
+        c.close()
