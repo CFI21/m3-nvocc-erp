@@ -438,6 +438,14 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
                 if all(str(other.get(k) or '').strip().upper()==str(restored.get(k) or '').strip().upper() for k in fields):
                     c.close()
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
+    if ch['operation']=='REACTIVATE' and current and ch['domain']=='configuration':
+        restored=json.loads(current['payload_json'] or '{}')
+        if (str(restored.get('config_type') or '').upper()=='AGENT_NETWORK' and
+            str(restored.get('network_type') or '').upper()=='PORT_COVERAGE'):
+            errors=reference_errors(c,'configuration',restored)
+            if errors:
+                c.close()
+                raise HTTPException(422,{'codes':sorted(set(errors))})
     if current and current['version']!=ch['base_version']:c.close();raise HTTPException(409,{'code':'MASTER_VERSION_CONFLICT','current_version':current['version'],'base_version':ch['base_version']})
     payload=json.loads(ch['payload_json']);ts=now();before=dict(current) if current else None
     # Final independent-checker uniqueness barrier protects against competing pending requests.
