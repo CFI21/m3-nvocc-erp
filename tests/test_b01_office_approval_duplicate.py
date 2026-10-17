@@ -252,3 +252,37 @@ def test_checker_reactivation_rejects_duplicate_active_office(office_database):
     assert db.execute("SELECT status FROM md_records WHERE record_key='OFFICE-OLD'").fetchone()["status"]=="INACTIVE"
     assert db.execute("SELECT status FROM md_change_requests WHERE change_ref='MDC-OFFICE-REACTIVATE'").fetchone()["status"]=="PENDING"
     db.close()
+
+
+def test_checker_reactivation_rejects_inactive_iam_office(office_database):
+    """An Office assignment cannot revive if IAM has deactivated that Office."""
+    db=office_database()
+    db.execute("UPDATE iam_offices SET status='INACTIVE' WHERE office_code='RTM'")
+    payload={
+        "config_type":"AGENT_OFFICE_ASSIGNMENT",
+        "agent_code":"UAT-AGENT-001",
+        "office_code":"RTM",
+        "address":"Rotterdam",
+    }
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','OFFICE-RETIRED',?,'INACTIVE',1,'now','now')",
+        (json.dumps(payload),),
+    )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-OFFICE-RETIRED','configuration','OFFICE-RETIRED','REACTIVATE','{}','review','office-maker','now',1)"
+    )
+    db.close()
+    with pytest.raises(HTTPException) as err:
+        masterdata.decide(
+            "MDC-OFFICE-RETIRED",
+            masterdata.Decision(decision="APPROVE",comment="review"),
+            "checker",
+        )
+    assert err.value.status_code==422
+    assert "AGENT_OFFICE_REFERENCE_NOT_ACTIVE" in err.value.detail["codes"]
+    db=office_database()
+    assert db.execute("SELECT status FROM md_records WHERE record_key='OFFICE-RETIRED'").fetchone()["status"]=="INACTIVE"
+    db.close()
