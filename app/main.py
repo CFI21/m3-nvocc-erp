@@ -179,8 +179,10 @@ def booking_iam_agent_granted(conn, user_id, agent_code):
     """Verify an active agent-party assignment; no implicit global grant."""
     if not isinstance(user_id,int) or isinstance(user_id,bool):
         return False
-    code=str(agent_code or '').strip()
-    if not code:
+    if not isinstance(agent_code,str):
+        return False
+    code=agent_code.strip()
+    if not code or any(ch.isspace() for ch in code):
         return False
     row=conn.execute("""SELECT 1 FROM iam_party_access
         WHERE user_id=? AND party_type='AGENT' AND party_key=?
