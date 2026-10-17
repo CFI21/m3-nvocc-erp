@@ -44,7 +44,7 @@ def _roles_priority(roles):
 def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
     if x_m3_session:
         s=iam_session(conn,x_m3_session)
-        rs=[r["role_code"] for r in roles_for(conn,s["user_id"])]
+        rs=[str(r["role_code"] or "").strip().upper() for r in roles_for(conn,s["user_id"])]
         role=_roles_priority(rs)
         # Never treat request-supplied scope headers as IAM grants.
         br=conn.execute(
