@@ -59,8 +59,23 @@ def catalog():
         if not records:
             raise RuntimeError("UNLOCODE_RELEASE_EMPTY")
         return list(records.values())
+    if not LEGACY.is_file():
+        raise RuntimeError("UNLOCODE_CATALOG_SOURCE_MISSING")
     with LEGACY.open(encoding="utf-8",newline="") as stream:
-        return list(csv.DictReader(stream))
+        rows=list(csv.DictReader(stream))
+    if not rows:
+        raise RuntimeError("UNLOCODE_CATALOG_EMPTY")
+    records={}
+    for row in rows:
+        code=(row.get("unlocode") or "").strip().upper()
+        country=(row.get("country_code") or "").strip().upper()
+        location=(row.get("port_code") or "").strip().upper()
+        if not PATTERN.fullmatch(code) or code!=country+location:
+            raise RuntimeError("UNLOCODE_CATALOG_INVALID_RECORD")
+        if code in records and records[code]!=row:
+            raise RuntimeError("UNLOCODE_CATALOG_CONFLICT:"+code)
+        records[code]=row
+    return list(records.values())
 
 
 def subdivisions():
