@@ -787,3 +787,61 @@ def test_checker_reactivation_revalidates_retired_port(tmp_path,monkeypatch):
         "SELECT status FROM md_records WHERE record_key='EMAIL-REACTIVATE'"
     ).fetchone()["status"]=="INACTIVE"
     db.close()
+
+
+def test_checker_reactivation_rejects_duplicate_active_email(tmp_path, monkeypatch):
+    """An inactive legacy email cannot revive over an approved active route."""
+    import json
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "reactivation_collision.sqlite3")
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}),
+    )
+    db = connect()
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('agent','UAT-AGENT-001','{}','ACTIVE','now','now')"
+    )
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM','{}','ACTIVE','now','now')"
+    )
+    for key, status in (("EMAIL-LIVE", "ACTIVE"), ("EMAIL-OLD", "INACTIVE")):
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+            "VALUES ('configuration',?,?,?,1,'now','now')",
+            (key, json.dumps(_email()), status),
+        )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-EMAIL-COLLISION','configuration','EMAIL-OLD','REACTIVATE','{}','review','maker','now',1)"
+    )
+    db.close()
+
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide(
+            "MDC-EMAIL-COLLISION",
+            masterdata.Decision(decision="APPROVE", comment="review"),
+            "checker",
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "DUPLICATE_AGENT_RELATIONSHIP"
+    db = connect()
+    assert db.execute(
+        "SELECT status FROM md_records WHERE record_key='EMAIL-OLD'"
+    ).fetchone()["status"] == "INACTIVE"
+    assert db.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref='MDC-EMAIL-COLLISION'"
+    ).fetchone()["status"] == "PENDING"
+    db.close()
