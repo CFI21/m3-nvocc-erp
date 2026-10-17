@@ -51,7 +51,9 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
             "SELECT branch_code FROM iam_branches WHERE office_id=? ORDER BY id LIMIT 1",
             (s["home_office_id"],)
         ).fetchone()
-        branch=br["branch_code"] if br else None
+        branch=_trusted_scope(br["branch_code"], "EQUIPMENT_BRANCH_SCOPE_REQUIRED") if br else None
+        if role in {"OPS", "BRANCH_OPS", "DOCS", "EQUIPMENT_CONTROLLER"} and not branch:
+            raise HTTPException(403, {"code": "EQUIPMENT_BRANCH_SCOPE_REQUIRED"})
         agent=None
         if role == "AGENT":
             # Fail closed for zero or multiple memberships: no caller-selected scope.
