@@ -456,3 +456,21 @@ def test_mrg_rejects_missing_iam_role_collection(monkeypatch, roles):
         mrg.actor(None, "valid", "ADMIN")
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "MRG_IAM_ROLE_NOT_AUTHORIZED"
+
+
+@pytest.mark.parametrize("rows", [
+    [None], ["bad-row"], [{}], [{"wrong_key": "ADMIN"}],
+    [{"role_code": "FINANCE"}, None],
+])
+def test_mrg_malformed_role_rows_fail_closed_or_ignore_invalid(monkeypatch, rows):
+    monkeypatch.setattr(mrg, "iam_session", lambda c, t: {
+        "user_id": 7, "user_ref": "mrg-user",
+    })
+    monkeypatch.setattr(mrg, "iam_roles_for", lambda c, uid: rows)
+    if rows[0] == {"role_code": "FINANCE"}:
+        result = mrg.actor(None, "valid", "ADMIN")
+        assert result["roles"] == {"FINANCE"}
+    else:
+        with pytest.raises(HTTPException) as exc:
+            mrg.actor(None, "valid", "ADMIN")
+        assert exc.value.status_code == 403
