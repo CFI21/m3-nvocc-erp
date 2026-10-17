@@ -95,6 +95,34 @@ jobs:
               assert forbidden not in endpoint
           PY
 
+      - name: Deadline acceptance evidence summary
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports=['m3-security-auth.xml','m3-b01-b02-focused.xml','m3-full-regression.xml']
+          lines=['# M3 October 20 validation evidence','']
+          blocked=False
+          for name in reports:
+              path=Path(name)
+              if not path.exists():
+                  lines.append(f'- {name}: BLOCKED (no test report)')
+                  blocked=True
+                  continue
+              root=ET.parse(path).getroot()
+              suites=[root] if root.tag=='testsuite' else list(root.iter('testsuite'))
+              for attr in ('tests','failures','errors','skipped'):
+                  pass
+              totals={k:sum(int(e.attrib.get(k,0)) for e in suites) for k in ('tests','failures','errors','skipped')}
+              status='PASS' if totals['tests']>0 and totals['failures']==0 and totals['errors']==0 else 'FAIL'
+              blocked|=status!='PASS'
+              lines.append(f"- {name}: {status} | "+', '.join(f'{k}={v}' for k,v in totals.items()))
+          lines += ['', '## Scope', 'B01/B02 and available backend regression only; no live ERP or 196-screen UAT claimed.', 'Acceptance: '+('BLOCKED' if blocked else 'TEST GATES PASS; UAT STILL REQUIRED')]
+          Path('m3-oct20-evidence.md').write_text('\n'.join(lines)+'\n')
+          with Path(__import__('os').environ['GITHUB_STEP_SUMMARY']).open('a') as out:
+              out.write('\n'.join(lines)+'\n')
+          PY
       - name: Preserve B01/B02 and full regression evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -107,5 +135,6 @@ jobs:
             b01-regression.log
             m3-b01-b02-focused.xml
             m3-full-regression.xml
+            m3-oct20-evidence.md
           if-no-files-found: warn
           retention-days: 14
