@@ -129,6 +129,10 @@ jobs:
                   blocked=True
                   continue
               totals={k:sum(int(e.attrib.get(k,0)) for e in suites) for k in ('tests','failures','errors','skipped')}
+              if any(value < 0 for value in totals.values()):
+                  lines.append(f'- {name}: BLOCKED (invalid negative test count)')
+                  blocked=True
+                  continue
               status='PASS' if totals['tests']>0 and totals['failures']==0 and totals['errors']==0 else 'FAIL'
               blocked|=status!='PASS'
               lines.append(f"- {name}: {status} | "+', '.join(f'{k}={v}' for k,v in totals.items()))
