@@ -89,3 +89,26 @@ def test_catalog_not_automatically_activated_in_port_master():
     stage=inspect.getsource(masterdata.unlocode_stage)
     assert "create_change(" in stage
     assert "operation='CREATE'" in stage
+
+
+@pytest.mark.parametrize("code",["NL","NLRTMM","12345","NL RTM","N!RTM",""])
+def test_unlocode_stage_rejects_malformed_codes_before_source_lookup(monkeypatch,code):
+    monkeypatch.setattr(masterdata,"_unlocode_catalog",
+                        lambda:pytest.fail("Invalid key must not load catalog"))
+    with pytest.raises(HTTPException) as error:
+        masterdata.unlocode_stage(code,x_m3_session="maker-session")
+    assert error.value.status_code==422
+    assert error.value.detail["code"]=="UNLOCODE_INVALID"
+
+
+def test_unlocode_deleted_release_code_cannot_be_staged(monkeypatch):
+    monkeypatch.setattr(masterdata,"_unlocode_catalog",lambda:[{
+        "unlocode":"NLRTM","country_code":"NL","country_name":"Netherlands",
+        "port_code":"RTM","port_name":"Rotterdam","eligible_for_activation":False,
+    }])
+    monkeypatch.setattr(masterdata,"create_change",
+                        lambda *args,**kwargs:pytest.fail("Deleted code must not enter maker/checker"))
+    with pytest.raises(HTTPException) as error:
+        masterdata.unlocode_stage("NLRTM",x_m3_session="maker-session")
+    assert error.value.status_code==409
+    assert error.value.detail["code"]=="UNLOCODE_DELETED_NOT_ACTIVATABLE"
