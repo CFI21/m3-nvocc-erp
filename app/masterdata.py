@@ -24,7 +24,7 @@ GOVERNANCE_SCREENS=['dashboard','change-requests','approval-queue','versions','d
 SCREENS=['dashboard']+[d+'s' if not d.endswith('s') else d for d in DOMAINS]+GOVERNANCE_SCREENS[1:]
 
 class Change(BaseModel):
-    domain:str; record_key:str; operation:str=Field(pattern=r'^(CREATE|UPDATE|DEACTIVATE|ACTIVATE|REACTIVATE)dict[str,Any]=Field(default_factory=dict); reason:str
+    domain:str; record_key:str; operation:str=Field(pattern=r'^(CREATE|UPDATE|DEACTIVATE|ACTIVATE|REACTIVATE)$'); payload:dict[str,Any]=Field(default_factory=dict); reason:str
 class Decision(BaseModel): decision:str=Field(pattern='^(APPROVE|REJECT)$'); comment:Optional[str]=None
 class SequenceNext(BaseModel): sequence_code:str
 class AliasMerge(BaseModel): domain:str; source_key:str; target_key:str; reason:str
