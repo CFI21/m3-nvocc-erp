@@ -231,8 +231,8 @@ def booking_agent_port_grants(conn,user_id,agent_code):
             continue
         if (str(config.get('config_type') or '').upper()!='AGENT_NETWORK'
                 or str(config.get('network_type') or '').upper()!='PORT_COVERAGE'
-                or str(config.get('agent_code') or '')!=agent_code
-                or str(config.get('office_code') or '') not in offices):
+                or str(config.get('agent_code') or '').strip().upper()!=str(agent_code or '').strip().upper()
+                or str(config.get('office_code') or '').strip().upper() not in offices):
             continue
         active_day=datetime.datetime.now(datetime.timezone.utc).date().isoformat()
         if not (str(config.get('effective_from') or '0000-01-01')<=active_day<=str(config.get('effective_to') or '9999-12-31')):
