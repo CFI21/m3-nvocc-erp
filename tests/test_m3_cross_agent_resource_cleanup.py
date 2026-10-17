@@ -37,3 +37,25 @@ def test_not_found_record_closes_connection(monkeypatch):
         main.get_record("booking",9876,x_m3_session="session")
     assert exc.value.status_code==404
     assert conn.closed
+
+
+def test_list_requires_session_and_closes_connection(monkeypatch):
+    conn=Connection()
+    monkeypatch.setattr(main,"connect",lambda:conn)
+    monkeypatch.setattr(main,"bulk_permission_enabled",lambda:True)
+    with pytest.raises(HTTPException) as exc:
+        main.list_records("booking",x_m3_session=None)
+    assert exc.value.status_code==401
+    assert conn.closed
+
+
+def test_list_invalid_session_closes_connection(monkeypatch):
+    conn=Connection()
+    monkeypatch.setattr(main,"connect",lambda:conn)
+    monkeypatch.setattr(main,"bulk_permission_enabled",lambda:True)
+    monkeypatch.setattr(main,"iam_session",lambda *_args: (_ for _ in ()).throw(
+        HTTPException(401,{"code":"SESSION_INVALID"})))
+    with pytest.raises(HTTPException) as exc:
+        main.list_records("booking",x_m3_session="invalid")
+    assert exc.value.status_code==401
+    assert conn.closed
