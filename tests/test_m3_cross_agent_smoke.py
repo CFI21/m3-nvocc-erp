@@ -91,3 +91,18 @@ def test_redirect_failure_is_blocked_without_logging_session(monkeypatch):
     assert result["status"]=="BLOCKED"
     assert all(item["status"]=="BLOCKED" for item in result["tests"])
     assert "sensitive-a" not in str(result)
+
+
+def test_denial_response_with_foreign_booking_fields_is_leakage(monkeypatch):
+    def fake_request(base,path,token):
+        own=(token=="a" and path.endswith("/1")) or (token=="b" and path.endswith("/2"))
+        if own:
+            return {"status":200,"body":'{"id":'+path.rsplit("/",1)[-1]+',"module":"booking"}'}
+        return {"status":403,"body":'{"detail":"denied","agent_code":"FOREIGN_AGENT"}'}
+    monkeypatch.setattr(smoke,"request_json",fake_request)
+    report=smoke.run("https://m3-pr124-booking-api-preview.onrender.com",
+                     "a","b","1","2",SHA)
+    assert report["status"]=="BLOCKED"
+    assert [item["status"] for item in report["tests"]]==[
+        "PASS","BLOCKED","BLOCKED","PASS"]
+    assert "FOREIGN_AGENT" not in str(report)
