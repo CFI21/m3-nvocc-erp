@@ -83,3 +83,39 @@ def test_equipment_agent_scope_uses_iam_not_headers(monkeypatch):
     assert actor["agent"] == "REAL-AGENT"
     assert actor["branch"] is None
     assert actor["depot"] is None
+
+
+@pytest.mark.parametrize("grants", [[], ["DEPOT-1", "DEPOT-2"], [""]])
+def test_equipment_depot_requires_unique_iam_grant(monkeypatch, grants):
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "depot-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": "DEPOT"}])
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(
+            _GrantConn(grants), "valid", "ADMIN",
+            "FAKE-AGENT", "FAKE-BRANCH", "FAKE-DEPOT",
+        )
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] in {
+        "EQUIPMENT_AMBIGUOUS_DEPOT_GRANTS", "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"
+    }
+
+
+def test_equipment_depot_scope_from_iam_not_request_headers(monkeypatch):
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "depot-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": "DEPOT"}])
+    result = equipment.actor(
+        _GrantConn(["REAL-DEPOT"]), "valid", "ADMIN",
+        "FAKE-AGENT", "FAKE-BRANCH", "FAKE-DEPOT",
+    )
+    assert result["role"] == "DEPOT"
+    assert result["depot"] == "REAL-DEPOT"
+    assert result["agent"] is None
+    assert result["branch"] is None
