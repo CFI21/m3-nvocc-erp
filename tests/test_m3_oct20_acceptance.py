@@ -95,3 +95,34 @@ def test_all_seven_modules_and_preview_required_for_release_pass(tmp_path):
 
 def test_unknown_sha_is_blocked(tmp_path):
     assert evaluate(tmp_path,"faac7b39")["reason"]=="INVALID_OR_UNKNOWN_COMMIT_SHA"
+
+
+def test_fake_empty_scenario_and_screen_proofs_cannot_pass(tmp_path):
+    from scripts.m3_oct20_acceptance import MODULES
+    requirements={
+        "Countries/Port Auth":[f"SEC-{i:03d}" for i in range(1,13)],
+        "Booking Workflow":[f"E2E-{i:03d}" for i in range(1,5)],
+        "Agent Master":["UAT-001","UAT-002"],"IAM":["UAT-003"],
+        "Equipment/Depot":["UAT-007"],"Finance":["UAT-008"],
+        "196-screen cross-module":["UAT-010"],
+    }
+    for name,(xml,filename) in MODULES.items():
+        _xml(tmp_path/xml)
+        doc={"commit_sha":SHA,"status":"PASS","artifacts":["run/123"],
+             "scenarios":{key:{"status":"PASS","artifacts":["run/123"]}
+                          for key in requirements[name]}}
+        if name=="196-screen cross-module":
+            doc["screens"]={f"SCREEN-{i:03d}":{"status":"PASS","artifacts":["run/123"]}
+                            for i in range(1,197)}
+            doc["screens"]["SCREEN-001"]["artifacts"]=[""]
+        if name=="Countries/Port Auth":
+            doc["scenarios"]["SEC-001"]["artifacts"]=[""]
+        (tmp_path/filename).write_text(json.dumps(doc))
+    (tmp_path/"preview_deploys.json").write_text(json.dumps({
+        "commit_sha":SHA,"status":"PASS","artifacts":["run/123"],
+        "web":{"commit_sha":SHA,"deployment_id":"web-1"},
+        "api":{"commit_sha":SHA,"deployment_id":"api-1"}}))
+    report=evaluate(tmp_path,SHA)
+    assert report["release"]=="BLOCKED"
+    assert report["modules"]["Countries/Port Auth"]["status"]=="BLOCKED"
+    assert report["modules"]["196-screen cross-module"]["status"]=="BLOCKED"
