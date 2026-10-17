@@ -285,3 +285,33 @@ def test_booking_rejects_invalid_agent_network_effective_period(monkeypatch,star
         assert main.booking_agent_port_grants(c,1,'A1')['POL']['ports']==set()
     finally:
         c.close()
+
+
+@pytest.mark.parametrize("offset_start,offset_end,expected", [
+    (-1, 1, True), (-3, -1, False), (1, 3, False),
+    (0, 0, True), (1, -1, False),
+])
+def test_booking_agent_network_effective_window_boundaries(
+    monkeypatch, offset_start, offset_end, expected
+):
+    from datetime import date, timedelta
+    c=_conn()
+    monkeypatch.setattr(
+        'app.admin._assigned_agent_offices',
+        lambda conn,user,agent:[{'office_code':'RTM','country_code':'NL'}],
+    )
+    today=date.today()
+    data={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+          'agent_code':'A1','office_code':'RTM','scope':'POL',
+          'port_code':'NLRTM',
+          'effective_from':(today+timedelta(days=offset_start)).isoformat(),
+          'effective_to':(today+timedelta(days=offset_end)).isoformat()}
+    c.execute("INSERT INTO md_records VALUES ('configuration','COV',?,'ACTIVE')",
+              (json.dumps(data),))
+    c.execute("INSERT INTO md_records VALUES ('port','NLRTM',?,'ACTIVE')",
+              (json.dumps({'unlocode':'NLRTM'}),))
+    try:
+        ports=main.booking_agent_port_grants(c,1,'A1')['POL']['ports']
+        assert ('NLRTM' in ports) is expected
+    finally:
+        c.close()
