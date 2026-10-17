@@ -232,3 +232,20 @@ def test_equipment_rejects_malformed_iam_party_grants(monkeypatch, role, grant):
         )
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"
+
+
+@pytest.mark.parametrize("role", ["OPS", "BRANCH_OPS", "DOCS", "EQUIPMENT_CONTROLLER"])
+def test_equipment_actor_requires_authoritative_branch(monkeypatch, role):
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "ops-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": role}])
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(
+            _GrantConn([]), "valid", "ADMIN", "AGENT-OVERRIDE",
+            "BRANCH-OVERRIDE", "DEPOT-OVERRIDE",
+        )
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_BRANCH_SCOPE_REQUIRED"
