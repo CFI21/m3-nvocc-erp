@@ -21,7 +21,7 @@ def test_cross_agent_smoke_positive_and_negative_paths(monkeypatch):
               ("b","/api/v1/booking/2"):200}
     monkeypatch.setattr(smoke,"request_json",
                         lambda base,path,token:{"status":statuses[(token,path)],
-                                               "body":"private fixture"})
+                                               "body":'{"id":1,"module":"booking"}' if path.endswith("/1") else '{"id":2,"module":"booking"}'})
     report=smoke.run("https://m3-pr124-booking-api-preview.onrender.com","a","b","1","2",SHA)
     assert report["status"]=="PASS"
     assert len(report["tests"])==4
@@ -55,3 +55,14 @@ def test_redirects_are_explicitly_disabled():
     handler=smoke._NoRedirect()
     assert handler.redirect_request(None,None,302,"Found",{},
                                     "https://attacker.example/collect") is None
+
+
+def test_generic_200_or_wrong_booking_is_not_success(monkeypatch):
+    monkeypatch.setattr(smoke,"request_json",
+                        lambda base,path,token:{"status":200,"body":"<html>login page</html>"}
+                        if token=="a" and path.endswith("/1") else
+                        {"status":403,"body":"denied"})
+    report=smoke.run("https://m3-pr124-booking-api-preview.onrender.com",
+                     "a","b","1","2",SHA)
+    assert report["status"]=="BLOCKED"
+    assert report["tests"][0]["status"]=="BLOCKED"
