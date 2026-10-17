@@ -101,14 +101,14 @@ def scope_clause(a,alias="c"):
     if role in GLOBAL_ROLES or role in {"FINANCE","EQUIPMENT_MANAGER"}: return "",[]
     if role=="AGENT":
         if not a.get("agent"):raise HTTPException(403,{"code":"AGENT_SCOPE_REQUIRED"})
-        return f" AND {alias}.agent_code=?", [a["agent"]]
+        return f" AND {alias}.agent_code=?", [str(a["agent"]).strip()]
     if role=="DEPOT":
         if not a.get("depot"):raise HTTPException(403,{"code":"DEPOT_SCOPE_REQUIRED"})
-        return f" AND {alias}.depot_code=?", [a["depot"]]
+        return f" AND {alias}.depot_code=?", [str(a["depot"]).strip()]
     if role in {"OPS","BRANCH_OPS","DOCS","EQUIPMENT_CONTROLLER"}:
         if not a.get("branch"):
             raise HTTPException(403, {"code": "EQUIPMENT_BRANCH_SCOPE_REQUIRED"})
-        return f" AND {alias}.branch_code=?", [a["branch"]]
+        return f" AND {alias}.branch_code=?", [str(a["branch"]).strip()]
     raise HTTPException(403, {"code": "EQUIPMENT_ROLE_SCOPE_DENIED"})
 
 def audit(conn,a,action,container_id=None,job_id=None,before=None,after=None,meta=None):
