@@ -294,13 +294,13 @@ def test_booking_rejects_invalid_agent_network_effective_period(monkeypatch,star
 def test_booking_agent_network_effective_window_boundaries(
     monkeypatch, offset_start, offset_end, expected
 ):
-    from datetime import date, timedelta
+    from datetime import datetime, timezone, timedelta
     c=_conn()
     monkeypatch.setattr(
         'app.admin._assigned_agent_offices',
         lambda conn,user,agent:[{'office_code':'RTM','country_code':'NL'}],
     )
-    today=date.today()
+    today=datetime.now(timezone.utc).date()
     data={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
           'agent_code':'A1','office_code':'RTM','scope':'POL',
           'port_code':'NLRTM',
