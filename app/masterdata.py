@@ -286,6 +286,12 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
     if b.operation=='CREATE' and existing:c.close();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
     if b.operation!='CREATE' and not existing:c.close();raise HTTPException(404,{'code':'MASTER_RECORD_NOT_FOUND'})
+    if existing and b.operation in ('UPDATE','DEACTIVATE') and existing['status']!='ACTIVE':
+        c.close()
+        raise HTTPException(409,{'code':'MASTER_RECORD_NOT_ACTIVE','record_key':b.record_key})
+    if existing and b.operation in ('ACTIVATE','REACTIVATE') and existing['status']!='INACTIVE':
+        c.close()
+        raise HTTPException(409,{'code':'MASTER_RECORD_NOT_INACTIVE','record_key':b.record_key})
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
     if b.domain=='configuration' and b.operation=='UPDATE' and existing_payload.get('config_type')=='AGENT_NETWORK':
