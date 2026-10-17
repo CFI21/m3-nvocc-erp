@@ -240,6 +240,9 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     if not str(user or '').strip():
         c.close()
         raise HTTPException(403,{'code':'MAKER_IDENTITY_REQUIRED'})
+    if not isinstance(sess,dict) or not str(sess.get('username') or '').strip():
+        c.close()
+        raise HTTPException(403,{'code':'MAKER_SESSION_USERNAME_REQUIRED'})
     # Dedicated isolated B01 UAT only: enforce strict two-account separation.
     # This does not change other domains, identities, or production policies.
     import os
