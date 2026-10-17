@@ -16,11 +16,29 @@ import urllib.parse
 import urllib.request
 
 
+APPROVED_HOST = "m3-pr124-booking-api-preview.onrender.com"
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+def _validate_target(base):
+    parsed = urllib.parse.urlsplit(base)
+    if (parsed.scheme != "https" or parsed.hostname != APPROVED_HOST
+            or parsed.username or parsed.password or parsed.port not in (None, 443)
+            or parsed.query or parsed.fragment or parsed.path not in ("", "/")):
+        raise ValueError("APPROVED_PREVIEW_API_REQUIRED")
+
+
 def request_json(base, path, token, timeout=15):
+    _validate_target(base)
     url=base.rstrip("/") + path
+    opener=urllib.request.build_opener(_NoRedirect())
     req=urllib.request.Request(url,headers={"X-M3-Session":token,"Accept":"application/json"})
     try:
-        with urllib.request.urlopen(req,timeout=timeout) as response:
+        with opener.open(req,timeout=timeout) as response:
             raw=response.read(262144)
             return {"status":response.status,"body":raw.decode("utf-8","replace")}
     except urllib.error.HTTPError as error:
@@ -29,8 +47,7 @@ def request_json(base, path, token, timeout=15):
 
 
 def run(api_url, token_a, token_b, own_id, other_id, target_sha):
-    if not api_url.startswith("https://"):
-        raise ValueError("HTTPS_API_REQUIRED")
+    _validate_target(api_url)
     if not token_a or not token_b or token_a==token_b:
         raise ValueError("DISTINCT_AUTHENTICATED_SESSIONS_REQUIRED")
     if not own_id.isdigit() or not other_id.isdigit() or own_id==other_id:
