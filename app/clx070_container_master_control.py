@@ -51,8 +51,7 @@ def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
             br=conn.execute("SELECT branch_code FROM iam_branches WHERE office_id=? ORDER BY id LIMIT 1",(s["home_office_id"],)).fetchone()
             branch=br["branch_code"] if br else None
         return {"role":role,"roles":rs,"user":s["user_ref"],"office":s["office_code"],"branch":branch,"agent":x_agent_scope,"depot":x_depot_scope}
-    role=(x_role or "VIEWER").upper()
-    return {"role":role,"roles":[role],"user":"uat-user","office":None,"branch":x_branch_scope,"agent":x_agent_scope,"depot":x_depot_scope}
+    raise HTTPException(401, {"code": "EQUIPMENT_SESSION_REQUIRED"})
 
 def require_action(a,action):
     role=a["role"]
