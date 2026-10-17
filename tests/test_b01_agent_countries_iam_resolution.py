@@ -483,3 +483,47 @@ def test_pol_reactivation_rejects_inactive_iam_country(country_db, monkeypatch):
         "SELECT status FROM md_records WHERE record_key='POL-INACTIVE-COUNTRY'"
     ).fetchone()["status"]=="INACTIVE"
     c.close()
+
+
+@pytest.mark.parametrize("operation", ["ACTIVATE", "REACTIVATE"])
+def test_maker_cannot_queue_duplicate_pol_activation(country_db, monkeypatch, operation):
+    """The maker must not queue POL coverage that duplicates an active relationship."""
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _c, _token: ({"user_ref": "maker", "username": "md.maker"}, {"MASTER_DATA"}),
+    )
+    c = country_db()
+    coverage = {
+        "config_type": "AGENT_NETWORK", "network_type": "PORT_COVERAGE",
+        "scope": "POL", "agent_code": "UAT-AGENT-001",
+        "office_code": "RTM", "port_code": "NLRTM",
+    }
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM',?,'ACTIVE','now','now')",
+        (json.dumps({"unlocode": "NLRTM"}),),
+    )
+    for key, status in (("POL-EXISTING", "ACTIVE"), ("POL-REACTIVATE", "INACTIVE")):
+        c.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+            "VALUES ('configuration',?,?,?,1,'now','now')",
+            (key, json.dumps(coverage), status),
+        )
+    c.close()
+    with pytest.raises(HTTPException) as error:
+        masterdata.create_change(
+            masterdata.Change(
+                domain="configuration", record_key="POL-REACTIVATE",
+                operation=operation, payload={}, reason="Duplicate POL activation",
+            ), "maker",
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "DUPLICATE_AGENT_RELATIONSHIP"
+    c = country_db()
+    assert c.execute(
+        "SELECT COUNT(*) FROM md_change_requests WHERE record_key='POL-REACTIVATE'"
+    ).fetchone()[0] == 0
+    assert c.execute(
+        "SELECT status FROM md_records WHERE record_key='POL-REACTIVATE'"
+    ).fetchone()["status"] == "INACTIVE"
+    c.close()
