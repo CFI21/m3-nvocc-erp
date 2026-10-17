@@ -249,3 +249,25 @@ def test_equipment_actor_requires_authoritative_branch(monkeypatch, role):
         )
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_BRANCH_SCOPE_REQUIRED"
+
+
+def test_equipment_branch_requires_active_iam_office_membership(monkeypatch):
+    """A stale or revoked home office cannot authorize branch equipment access."""
+    class MembershipConn:
+        def execute(self, sql, params):
+            assert "iam_office_membership" in sql
+            assert "m.status='ACTIVE'" in sql
+            assert "o.status='ACTIVE'" in sql
+            assert params == (7, 1)
+            return _Results([])
+
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "ops-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": "OPS"}])
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(MembershipConn(), "valid", "ADMIN", "A1", "RTM", "D1")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_BRANCH_SCOPE_REQUIRED"
