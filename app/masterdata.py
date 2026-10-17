@@ -328,13 +328,15 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
-    if b.domain=='configuration' and b.operation=='UPDATE' and existing_payload.get('config_type')=='AGENT_NETWORK':
+    if (b.domain=='configuration' and b.operation=='UPDATE' and
+        str(({**existing_payload,**b.payload}).get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+        str(({**existing_payload,**b.payload}).get('network_type') or '').strip().upper()=='PORT_COVERAGE'):
         candidate={**existing_payload,**b.payload}
         fields=('config_type','network_type','agent_code','office_code','scope','port_code')
         for item in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
             if item['record_key']==b.record_key: continue
             p=json.loads(item['payload_json'] or '{}')
-            if all(str(p.get(k) or '').upper()==str(candidate.get(k) or '').upper() for k in fields):
+            if all(str(p.get(k) or '').strip().upper()==str(candidate.get(k) or '').strip().upper() for k in fields):
                 c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP'})
     # Reject Agent Email / Office UPDATE collisions before creating a pending
     # change. Checker approval independently rechecks the same identities.
