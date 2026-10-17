@@ -111,9 +111,12 @@ jobs:
                   blocked=True
                   continue
               root=ET.parse(path).getroot()
-              suites=[root] if root.tag=='testsuite' else list(root.iter('testsuite'))
-              for attr in ('tests','failures','errors','skipped'):
-                  pass
+              if root.tag=='testsuite':
+                  suites=[root]
+              elif root.tag=='testsuites':
+                  suites=[e for e in root if e.tag=='testsuite']
+              else:
+                  raise ValueError(f'Unexpected JUnit report root: {root.tag}')
               totals={k:sum(int(e.attrib.get(k,0)) for e in suites) for k in ('tests','failures','errors','skipped')}
               status='PASS' if totals['tests']>0 and totals['failures']==0 and totals['errors']==0 else 'FAIL'
               blocked|=status!='PASS'
