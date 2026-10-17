@@ -25,5 +25,7 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Validate email reference and maker-checker regressions
         run: python -m pytest -q tests/test_b01_email_port_gate.py tests/test_b01_office_approval_duplicate.py tests/test_b01_agent_countries_iam_resolution.py
-      - name: Compile backend
-        run: python -m compileall -q app
+      - name: Compile backend and B01 tests
+        run: python -m compileall -q app tests/test_b01_email_port_gate.py tests/test_b01_office_approval_duplicate.py tests/test_b01_agent_countries_iam_resolution.py
+      - name: Assert B01 test collection
+        run: python -m pytest --collect-only -q tests/test_b01_email_port_gate.py tests/test_b01_office_approval_duplicate.py tests/test_b01_agent_countries_iam_resolution.py
