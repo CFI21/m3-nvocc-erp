@@ -150,3 +150,11 @@ def test_equipment_rejects_untrusted_sql_scope_alias(alias):
         equipment.scope_clause({"role": "AGENT", "agent": "A1"}, alias=alias)
     assert exc.value.status_code == 400
     assert exc.value.detail["code"] == "EQUIPMENT_INVALID_SQL_ALIAS"
+
+
+@pytest.mark.parametrize("context", [{}, {"role": None}, {"role": ""}])
+def test_equipment_missing_role_is_denied(context):
+    with pytest.raises(HTTPException) as exc:
+        equipment.scope_clause(context)
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_ROLE_SCOPE_DENIED"
