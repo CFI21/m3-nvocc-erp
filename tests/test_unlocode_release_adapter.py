@@ -40,3 +40,13 @@ def test_release_reader_rejects_headers_and_invalid_rows(tmp_path):
     ])
     rows=list(source._release_rows(path))
     assert [r["unlocode"] for r in rows]==["NLRTM","NLAMS"]
+
+
+def test_conflicting_duplicate_across_release_parts_is_rejected(monkeypatch,tmp_path):
+    parts=tuple(tmp_path/f"UNLOCODE CodeListPart{i}.csv" for i in (1,2,3))
+    monkeypatch.setattr(source,"PARTS",parts)
+    _part(parts[0],[["","NL","RTM","Rotterdam","Rotterdam"]])
+    _part(parts[1],[["","DE","HAM","Hamburg","Hamburg"]])
+    _part(parts[2],[["","NL","RTM","Conflicting Port","Conflicting Port"]])
+    with pytest.raises(RuntimeError,match="UNLOCODE_RELEASE_CONFLICT:NLRTM"):
+        source.catalog()
