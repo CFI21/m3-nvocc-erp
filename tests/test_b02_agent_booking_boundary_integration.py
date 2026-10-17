@@ -109,3 +109,78 @@ def test_booking_port_coverage_does_not_grant_unspecified_scopes(monkeypatch):
             assert error.value.status_code==403
     finally:
         c.close()
+
+
+@pytest.mark.parametrize("revoked_domain", ["configuration", "port"])
+@pytest.mark.parametrize("status", ["INACTIVE", "DRAFT", "PENDING_APPROVAL"])
+def test_booking_rejects_revoked_network_or_port_master(monkeypatch,revoked_domain,status):
+    conn=_db()
+    monkeypatch.setattr(
+        "app.admin._assigned_agent_offices",
+        lambda conn,user,agent:[{"office_code":"RTM","country_code":"NL"}],
+    )
+    _coverage(conn,"A","RTM","NL","NLRTM","POL")
+    try:
+        assert main.booking_validate_authorized_ports(
+            {"POL":"NLRTM"},main.booking_agent_port_grants(conn,101,"A")
+        )
+        conn.execute("UPDATE md_records SET status=? WHERE domain=?",(status,revoked_domain))
+        grants=main.booking_agent_port_grants(conn,101,"A")
+        assert grants["POL"]["ports"]==set()
+        with pytest.raises(HTTPException) as e:
+            main.booking_validate_authorized_ports({"POL":"NLRTM"},grants)
+        assert e.value.status_code==403
+    finally:
+        conn.close()
+
+
+def test_multi_office_agent_has_only_explicitly_covered_ports(monkeypatch):
+    conn=_db()
+    monkeypatch.setattr(
+        "app.admin._assigned_agent_offices",
+        lambda conn,user,agent:[
+            {"office_code":"RTM","country_code":"NL"},
+            {"office_code":"HAM","country_code":"DE"},
+        ],
+    )
+    _coverage(conn,"A","RTM","NL","NLRTM","POL")
+    _coverage(conn,"A","HAM","DE","DEHAM","POD")
+    try:
+        grants=main.booking_agent_port_grants(conn,101,"A")
+        assert grants["POL"]["ports"]=={"NLRTM"}
+        assert grants["POD"]["ports"]=={"DEHAM"}
+        assert grants["TS"]["ports"]==set()
+        assert main.booking_validate_authorized_ports(
+            {"POL":"NLRTM","POD":"DEHAM"},grants
+        )
+        for fields in (
+            {"POL":"DEHAM","POD":"NLRTM"},
+            {"POT (1)":"NLRTM"},
+            {"POT (2)":"DEHAM"},
+        ):
+            with pytest.raises(HTTPException) as error:
+                main.booking_validate_authorized_ports(fields,grants)
+            assert error.value.status_code==403
+    finally:
+        conn.close()
+
+
+def test_country_conflict_revokes_same_office_independent_of_order(monkeypatch):
+    conn=_db()
+    _coverage(conn,"A","RTM","NL","NLRTM","POL")
+    try:
+        for countries in (("NL","DE"),("DE","NL")):
+            monkeypatch.setattr(
+                "app.admin._assigned_agent_offices",
+                lambda conn,user,agent,countries=countries:[
+                    {"office_code":"RTM","country_code":country}
+                    for country in countries
+                ],
+            )
+            grants=main.booking_agent_port_grants(conn,101,"A")
+            assert grants["POL"]["ports"]==set()
+            with pytest.raises(HTTPException) as error:
+                main.booking_validate_authorized_ports({"POL":"NLRTM"},grants)
+            assert error.value.status_code==403
+    finally:
+        conn.close()
