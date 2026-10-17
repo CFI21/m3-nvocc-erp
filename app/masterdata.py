@@ -234,7 +234,7 @@ def records(domain:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Sessio
         c.close()
 @router.post('/changes')
 def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess.get('user_ref') if isinstance(sess,dict) else None
     if b.domain not in DOMAINS:c.close();raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
     if not can_make_roles(roles):c.close();raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
     if not str(user or '').strip():
