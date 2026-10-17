@@ -474,3 +474,20 @@ def test_mrg_malformed_role_rows_fail_closed_or_ignore_invalid(monkeypatch, rows
         with pytest.raises(HTTPException) as exc:
             mrg.actor(None, "valid", "ADMIN")
         assert exc.value.status_code == 403
+
+
+def test_mrg_accepts_real_sqlite_row_iam_roles(monkeypatch):
+    import sqlite3
+    db=sqlite3.connect(":memory:")
+    db.row_factory=sqlite3.Row
+    db.execute("CREATE TABLE iam_role_test (role_code TEXT)")
+    db.execute("INSERT INTO iam_role_test VALUES ('FINANCE')")
+    rows=db.execute("SELECT role_code FROM iam_role_test").fetchall()
+    monkeypatch.setattr(mrg, "iam_session", lambda _c, _t: {
+        "user_id": 7, "user_ref": "mrg-user",
+    })
+    monkeypatch.setattr(mrg, "iam_roles_for", lambda _c, _uid: rows)
+    result=mrg.actor(None, "valid", "VIEWER")
+    assert result["role"] == "FINANCE"
+    assert result["roles"] == {"FINANCE"}
+    db.close()
