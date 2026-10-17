@@ -390,3 +390,23 @@ def test_booking_canonical_unlocode_still_denies_missing_grant(field,scope):
         main.booking_validate_authorized_ports({field:" nlrtm "},grants)
     assert exc.value.status_code==403
     assert exc.value.detail["code"]=="BOOKING_PORT_NOT_AUTHORIZED"
+
+
+@pytest.mark.parametrize("agent_code", [None, 17, True, [], {}, "", " ", "A 1", "A\t1", "A\n1"])
+def test_booking_agent_iam_grant_rejects_invalid_party_identifiers(agent_code):
+    class NoSql:
+        def execute(self, *_args, **_kwargs):
+            pytest.fail("Invalid IAM agent key must be rejected before SQL")
+    assert main.booking_iam_agent_granted(NoSql(), 7, agent_code) is False
+
+
+def test_booking_agent_iam_grant_uses_parameterized_exact_party_key():
+    class ExactSql:
+        def execute(self, sql, args):
+            assert "party_type='AGENT'" in sql
+            assert "status='ACTIVE'" in sql
+            assert args == (7, "A1")
+            return self
+        def fetchone(self):
+            return (1,)
+    assert main.booking_iam_agent_granted(ExactSql(), 7, " A1 ") is True
