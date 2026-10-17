@@ -59,3 +59,20 @@ def test_list_invalid_session_closes_connection(monkeypatch):
         main.list_records("booking",x_m3_session="invalid")
     assert exc.value.status_code==401
     assert conn.closed
+
+
+@pytest.mark.asyncio
+async def test_create_denied_identity_closes_connection(monkeypatch):
+    conn=Connection()
+    monkeypatch.setattr(main,"connect",lambda:conn)
+    monkeypatch.setattr(main,"bulk_permission_enabled",lambda:True)
+    monkeypatch.setattr(main,"governed_job_actor",
+                        lambda *_args,**_kwargs: (_ for _ in ()).throw(
+                            HTTPException(403,{"code":"GOVERNED_JOB_ROLE_NOT_GRANTED"})))
+    class Request:
+        async def body(self): return b'{}'
+    with pytest.raises(HTTPException) as exc:
+        await main.create_record("booking",main.CreateBody(job_ref="00001"),
+                                 Request(),x_m3_session="session")
+    assert exc.value.status_code==403
+    assert conn.closed
