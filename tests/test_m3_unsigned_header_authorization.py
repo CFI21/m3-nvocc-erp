@@ -346,3 +346,42 @@ def test_equipment_missing_iam_user_reference_denied(monkeypatch, user_ref, iam_
         equipment.actor(None, "valid", "SUPER_ADMIN", "A1", "NLRTM", "D1")
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_IAM_IDENTITY_REQUIRED"
+
+
+@pytest.mark.parametrize("roles,expected", [
+    (["VIEWER", "FINANCE"], "FINANCE"),
+    (["OPS", "ADMIN"], "ADMIN"),
+    (["DOCS", "AUDITOR"], "AUDITOR"),
+    ([" agent ", "VIEWER"], "AGENT"),
+])
+def test_mrg_authenticated_roles_have_stable_precedence(monkeypatch, roles, expected):
+    monkeypatch.setattr(mrg, "iam_session", lambda c, t: {
+        "user_id": 7, "user_ref": "mrg-user",
+    })
+    monkeypatch.setattr(
+        mrg, "iam_roles_for",
+        lambda c, uid: [{"role_code": code} for code in roles],
+    )
+    result = mrg.actor(None, "valid", "SUPER_ADMIN")
+    assert result["role"] == expected
+    assert result["user"] == "mrg-user"
+
+
+@pytest.mark.parametrize("roles,user_ref", [
+    ([], "mrg-user"),
+    ([""], "mrg-user"),
+    (["ADMIN"], ""),
+    (["FINANCE"], None),
+])
+def test_mrg_fails_closed_without_valid_iam_identity(monkeypatch, roles, user_ref):
+    monkeypatch.setattr(mrg, "iam_session", lambda c, t: {
+        "user_id": 7, "user_ref": user_ref,
+    })
+    monkeypatch.setattr(
+        mrg, "iam_roles_for",
+        lambda c, uid: [{"role_code": code} for code in roles],
+    )
+    with pytest.raises(HTTPException) as exc:
+        mrg.actor(None, "valid", "ADMIN")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "MRG_IAM_IDENTITY_REQUIRED"
