@@ -30,7 +30,7 @@ class _GrantConn:
 
     def execute(self, sql, params):
         if "iam_branches" in sql:
-            return _Results([])
+            return _Results([{"branch_code": "NLRTM"}])
         if "iam_party_access" in sql:
             return _Results([{"party_key": key} for key in self.grants])
         raise AssertionError("Unexpected IAM SQL")
