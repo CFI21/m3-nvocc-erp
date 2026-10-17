@@ -50,3 +50,34 @@ def test_conflicting_duplicate_across_release_parts_is_rejected(monkeypatch,tmp_
     _part(parts[2],[["","NL","RTM","Conflicting Port","Conflicting Port"]])
     with pytest.raises(RuntimeError,match="UNLOCODE_RELEASE_CONFLICT:NLRTM"):
         source.catalog()
+
+
+def test_legacy_catalog_rejects_invalid_and_duplicate_conflicts(monkeypatch,tmp_path):
+    parts=tuple(tmp_path/f"UNLOCODE CodeListPart{i}.csv" for i in (1,2,3))
+    monkeypatch.setattr(source,"PARTS",parts)
+    legacy=tmp_path/"legacy.csv"
+    monkeypatch.setattr(source,"LEGACY",legacy)
+    _part(legacy,[
+        ["unlocode","country_code","country_name","port_code","port_name"],
+        ["NLRTM","NL","Netherlands","RTM","Rotterdam"],
+        ["NLRTM","NL","Netherlands","RTM","Wrong duplicate"],
+    ])
+    with pytest.raises(RuntimeError,match="UNLOCODE_CATALOG_CONFLICT:NLRTM"):
+        source.catalog()
+    _part(legacy,[
+        ["unlocode","country_code","country_name","port_code","port_name"],
+        ["NLRTM","DE","Germany","RTM","Rotterdam"],
+    ])
+    with pytest.raises(RuntimeError,match="UNLOCODE_CATALOG_INVALID_RECORD"):
+        source.catalog()
+
+
+def test_legacy_catalog_requires_existing_nonempty_source(monkeypatch,tmp_path):
+    monkeypatch.setattr(source,"PARTS",tuple(tmp_path/f"part{i}.csv" for i in range(3)))
+    legacy=tmp_path/"legacy.csv"
+    monkeypatch.setattr(source,"LEGACY",legacy)
+    with pytest.raises(RuntimeError,match="UNLOCODE_CATALOG_SOURCE_MISSING"):
+        source.catalog()
+    _part(legacy,[["unlocode","country_code","port_code","port_name"]])
+    with pytest.raises(RuntimeError,match="UNLOCODE_CATALOG_EMPTY"):
+        source.catalog()
