@@ -248,7 +248,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     import os
     if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='ON'
         and os.getenv('M3_B01_STRICT_MAKER_CHECKER','false').lower()=='true'
-        and sess['username']=='md.checker'):
+        and str(sess.get('username') or '').strip().casefold()=='md.checker'):
         agent_configuration=False
         if b.domain=='configuration':
             if b.operation=='CREATE':
