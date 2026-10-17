@@ -157,6 +157,22 @@ jobs:
           with Path(__import__('os').environ['GITHUB_STEP_SUMMARY']).open('a') as out:
               out.write('\n'.join(lines)+'\n')
           PY
+      - name: Oct 20 acceptance validator unit tests
+        if: always()
+        run: |
+          set -o pipefail
+          python -m pytest -q tests/test_m3_oct20_acceptance.py \
+            --junitxml=m3-acceptance-validator.xml 2>&1 | tee m3-acceptance-validator.log
+      - name: Generate fail-closed release verdict
+        if: always()
+        run: |
+          mkdir -p acceptance-evidence
+          cp -f m3-security-auth.xml m3-b01-b02-focused.xml m3-cross-agent-integration.xml m3-full-regression.xml acceptance-evidence/ 2>/dev/null || true
+          python scripts/m3_oct20_acceptance.py \
+            --commit-sha "${GITHUB_SHA}" \
+            --evidence-dir acceptance-evidence \
+            --output m3-oct20-acceptance.json \
+            || echo "Release verdict: BLOCKED pending full evidence"
       - name: Preserve B01/B02 and full regression evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -173,5 +189,8 @@ jobs:
             m3-cross-agent-integration.log
             m3-b02-collection.log
             m3-oct20-evidence.md
+            m3-oct20-acceptance.json
+            m3-acceptance-validator.xml
+            m3-acceptance-validator.log
           if-no-files-found: warn
           retention-days: 14
