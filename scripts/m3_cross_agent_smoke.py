@@ -80,12 +80,17 @@ def run(api_url, token_a, token_b, own_id, other_id, target_sha):
                 sensitive={"job_ref","agent_code","customer_name","fields",
                            "records","payload_json","booking_ref","agent_id",
                            "booking_id","customer_id","container_id"}
-                def contains_sensitive(value):
+                def contains_sensitive(value, depth=0):
+                    # Unknown/deep response structures cannot establish isolation.
+                    if depth > 32:
+                        return True
                     if isinstance(value,dict):
-                        return (bool(sensitive.intersection(value))
-                                or any(contains_sensitive(v) for v in value.values()))
+                        return (bool(sensitive.intersection(
+                                    str(key).lower() for key in value))
+                                or any(contains_sensitive(v,depth+1)
+                                       for v in value.values()))
                     if isinstance(value,list):
-                        return any(contains_sensitive(v) for v in value)
+                        return any(contains_sensitive(v,depth+1) for v in value)
                     return False
                 if contains_sensitive(denied):
                     allowed=False
