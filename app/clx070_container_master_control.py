@@ -97,7 +97,7 @@ def scope_clause(a,alias="c"):
     # Alias is SQL syntax, never accept arbitrary caller-controlled fragments.
     if alias not in {"c", "container", "containers"}:
         raise HTTPException(400, {"code": "EQUIPMENT_INVALID_SQL_ALIAS"})
-    role=a["role"]
+    role=a.get("role")
     if role in GLOBAL_ROLES or role in {"FINANCE","EQUIPMENT_MANAGER"}: return "",[]
     if role=="AGENT":
         if not a["agent"]:raise HTTPException(403,{"code":"AGENT_SCOPE_REQUIRED"})
