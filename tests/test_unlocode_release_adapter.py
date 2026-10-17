@@ -81,3 +81,12 @@ def test_legacy_catalog_requires_existing_nonempty_source(monkeypatch,tmp_path):
     _part(legacy,[["unlocode","country_code","port_code","port_name"]])
     with pytest.raises(RuntimeError,match="UNLOCODE_CATALOG_EMPTY"):
         source.catalog()
+
+
+def test_deleted_unece_code_is_reference_only(tmp_path):
+    path=tmp_path/"part.csv"
+    _part(path,[["X","NL","RTM","Rotterdam","Rotterdam"],["","DE","HAM","Hamburg","Hamburg"]])
+    rows=list(source._release_rows(path))
+    assert rows[0]["change_indicator"]=="X"
+    assert rows[0]["eligible_for_activation"] is False
+    assert rows[1]["eligible_for_activation"] is True
