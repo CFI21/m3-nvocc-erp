@@ -420,3 +420,9 @@ def test_booking_direct_port_grant_rejects_malformed_unlocode_even_when_global(p
 @pytest.mark.parametrize("port", ["nlrtm", " NLRTM ", "NlRtM"])
 def test_booking_direct_port_grant_accepts_canonical_valid_unlocode(port):
     assert main.booking_port_allowed(port, {"NLRTM"}) is True
+
+
+@pytest.mark.parametrize("port", [12345, True, False, ["NLRTM"], {"code":"NLRTM"}, 0.0])
+def test_booking_direct_port_grant_denies_nonstring_values_before_global_permission(port):
+    assert main.booking_port_allowed(port, {"NLRTM"}, all_ports_granted=True) is False
+    assert main.booking_port_allowed(port, {"NLRTM"}, all_ports_granted=False) is False
