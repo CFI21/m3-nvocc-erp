@@ -271,3 +271,25 @@ def test_equipment_branch_requires_active_iam_office_membership(monkeypatch):
         equipment.actor(MembershipConn(), "valid", "ADMIN", "A1", "RTM", "D1")
     assert exc.value.status_code == 403
     assert exc.value.detail["code"] == "EQUIPMENT_BRANCH_SCOPE_REQUIRED"
+
+
+@pytest.mark.parametrize("role", ["AGENT", "DEPOT"])
+def test_restricted_equipment_actor_requires_active_office(monkeypatch, role):
+    class RevokedMembershipConn:
+        def execute(self, sql, params):
+            assert "iam_office_membership" in sql
+            return _Results([])
+
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "restricted-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": role}])
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(
+            RevokedMembershipConn(), "valid", "ADMIN",
+            "FORGED-AGENT", "FORGED-BRANCH", "FORGED-DEPOT",
+        )
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_ACTIVE_OFFICE_REQUIRED"
