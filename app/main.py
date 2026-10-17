@@ -572,26 +572,34 @@ def modules(): return list(MODULES.values())
 @app.get('/api/v1/{module}')
 def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None,q:Optional[str]=None,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); conn=connect()
-    if bulk_permission_enabled():
-        if not x_m3_session: conn.close(); raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_JOB_SCOPE'})
-        ss=iam_session(conn,x_m3_session); role='SESSION';ascope=cscope=None;clause='';args=[]
-    else:
-        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); clause,args=scope_clause(role,ascope,cscope)
-    where,vals=module_where(module)
-    if job_ref: where+=' AND j.job_ref=?'; vals.append(job_ref)
-    if status: where+=' AND t.status=?'; vals.append(status)
-    rows=conn.execute(tx_query(where)+clause+' ORDER BY t.id',vals+args).fetchall()
-    if bulk_permission_enabled():
-        filtered=[]
-        for r in rows:
-            a=bulk_authorize_job(conn,ss['user_id'],r['job_ref'],'agent-tasks','view')
-            if a['allowed']: filtered.append(r)
-        rows=filtered
-    conn.close()
-    out=[serialize_tx(r) for r in rows]
-    if q:
-        qq=q.lower(); out=[r for r in out if qq in json.dumps(r).lower()]
-    return {'module':module,'count':len(out),'records':out}
+    try:
+        governed=bulk_permission_enabled()
+        if governed:
+            if not x_m3_session:
+                raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_JOB_SCOPE'})
+            ss=iam_session(conn,x_m3_session)
+            clause='';args=[]
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            clause,args=scope_clause(role,ascope,cscope)
+        where,vals=module_where(module)
+        if job_ref: where+=' AND j.job_ref=?'; vals.append(job_ref)
+        if status: where+=' AND t.status=?'; vals.append(status)
+        rows=conn.execute(tx_query(where)+clause+' ORDER BY t.id',vals+args).fetchall()
+        if governed:
+            filtered=[]
+            for record in rows:
+                authorization=bulk_authorize_job(conn,ss['user_id'],record['job_ref'],'agent-tasks','view')
+                if authorization['allowed']:
+                    filtered.append(record)
+            rows=filtered
+        out=[serialize_tx(record) for record in rows]
+        if q:
+            qq=q.lower()
+            out=[record for record in out if qq in json.dumps(record).lower()]
+        return {'module':module,'count':len(out),'records':out}
+    finally:
+        conn.close()
 
 @app.get('/api/v1/{module}/{tid}')
 def get_record(module:str,tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
