@@ -427,10 +427,10 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
     if not ch:c.close();raise HTTPException(404,'Change not found')
     if ch['status']!='PENDING':c.close();raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
-    if ch['operation'] not in ('CREATE','UPDATE','DEACTIVATE','ACTIVATE','REACTIVATE'):
+    if ch['maker']==user:c.close();raise HTTPException(409,{'code':'FOUR_EYES_VIOLATION'})
+    if b.decision=='APPROVE' and ch['operation'] not in ('CREATE','UPDATE','DEACTIVATE','ACTIVATE','REACTIVATE'):
         c.close()
         raise HTTPException(422,{'code':'INVALID_MASTER_OPERATION','operation':ch['operation']})
-    if ch['maker']==user:c.close();raise HTTPException(409,{'code':'FOUR_EYES_VIOLATION'})
     if b.decision=='REJECT':c.execute("UPDATE md_change_requests SET status='REJECTED',checker=?,decision_comment=?,decided_at=? WHERE id=?",(user,b.comment,now(),ch['id']));audit(c,user,'CHANGE_REJECT',ch['domain'],ch['record_key'],change_ref);c.close();return {'status':'REJECTED'}
     current=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(ch['domain'],ch['record_key'])).fetchone()
     if ch['operation']=='CREATE' and current:
