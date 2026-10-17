@@ -29,6 +29,20 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Compile backend and targeted regressions
         run: python -m compileall -q app tests
+      - name: Reject unsafe equipment / MRG authorization contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          equipment=Path('app/clx070_container_master_control.py').read_text()
+          mrg=Path('app/mrg.py').read_text()
+          assert 'EQUIPMENT_SESSION_REQUIRED' in equipment
+          assert 'MRG_SESSION_REQUIRED' in mrg
+          assert 'EQUIPMENT_TRUSTED_SCOPE_REQUIRED' in equipment
+          assert 'EQUIPMENT_ROLE_SCOPE_DENIED' in equipment
+          assert 'EQUIPMENT_AMBIGUOUS_AGENT_GRANTS' in equipment
+          assert 'EQUIPMENT_AMBIGUOUS_DEPOT_GRANTS' in equipment
+          assert 'def _trusted_scope(' in equipment
+          PY
       - name: Unsigned role and equipment scope security regressions
         run: |
           set -o pipefail
