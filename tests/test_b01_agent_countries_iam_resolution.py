@@ -377,3 +377,36 @@ def test_country_projection_excludes_inactive_office_while_other_remains(country
     assign(country_db,key="OFFICE-HAM",office="HAM")
     rows=masterdata.agent_office_countries("valid")
     assert [(row["country_code"],row["office_code"]) for row in rows]==[("NL","RTM")]
+
+
+def test_checker_reactivation_rejects_duplicate_pol_coverage(country_db,monkeypatch):
+    """Inactive POL relationship cannot revive over identical active coverage."""
+    def identity(_c,token):
+        if token=="checker": return {"user_ref":"checker"},{"MASTER_DATA_MANAGER"}
+        return {"user_ref":"maker"},{"MASTER_DATA"}
+    monkeypatch.setattr(masterdata,"authenticated_actor",identity)
+    c=country_db()
+    c.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+        "VALUES ('port','NLRTM',?,'ACTIVE','now','now')",
+        (json.dumps({"unlocode":"NLRTM"}),),
+    )
+    coverage={"config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE","agent_code":"UAT-AGENT-001","office_code":"RTM","scope":"POL","port_code":"NLRTM"}
+    for key,status in (("POL-ACTIVE","ACTIVE"),("POL-OLD","INACTIVE")):
+        c.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+            "VALUES ('configuration',?,?,?,1,'now','now')",
+            (key,json.dumps(coverage),status),
+        )
+    c.execute(
+        "INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-POL-REACTIVATE','configuration','POL-OLD','REACTIVATE','{}','review','maker','now',1)"
+    )
+    c.close()
+    with pytest.raises(HTTPException) as exc:
+        masterdata.decide("MDC-POL-REACTIVATE",masterdata.Decision(decision="APPROVE",comment="review"),"checker")
+    assert exc.value.status_code==409
+    assert exc.value.detail["code"]=="DUPLICATE_AGENT_RELATIONSHIP"
+    c=country_db()
+    assert c.execute("SELECT status FROM md_records WHERE record_key='POL-OLD'").fetchone()["status"]=="INACTIVE"
+    c.close()
