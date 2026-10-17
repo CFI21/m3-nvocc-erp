@@ -259,7 +259,12 @@ def booking_agent_port_grants(conn,user_id,agent_code):
                 or str(config.get('office_code') or '').strip().upper() not in offices):
             continue
         active_day=datetime.datetime.now(datetime.timezone.utc).date().isoformat()
-        if not (str(config.get('effective_from') or '0000-01-01')<=active_day<=str(config.get('effective_to') or '9999-12-31')):
+        start=str(config.get('effective_from') or '0000-01-01')
+        end=str(config.get('effective_to') or '9999-12-31')
+        # Only ISO dates are eligible; malformed effective periods cannot grant access.
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',start) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',end):
+            continue
+        if not start<=active_day<=end:
             continue
         scope=str(config.get('scope') or '').strip().upper()
         port=str(config.get('port_code') or '').strip().upper()
