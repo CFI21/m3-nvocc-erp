@@ -315,3 +315,17 @@ def test_equipment_normalizes_authenticated_iam_role(monkeypatch, iam_role):
     result = equipment.actor(Conn(), "valid", "ADMIN", "OTHER", "OTHER", "OTHER")
     assert result["role"] == "AGENT"
     assert result["agent"] == "A1"
+
+
+@pytest.mark.parametrize("roles", [[], [{"role_code": "UNKNOWN"}], [{"role_code": ""}]])
+def test_equipment_missing_or_unknown_iam_roles_rejected(monkeypatch, roles):
+    monkeypatch.setattr(
+        equipment, "iam_session",
+        lambda c, token: {"user_id": 7, "user_ref": "unknown-user",
+                          "office_code": "RTM", "home_office_id": 1},
+    )
+    monkeypatch.setattr(equipment, "roles_for", lambda c, user: roles)
+    with pytest.raises(HTTPException) as exc:
+        equipment.actor(None, "valid", "SUPER_ADMIN", "A1", "NLRTM", "D1")
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "EQUIPMENT_IAM_ROLE_REQUIRED"
