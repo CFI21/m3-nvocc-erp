@@ -629,3 +629,53 @@ def test_same_agent_same_email_different_ports_are_distinct(tmp_path, monkeypatc
         "SELECT COUNT(*) FROM md_change_requests WHERE record_key='EMAIL-PORT-AMS' AND status='PENDING'"
     ).fetchone()[0] == 1
     db.close()
+
+
+def test_checker_rejects_update_when_record_is_inactive(tmp_path, monkeypatch):
+    """A stale UPDATE may not silently reactivate an inactive master record."""
+    import json
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "inactive_update.sqlite3")
+
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: ({"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}),
+    )
+    db = connect()
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
+        "VALUES ('configuration','EMAIL-INACTIVE',?,'INACTIVE',1,'now','now')",
+        (json.dumps(_email()),),
+    )
+    db.execute(
+        "INSERT INTO md_change_requests"
+        "(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
+        "VALUES ('MDC-INACTIVE-UPDATE','configuration','EMAIL-INACTIVE','UPDATE',?,'stale','maker','now',1)",
+        (json.dumps({"email":"new@example.org"}),),
+    )
+    db.close()
+    with pytest.raises(HTTPException) as error:
+        masterdata.decide(
+            "MDC-INACTIVE-UPDATE",
+            masterdata.Decision(decision="APPROVE",comment="review"),
+            "checker",
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "MASTER_RECORD_NOT_ACTIVE"
+    db = connect()
+    row = db.execute(
+        "SELECT status,version,payload_json FROM md_records WHERE record_key='EMAIL-INACTIVE'"
+    ).fetchone()
+    assert (row["status"],row["version"],json.loads(row["payload_json"])["email"]) == (
+        "INACTIVE",1,"ops@example.org"
+    )
+    db.close()
