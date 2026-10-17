@@ -237,3 +237,27 @@ def test_booking_accepts_duplicate_same_country_iam_office_grants(monkeypatch):
         assert main.booking_agent_port_grants(c,1,'A1')['POL']['ports']=={'NLRTM'}
     finally:
         c.close()
+
+
+@pytest.mark.parametrize("countries", [
+    ("NL", "DE", "NL"),
+    ("DE", "NL", "DE"),
+    ("NL", "DE", "NL", "NL"),
+])
+def test_booking_conflicted_office_never_regains_access(monkeypatch, countries):
+    c=_conn()
+    monkeypatch.setattr('app.admin._assigned_agent_offices',
+                        lambda conn,user,agent:[
+                            {'office_code':'RTM','country_code':country}
+                            for country in countries
+                        ])
+    network={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
+             'agent_code':'A1','office_code':'RTM','scope':'POL','port_code':'NLRTM'}
+    c.execute("INSERT INTO md_records VALUES ('configuration','COV',?,'ACTIVE')",
+              (json.dumps(network),))
+    c.execute("INSERT INTO md_records VALUES ('port','NLRTM',?,'ACTIVE')",
+              (json.dumps({'unlocode':'NLRTM'}),))
+    try:
+        assert main.booking_agent_port_grants(c,1,'A1')['POL']['ports']==set()
+    finally:
+        c.close()
