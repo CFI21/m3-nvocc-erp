@@ -1043,3 +1043,65 @@ def test_checker_blocks_normalized_self_approval(tmp_path, monkeypatch, maker, c
         "SELECT status FROM md_change_requests WHERE change_ref='MDC-FOUR-EYES'"
     ).fetchone()["status"] == "PENDING"
     db.close()
+
+
+@pytest.mark.parametrize("operation,prior_type,requested_type", [
+    ("CREATE", None, " AGENT_EMAIL "),
+    ("CREATE", None, "agent_office_assignment"),
+    ("CREATE", None, "Agent_Network"),
+    ("UPDATE", "OTHER", " AGENT_EMAIL "),
+    ("UPDATE", "AGENT_EMAIL", "OTHER"),
+    ("ACTIVATE", "AGENT_OFFICE_ASSIGNMENT", ""),
+    ("DEACTIVATE", "AGENT_NETWORK", ""),
+])
+def test_isolated_checker_cannot_submit_agent_config(
+    tmp_path, monkeypatch, operation, prior_type, requested_type
+):
+    """All B01 config lifecycle operations must honor separated UAT roles."""
+    import json
+    from fastapi import HTTPException
+
+    filename = str(tmp_path / "checker_submission.sqlite3")
+    def connect():
+        db = sqlite3.connect(filename, isolation_level=None)
+        db.row_factory = sqlite3.Row
+        masterdata.init_schema(db)
+        return db
+
+    monkeypatch.setattr(masterdata, "connect", connect)
+    monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
+    monkeypatch.setenv("M3_B01_STRICT_MAKER_CHECKER", " TRUE ")
+    monkeypatch.setenv("M3_PRODUCTION_TRAFFIC", "OFF")
+    monkeypatch.setattr(
+        masterdata, "authenticated_actor",
+        lambda _db, _token: (
+            {"user_ref": "checker", "username": " MD.CHECKER "},
+            {"MASTER_DATA", "MASTER_DATA_MANAGER"},
+        ),
+    )
+    db = connect()
+    if prior_type is not None:
+        db.execute(
+            "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
+            "VALUES ('configuration','B01-GUARD',?,'ACTIVE','now','now')",
+            (json.dumps({"config_type": prior_type}),),
+        )
+    db.close()
+    with pytest.raises(HTTPException) as error:
+        masterdata.create_change(
+            masterdata.Change(
+                domain="configuration",
+                record_key="B01-GUARD",
+                operation=operation,
+                payload={"config_type": requested_type} if requested_type else {},
+                reason="Role separation regression",
+            ),
+            "valid",
+        )
+    assert error.value.status_code == 403
+    assert error.value.detail["code"] == "B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE"
+    db = connect()
+    assert db.execute(
+        "SELECT COUNT(*) FROM md_change_requests WHERE record_key='B01-GUARD'"
+    ).fetchone()[0] == 0
+    db.close()
