@@ -264,6 +264,11 @@ def booking_agent_port_grants(conn,user_id,agent_code):
         # Only ISO dates are eligible; malformed effective periods cannot grant access.
         if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',start) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',end):
             continue
+        try:
+            datetime.date.fromisoformat(start)
+            datetime.date.fromisoformat(end)
+        except ValueError:
+            continue
         if not start<=active_day<=end:
             continue
         scope=str(config.get('scope') or '').strip().upper()
