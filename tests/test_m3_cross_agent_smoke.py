@@ -125,3 +125,21 @@ def test_nested_denied_payload_leakage_is_blocked(monkeypatch,denied_body):
     assert report["status"]=="BLOCKED"
     assert report["tests"][1]["status"]=="BLOCKED"
     assert report["tests"][2]["status"]=="BLOCKED"
+
+
+@pytest.mark.parametrize("denial", [
+    '{"Detail":{"Agent_ID":17}}',
+    '{"Errors":[{"Customer_Name":"Other Agent Customer"}]}',
+    '{"DETAIL":{"FIELDS":{"POL":"NLRTM"}}}',
+])
+def test_case_variant_denial_leakage_is_blocked(monkeypatch,denial):
+    def mocked(base,path,token):
+        own=(token=="a" and path.endswith("/1")) or (token=="b" and path.endswith("/2"))
+        return {"status":200 if own else 403,
+                "body":('{"id":'+path.rsplit("/",1)[-1]+',"module":"booking"}')
+                       if own else denial}
+    monkeypatch.setattr(smoke,"request_json",mocked)
+    out=smoke.run("https://m3-pr124-booking-api-preview.onrender.com","a","b","1","2",SHA)
+    assert out["status"]=="BLOCKED"
+    assert out["tests"][1]["status"]=="BLOCKED"
+    assert out["tests"][2]["status"]=="BLOCKED"
