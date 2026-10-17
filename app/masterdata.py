@@ -512,12 +512,13 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
                 if duplicate:
                     c.close()
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':rec['record_key']})
-        if proposed.get('config_type')=='AGENT_NETWORK' and proposed.get('network_type')=='PORT_COVERAGE':
+        if (str(proposed.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+            str(proposed.get('network_type') or '').strip().upper()=='PORT_COVERAGE'):
             fields=('config_type','network_type','agent_code','office_code','scope','port_code')
             for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
                 if rec['record_key']==ch['record_key']: continue
                 existing_values=json.loads(rec['payload_json'] or '{}')
-                if all(str(existing_values.get(k) or '').upper()==str(proposed.get(k) or '').upper() for k in fields):
+                if all(str(existing_values.get(k) or '').strip().upper()==str(proposed.get(k) or '').strip().upper() for k in fields):
                     c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP'})
     if ch['operation']=='CREATE':
         errs=validate_payload(ch['domain'],payload,{})+reference_errors(c,ch['domain'],payload)
