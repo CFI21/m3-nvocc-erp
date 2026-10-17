@@ -143,3 +143,30 @@ def test_case_variant_denial_leakage_is_blocked(monkeypatch,denial):
     assert out["status"]=="BLOCKED"
     assert out["tests"][1]["status"]=="BLOCKED"
     assert out["tests"][2]["status"]=="BLOCKED"
+
+
+def test_bulk_list_agent_isolation_passes_when_only_own_booking_visible(monkeypatch):
+    def fake(base,path,token):
+        assert path=="/api/v1/booking"
+        own=1 if token=="a" else 2
+        return {"status":200,"body":'{"module":"booking","count":1,"records":[{"id":'+str(own)+',"module":"booking"}]}'}
+    monkeypatch.setattr(smoke,"request_json",fake)
+    checks=smoke.check_list_scope(
+        "https://m3-pr124-booking-api-preview.onrender.com","a","b","1","2")
+    assert [x["id"] for x in checks]==["SEC-005","SEC-006"]
+    assert all(x["status"]=="PASS" for x in checks)
+
+
+@pytest.mark.parametrize("payload",[
+    '{"module":"booking","count":2,"records":[{"id":1,"module":"booking"},{"id":2,"module":"booking"}]}',
+    '{"module":"booking","count":1,"records":[{"id":2,"module":"booking"}]}',
+    '{"module":"booking","count":1,"records":[]}',
+    '<html>login</html>',
+])
+def test_bulk_list_foreign_ids_and_invalid_responses_block(monkeypatch,payload):
+    monkeypatch.setattr(smoke,"request_json",
+                        lambda *_args:{"status":200,"body":payload})
+    checks=smoke.check_list_scope(
+        "https://m3-pr124-booking-api-preview.onrender.com","a","b","1","2")
+    assert any(x["status"]=="BLOCKED" for x in checks)
+    assert all("body" not in x for x in checks)
