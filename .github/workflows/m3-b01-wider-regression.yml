@@ -110,7 +110,12 @@ jobs:
                   lines.append(f'- {name}: BLOCKED (no test report)')
                   blocked=True
                   continue
-              root=ET.parse(path).getroot()
+              try:
+                  root=ET.parse(path).getroot()
+              except (ET.ParseError, OSError) as err:
+                  lines.append(f'- {name}: BLOCKED (invalid JUnit report: {err})')
+                  blocked=True
+                  continue
               if root.tag=='testsuite':
                   suites=[root]
               elif root.tag=='testsuites':
