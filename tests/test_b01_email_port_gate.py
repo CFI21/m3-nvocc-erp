@@ -81,9 +81,9 @@ def test_email_requires_independent_checker_and_keeps_audit(tmp_path, monkeypatc
 
     def actor(_connection, token):
         if token == "maker":
-            return {"user_ref": "email-maker"}, {"MASTER_DATA"}
+            return {"user_ref": "email-maker", "username": "uat.actor"}, {"MASTER_DATA"}
         if token == "checker":
-            return {"user_ref": "email-checker"}, {"MASTER_DATA_MANAGER"}
+            return {"user_ref": "email-checker", "username": "uat.actor"}, {"MASTER_DATA_MANAGER"}
         raise HTTPException(401, "Unknown actor")
 
     monkeypatch.setattr(masterdata, "authenticated_actor", actor)
@@ -154,7 +154,7 @@ def test_checker_rejects_email_and_preserves_no_active_record(tmp_path, monkeypa
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
         lambda _c, token: (
-            {"user_ref": "email-maker" if token == "maker" else "email-checker"},
+            {"user_ref": "email-maker" if token == "maker" else "email-checker", "username": "uat.actor"},
             {"MASTER_DATA"} if token == "maker" else {"MASTER_DATA_MANAGER"},
         ),
     )
@@ -208,7 +208,7 @@ def test_checker_approval_rechecks_email_uniqueness(tmp_path, monkeypatch):
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
         lambda _c, token: (
-            {"user_ref": "maker" if token == "maker" else "checker"},
+            {"user_ref": "maker" if token == "maker" else "checker", "username": "uat.actor"},
             {"MASTER_DATA"} if token == "maker" else {"MASTER_DATA_MANAGER"},
         ),
     )
@@ -267,7 +267,7 @@ def test_checker_revalidates_port_after_submission(tmp_path, monkeypatch):
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
         lambda _db, token: (
-            {"user_ref": "email-maker" if token == "maker" else "email-checker"},
+            {"user_ref": "email-maker" if token == "maker" else "email-checker", "username": "uat.actor"},
             {"MASTER_DATA"} if token == "maker" else {"MASTER_DATA_MANAGER"},
         ),
     )
@@ -334,7 +334,7 @@ def test_maker_rejects_duplicate_agent_email_update_before_queue(tmp_path, monke
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": "email-maker"}, {"MASTER_DATA"}),
+        lambda _db, _token: ({"user_ref": "email-maker", "username": "uat.actor"}, {"MASTER_DATA"}),
     )
 
     db = connect()
@@ -396,7 +396,7 @@ def test_checker_create_fails_cleanly_when_key_was_claimed(tmp_path, monkeypatch
     monkeypatch.setattr(masterdata, "connect", connect)
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(masterdata, "authenticated_actor", lambda _db, _token: (
-        {"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}
+        {"user_ref": "checker", "username": "uat.actor"}, {"MASTER_DATA_MANAGER"}
     ))
     db = connect()
     db.execute(
@@ -445,7 +445,7 @@ def test_checker_rejects_missing_master_for_noncreate(tmp_path, monkeypatch, ope
     monkeypatch.setattr(masterdata, "connect", connect)
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(masterdata, "authenticated_actor", lambda _db, _token: (
-        {"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}
+        {"user_ref": "checker", "username": "uat.actor"}, {"MASTER_DATA_MANAGER"}
     ))
     db = connect()
     db.execute(
@@ -488,7 +488,7 @@ def test_same_email_port_allowed_for_different_agents(tmp_path, monkeypatch):
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": "email-maker"}, {"MASTER_DATA"}),
+        lambda _db, _token: ({"user_ref": "email-maker", "username": "uat.actor"}, {"MASTER_DATA"}),
     )
     db = connect()
     for agent in ("UAT-AGENT-001", "UAT-AGENT-002"):
@@ -544,7 +544,7 @@ def test_same_agent_different_email_routes_are_distinct(tmp_path, monkeypatch):
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": "email-maker"}, {"MASTER_DATA"}),
+        lambda _db, _token: ({"user_ref": "email-maker", "username": "uat.actor"}, {"MASTER_DATA"}),
     )
     db = connect()
     db.execute(
@@ -594,7 +594,7 @@ def test_same_agent_same_email_different_ports_are_distinct(tmp_path, monkeypatc
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": "email-maker"}, {"MASTER_DATA"}),
+        lambda _db, _token: ({"user_ref": "email-maker", "username": "uat.actor"}, {"MASTER_DATA"}),
     )
     db = connect()
     db.execute(
@@ -648,7 +648,7 @@ def test_checker_rejects_update_when_record_is_inactive(tmp_path, monkeypatch):
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}),
+        lambda _db, _token: ({"user_ref": "checker", "username": "uat.actor"}, {"MASTER_DATA_MANAGER"}),
     )
     db = connect()
     db.execute(
@@ -702,7 +702,7 @@ def test_checker_rejects_invalid_state_transition(tmp_path,monkeypatch,operation
     monkeypatch.setattr(masterdata,"using_postgres",lambda:False)
     monkeypatch.setattr(
         masterdata,"authenticated_actor",
-        lambda _db,_token:({"user_ref":"checker"},{"MASTER_DATA_MANAGER"}),
+        lambda _db,_token:({"user_ref": "checker", "username": "uat.actor"},{"MASTER_DATA_MANAGER"}),
     )
     db=connect()
     db.execute(
@@ -752,7 +752,7 @@ def test_checker_reactivation_revalidates_retired_port(tmp_path,monkeypatch):
     monkeypatch.setattr(masterdata,"using_postgres",lambda:False)
     monkeypatch.setattr(
         masterdata,"authenticated_actor",
-        lambda _db,_token:({"user_ref":"checker"},{"MASTER_DATA_MANAGER"}),
+        lambda _db,_token:({"user_ref": "checker", "username": "uat.actor"},{"MASTER_DATA_MANAGER"}),
     )
     db=connect()
     db.execute(
@@ -806,7 +806,7 @@ def test_checker_reactivation_rejects_duplicate_active_email(tmp_path, monkeypat
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}),
+        lambda _db, _token: ({"user_ref": "checker", "username": "uat.actor"}, {"MASTER_DATA_MANAGER"}),
     )
     db = connect()
     db.execute(
@@ -923,7 +923,7 @@ def test_checker_rejects_unknown_stored_operation(tmp_path, monkeypatch):
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}),
+        lambda _db, _token: ({"user_ref": "checker", "username": "uat.actor"}, {"MASTER_DATA_MANAGER"}),
     )
     db = connect()
     db.execute(
@@ -972,7 +972,7 @@ def test_checker_can_reject_unknown_stored_operation(tmp_path, monkeypatch):
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": "checker"}, {"MASTER_DATA_MANAGER"}),
+        lambda _db, _token: ({"user_ref": "checker", "username": "uat.actor"}, {"MASTER_DATA_MANAGER"}),
     )
     db = connect()
     db.execute(
@@ -1019,7 +1019,7 @@ def test_checker_blocks_normalized_self_approval(tmp_path, monkeypatch, maker, c
     monkeypatch.setattr(masterdata, "using_postgres", lambda: False)
     monkeypatch.setattr(
         masterdata, "authenticated_actor",
-        lambda _db, _token: ({"user_ref": checker}, {"MASTER_DATA_MANAGER"}),
+        lambda _db, _token: ({"user_ref": checker, "username": "uat.actor"}, {"MASTER_DATA_MANAGER"}),
     )
     db = connect()
     db.execute(
