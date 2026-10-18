@@ -56,7 +56,10 @@ def run(api_url, token_a, token_b, own_id, other_id, target_sha):
     _validate_target(api_url)
     if not token_a or not token_b or token_a==token_b:
         raise ValueError("DISTINCT_AUTHENTICATED_SESSIONS_REQUIRED")
-    if not own_id.isdigit() or not other_id.isdigit() or own_id==other_id:
+    if (not own_id.isascii() or not other_id.isascii()
+            or not own_id.isdecimal() or not other_id.isdecimal()
+            or int(own_id)<=0 or int(other_id)<=0
+            or int(own_id)==int(other_id)):
         raise ValueError("DISTINCT_NUMERIC_BOOKING_IDS_REQUIRED")
     if len(target_sha)!=40 or any(x not in "0123456789abcdef" for x in target_sha.lower()):
         raise ValueError("FULL_COMMIT_SHA_REQUIRED")
