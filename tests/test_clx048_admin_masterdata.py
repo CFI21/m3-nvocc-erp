@@ -36,8 +36,9 @@ def test_frozen_196_top_level_and_all_admin_master_screens_load(isolated):
     ]
     screens=[x for x in c['screens'] if x['domain'] in {'General / Administration','Master Data'}]
     assert screens
+    token=admin_session()
     for s in screens:
-        d=screen_data(s['screen_id'],x_role='ADMIN')
+        d=screen_data(s['screen_id'],x_role='ADMIN',x_m3_session=token)
         assert 'rows' in d
         a=set(quick_actions(s['screen_id'],'ADMIN')['visible_actions'])
         if s['screen_id'].startswith('administration::'):
