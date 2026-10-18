@@ -190,3 +190,17 @@ def test_missing_session_requires_401_not_just_non_200(monkeypatch,status):
     results=smoke.check_unauthenticated(
         "https://m3-pr124-booking-api-preview.onrender.com","1","2")
     assert all(item["status"]=="BLOCKED" for item in results)
+
+
+def test_redirect_returned_as_normal_response_is_still_blocked(monkeypatch):
+    class Response:
+        status=302
+        def __enter__(self): return self
+        def __exit__(self,*args): return False
+        def read(self,n): return b""
+    class Opener:
+        def open(self,request,timeout): return Response()
+    monkeypatch.setattr(smoke.urllib.request,"build_opener",lambda *_args:Opener())
+    with pytest.raises(ValueError,match="UNEXPECTED_AUTH_REDIRECT"):
+        smoke.request_json("https://m3-pr124-booking-api-preview.onrender.com",
+                           "/api/v1/booking/1","agent-a")
