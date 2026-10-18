@@ -36,9 +36,18 @@ def test_frozen_screen_baseline_unchanged():
 
 
 def test_agent_screen_data_requires_scope(isolated):
+    # An unsigned role header is not an authenticated IAM identity.
     with pytest.raises(HTTPException) as exc:
         screen_data("agent-tasks::booking",x_role="AGENT")
-    assert exc.value.status_code==403
+    assert exc.value.status_code==401
+    assert exc.value.detail["code"]=="EQUIPMENT_SESSION_REQUIRED"
+
+    from tests.iam_personas import persona_session
+    token=persona_session(role="AGENT",agent_code="CLX-AGT-SIN")
+    scoped=screen_data("agent-tasks::booking",x_role="ADMIN",
+                       x_agent_scope="WRONG-AGENT",x_m3_session=token)
+    assert isinstance(scoped["rows"],list)
+    assert all(row.get("agent")=="CLX-AGT-SIN" for row in scoped["rows"])
 
 
 def test_agent_screen_data_filters_cross_agent_rows(isolated):
