@@ -358,7 +358,16 @@ def set_runtime_mode(body:ModeBody,x_role:str=Header('VIEWER'),x_actor_id:str=He
 def failure_drills():return failure_drill_matrix()
 
 @router.get('/readiness')
-def readiness():return readiness_status()
+def readiness():
+    try:
+        return readiness_status()
+    except sqlite3.OperationalError as exc:
+        if not using_postgres() and 'no such table' in str(exc).lower():
+            raise HTTPException(status_code=503, detail={
+                'code': 'ISOLATED_UAT_DATABASE_NOT_CONFIGURED',
+                'message': 'Readiness requires the configured isolated PostgreSQL database, not an empty SQLite fallback.',
+            }) from None
+        raise
 
 @router.post('/production/promote')
 def production_promote():
