@@ -391,7 +391,8 @@ def test_mrg_fails_closed_without_valid_iam_identity(monkeypatch, roles, user_re
     with pytest.raises(HTTPException) as exc:
         mrg.actor(None, "valid", "ADMIN")
     assert exc.value.status_code == 403
-    assert exc.value.detail["code"] == "MRG_IAM_IDENTITY_REQUIRED"
+    expected = "MRG_IAM_IDENTITY_REQUIRED" if not user_ref else "MRG_IAM_ROLE_NOT_AUTHORIZED"
+    assert exc.value.detail["code"] == expected
 
 
 @pytest.mark.parametrize("roles", [["UNKNOWN"], ["FAKE_ADMIN", "CUSTOM_ROLE"]])
