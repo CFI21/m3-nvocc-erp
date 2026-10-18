@@ -32,6 +32,17 @@ def persona_session(role="AGENT", agent_code="CLX-AGT-SIN", office_code=None):
             office = c.execute("SELECT id FROM iam_offices WHERE office_code=?", (office_code,)).fetchone()
         if not office:
             raise RuntimeError("TEST_OFFICE_NOT_FOUND")
+        if role == "AGENT":
+            # Equipment IAM requires a branch in the member's home office.
+            existing_branch = c.execute(
+                "SELECT id FROM iam_branches WHERE office_id=? ORDER BY id LIMIT 1",
+                (office["id"],)
+            ).fetchone()
+            if not existing_branch:
+                c.execute(
+                    "INSERT INTO iam_branches(branch_code,name,office_id,status) VALUES(?,?,?,'ACTIVE')",
+                    ("TEST-" + suffix.upper(), "Test agent branch", office["id"])
+                )
         rr = c.execute("SELECT id FROM iam_roles WHERE role_code=? AND status='ACTIVE'", (role,)).fetchone()
         if not rr:
             raise RuntimeError("TEST_ROLE_NOT_FOUND")
