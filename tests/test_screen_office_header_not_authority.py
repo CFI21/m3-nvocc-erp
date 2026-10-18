@@ -26,3 +26,18 @@ def test_trusted_iam_office_survives_spoofed_header(monkeypatch):
     )
     assert actual["office"] == "RTM"
     assert actual["role"] == "OPS"
+
+
+def test_missing_iam_role_cannot_inherit_caller_role(monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+    monkeypatch.setattr(
+        screen_integration, "scope_actor",
+        lambda conn, token, role, agent, branch, depot: {"role": None, "office": None},
+    )
+    with pytest.raises(HTTPException) as denied:
+        screen_integration._read_actor(
+            None, "SUPER_ADMIN", "validated-token", None, None, None, "SPOOFED"
+        )
+    assert denied.value.status_code == 403
+    assert denied.value.detail["code"] == "SCREEN_IAM_ROLE_REQUIRED"
