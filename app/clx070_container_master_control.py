@@ -37,7 +37,7 @@ def _json(v,default=None):
     except Exception:return {} if default is None else default
 
 def _roles_priority(roles):
-    order=["SUPER_ADMIN","ADMIN","EQUIPMENT_MANAGER","MANAGEMENT","FINANCE","EQUIPMENT_CONTROLLER","BRANCH_OPS","OPS","DOCS","AGENT","DEPOT","AUDITOR","VIEWER"]
+    order=["SUPER_ADMIN","ADMIN","EQUIPMENT_MANAGER","MANAGEMENT","FINANCE","TREASURY","GL_ACCOUNTANT","EQUIPMENT_CONTROLLER","BRANCH_OPS","OPS","DOCS","AGENT","DEPOT","AUDITOR","VIEWER"]
     rs=set(roles)
     return next((r for r in order if r in rs),"VIEWER")
 
