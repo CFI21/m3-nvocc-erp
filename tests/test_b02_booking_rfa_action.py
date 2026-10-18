@@ -310,7 +310,7 @@ def test_rfa_unsaved_grid_guard_is_scoped_to_current_booking():
     ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
     fn=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('async function clx49RenderBooking',1)[0]
     assert 'clx81BookingDraft?.key===draftKey' in fn
-    assert 'if(dirty||pendingGridEdits)' in fn
+    assert 'if(dirty||gridDirty||pendingGridEdits)' in fn
 
 
 def test_rfa_allows_unchanged_grid_draft_values():
