@@ -28,6 +28,9 @@ def validate_readiness(data):
     return (isinstance(data,dict) and data.get("ready") is True
             and data.get("database_health")=="ok"
             and data.get("database_target_approved") is True
+            and data.get("configured_project_ref") == data.get("approved_project_ref")
+            and bool(data.get("approved_project_ref"))
+            and data.get("jobs_50001_50005") == 5
             and data.get("production_traffic")=="OFF"
             and data.get("live_providers")=="OFF"
             and data.get("real_money")=="OFF")
