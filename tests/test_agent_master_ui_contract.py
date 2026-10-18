@@ -155,8 +155,10 @@ def test_admin_ui_alias_shows_agent_master_controls_without_changing_backend_aut
 
 def test_preview_switch_user_requires_fresh_iam_login():
     source=agent_source()
-    assert '<button onclick="m3SwitchPreviewUser()">Switch M3 User</button>' in source
-    switch=source.split('function m3SwitchPreviewUser(){',1)[1].split('async function m3EnsureIamLogin()',1)[0]
+    assert '<button onclick="m3SwitchPreviewUser()">Sign Out / Switch M3 User</button>' in source
+    switch=source.split('async function m3SwitchPreviewUser(){',1)[1].split('async function m3EnsureIamLogin()',1)[0]
+    assert "await fetch('/api/admin/auth/logout',{method:'POST',headers:{'X-M3-Session':token}})" in switch
+    assert "if(!response.ok&&response.status!==401)" in switch
     assert "sessionStorage.removeItem('M3_SESSION')" in switch
     assert "sessionStorage.removeItem('M3_SESSION_TOKEN')" in switch
     assert "location.reload()" in switch
