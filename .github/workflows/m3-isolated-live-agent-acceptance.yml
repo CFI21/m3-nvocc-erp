@@ -25,6 +25,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+      - name: Run offline security runner regression before live probing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install pytest
+          python -m compileall -q scripts/m3_cross_agent_smoke.py tests/test_m3_cross_agent_smoke.py
+          python -m pytest -q tests/test_m3_cross_agent_smoke.py \
+            --junitxml=m3-live-runner-unit.xml
       - name: Validate isolated preview and distinct accounts
         shell: bash
         run: |
@@ -50,6 +58,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: m3-isolated-live-agent-security
-          path: m3-live-agent-security.json
+          path: |
+            m3-live-agent-security.json
+            m3-live-runner-unit.xml
           if-no-files-found: warn
           retention-days: 14
