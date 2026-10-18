@@ -242,9 +242,16 @@ def test_equipment_actor_requires_authoritative_branch(monkeypatch, role):
                           "office_code": "RTM", "home_office_id": 1},
     )
     monkeypatch.setattr(equipment, "roles_for", lambda c, user: [{"role_code": role}])
+    class NoActiveMembership:
+        def execute(self, sql, params):
+            assert "iam_office_membership" in sql
+            assert "m.status='ACTIVE'" in sql
+            assert params == (7, 1)
+            return _Results([])
+
     with pytest.raises(HTTPException) as exc:
         equipment.actor(
-            _GrantConn([]), "valid", "ADMIN", "AGENT-OVERRIDE",
+            NoActiveMembership(), "valid", "ADMIN", "AGENT-OVERRIDE",
             "BRANCH-OVERRIDE", "DEPOT-OVERRIDE",
         )
     assert exc.value.status_code == 403
