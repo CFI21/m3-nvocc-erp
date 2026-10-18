@@ -23,10 +23,12 @@ def isolated(tmp_path,monkeypatch):
 def test_all_196_existing_screens_load_in_one_completion_sweep(isolated):
     c=build_catalog()
     assert c['screen_count']==196
+    from app.admin import Login, login
+    token=login(Login(username='admin',password='Admin123!',mfa_code='123456'))['session_token']
     failures=[]
     for s in c['screens']:
         try:
-            d=screen_data(s['screen_id'],x_role='ADMIN')
+            d=screen_data(s['screen_id'],x_role='ADMIN',x_m3_session=token)
             assert isinstance(d.get('rows'),list)
             qa=quick_actions(s['screen_id'],'ADMIN')
             assert 'visible_actions' in qa
