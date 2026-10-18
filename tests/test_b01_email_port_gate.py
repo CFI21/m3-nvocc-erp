@@ -997,13 +997,13 @@ def test_checker_can_reject_unknown_stored_operation(tmp_path, monkeypatch):
     db.close()
 
 
-@pytest.mark.parametrize("maker,checker", [
-    ("md.maker", "MD.MAKER"),
-    ("md.maker ", " md.maker"),
-    (" ", "md.checker"),
-    ("md.maker", " "),
+@pytest.mark.parametrize("maker,checker,status,code", [
+    ("md.maker", "MD.MAKER", 409, "FOUR_EYES_VIOLATION"),
+    ("md.maker ", " md.maker", 409, "FOUR_EYES_VIOLATION"),
+    (" ", "md.checker", 409, "FOUR_EYES_VIOLATION"),
+    ("md.maker", " ", 403, "CHECKER_IDENTITY_REQUIRED"),
 ])
-def test_checker_blocks_normalized_self_approval(tmp_path, monkeypatch, maker, checker):
+def test_checker_blocks_normalized_self_approval(tmp_path, monkeypatch, maker, checker, status, code):
     """Four-eyes approval must reject case and surrounding-space aliases."""
     from fastapi import HTTPException
 
@@ -1036,8 +1036,8 @@ def test_checker_blocks_normalized_self_approval(tmp_path, monkeypatch, maker, c
             masterdata.Decision(decision="APPROVE", comment="must fail"),
             "checker",
         )
-    assert error.value.status_code == 409
-    assert error.value.detail["code"] == "FOUR_EYES_VIOLATION"
+    assert error.value.status_code == status
+    assert error.value.detail["code"] == code
     db = connect()
     assert db.execute(
         "SELECT status FROM md_change_requests WHERE change_ref='MDC-FOUR-EYES'"
