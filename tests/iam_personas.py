@@ -4,6 +4,7 @@ Call after seed_run(), admin_seed_run(), and masterdata_seed_run().
 Never import this module from app/ or use it against a production database.
 """
 import uuid
+import json
 
 from app import db
 from app.admin import Login, login, now, phash
@@ -53,6 +54,19 @@ def persona_session(role="AGENT", agent_code="CLX-AGT-SIN", office_code=None):
                   (uid,rr["id"],office["id"],now()))
         c.execute("INSERT INTO iam_office_membership(user_id,office_id,membership_type,status) VALUES(?,?,'PRIMARY','ACTIVE')",
                   (uid,office["id"]))
+        if role == "AGENT" and office_code == "RTM":
+            # A test-only governed assignment links the seeded job's RTM office to
+            # the real AGENT IAM membership. The production authorization logic
+            # still performs both office membership and agent grant checks.
+            key = "TEST-ASSIGN-" + suffix
+            payload = json.dumps({"config_type": "AGENT_OFFICE_ASSIGNMENT",
+                                  "agent_code": agent_code, "office_code": office_code})
+            ts = now()
+            c.execute(
+                "INSERT INTO md_records(domain,record_key,display_name,payload_json,status,version,"
+                "approved_by,approved_at,created_at,updated_at) "
+                "VALUES('configuration',?,?,?,'ACTIVE',1,'pytest',?,?,?)",
+                (key, "Isolated agent office assignment", payload, ts, ts, ts))
         if role == "AGENT":
             c.execute("INSERT INTO iam_party_access(user_id,party_type,party_key,access_level,status) VALUES(?,'AGENT',?,'VIEW','ACTIVE')",
                       (uid,agent_code))
