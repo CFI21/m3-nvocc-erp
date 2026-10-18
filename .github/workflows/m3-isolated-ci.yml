@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - preview-pr124-booking-isolated
+      - m3-dev-sprint-2
   pull_request:
     branches:
       - main
@@ -18,7 +19,7 @@ concurrency:
 
 jobs:
   test:
-    if: github.head_ref == 'preview-pr124-booking-isolated' || github.ref_name == 'preview-pr124-booking-isolated'
+    if: github.head_ref == 'preview-pr124-booking-isolated' || github.ref_name == 'preview-pr124-booking-isolated' || github.head_ref == 'm3-dev-sprint-2' || github.ref_name == 'm3-dev-sprint-2'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
