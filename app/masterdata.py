@@ -88,19 +88,38 @@ def validate_payload(domain,payload,existing=None):
     if domain=='route' and merged.get('pol') and merged.get('pod') and merged.get('pol')==merged.get('pod'): errs.append('ROUTE_POL_POD_SAME')
     return errs
 
+def _canonical_display_name(value):
+    return " ".join(str(value or "").split()).casefold()
+
 def duplicate_name(c,domain,name,exclude_key=None):
-    if not name:return None
-    q="SELECT record_key FROM md_records WHERE domain=? AND lower(display_name)=lower(?) AND status='ACTIVE'"; args=[domain,name]
-    if exclude_key:q+=' AND record_key<>?';args.append(exclude_key)
-    return c.execute(q,args).fetchone()
+    canonical=_canonical_display_name(name)
+    if not canonical:return None
+    # Compare canonical values in Python so internal whitespace and Unicode case
+    # variants cannot bypass the existing active-record duplicate barrier.
+    for row in c.execute(
+        "SELECT record_key,display_name FROM md_records WHERE domain=? AND status='ACTIVE'",
+        (domain,),
+    ):
+        if exclude_key and row['record_key']==exclude_key:
+            continue
+        if _canonical_display_name(row['display_name'])==canonical:
+            return row
+    return None
 
 def pending_duplicate_name(c,domain,name,exclude_key=None):
-    if not name:return None
-    for r in c.execute("SELECT record_key,payload_json FROM md_change_requests WHERE domain=? AND status='PENDING' AND operation IN ('CREATE','UPDATE')",(domain,)):
-        if exclude_key and r['record_key']==exclude_key: continue
-        p=json.loads(r['payload_json'] or '{}')
-        n=p.get('name') or p.get('display_name')
-        if n and str(n).strip().lower()==str(name).strip().lower(): return r
+    canonical=_canonical_display_name(name)
+    if not canonical:return None
+    for row in c.execute(
+        "SELECT record_key,payload_json FROM md_change_requests "
+        "WHERE domain=? AND status='PENDING' AND operation IN ('CREATE','UPDATE')",
+        (domain,),
+    ):
+        if exclude_key and row['record_key']==exclude_key:
+            continue
+        payload=json.loads(row['payload_json'] or '{}')
+        other=payload.get('name') or payload.get('display_name')
+        if _canonical_display_name(other)==canonical:
+            return row
     return None
 
 def active_master(c,domain,key):
