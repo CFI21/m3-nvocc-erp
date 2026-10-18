@@ -153,7 +153,7 @@ def test_missing_segment_store_and_ref_collision(case):
 
 def test_unapproved_ancillary_charge_and_reefer_conflict(case):
     c=db.connect();c.execute("UPDATE mrg_rules SET status='PENDING_APPROVAL' WHERE rule_ref='REV1'");c.close()
-    blocked('UNAPPROVED_CHARGE_CODE',lambda:journey.add_detention_charge(case['id'],journey.DetentionChargeBody(rule_ref='REV1'),x_role='SUPER_ADMIN',x_m3_session=None,x_agent_scope=None,x_branch_scope=None,x_depot_scope=None))
+    blocked('UNAPPROVED_CHARGE_CODE',lambda:journey.add_detention_charge(case['id'],journey.DetentionChargeBody(rule_ref='REV1'),x_role='SUPER_ADMIN',x_m3_session=case['_session'],x_agent_scope=None,x_branch_scope=None,x_depot_scope=None))
     blocked('REEFER_CLASSIFICATION_CONFLICT',lambda:journey._detention_reefer_classification({'size_type':'40RF','container_type':'DRY'}))
 
 def test_authenticated_session_overrides_spoofed_role(case):
@@ -169,7 +169,7 @@ def test_authenticated_session_overrides_spoofed_role(case):
 
 def test_empty_return_requires_depot(case):
     c=db.connect();c.execute("UPDATE containers SET journey_state='GATE_OUT_FULL',depot_code=NULL WHERE id=?",(case['container_id'],));no=c.execute('SELECT container_no FROM containers WHERE id=?',(case['container_id'],)).fetchone()['container_no'];c.close()
-    blocked('EMPTY_RETURN_DEPOT_REQUIRED',lambda:journey.post_event(no,journey.EventBody(event_type='EMPTY_RETURN',actual_time='2026-10-06T00:00:00+00:00'),x_role='SUPER_ADMIN',x_m3_session=None,x_agent_scope=None,x_branch_scope=None,x_depot_scope=None))
+    blocked('EMPTY_RETURN_DEPOT_REQUIRED',lambda:journey.post_event(no,journey.EventBody(event_type='EMPTY_RETURN',actual_time='2026-10-06T00:00:00+00:00'),x_role='SUPER_ADMIN',x_m3_session=case['_session'],x_agent_scope=None,x_branch_scope=None,x_depot_scope=None))
 
 def test_authorized_finance_creates_draft_invoice_without_posting(case):
     import asyncio
