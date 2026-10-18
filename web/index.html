@@ -4743,15 +4743,22 @@ async function m3EnsureIamLogin(){
         if(!res.ok){let reason='';try{const body=await res.json();reason=String(body?.detail?.code||body?.detail?.reason||'')}catch(_error){}const attempted=username.value.trim();const hint=reason==='INVALID_CREDENTIALS'?'Account password was rejected.':reason==='MFA_REQUIRED'?'MFA verification was rejected.':'Check credentials and UAT API status.';throw Error('Sign-in failed for '+attempted+' (HTTP '+res.status+(reason?', '+reason:'')+'). '+hint+'');}
         const result=await res.json();
         if(!result.session_token)throw Error('Login returned no IAM session');
-        sessionStorage.setItem('M3_SESSION',result.session_token);
-        sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles:result.roles||[]}));
-        sessionStorage.setItem('M3_IAM_LAST_USER',result.username);
-        sessionStorage.removeItem('M3_FORCE_RELOGIN');
         const roles=Array.isArray(result.roles)?result.roles:[];
         const allowed=['SUPER_ADMIN','MASTER_DATA_MANAGER','MASTER_DATA','FINANCE','OPS','AGENT','VIEWER'];
         const selected=allowed.find(role=>roles.includes(role));
-        if(selected){state.role=selected==='SUPER_ADMIN'?'ADMIN':selected;const roleSelect=document.getElementById('role');if(roleSelect&&[...roleSelect.options].some(x=>x.value===state.role))roleSelect.value=state.role;}
-        const roleSelect=document.getElementById('role');if(roleSelect)roleSelect.disabled=true;
+        if(!selected)throw Error('This account has no authorized M3 workspace role. Contact an administrator.');
+        const authorizedUiRole=selected==='SUPER_ADMIN'?'ADMIN':selected;
+        const roleSelect=document.getElementById('role');
+        if(!roleSelect||![...roleSelect.options].some(option=>option.value===authorizedUiRole)){
+          throw Error('This account has no available M3 workspace. Contact an administrator.');
+        }
+        state.role=authorizedUiRole;
+        roleSelect.value=authorizedUiRole;
+        roleSelect.disabled=true;
+        sessionStorage.setItem('M3_SESSION',result.session_token);
+        sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles}));
+        sessionStorage.setItem('M3_IAM_LAST_USER',result.username);
+        sessionStorage.removeItem('M3_FORCE_RELOGIN');
         password.value='';mfa.value='';cover.remove();resolve();
       }catch(error){message.textContent=error.message||'Sign-in failed';password.value='';}
       finally{submit.disabled=false;}
