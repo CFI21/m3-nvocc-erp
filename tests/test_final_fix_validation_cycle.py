@@ -67,11 +67,12 @@ def test_duplicate_review_is_database_portable_and_integrity_scan_is_not_changed
         c.commit()
     finally:
         c.close()
-    dup=screen_data("master-data::duplicate-review",x_role="ADMIN")
+    token=login(Login(username='admin',password='Admin123!',mfa_code='123456'))['session_token']
+    dup=screen_data("master-data::duplicate-review",x_role="ADMIN",x_m3_session=token)
     row=next(x for x in dup["rows"] if x["domain"]=="carrier" and x["normalized_name"]=="audit duplicate")
     assert row["n"]==2
     assert set(row["record_keys"].split(","))=={"AUD-DUP-1","AUD-DUP-2"}
-    integrity=screen_data("master-data::integrity-scan",x_role="ADMIN")
+    integrity=screen_data("master-data::integrity-scan",x_role="ADMIN",x_m3_session=token)
     assert integrity["rows"]==[{"status":"PASS","critical_issues":0}]
 
 def test_authenticated_196_screen_field_api_action_state_and_audit_sweep(isolated):
