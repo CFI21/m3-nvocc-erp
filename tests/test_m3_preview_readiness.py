@@ -11,11 +11,16 @@ def test_health_rejects_production_and_real_money():
 
 def test_readiness_requires_approved_db_and_sandbox():
     ready={"ready":True,"database_health":"ok","database_target_approved":True,
+           "approved_project_ref":"isolated-test-project",
+           "configured_project_ref":"isolated-test-project",
+           "jobs_50001_50005":5,
            "production_traffic":"OFF","live_providers":"OFF","real_money":"OFF"}
     assert probe.validate_readiness(ready)
     for key,value in [("ready",False),("database_health","fail"),
                       ("database_target_approved",False),("production_traffic","ON"),
-                      ("live_providers","ON"),("real_money","ON")]:
+                      ("live_providers","ON"),("real_money","ON"),
+                      ("configured_project_ref","wrong-target"),
+                      ("jobs_50001_50005",4)]:
         assert not probe.validate_readiness({**ready,key:value})
 
 def test_offline_probe_blocks_unavailable_preview(monkeypatch,capsys):
