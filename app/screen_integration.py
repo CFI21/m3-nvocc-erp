@@ -161,7 +161,9 @@ def _read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope
     x_office_scope=x_office_scope if isinstance(x_office_scope,str) else None
     a=scope_actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope)
     # Office scope must originate from the verified IAM actor, never a caller header.
-    role=str(a.get('role') or x_role or 'VIEWER').upper()
+    role=str(a.get('role') or '').strip().upper()
+    if not role:
+        raise HTTPException(403, {'code': 'SCREEN_IAM_ROLE_REQUIRED'})
     a['role']=role
     if role=='AGENT' and not a.get('agent'):
         raise HTTPException(403,'AGENT requires X-Agent-Scope')
