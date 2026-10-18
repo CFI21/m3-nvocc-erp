@@ -23,6 +23,14 @@ def persona_session(role="AGENT", agent_code="CLX-AGT-SIN", office_code=None):
     office_code = office_code or ("AGT-" + agent_code if role == "AGENT" else "RTM")
     c = db.connect()
     try:
+        # The legacy operational seed creates jobs before IAM and leaves these
+        # optional scope columns unset. Populate the isolated test dataset with
+        # the authoritative seeded Rotterdam office and branch so real IAM
+        # scoped reads can exercise positive as well as negative authorization.
+        c.execute(
+            "UPDATE jobs SET office_code='RTM',branch_code='RTM-HQ' "
+            "WHERE office_code IS NULL AND branch_code IS NULL"
+        )
         office = c.execute("SELECT id FROM iam_offices WHERE office_code=? AND status='ACTIVE'", (office_code,)).fetchone()
         if not office and role == "AGENT":
             base = c.execute("SELECT organization_id,country_id FROM iam_offices WHERE office_code='SIN' AND status='ACTIVE'").fetchone()
