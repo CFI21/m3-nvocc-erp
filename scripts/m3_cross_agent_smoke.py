@@ -39,6 +39,8 @@ def request_json(base, path, token, timeout=15):
     req=urllib.request.Request(url,headers={"X-M3-Session":token,"Accept":"application/json"})
     try:
         with opener.open(req,timeout=timeout) as response:
+            if 300 <= response.status < 400:
+                raise ValueError("UNEXPECTED_AUTH_REDIRECT")
             raw=response.read(262144)
             return {"status":response.status,"body":raw.decode("utf-8","replace")}
     except urllib.error.HTTPError as error:
