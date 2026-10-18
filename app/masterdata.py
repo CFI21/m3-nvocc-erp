@@ -49,6 +49,9 @@ def audit(c,actor,action,domain=None,key=None,change_ref=None,before=None,after=
     c.execute('INSERT INTO md_audit(event_ref,ts,actor,action,domain,record_key,change_ref,before_json,after_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?,?,?)',(event,ts,actor,action,domain,key,change_ref,j(before) if before is not None else None,j(after) if after is not None else None,h(base)))
 def authenticated_actor(c,token):
     sess=iam_session(c,token)
+    # IAM returns sqlite3.Row in SQLite and mapping rows in PostgreSQL.
+    # Normalize only after the server has validated the session token.
+    sess=dict(sess)
     roles={r['role_code'] for r in iam_roles_for(c,sess['user_id'])}
     return sess,roles
 
