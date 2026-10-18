@@ -1,0 +1,43 @@
+name: M3 Isolated CI
+
+on:
+  push:
+    branches:
+      - preview-pr124-booking-isolated
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-isolated-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    if: github.head_ref == 'preview-pr124-booking-isolated' || github.ref_name == 'preview-pr124-booking-isolated'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: .
+      DATABASE_URL: ""
+      ENVIRONMENT: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Syntax validation
+        run: python -m compileall -q app
+      - name: Run regression tests
+        run: python -m pytest -q
