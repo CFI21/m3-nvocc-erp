@@ -204,3 +204,12 @@ def test_redirect_returned_as_normal_response_is_still_blocked(monkeypatch):
     with pytest.raises(ValueError,match="UNEXPECTED_AUTH_REDIRECT"):
         smoke.request_json("https://m3-pr124-booking-api-preview.onrender.com",
                            "/api/v1/booking/1","agent-a")
+
+
+@pytest.mark.parametrize("left,right",[
+    ("1","01"),("0","2"),("1","0"),("١","2"),("1","١")
+])
+def test_booking_ids_must_be_distinct_positive_ascii_canonical(left,right):
+    with pytest.raises(ValueError,match="DISTINCT_NUMERIC_BOOKING_IDS_REQUIRED"):
+        smoke.run("https://m3-pr124-booking-api-preview.onrender.com",
+                  "a","b",left,right,SHA)
