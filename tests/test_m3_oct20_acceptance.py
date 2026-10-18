@@ -51,8 +51,8 @@ def test_all_seven_modules_and_preview_required_for_release_pass(tmp_path):
             "commit_sha":SHA,"status":"PASS",
             "artifacts":["https://github.com/CFI21/m3-nvocc-erp/actions/runs/123"]}))
     report=evaluate(tmp_path,SHA)
-    assert all(v["status"]=="PASS" for v in report["modules"].values())
     assert report["release"]=="BLOCKED"
+    assert all(v["status"]=="BLOCKED" for v in report["modules"].values())  # Mandatory scenarios absent
     (tmp_path/"preview_deploys.json").write_text(json.dumps({
         "commit_sha":SHA,"status":"PASS",
         "artifacts":["https://dashboard.render.com/web/srv-test/events"]}))
