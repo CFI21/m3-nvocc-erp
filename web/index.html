@@ -4756,7 +4756,7 @@ async function m3EnsureIamLogin(){
         roleSelect.value=authorizedUiRole;
         roleSelect.disabled=true;
         sessionStorage.setItem('M3_SESSION',result.session_token);
-        sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles}));
+        sessionStorage.setItem('M3_IAM_IDENTITY',JSON.stringify({username:result.username,user_ref:result.user_ref,roles:result.roles||[]}));
         sessionStorage.setItem('M3_IAM_LAST_USER',result.username);
         sessionStorage.removeItem('M3_FORCE_RELOGIN');
         password.value='';mfa.value='';cover.remove();resolve();
