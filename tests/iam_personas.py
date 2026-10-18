@@ -14,7 +14,7 @@ def persona_session(role="AGENT", agent_code="CLX-AGT-SIN", office_code=None):
     """Provision one real IAM identity and authenticate through the login endpoint."""
     if db.using_postgres():
         raise RuntimeError("TEST_PERSONA_POSTGRES_FORBIDDEN")
-    allowed = {"AGENT", "VIEWER", "OPS", "AUDITOR", "FINANCE", "TREASURY", "GL_ACCOUNTANT"}
+    allowed = {"AGENT", "VIEWER", "OPS", "AUDITOR", "FINANCE", "TREASURY", "GL_ACCOUNTANT", "DOCS"}
     if role not in allowed:
         raise ValueError("UNSUPPORTED_TEST_ROLE")
     suffix = uuid.uuid4().hex[:16]
@@ -44,6 +44,12 @@ def persona_session(role="AGENT", agent_code="CLX-AGT-SIN", office_code=None):
                     "INSERT INTO iam_branches(branch_code,name,office_id,status) VALUES(?,?,?,'ACTIVE')",
                     ("TEST-" + suffix.upper(), "Test agent branch", office["id"])
                 )
+        if role == "DOCS":
+            c.execute("INSERT OR IGNORE INTO iam_roles(role_code,name,status,sensitive) VALUES('DOCS','Test Documents','ACTIVE',0)")
+            doc_role = c.execute("SELECT id FROM iam_roles WHERE role_code='DOCS'").fetchone()["id"]
+            for perm in c.execute("SELECT id FROM iam_permissions WHERE module='agent-tasks' AND action IN ('view','create','edit')").fetchall():
+                c.execute("INSERT OR IGNORE INTO iam_role_permissions(role_id,permission_id,effect) VALUES(?,?,'ALLOW')",
+                          (doc_role,perm["id"]))
         rr = c.execute("SELECT id FROM iam_roles WHERE role_code=? AND status='ACTIVE'", (role,)).fetchone()
         if not rr:
             raise RuntimeError("TEST_ROLE_NOT_FOUND")
