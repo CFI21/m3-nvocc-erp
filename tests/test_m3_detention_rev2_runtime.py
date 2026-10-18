@@ -92,9 +92,12 @@ def test_tariff_ambiguity_and_missing_fx(case):
     blocked('FX_RATE_MISSING_ON_SEGMENT',lambda:calculate(case,'ADVANCE','2026-10-03T00:00:00+00:00'))
 
 def test_role_scope_and_rollback_switch(case):
-    blocked('EQUIPMENT_POLICY_DENIED',lambda:calculate(case,'ADVANCE','2026-10-03T00:00:00+00:00',role='VIEWER'))
+    from tests.iam_personas import persona_session
+    viewer=persona_session(role="VIEWER")
+    blocked('EQUIPMENT_POLICY_DENIED',lambda:calculate(case,'ADVANCE','2026-10-03T00:00:00+00:00',role='VIEWER',session=viewer))
+    agent=persona_session(role="AGENT",agent_code="WRONG-AGENT",office_code="RTM")
     with pytest.raises(HTTPException) as denied:
-        calculate(case,'ADVANCE','2026-10-03T00:00:00+00:00',role='AGENT',agent='OTHER')
+        calculate(case,'ADVANCE','2026-10-03T00:00:00+00:00',role='AGENT',agent='OTHER',session=agent)
     assert denied.value.status_code==404
     c=db.connect();c.execute("INSERT INTO md_config(config_key,config_value,value_type,scope,status) VALUES('DETENTION_CALCULATION_ENABLED','false','BOOLEAN','GLOBAL','ACTIVE')");c.close()
     blocked('DETENTION_CALCULATION_DISABLED',lambda:calculate(case,'ADVANCE','2026-10-03T00:00:00+00:00'))
