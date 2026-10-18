@@ -63,7 +63,6 @@ def test_all_seven_modules_and_preview_required_for_release_pass(tmp_path):
         "web":{"commit_sha":SHA,"deployment_id":"preview-web-1"},
         "api":{"commit_sha":SHA,"deployment_id":"preview-api-1"}}))
     assert evaluate(tmp_path,SHA)["release"]=="BLOCKED"
-    from scripts.m3_oct20_acceptance import MODULES
     required={
         "Countries/Port Auth":[f"SEC-{i:03d}" for i in range(1,13)],
         "Booking Workflow":[f"E2E-{i:03d}" for i in range(1,5)],
