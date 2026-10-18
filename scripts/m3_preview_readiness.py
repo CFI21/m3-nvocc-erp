@@ -11,6 +11,8 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self,*args): return None
 
 def fetch(url):
+    if url not in (API+"/api/v1/health",API+"/api/clx016/readiness",UI):
+        raise ValueError("UNAPPROVED_PREVIEW_TARGET")
     with urllib.request.build_opener(NoRedirect()).open(
         urllib.request.Request(url,headers={"Accept":"application/json, text/html"}),
         timeout=25
