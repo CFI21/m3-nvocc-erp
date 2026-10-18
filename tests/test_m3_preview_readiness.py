@@ -30,3 +30,11 @@ def test_offline_probe_blocks_unavailable_preview(monkeypatch,capsys):
     assert probe.main()==1
     output=capsys.readouterr().out
     assert '"status": "BLOCKED"' in output
+
+
+def test_probe_rejects_unapproved_host_before_network(monkeypatch):
+    import pytest
+    monkeypatch.setattr(probe.urllib.request,"build_opener",
+                        lambda *_args: (_ for _ in ()).throw(AssertionError("network called")))
+    with pytest.raises(ValueError,match="UNAPPROVED_PREVIEW_TARGET"):
+        probe.fetch("https://attacker.example/api/v1/health")
