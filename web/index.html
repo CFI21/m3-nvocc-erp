@@ -4722,13 +4722,20 @@ async function m3EnsureIamLogin(){
     card.style.cssText='width:min(420px,100%);background:#fff;border:1px solid #cbd5e1;border-radius:7px;padding:22px;display:grid;gap:12px';
     const title=document.createElement('h2');title.textContent='M3 — User Sign In';title.style.margin='0 0 3px';
     const intro=document.createElement('p');intro.textContent='Sign in with your authorized M3 account. Your account permissions determine which modules you can access. Enter your password and MFA code when required.';intro.style.margin='0';intro.style.color='#475569';
-    const username=document.createElement('input');username.placeholder='M3 username (e.g. admin)';username.autocomplete='off';username.value=sessionStorage.getItem('M3_NEXT_UAT_USER')||'';sessionStorage.removeItem('M3_NEXT_UAT_USER');username.required=true;
+    const accountType=document.createElement('select');accountType.setAttribute('aria-label','Account type');
+    for(const [value,label] of [['','Other authorized account'],['admin','System Administrator'],['md.maker','Master Data Maker'],['md.checker','Master Data Checker']]){
+      const option=document.createElement('option');option.value=value;option.textContent=label;accountType.append(option);
+    }
+    const username=document.createElement('input');username.placeholder='M3 username';username.autocomplete='username';username.value=sessionStorage.getItem('M3_NEXT_UAT_USER')||'';sessionStorage.removeItem('M3_NEXT_UAT_USER');username.required=true;
+    accountType.value=['admin','md.maker','md.checker'].includes(username.value)?username.value:'';
+    accountType.addEventListener('change',()=>{if(accountType.value)username.value=accountType.value;username.focus();});
+    username.addEventListener('input',()=>{accountType.value=['admin','md.maker','md.checker'].includes(username.value.trim())?username.value.trim():'';});
     const password=document.createElement('input');password.type='password';password.placeholder='Password';password.autocomplete='current-password';password.required=true;
     const mfa=document.createElement('input');mfa.placeholder='MFA code, if required';mfa.autocomplete='one-time-code';
     const message=document.createElement('p');message.style.cssText='margin:0;color:#b42318;font-size:12px';
     const submit=document.createElement('button');submit.type='submit';submit.textContent='Sign in';submit.className='btn primary';
-    for(const input of [username,password,mfa])input.style.cssText='height:36px;padding:7px;border:1px solid #94a3b8;border-radius:4px';
-    card.append(title,intro,username,password,mfa,message,submit);cover.append(card);document.body.append(cover);
+    for(const input of [accountType,username,password,mfa])input.style.cssText='height:36px;padding:7px;border:1px solid #94a3b8;border-radius:4px';
+    card.append(title,intro,accountType,username,password,mfa,message,submit);cover.append(card);document.body.append(cover);
     card.addEventListener('submit',async event=>{
       event.preventDefault();submit.disabled=true;message.textContent='';
       try{
