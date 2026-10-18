@@ -361,6 +361,13 @@ def failure_drills():return failure_drill_matrix()
 def readiness():
     try:
         return readiness_status()
+    except HTTPException as exc:
+        if using_postgres() and exc.status_code == 404 and exc.detail == 'Unknown job':
+            raise HTTPException(status_code=503, detail={
+                'code': 'UAT_CANONICAL_JOBS_NOT_SEEDED',
+                'message': 'Isolated PostgreSQL UAT is missing the five required synthetic business-day jobs; seed through the approved UAT fixture process.',
+            }) from None
+        raise
     except sqlite3.OperationalError as exc:
         if not using_postgres() and 'no such table' in str(exc).lower():
             raise HTTPException(status_code=503, detail={
