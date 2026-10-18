@@ -38,8 +38,12 @@ CREATE TABLE IF NOT EXISTS clx012_events(
 
 CREATE OR REPLACE FUNCTION clx012_reject_event_change() RETURNS trigger
 LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'IMMUTABLE_CLX012_EVENT'; END $$;
-CREATE TRIGGER clx012_events_no_update BEFORE UPDATE ON clx012_events
-FOR EACH ROW EXECUTE FUNCTION clx012_reject_event_change();
-CREATE TRIGGER clx012_events_no_delete BEFORE DELETE ON clx012_events
-FOR EACH ROW EXECUTE FUNCTION clx012_reject_event_change();
+DO $ BEGIN
+IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='clx012_events_no_update' AND tgrelid='clx012_events'::regclass) THEN
+CREATE TRIGGER clx012_events_no_update BEFORE UPDATE ON clx012_events FOR EACH ROW EXECUTE FUNCTION clx012_reject_event_change();
+END IF;
+IF NOT EXISTS (SELECT 1 FROM pg_trigger WHERE tgname='clx012_events_no_delete' AND tgrelid='clx012_events'::regclass) THEN
+CREATE TRIGGER clx012_events_no_delete BEFORE DELETE ON clx012_events FOR EACH ROW EXECUTE FUNCTION clx012_reject_event_change();
+END IF;
+END $;
 COMMIT;
