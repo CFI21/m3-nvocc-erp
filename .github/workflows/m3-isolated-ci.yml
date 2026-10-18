@@ -40,4 +40,20 @@ jobs:
       - name: Syntax validation
         run: python -m compileall -q app
       - name: Run regression tests
-        run: python -m pytest -q
+        id: pytest
+        shell: bash
+        run: |
+          mkdir -p ci-proof
+          set +e
+          python -m pytest -q 2>&1 | tee ci-proof/pytest.log
+          result=${PIPESTATUS[0]}
+          printf '%s\n' "$result" > ci-proof/pytest-exit-code.txt
+          exit "$result"
+      - name: Upload pytest evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: ci-proof/
+          if-no-files-found: error
+          retention-days: 7
