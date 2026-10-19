@@ -48,6 +48,12 @@ def sha256_file(path:Path):
     return h.hexdigest()
 
 def init_schema(c):
+    if using_postgres():
+        required = ('clx013_schema_versions', 'clx013_request_log', 'clx013_backup_manifests', 'clx013_deployment_runs', 'clx013_runtime_events', 'clx013_runtime_mode')
+        missing = [name for name in required if not db_table_exists(c, name)]
+        if missing:
+            raise RuntimeError('CLX013_POSTGRES_MIGRATION_REQUIRED: ' + ', '.join(missing))
+        return
     sql=MIGRATION.read_text()
     c.executescript(sql)
     checksum=hashlib.sha256(sql.encode()).hexdigest()
