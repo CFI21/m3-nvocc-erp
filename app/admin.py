@@ -122,6 +122,9 @@ def uat_admin_setup(b: UATAdminSetup):
         raise HTTPException(403, {'code':'UAT_ADMIN_SETUP_NOT_AUTHORIZED'})
     if len(b.new_password.strip()) < 12 or b.new_password != b.new_password.strip():
         raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+    from urllib.parse import urlparse
+    if urlparse(db.DATABASE_URL).hostname != 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech':
+        raise HTTPException(409, {'code':'UAT_ADMIN_WRONG_NEON_TARGET'})
     c = connect()
     try:
         db.tx(c)
