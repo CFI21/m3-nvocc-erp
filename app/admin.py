@@ -693,7 +693,8 @@ def isolated_uat_checker_reset(body:UATCheckerPasswordReset,
     """SUPER_ADMIN-only, Checker-only recovery on the host-pinned isolated UAT database."""
     from . import db
     from urllib.parse import urlparse
-    if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='OFF'
+    if (os.getenv('M3_ALLOW_CHECKER_RECOVERY','').strip().lower()!='true'
+        or os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='OFF'
         or os.getenv('M3_UAT_PRESERVE_DATA')!='1'
         or not db.using_postgres() or not db._uat_target_approved()
         or urlparse(db.DATABASE_URL).hostname!='ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech'):
