@@ -127,8 +127,12 @@ def uat_admin_setup(b: UATAdminSetup):
         db.tx(c)
         c.execute('SELECT pg_advisory_xact_lock(84620317)')
         user = c.execute("SELECT * FROM iam_users WHERE username='admin'").fetchone()
-        if not user or user['status'] != 'INACTIVE' or not user['mfa_required']:
-            raise HTTPException(409, {'code':'UAT_ADMIN_SETUP_ALREADY_USED_OR_NOT_PROVISIONED'})
+        if not user:
+            raise HTTPException(409, {'code':'UAT_ADMIN_MISSING_ON_RENDER_DATABASE'})
+        if user['status'] != 'INACTIVE':
+            raise HTTPException(409, {'code':'UAT_ADMIN_NOT_INACTIVE','account_status':user['status']})
+        if not user['mfa_required']:
+            raise HTTPException(409, {'code':'UAT_ADMIN_MFA_NOT_PROVISIONED'})
         office = c.execute('SELECT office_code FROM iam_offices WHERE id=?',(user['home_office_id'],)).fetchone()
         assignment = c.execute("""SELECT r.id FROM iam_user_roles ur JOIN iam_roles r ON r.id=ur.role_id
             WHERE ur.user_id=? AND ur.status='ACTIVE' AND r.status='ACTIVE' AND r.role_code='SUPER_ADMIN'""",(user['id'],)).fetchone()
