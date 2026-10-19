@@ -496,12 +496,13 @@ async def security_headers(request, call_next):
     # host-pinned Neon UAT target, and an INACTIVE-only administrator check.
     setup_path=request.url.path=='/api/admin/auth/uat-admin-setup'
     setup_exempt=setup_path and request.method.upper() in {'GET','POST'}
+    recovery_page_exempt=(request.url.path=='/api/admin/auth/uat-recovery-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
     production_traffic=os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()
     uat_token=os.getenv('M3_UAT_TOKEN','')
     supplied_uat=request.headers.get('X-M3-UAT-Token','')
     uat_allowed=bool(uat_token and supplied_uat and hmac.compare_digest(uat_token,supplied_uat))
     try:
-        if production_traffic!='ON' and not health_exempt and not setup_exempt and not uat_allowed:
+        if production_traffic!='ON' and not health_exempt and not setup_exempt and not recovery_page_exempt and not uat_allowed:
             response=JSONResponse({'detail':{'code':'PRODUCTION_TRAFFIC_LOCKED','uat_header':'X-M3-UAT-Token'}},status_code=503)
         elif not health_exempt and runtime_mode=='MAINTENANCE':
             response=JSONResponse({'detail':{'code':'MAINTENANCE_MODE'}},status_code=503)
@@ -996,3 +997,16 @@ def exception_list(job_ref:Optional[str]=None,limit:int=100,x_role:str=Header('V
     if job_ref:q+=' AND j.job_ref=?';args.append(job_ref)
     sc,sa=_system_event_scope_sql(role,agent_scope,customer_scope,x_office_scope,x_branch_scope,x_depot_scope,'j');q+=sc;args+=sa
     q+=' ORDER BY e.id DESC LIMIT ?';args.append(min(limit,500));rows=[dict(r) for r in conn.execute(q,args)];conn.close();return rows
+@app.get('/api/admin/auth/uat-recovery-page', response_class=HTMLResponse, include_in_schema=False)
+def isolated_uat_recovery_page():
+    from . import db
+    from urllib.parse import urlparse
+    enabled = (os.getenv('M3_ALLOW_ADMIN_RECOVERY','').lower() == 'true'
+               and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper() == 'OFF'
+               and os.getenv('M3_UAT_PRESERVE_DATA') == '1'
+               and db.using_postgres() and db._uat_target_approved()
+               and urlparse(db.DATABASE_URL).hostname == 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech')
+    if not enabled:
+        raise HTTPException(404, 'NOT_FOUND')
+    html = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>M3 Isolated UAT Admin Recovery</title><style>body{font:16px system-ui,sans-serif;background:#f4f6f9;color:#111827;max-width:520px;margin:40px auto;padding:20px}main{background:white;padding:28px;border-radius:12px;box-shadow:0 3px 16px #0001}label{display:block;margin-top:16px;font-weight:600}input{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:6px;font:inherit;border:1px solid #9ca3af;border-radius:6px}button{margin-top:22px;padding:13px 18px;background:#173f67;color:white;border:0;border-radius:6px;font:inherit;cursor:pointer}button:disabled{opacity:.5}#out{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#4b5563}h1{font-size:24px}</style></head><body><main><h1>M3 — Isolated UAT Admin Recovery</h1><p>Enter existing Render secrets privately. They are submitted only to this same-origin isolated API; they are not stored by this page. Run recovery only once.</p><form id="f" autocomplete="off"><label>UAT access token<input id="uat" type="password" required autocomplete="off"></label><label>UAT diagnostic token<input id="diag" type="password" required autocomplete="off"></label><label>Recovery secret<input id="rec" type="password" required autocomplete="off"></label><label>New Admin password<input id="pw" type="password" required minlength="12" autocomplete="new-password"></label><button id="go" type="submit">Recover Admin — once</button></form><p id="out" role="status" aria-live="polite"></p><small>Production and other services are not targeted. Never share secrets or session tokens in chat.</small></main><script>const f=document.getElementById('f'),o=document.getElementById('out'),go=document.getElementById('go');f.addEventListener('submit',async e=>{e.preventDefault();go.disabled=true;o.textContent='Submitting one recovery request…';const u=document.getElementById('uat').value.trim(),d=document.getElementById('diag').value.trim(),r=document.getElementById('rec').value.trim(),p=document.getElementById('pw').value;try{const x=await fetch('/api/admin/auth/uat-recover-password',{method:'POST',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json','X-M3-UAT-Token':u,'X-M3-UAT-Diagnostic-Token':d,'X-M3-Recovery-Secret':r},body:JSON.stringify({new_password:p})});let b=await x.json().catch(()=>({}));o.textContent=x.ok?'RECOVERED — contact ChatGPT to disable recovery and verify login.':'HTTP '+x.status+' — '+(b.detail?.code||b.detail||'Request failed');}catch(err){o.textContent='Network failure — do not retry without checking server logs.'}finally{for(const id of ['uat','diag','rec','pw'])document.getElementById(id).value='';}});</script></body></html>'''
+    return HTMLResponse(html, headers={'Cache-Control':'no-store, max-age=0','Pragma':'no-cache','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"})
