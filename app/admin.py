@@ -1,4 +1,5 @@
 from fastapi import APIRouter,HTTPException,Header
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel,Field
 from typing import Optional
 import hashlib,uuid,json,datetime,secrets,os
@@ -86,6 +87,28 @@ def overview():
 class UATAdminSetup(BaseModel):
     setup_token: str
     new_password: str = Field(min_length=12, max_length=256)
+
+@router.get('/auth/uat-admin-setup', response_class=HTMLResponse, include_in_schema=False)
+def uat_admin_setup_form():
+    from . import db
+    if not db.using_postgres() or not db._uat_target_approved() or os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper() != 'OFF':
+        raise HTTPException(404)
+    return """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>M3 Isolated UAT Admin Setup</title>
+    <body style="font:16px system-ui;max-width:480px;margin:50px auto;padding:20px">
+    <h2>M3 UAT — Activate Administrator</h2><p>One-time setup for the isolated test database. Enter the private setup token and choose your Admin password. MFA remains required.</p>
+    <form id="f"><p><label>Setup token<br><input id="token" type="password" autocomplete="off" required style="width:100%;padding:10px"></label></p>
+    <p><label>New Admin password (12+ characters)<br><input id="password" type="password" autocomplete="new-password" minlength="12" required style="width:100%;padding:10px"></label></p>
+    <p><label>Confirm password<br><input id="confirm" type="password" autocomplete="new-password" minlength="12" required style="width:100%;padding:10px"></label></p>
+    <button type="submit">Activate Admin</button></form><p id="result" role="status"></p>
+    <script>
+    document.getElementById('f').addEventListener('submit',async(e)=>{
+      e.preventDefault();let p=document.getElementById('password').value,c=document.getElementById('confirm').value;
+      let status=document.getElementById('result');if(p!==c){status.textContent='Passwords do not match';return;}
+      try{let r=await fetch('/api/admin/auth/uat-admin-setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({setup_token:document.getElementById('token').value,new_password:p})});
+      if(!r.ok){let b=await r.json();status.textContent='Setup rejected: '+(b.detail?.code||r.status);return;}
+      document.getElementById('f').reset();status.textContent='Admin activated. Sign in using username admin and your chosen password; MFA is required.';
+      }catch(_){status.textContent='Could not contact isolated UAT API';}
+    });</script></body></html>"""
 
 @router.post('/auth/uat-admin-setup')
 def uat_admin_setup(b: UATAdminSetup):
