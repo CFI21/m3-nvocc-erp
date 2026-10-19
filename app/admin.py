@@ -83,6 +83,52 @@ def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','screens':ADMIN_S
 @router.get('/overview')
 def overview():
     c=connect(); out={k:c.execute(f'SELECT COUNT(*) n FROM {t}').fetchone()['n'] for k,t in [('users','iam_users'),('roles','iam_roles'),('offices','iam_offices'),('countries','iam_countries'),('legal_entities','iam_legal_entities'),('branches','iam_branches'),('departments','iam_departments'),('scope_rules','iam_scope_rules'),('approval_limits','iam_approval_limits')]}; out['screens']=len(ADMIN_SCREENS); c.close(); return out
+class UATAdminSetup(BaseModel):
+    setup_token: str
+    new_password: str = Field(min_length=12, max_length=256)
+
+@router.post('/auth/uat-admin-setup')
+def uat_admin_setup(b: UATAdminSetup):
+    """One-time isolated UAT activation. Token is configured privately in Render."""
+    from . import db
+    token = os.getenv('M3_UAT_ADMIN_SETUP_TOKEN', '')
+    if (not db.using_postgres() or not db._uat_target_approved()
+            or os.getenv('M3_UAT_PRESERVE_DATA') != '1'
+            or os.getenv('M3_PRODUCTION_TRAFFIC', 'OFF').upper() != 'OFF'
+            or len(token) < 32 or not secrets.compare_digest(b.setup_token, token)):
+        raise HTTPException(403, {'code':'UAT_ADMIN_SETUP_NOT_AUTHORIZED'})
+    if len(b.new_password.strip()) < 12 or b.new_password != b.new_password.strip():
+        raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+    c = connect()
+    try:
+        db.tx(c)
+        c.execute('SELECT pg_advisory_xact_lock(84620317)')
+        user = c.execute("SELECT * FROM iam_users WHERE username='admin'").fetchone()
+        if not user or user['status'] != 'INACTIVE' or not user['mfa_required']:
+            raise HTTPException(409, {'code':'UAT_ADMIN_SETUP_ALREADY_USED_OR_NOT_PROVISIONED'})
+        office = c.execute('SELECT office_code FROM iam_offices WHERE id=?',(user['home_office_id'],)).fetchone()
+        assignment = c.execute("""SELECT r.id FROM iam_user_roles ur JOIN iam_roles r ON r.id=ur.role_id
+            WHERE ur.user_id=? AND ur.status='ACTIVE' AND r.status='ACTIVE' AND r.role_code='SUPER_ADMIN'""",(user['id'],)).fetchone()
+        membership = c.execute("SELECT 1 FROM iam_office_membership WHERE user_id=? AND office_id=? AND status='ACTIVE'",(user['id'],user['home_office_id'])).fetchone()
+        if not office or office['office_code'] != 'RTM' or not assignment or not membership:
+            raise HTTPException(409, {'code':'UAT_ADMIN_ASSIGNMENT_INVALID'})
+        grants = c.execute("SELECT COUNT(*) AS n FROM iam_role_permissions WHERE role_id=? AND effect='ALLOW'",(assignment['id'],)).fetchone()['n']
+        catalog = c.execute('SELECT COUNT(*) AS n FROM iam_permissions').fetchone()['n']
+        if catalog != 68 or grants != catalog:
+            raise HTTPException(409, {'code':'UAT_ADMIN_PERMISSIONS_INVALID'})
+        minimum = max(12,int(policy(c,'password_min_length','10')))
+        if len(b.new_password) < minimum:
+            raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+        c.execute("UPDATE iam_users SET password_hash=?,status='ACTIVE',failed_attempts=0,locked_until=NULL,version=version+1 WHERE id=? AND status='INACTIVE'",(phash(b.new_password),user['id']))
+        audit(c,user['user_ref'],'UAT_ADMIN_ACTIVATE','USER',user['user_ref'],before={'status':'INACTIVE'},after={'status':'ACTIVE','mfa_required':True},scope={'office':'RTM','method':'one_time_token'})
+        c.commit()
+        return {'status':'ACTIVE','username':'admin','mfa_required':True}
+    except Exception:
+        c.rollback()
+        raise
+    finally:
+        c.close()
+
 @router.post('/auth/login')
 def login(b:Login):
     c=connect(); u=c.execute('SELECT u.*,o.office_code FROM iam_users u JOIN iam_offices o ON o.id=u.home_office_id WHERE username=?',(b.username,)).fetchone(); ts=now(); event=str(uuid.uuid4())
