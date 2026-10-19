@@ -84,6 +84,35 @@ def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','screens':ADMIN_S
 @router.get('/overview')
 def overview():
     c=connect(); out={k:c.execute(f'SELECT COUNT(*) n FROM {t}').fetchone()['n'] for k,t in [('users','iam_users'),('roles','iam_roles'),('offices','iam_offices'),('countries','iam_countries'),('legal_entities','iam_legal_entities'),('branches','iam_branches'),('departments','iam_departments'),('scope_rules','iam_scope_rules'),('approval_limits','iam_approval_limits')]}; out['screens']=len(ADMIN_SCREENS); c.close(); return out
+@router.get('/auth/uat-diagnostic', include_in_schema=False)
+def isolated_uat_diagnostic(x_m3_uat_diagnostic_token: str = Header('', alias='X-M3-UAT-Diagnostic-Token')):
+    """Read-only UAT identity check. No password hashes, tokens or connection URLs."""
+    from . import db
+    from urllib.parse import urlparse
+    configured = os.getenv('M3_UAT_ADMIN_SETUP_TOKEN', '')
+    if (not db.using_postgres() or not db._uat_target_approved()
+            or os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper() != 'OFF'
+            or len(configured) < 32
+            or not secrets.compare_digest(configured, x_m3_uat_diagnostic_token)):
+        raise HTTPException(404, {'code':'NOT_FOUND'})
+    target = urlparse(db.DATABASE_URL)
+    c = connect()
+    try:
+        identity = c.execute("SELECT current_database() AS database_name, inet_server_addr()::text AS server_address").fetchone()
+        user = c.execute("SELECT status,mfa_required FROM iam_users WHERE username='admin'").fetchone()
+        return {
+            'backend':'postgres',
+            'configured_host_matches_expected':target.hostname == 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech',
+            'database_name':identity['database_name'],
+            'admin_exists':bool(user),
+            'admin_status':user['status'] if user else None,
+            'admin_mfa_required':bool(user['mfa_required']) if user else None,
+            'admin_password_initialized':None,
+            'note':'Password hashes and connection secrets are never returned; password initialization is not asserted.'
+        }
+    finally:
+        c.close()
+
 class UATAdminSetup(BaseModel):
     setup_token: str
     new_password: str = Field(min_length=12, max_length=256)
