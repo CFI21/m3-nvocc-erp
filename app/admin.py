@@ -683,3 +683,46 @@ def agent_authorized_profile(agent_code:str,x_m3_session:Optional[str]=Header(No
         return _authorized_agent_profile(c,s['user_id'],agent_code)
     finally:
         c.close()
+
+class UATCheckerPasswordReset(BaseModel):
+    new_password: str = Field(min_length=12,max_length=256)
+
+@router.post('/auth/uat-reset-checker',include_in_schema=False)
+def isolated_uat_checker_reset(body:UATCheckerPasswordReset,
+    x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """SUPER_ADMIN-only, Checker-only recovery on the host-pinned isolated UAT database."""
+    from . import db
+    from urllib.parse import urlparse
+    if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='OFF'
+        or os.getenv('M3_UAT_PRESERVE_DATA')!='1'
+        or not db.using_postgres() or not db._uat_target_approved()
+        or urlparse(db.DATABASE_URL).hostname!='ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech'):
+        raise HTTPException(404,{'code':'NOT_FOUND'})
+    if body.new_password!=body.new_password.strip():
+        raise HTTPException(422,{'code':'PASSWORD_POLICY'})
+    c=connect()
+    try:
+        from . import db as database
+        database.tx(c)
+        actor=session(c,x_m3_session)
+        if actor['username']!='admin' or not any(r['role_code']=='SUPER_ADMIN' for r in roles_for(c,actor['user_id'])):
+            raise HTTPException(403,{'code':'SUPER_ADMIN_REQUIRED'})
+        u=c.execute("SELECT * FROM iam_users WHERE username='md.checker'").fetchone()
+        if not u or u['status']!='ACTIVE' or not u['mfa_required']:
+            raise HTTPException(409,{'code':'CHECKER_ACCOUNT_STATE_INVALID'})
+        office=c.execute('SELECT office_code FROM iam_offices WHERE id=?',(u['home_office_id'],)).fetchone()
+        roles=roles_for(c,u['id'])
+        if not office or office['office_code']!='RTM' or not any(r['role_code']=='MASTER_DATA_MANAGER' for r in roles):
+            raise HTTPException(409,{'code':'CHECKER_ASSIGNMENT_INVALID'})
+        if len(body.new_password)<max(12,int(policy(c,'password_min_length','10'))):
+            raise HTTPException(422,{'code':'PASSWORD_POLICY'})
+        c.execute("UPDATE iam_users SET password_hash=?,failed_attempts=0,locked_until=NULL,version=version+1 WHERE id=? AND status='ACTIVE'",(phash(body.new_password),u['id']))
+        c.execute("UPDATE iam_sessions SET status='REVOKED',revoked_at=?,last_seen_at=? WHERE user_id=? AND status='ACTIVE'",(now(),now(),u['id']))
+        audit(c,actor['user_ref'],'UAT_CHECKER_PASSWORD_RESET','USER',u['user_ref'],before={'status':'ACTIVE','mfa_required':True},after={'status':'ACTIVE','mfa_required':True,'sessions_revoked':True},scope={'office':'RTM','isolated_uat':True})
+        c.commit()
+        return {'status':'CHECKER_RESET','username':'md.checker','sessions_revoked':True}
+    except Exception:
+        c.rollback()
+        raise
+    finally:
+        c.close()
