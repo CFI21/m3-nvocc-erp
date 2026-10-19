@@ -12,7 +12,7 @@ def test_diagnostic_requires_private_secret_and_isolated_postgres():
 def test_diagnostic_exposes_no_password_data():
     source = Path("app/admin.py").read_text()
     start=source.index("def isolated_uat_diagnostic(")
-    end=source.index("class UATAdminSetup",start)
+    end=source.index("class UATAdminRecovery",start)
     body=source[start:end]
     assert "password_hash" not in body
     assert "SELECT * FROM iam_users" not in body
