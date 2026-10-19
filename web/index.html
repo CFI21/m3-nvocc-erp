@@ -4736,7 +4736,13 @@ async function m3EnsureIamLogin(){
     const message=document.createElement('p');message.style.cssText='margin:0;color:#b42318;font-size:12px';
     const submit=document.createElement('button');submit.type='submit';submit.textContent='Sign in';submit.className='btn primary';
     for(const input of [accountType,username,password,mfa,uatAccess])input.style.cssText='height:36px;padding:7px;border:1px solid #94a3b8;border-radius:4px';
-    card.append(title,intro,accountType,username,password,mfa,uatAccess,message,submit);cover.append(card);document.body.append(cover);
+    const passwordTools=document.createElement('div');passwordTools.style.cssText='display:flex;gap:8px;align-items:center';
+    const revealPassword=document.createElement('button');revealPassword.type='button';revealPassword.textContent='Show password';revealPassword.setAttribute('aria-label','Show password');
+    revealPassword.addEventListener('click',()=>{const show=password.type==='password';password.type=show?'text':'password';revealPassword.textContent=show?'Hide password':'Show password';revealPassword.setAttribute('aria-label',revealPassword.textContent);});
+    const copyUsername=document.createElement('button');copyUsername.type='button';copyUsername.textContent='Copy username';
+    copyUsername.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(username.value.trim());copyUsername.textContent='Username copied';}catch(_error){copyUsername.textContent='Unable to copy';}});
+    passwordTools.append(revealPassword,copyUsername);
+    card.append(title,intro,accountType,username,password,passwordTools,mfa,uatAccess,message,submit);cover.append(card);document.body.append(cover);
     card.addEventListener('submit',async event=>{
       event.preventDefault();submit.disabled=true;message.textContent='';
       try{
