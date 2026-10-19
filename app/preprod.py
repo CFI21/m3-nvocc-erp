@@ -53,6 +53,9 @@ def init_schema(c):
         missing = [name for name in required if not db_table_exists(c, name)]
         if missing:
             raise RuntimeError('CLX013_POSTGRES_MIGRATION_REQUIRED: ' + ', '.join(missing))
+        checksum = hashlib.sha256(MIGRATION.read_bytes()).hexdigest()
+        c.execute('INSERT INTO clx013_schema_versions(version,applied_at,checksum,destructive) VALUES(?,?,?,0) ON CONFLICT(version) DO NOTHING', ('CLX013_001', now(), checksum))
+        c.execute("INSERT INTO clx013_runtime_mode(id,mode,reason,updated_at,updated_by) VALUES(1,'NORMAL','default',?,?) ON CONFLICT(id) DO NOTHING", (now(), 'system'))
         return
     sql=MIGRATION.read_text()
     c.executescript(sql)
