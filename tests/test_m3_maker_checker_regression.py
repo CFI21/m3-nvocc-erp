@@ -77,3 +77,29 @@ def test_checker_rejection_audited_and_repeat_blocked(harness):
         md.decide("MDC-UAT-01", md.Decision(decision="APPROVE"), x_m3_session="checker")
     assert exc.value.status_code==409
     assert _error_code(exc)=="CHANGE_ALREADY_DECIDED"
+
+
+def test_original_maker_can_withdraw_pending_change(harness):
+    _pending(harness)
+    result=md.withdraw_change("MDC-UAT-01", md.Withdrawal(reason="UAT withdrawal"), x_m3_session="maker")
+    assert result["status"]=="WITHDRAWN"
+    c=harness()
+    assert c.execute("SELECT status FROM md_change_requests WHERE change_ref='MDC-UAT-01'").fetchone()["status"]=="WITHDRAWN"
+    assert c.execute("SELECT COUNT(*) AS n FROM md_audit WHERE action='CHANGE_WITHDRAW'").fetchone()["n"]==1
+    assert c.execute("SELECT COUNT(*) AS n FROM md_records").fetchone()["n"]==0
+    c.close()
+    with pytest.raises(HTTPException) as exc:
+        md.decide("MDC-UAT-01", md.Decision(decision="APPROVE"), x_m3_session="checker")
+    assert exc.value.status_code==409
+    assert _error_code(exc)=="CHANGE_ALREADY_DECIDED"
+
+
+def test_checker_cannot_withdraw_maker_request(harness):
+    _pending(harness)
+    with pytest.raises(HTTPException) as exc:
+        md.withdraw_change("MDC-UAT-01", md.Withdrawal(reason="Unauthorized withdrawal"), x_m3_session="checker")
+    assert exc.value.status_code==403
+    assert _error_code(exc)=="WITHDRAW_MAKER_ONLY"
+    c=harness()
+    assert c.execute("SELECT status FROM md_change_requests WHERE change_ref='MDC-UAT-01'").fetchone()["status"]=="PENDING"
+    c.close()
