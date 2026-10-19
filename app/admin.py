@@ -105,7 +105,7 @@ def uat_admin_setup_form():
       e.preventDefault();let p=document.getElementById('password').value,c=document.getElementById('confirm').value;
       let status=document.getElementById('result');if(p!==c){status.textContent='Passwords do not match';return;}
       try{let r=await fetch('/api/admin/auth/uat-admin-setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({setup_token:document.getElementById('token').value,new_password:p})});
-      if(!r.ok){let b=await r.json();status.textContent='Setup rejected: '+(b.detail?.code||r.status);return;}
+      if(!r.ok){let b=await r.json();status.textContent='Setup rejected: '+(b.detail?.code||r.status)+(b.detail?.account_status?' | Admin status: '+b.detail.account_status:'');return;}
       document.getElementById('f').reset();status.textContent='Admin activated. Sign in using username admin and your chosen password; MFA is required.';
       }catch(_){status.textContent='Could not contact isolated UAT API';}
     });</script></body></html>"""
