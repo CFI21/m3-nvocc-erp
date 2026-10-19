@@ -492,12 +492,16 @@ async def security_headers(request, call_next):
     error_class=None
     runtime_mode=get_runtime_mode_value()
     health_exempt=request.method.upper()=='OPTIONS' or request.url.path in {'/api/v1/health','/api/clx013/runtime-mode','/api/clx013/health','/api/clx013/readiness','/api/clx016/readiness'}
+    # One-time Admin setup is independently protected by a private 32+ character token,
+    # host-pinned Neon UAT target, and an INACTIVE-only administrator check.
+    setup_path=request.url.path=='/api/admin/auth/uat-admin-setup'
+    setup_exempt=setup_path and request.method.upper() in {'GET','POST'}
     production_traffic=os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()
     uat_token=os.getenv('M3_UAT_TOKEN','')
     supplied_uat=request.headers.get('X-M3-UAT-Token','')
     uat_allowed=bool(uat_token and supplied_uat and hmac.compare_digest(uat_token,supplied_uat))
     try:
-        if production_traffic!='ON' and not health_exempt and not uat_allowed:
+        if production_traffic!='ON' and not health_exempt and not setup_exempt and not uat_allowed:
             response=JSONResponse({'detail':{'code':'PRODUCTION_TRAFFIC_LOCKED','uat_header':'X-M3-UAT-Token'}},status_code=503)
         elif not health_exempt and runtime_mode=='MAINTENANCE':
             response=JSONResponse({'detail':{'code':'MAINTENANCE_MODE'}},status_code=503)
