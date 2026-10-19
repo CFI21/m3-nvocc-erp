@@ -116,6 +116,63 @@ def isolated_uat_diagnostic(x_m3_uat_diagnostic_token: str = Header('', alias='X
     finally:
         c.close()
 
+class UATAdminRecovery(BaseModel):
+    new_password: str = Field(min_length=12, max_length=256)
+
+@router.post('/auth/uat-recover-password', include_in_schema=False)
+def isolated_uat_admin_recovery(
+    body: UATAdminRecovery,
+    x_m3_uat_diagnostic_token: str = Header('', alias='X-M3-UAT-Diagnostic-Token'),
+    x_m3_recovery_secret: str = Header('', alias='X-M3-Recovery-Secret')
+):
+    """Disabled-by-default single-use recovery of isolated UAT Admin credentials."""
+    from . import db
+    from urllib.parse import urlparse
+    diagnostic_secret = os.getenv('M3_UAT_ADMIN_SETUP_TOKEN', '')
+    recovery_secret = os.getenv('M3_ADMIN_RECOVERY_SECRET', '')
+    if (os.getenv('M3_ALLOW_ADMIN_RECOVERY', '').lower() != 'true'
+            or not db.using_postgres() or not db._uat_target_approved()
+            or os.getenv('M3_UAT_PRESERVE_DATA') != '1'
+            or os.getenv('M3_PRODUCTION_TRAFFIC', 'OFF').upper() != 'OFF'
+            or urlparse(db.DATABASE_URL).hostname != 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech'
+            or len(diagnostic_secret) < 32 or len(recovery_secret) < 48
+            or not secrets.compare_digest(diagnostic_secret, x_m3_uat_diagnostic_token)
+            or not secrets.compare_digest(recovery_secret, x_m3_recovery_secret)):
+        raise HTTPException(404, {'code':'NOT_FOUND'})
+    if body.new_password != body.new_password.strip():
+        raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+    c = connect()
+    try:
+        db.tx(c)
+        c.execute('SELECT pg_advisory_xact_lock(84620317)')
+        used = c.execute("SELECT 1 FROM iam_audit_events WHERE action='UAT_ADMIN_PASSWORD_RECOVERY' LIMIT 1").fetchone()
+        if used:
+            raise HTTPException(409, {'code':'RECOVERY_ALREADY_USED'})
+        u = c.execute("SELECT * FROM iam_users WHERE username='admin'").fetchone()
+        if not u or u['status'] != 'ACTIVE' or not u['mfa_required']:
+            raise HTTPException(409, {'code':'RECOVERY_ACCOUNT_STATE_INVALID'})
+        role = c.execute("SELECT 1 FROM iam_user_roles ur JOIN iam_roles r ON ur.role_id=r.id WHERE ur.user_id=? AND ur.status='ACTIVE' AND r.status='ACTIVE' AND r.role_code='SUPER_ADMIN'",(u['id'],)).fetchone()
+        office = c.execute("SELECT office_code FROM iam_offices WHERE id=?",(u['home_office_id'],)).fetchone()
+        membership = c.execute("SELECT 1 FROM iam_office_membership WHERE user_id=? AND office_id=? AND status='ACTIVE'",(u['id'],u['home_office_id'])).fetchone()
+        if not role or not office or office['office_code'] != 'RTM' or not membership:
+            raise HTTPException(409, {'code':'RECOVERY_ASSIGNMENT_INVALID'})
+        min_len = max(12,int(policy(c,'password_min_length','10')))
+        if len(body.new_password) < min_len:
+            raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+        c.execute("UPDATE iam_users SET password_hash=?,failed_attempts=0,locked_until=NULL,version=version+1 WHERE id=? AND status='ACTIVE'",(phash(body.new_password),u['id']))
+        c.execute("UPDATE iam_sessions SET status='REVOKED',revoked_at=?,last_seen_at=? WHERE user_id=? AND status='ACTIVE'",(now(),now(),u['id']))
+        audit(c,u['user_ref'],'UAT_ADMIN_PASSWORD_RECOVERY','USER',u['user_ref'],
+            before={'status':'ACTIVE','mfa_required':True},
+            after={'status':'ACTIVE','mfa_required':True,'sessions_revoked':True},
+            scope={'office':'RTM','recovery':'one_time'})
+        c.commit()
+        return {'status':'RECOVERED','username':'admin','recovery_disabled_after_first_use':True}
+    except Exception:
+        c.rollback()
+        raise
+    finally:
+        c.close()
+
 class UATAdminSetup(BaseModel):
     setup_token: str
     new_password: str = Field(min_length=12, max_length=256)
