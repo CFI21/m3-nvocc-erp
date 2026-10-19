@@ -5,7 +5,7 @@ def test_setup_route_narrow_exemption():
     source=Path("app/main.py").read_text()
     assert "setup_path=request.url.path=='/api/admin/auth/uat-admin-setup'" in source
     assert "setup_exempt=setup_path and request.method.upper() in {'GET','POST'}" in source
-    assert "not setup_exempt and not uat_allowed" in source
+    assert "not setup_exempt and not recovery_page_exempt and not login_page_exempt and not maker_checker_page_exempt and not uat_allowed" in source
 
 def test_setup_endpoint_still_checks_private_token_and_isolated_database():
     source=Path("app/admin.py").read_text()
