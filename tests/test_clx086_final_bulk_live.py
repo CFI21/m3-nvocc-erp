@@ -4,7 +4,7 @@ ROOT=Path(__file__).resolve().parents[1]
 HTML=(ROOT/'web/index.html').read_text(encoding='utf-8')
 MAIN=(ROOT/'app/main.py').read_text(encoding='utf-8')
 
-def j(name): return json.loads((ROOT/name).read_text())
+def j(name): return json.loads((ROOT/name).read_text(encoding="utf-8"))
 
 def test_exact_parent_and_noop_bulk():
     b=j('CLX086_BULK_IMPORT_REPORT.json')
@@ -55,6 +55,6 @@ def test_canonical_196_screen_and_prior_acceptance():
 def test_safety_no_real_money_or_provider_activation():
     a=j('CLX086_FINAL_LIVE_ACCEPTANCE.json')
     assert a['live_providers']=='OFF' and a['real_money']=='OFF'
-    render=(ROOT/'render.yaml').read_text()
+    render=(ROOT/'render.yaml').read_text(encoding="utf-8")
     assert 'M3_LIVE_PROVIDERS' in render and 'REAL_MONEY' in render
     assert 'value: "OFF"' in render

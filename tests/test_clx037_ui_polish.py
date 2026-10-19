@@ -1,6 +1,6 @@
 from pathlib import Path
 
-HTML=Path("web/index.html").read_text()
+HTML=Path("web/index.html").read_text(encoding="utf-8")
 
 def test_sidebar_uses_neutral_grey_palette():
     assert "--nav:#4b5563" in HTML

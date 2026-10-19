@@ -19,7 +19,7 @@ def case(tmp_path, monkeypatch):
     c = db.connect(); ensure(c)
     # Mirror accepted additive journey columns in the SQLite test adapter.
     for migration in sorted(Path('migrations').glob('CLX07[01]*.sql')):
-        for table, column, definition in re.findall(r'ALTER TABLE public\.(containers|container_events) ADD COLUMN IF NOT EXISTS (\w+) ([^;]+);', migration.read_text()):
+        for table, column, definition in re.findall(r'ALTER TABLE public\.(containers|container_events) ADD COLUMN IF NOT EXISTS (\w+) ([^;]+);', migration.read_text(encoding="utf-8")):
             existing={x['name'] for x in c.execute(f'PRAGMA table_info({table})')}
             if column not in existing:c.execute(f'ALTER TABLE {table} ADD COLUMN {column} {definition}')
     r = dict(c.execute("SELECT * FROM transaction_records WHERE module='detention-collection' ORDER BY id LIMIT 1").fetchone())

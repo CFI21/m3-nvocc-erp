@@ -37,12 +37,12 @@ def test_global_equipment_tower_is_ho_native():
         assert route in HTML
 
 def test_no_real_money_or_provider_activation_change():
-    acc=json.loads((ROOT/'CLX078_LIVE_UI_ACCEPTANCE.json').read_text())
+    acc=json.loads((ROOT/'CLX078_LIVE_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert acc['REAL_MONEY_READY'] is False
     assert acc['REAL_PROVIDER_READY'] is False
 
 def test_canonical_196_contract_preserved():
-    matrix=json.loads((ROOT/'CLX078_UI_SCREEN_MATRIX.json').read_text())
+    matrix=json.loads((ROOT/'CLX078_UI_SCREEN_MATRIX.json').read_text(encoding="utf-8"))
     assert matrix['canonical_screen_count']==196
     assert matrix['canonical_ids_preserved'] is True
     assert matrix['canonical_routes_preserved'] is True

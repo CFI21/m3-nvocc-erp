@@ -15,7 +15,7 @@ def test_final_container_control_router_is_mounted():
     assert required <= paths
 
 def test_booking_equipment_is_native_m3_tab():
-    html=Path('web/index.html').read_text()
+    html=Path('web/index.html').read_text(encoding="utf-8")
     assert "CLX49_BOOKING_TABS=['Booking Info','Equipment','Other Info']" in html
     assert "booking-context/" in html
     assert "One M3 Equipment Control Flow" in html
@@ -23,7 +23,7 @@ def test_booking_equipment_is_native_m3_tab():
     assert "Policy &amp; SOP" in html
 
 def test_container_master_scope_covers_legacy_and_new_requirements():
-    sql=Path('migrations/CLX070_002_container_master_global_governance.sql').read_text()
+    sql=Path('migrations/CLX070_002_container_master_global_governance.sql').read_text(encoding="utf-8")
     required=[
       'owner_party_type','owner_party_code','csc_validity','csc_plate_no','csc_safety_approval_no',
       'manufacturing_no','manufacturer','max_gross_weight','tare_weight','classification','grade_payload',
@@ -36,7 +36,7 @@ def test_container_master_scope_covers_legacy_and_new_requirements():
         assert marker in sql
 
 def test_one_container_master_and_safety_guards_are_documented():
-    doc=Path('CLX070_FINAL_CONTAINER_MASTER_SCOPE.md').read_text()
+    doc=Path('CLX070_FINAL_CONTAINER_MASTER_SCOPE.md').read_text(encoding="utf-8")
     assert 'one M3 NVOCC ERP' in doc
     assert 'one containers table' in doc
     assert 'Production traffic, live providers and real-money execution remain OFF' in doc

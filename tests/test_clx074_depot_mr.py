@@ -22,29 +22,29 @@ def test_clx074_routes_mounted():
     assert required <= paths
 
 def test_no_parallel_container_or_finance_model():
-    sql=Path("migrations/CLX074_001_depot_inspection_mr.sql").read_text()
+    sql=Path("migrations/CLX074_001_depot_inspection_mr.sql").read_text(encoding="utf-8")
     assert "container_inspections" in sql and "container_repair_orders" in sql
     assert "CREATE TABLE IF NOT EXISTS public.containers" not in sql
     assert "CREATE TABLE IF NOT EXISTS public.container_financial_ledger" not in sql
     assert "CREATE TABLE IF NOT EXISTS public.equipment_work_items" not in sql
 
 def test_repair_flow_reuses_authoritative_models():
-    repair=Path("app/clx074_repair.py").read_text()
-    inspection=Path("app/clx074_inspection.py").read_text()
+    repair=Path("app/clx074_repair.py").read_text(encoding="utf-8")
+    inspection=Path("app/clx074_inspection.py").read_text(encoding="utf-8")
     assert "INSERT INTO equipment_work_items" in repair
     assert "INSERT INTO container_financial_ledger" in repair
     assert "INSERT INTO container_documents" in inspection
     assert "get_container" in repair and "get_container" in inspection
 
 def test_reinspection_controls_available_state():
-    repair=Path("app/clx074_repair.py").read_text()
+    repair=Path("app/clx074_repair.py").read_text(encoding="utf-8")
     assert "equipment_status='AVAILABLE'" in repair
     assert "equipment_status='HOLD'" in repair
     assert "REINSPECTION_FAILURE" in repair
 
 def test_manifest_and_ui_safety():
-    m=Path("CLX074_ACCEPTANCE_MANIFEST.json").read_text()
-    html=Path("web/index.html").read_text()
+    m=Path("CLX074_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8")
+    html=Path("web/index.html").read_text(encoding="utf-8")
     assert '"production_traffic":"OFF"' in m
     assert '"duplicate_container_model":false' in m
     assert '"duplicate_finance_model":false' in m

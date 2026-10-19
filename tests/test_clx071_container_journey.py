@@ -31,7 +31,7 @@ def test_standard_lifecycle_and_variants():
     assert not validate_transition("AVAILABLE","LOADED")
 
 def test_migration_is_additive_and_controls_present():
-    sql=Path("migrations/CLX071_001_full_container_journey.sql").read_text()
+    sql=Path("migrations/CLX071_001_full_container_journey.sql").read_text(encoding="utf-8")
     required=[
       "planned_time","actual_time","event_phase","voyage_ref","vessel_name",
       "detention_due_date","detention_rate","expected_empty_return","damage_hold","inspection_hold",
@@ -42,21 +42,21 @@ def test_migration_is_additive_and_controls_present():
     assert "DROP TABLE public.containers" not in sql
 
 def test_native_m3_ui_has_journey_and_exception_control():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     assert "Container Journey" in html
     assert "Journey Exceptions" in html
     assert "/api/clx071/journey/" in html
     assert "No separate ERP model or duplicate container inventory" in html
 
 def test_manifest_keeps_production_locked():
-    m=Path("CLX071_ACCEPTANCE_MANIFEST.json").read_text()
+    m=Path("CLX071_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8")
     assert '"production_traffic": "OFF"' in m
     assert '"live_providers": "OFF"' in m
     assert '"real_money": "OFF"' in m
 
 
 def test_exception_decision_enforces_container_custody_scope():
-    src=Path("app/clx071_container_journey.py").read_text()
+    src=Path("app/clx071_container_journey.py").read_text(encoding="utf-8")
     assert 'get_container(conn,e["container_no"],a)' in src
 
 
@@ -82,7 +82,7 @@ def test_detention_amount_reuses_mrg_rate_and_slabs():
 
 
 def test_detention_process_frontend_binds_existing_screen_to_server_engine():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     assert "function renderDetentionProcess" in html
     assert "function renderDetentionCollection" in html
     assert "runDetentionCalculation" in html
@@ -109,7 +109,7 @@ def test_running_detention_advance_ongoing_actual_contract():
 
 
 def test_detention_process_ui_has_running_advance_ongoing_actual_actions():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     for marker in [
       "Calculate Advance","Recalculate Ongoing","Calculate Actual",
       "Previous Advance Till","Advance / Calculate Till","Ongoing Days",
@@ -148,7 +148,7 @@ def test_detention_principal_agent_customer_and_charge_tabs_contract():
 
 
 def test_detention_existing_screen_has_commercial_direction_and_subcharge_tabs():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     for marker in [
       "Principal → Agent · Cost","Agent → Customer · Revenue",
       "Detention / Demurrage","Plug-in","Port Charges","Other Charges",
@@ -157,13 +157,13 @@ def test_detention_existing_screen_has_commercial_direction_and_subcharge_tabs()
       "Create Draft Invoice → Finance",
       "Create Principal Bill / AP","Open Principal / Agent SOA",
     ]:
-        assert marker in html or marker in Path("app/clx071_container_journey.py").read_text()
+        assert marker in html or marker in Path("app/clx071_container_journey.py").read_text(encoding="utf-8")
     assert "commercial_direction:detentionCommercialDirection" in html
     assert "No payment or GL posting" in html
 
 
 def test_no_new_detention_table_or_parallel_rate_engine():
-    src=Path("app/clx071_container_journey.py").read_text()
+    src=Path("app/clx071_container_journey.py").read_text(encoding="utf-8")
     assert "CREATE TABLE" not in src[src.index("def _detention_payload"):src.index("def scope_container_query")]
     assert "mrg_rules" in src
     assert "Ancillary Charges" in src

@@ -2,7 +2,7 @@ import sqlite3
 from pathlib import Path
 
 def test_schema_has_booking_scoped_customer_agent_pair_only():
-    schema=Path('app/schema.sql').read_text()
+    schema=Path('app/schema.sql').read_text(encoding="utf-8")
     assert 'CREATE TABLE IF NOT EXISTS bookings' in schema
     assert 'customer_id INTEGER NOT NULL REFERENCES customers(id)' in schema
     assert 'agent_id INTEGER NOT NULL REFERENCES agents(id)' in schema
@@ -26,11 +26,11 @@ def test_many_to_many_pairing_is_supported_by_independent_bookings():
     assert rows==[(1,1),(1,2),(2,1)]
 
 def test_runtime_exposes_booking_party_alignment_and_agent_scope_guard():
-    src=Path('app/clx049_booking_bl_workspace.py').read_text()
+    src=Path('app/clx049_booking_bl_workspace.py').read_text(encoding="utf-8")
     assert "relationship_model':'BOOKING_JOB_ONLY" in src
     assert "permanent_customer_agent_master_link':False" in src
     assert "agent_users_with_permanent_customer_party_grants" in src
     assert "CUSTOMER_AND_AGENT_RESOLVED_SEPARATELY" in src
-    main=Path('app/main.py').read_text()
+    main=Path('app/main.py').read_text(encoding="utf-8")
     assert "AGENT requires X-Agent-Scope" in main
     assert "return ' AND a.code=?',[agent_scope]" in main

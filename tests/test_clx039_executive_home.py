@@ -1,7 +1,7 @@
 from pathlib import Path
 from app.screen_catalog import build_catalog
 
-HTML=Path("web/index.html").read_text()
+HTML=Path("web/index.html").read_text(encoding="utf-8")
 
 def test_clean_header_keeps_only_core_controls():
     assert 'id="globalSearch"' in HTML

@@ -120,7 +120,7 @@ def test_pol_requires_approved_port_and_active_country(country_db):
 def test_country_actions_keep_existing_maker_checker_endpoint():
     from pathlib import Path
     root=Path(__file__).resolve().parents[1]
-    ui=(root/'web'/'index.html').read_text()
+    ui=(root/'web'/'index.html').read_text(encoding="utf-8")
     assert 'data-country-edit' in ui and 'data-country-remove' in ui
     assert 'id="m3CountryForm"' in ui
     assert "m3CountryChange(key?'UPDATE':'CREATE'" in ui
@@ -138,14 +138,14 @@ def test_pol_cross_country_office_is_denied(country_db):
 
 def test_countries_tab_preserves_six_tabs():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     assert "['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template']" in ui
     assert "m3CountryChange('DEACTIVATE'" in ui
 
 
 def test_pol_update_duplicate_guard_is_present():
     from pathlib import Path
-    source=(Path(__file__).resolve().parents[1]/'app'/'masterdata.py').read_text()
+    source=(Path(__file__).resolve().parents[1]/'app'/'masterdata.py').read_text(encoding="utf-8")
     assert "b.domain=='configuration' and b.operation=='UPDATE'" in source
     assert "candidate={**existing_payload,**b.payload}" in source
     assert "DUPLICATE_AGENT_RELATIONSHIP" in source
@@ -153,7 +153,7 @@ def test_pol_update_duplicate_guard_is_present():
 
 def test_checker_revalidates_pol_uniqueness():
     from pathlib import Path
-    source=(Path(__file__).resolve().parents[1]/'app'/'masterdata.py').read_text()
+    source=(Path(__file__).resolve().parents[1]/'app'/'masterdata.py').read_text(encoding="utf-8")
     decision=source.split('def decide(change_ref:',1)[1]
     assert "ch['domain']=='configuration' and ch['operation'] in ('CREATE','UPDATE')" in decision
     assert "DUPLICATE_AGENT_RELATIONSHIP" in decision
@@ -179,7 +179,7 @@ def test_pol_projection_fails_closed_if_port_inactive(country_db):
 
 def test_removal_request_appears_in_independent_checker_queue():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     assert "x.payload?.agent_code||approved?.payload?.agent_code" in ui
     assert "m3AgentConfigs.find(c=>c.record_key===x.record_key&&c.status==='ACTIVE')" in ui
     assert "data-agent-related-decision" in ui
@@ -288,7 +288,7 @@ def test_governed_pol_edit_duplicate_is_denied(country_db, monkeypatch):
 
 def test_removal_checker_panel_labels_empty_payload():
     from pathlib import Path
-    source=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    source=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     assert "m3AgentConfigs.find(c=>c.record_key===x.record_key)?.payload?.config_type" in source
     assert "esc(x.operation||'CHANGE')" in source
 

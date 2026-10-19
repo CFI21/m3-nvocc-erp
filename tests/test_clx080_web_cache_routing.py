@@ -57,7 +57,7 @@ def test_clx079_tower_preserved_not_old_duplicate_nav():
     assert '>Global Equipment Tower</button><button' not in shell
 
 def test_safety_manifest():
-    x=json.loads((ROOT/'CLX080_WEB_HARDENING_ACCEPTANCE.json').read_text())
+    x=json.loads((ROOT/'CLX080_WEB_HARDENING_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert x['backend_model_changed'] is False
     assert x['database_changed'] is False
     assert x['REAL_MONEY_READY'] is False

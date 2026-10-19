@@ -15,7 +15,7 @@ from app.clx045_gl_reporting import (
     control_summary
 )
 
-HTML=Path("web/index.html").read_text()
+HTML=Path("web/index.html").read_text(encoding="utf-8")
 
 @pytest.fixture()
 def isolated(tmp_path,monkeypatch):

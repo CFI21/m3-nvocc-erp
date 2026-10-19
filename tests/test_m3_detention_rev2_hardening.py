@@ -4,11 +4,11 @@ import pytest
 from fastapi import HTTPException
 
 
-SRC = Path("app/clx071_container_journey.py").read_text()
-GLGOV = Path("app/item7_financial_document_governance.py").read_text()
-MIGRATION = Path("migrations/M3_DETENTION_REV2_001_segments.sql").read_text()
-SCHEMA = Path("app/schema.sql").read_text()
-HTML = Path("web/index.html").read_text()
+SRC = Path("app/clx071_container_journey.py").read_text(encoding="utf-8")
+GLGOV = Path("app/item7_financial_document_governance.py").read_text(encoding="utf-8")
+MIGRATION = Path("migrations/M3_DETENTION_REV2_001_segments.sql").read_text(encoding="utf-8")
+SCHEMA = Path("app/schema.sql").read_text(encoding="utf-8")
+HTML = Path("web/index.html").read_text(encoding="utf-8")
 
 
 def test_rev2_uses_one_additive_detention_segment_child_store():

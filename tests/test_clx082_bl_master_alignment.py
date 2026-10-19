@@ -65,14 +65,14 @@ def test_finance_and_container_use_existing_apis():
     assert "/api/clx046/job/" in HTML
 
 def test_no_new_model():
-    m=json.loads((ROOT/'CLX082_BL_FIELD_MATRIX.json').read_text())
-    a=json.loads((ROOT/'CLX082_UI_ACCEPTANCE.json').read_text())
+    m=json.loads((ROOT/'CLX082_BL_FIELD_MATRIX.json').read_text(encoding="utf-8"))
+    a=json.loads((ROOT/'CLX082_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert m['backend_model_changed'] is False
     assert m['duplicate_bl_model_created'] is False
     assert a['backend_model_changed'] is False
     assert a['database_changed'] is False
 
 def test_safety():
-    a=json.loads((ROOT/'CLX082_UI_ACCEPTANCE.json').read_text())
+    a=json.loads((ROOT/'CLX082_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert a['REAL_MONEY_READY'] is False
     assert a['REAL_PROVIDER_READY'] is False

@@ -18,14 +18,14 @@ def test_activity_sequence_reuses_clx071_and_remains_server_enforced():
     assert STANDARD_FLOW[-1]=='AVAILABLE'
     assert validate_transition('AVAILABLE','RESERVED') is True
     assert validate_transition('AVAILABLE','LOADED') is False
-    src=Path('app/ho_operational_setup.py').read_text()
+    src=Path('app/ho_operational_setup.py').read_text(encoding="utf-8")
     assert 'from .clx071_container_journey import STANDARD_FLOW, NEXT' in src
     assert 'CREATE TABLE' not in src
     assert '"server_side_enforcement":True' in src
     assert '"container_journey_changed":False' in src
 
 def test_tariff_applicability_is_configuration_overlay_not_new_engine():
-    src=Path('app/ho_operational_setup.py').read_text()
+    src=Path('app/ho_operational_setup.py').read_text(encoding="utf-8")
     assert "DEMURRAGE_APPLICABLE_COUNTRY" in src
     assert "DETENTION_APPLICABLE_CITY" in src
     assert "domain='configuration'" in src
@@ -34,7 +34,7 @@ def test_tariff_applicability_is_configuration_overlay_not_new_engine():
     assert 'mrg_rules' not in src
 
 def test_ui_has_four_ho_setup_workspaces_without_new_screens():
-    html=Path('web/index.html').read_text()
+    html=Path('web/index.html').read_text(encoding="utf-8")
     for x in [
         "label:'Demurrage Applicable Countries'",
         "label:'Detention Applicable Cities'",

@@ -12,7 +12,7 @@ from app.screen_catalog import build_catalog, AGENT_SETUP_ALIASES
 from app.clx042_agent_workspace import form_schema, trace, verify, MODULES
 from app.main import CreateBody, UpdateBody, create_record, update_record, list_records
 
-HTML=Path("web/index.html").read_text()
+HTML=Path("web/index.html").read_text(encoding="utf-8")
 
 class FakeRequest:
     def __init__(self,payload): self.payload=payload

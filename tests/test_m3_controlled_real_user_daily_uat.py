@@ -17,7 +17,7 @@ from app.clx049_booking_bl_workspace import verify as verify_clx049
 from app.clx046_treasury_hardening import verify as verify_clx046
 from app.clx045_gl_reporting import control_summary as gl_control_summary
 
-RUNBOOK=Path("M3_LIVE_OPERATIONS_RUNBOOK.md").read_text()
+RUNBOOK=Path("M3_LIVE_OPERATIONS_RUNBOOK.md").read_text(encoding="utf-8")
 
 @pytest.fixture()
 def isolated(tmp_path, monkeypatch):

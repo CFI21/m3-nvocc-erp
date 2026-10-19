@@ -17,7 +17,7 @@ def test_mrg_router_and_screen_contract():
     assert build_catalog()['screen_count']==196
 
 def test_mrg_ui_preserves_existing_rate_management():
-    html=Path('web/index.html').read_text()
+    html=Path('web/index.html').read_text(encoding="utf-8")
     for label in [
         "MRG","MRG Export","MRG Import","MRG Transshipment",
         "MRG Detention","MRG Detention Export","Special Detention","MRG MTY Storage"
@@ -32,7 +32,7 @@ def test_mrg_ui_preserves_existing_rate_management():
     assert "MRG import available" in html
 
 def test_mrg_backend_is_shared_and_does_not_post_finance():
-    src=Path('app/mrg.py').read_text()
+    src=Path('app/mrg.py').read_text(encoding="utf-8")
     assert 'mrg_rules' in src
     assert 'mrg_slabs' in src
     assert 'SPECIAL_DETENTION' in src

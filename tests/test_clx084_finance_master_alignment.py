@@ -43,8 +43,8 @@ def test_preview_is_read_only_same_dataset():
     assert "data-clx43-field" not in p and "data-clx42-field" not in p
 
 def test_acceptance_safety_no_new_models():
-    m=json.loads((ROOT/'CLX084_FINANCE_FIELD_MATRIX.json').read_text())
-    a=json.loads((ROOT/'CLX084_SOA_UI_ACCEPTANCE.json').read_text())
+    m=json.loads((ROOT/'CLX084_FINANCE_FIELD_MATRIX.json').read_text(encoding="utf-8"))
+    a=json.loads((ROOT/'CLX084_SOA_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert m['baseline']=='d97ff08e67d107768d3d4d8f7699f0e5c57f45f9'
     assert m['backend_model_changed'] is False and m['database_changed'] is False and m['duplicate_finance_model_created'] is False
     assert a['backend_model_changed'] is False and a['database_changed'] is False

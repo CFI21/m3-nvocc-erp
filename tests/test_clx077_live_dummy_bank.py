@@ -13,7 +13,7 @@ def test_clx077_routes_mounted():
     assert required <= paths
 
 def test_clx077_no_parallel_finance_model():
-    sql=Path("migrations/CLX077_001_dummy_bank_live_review.sql").read_text()
+    sql=Path("migrations/CLX077_001_dummy_bank_live_review.sql").read_text(encoding="utf-8")
     for forbidden in [
       "CREATE TABLE IF NOT EXISTS public.treasury_records",
       "CREATE TABLE IF NOT EXISTS public.bank_import_batches",
@@ -27,7 +27,7 @@ def test_clx077_no_parallel_finance_model():
     assert "DUMMY-USD-CLX077" in sql
 
 def test_clx077_safety_and_markers():
-    src=Path("app/clx077_dummy_bank.py").read_text()
+    src=Path("app/clx077_dummy_bank.py").read_text(encoding="utf-8")
     assert 'M3_LIVE_PROVIDERS' in src
     assert 'REAL_MONEY' in src
     assert 'CLX077_TEST' in src
@@ -39,7 +39,7 @@ def test_clx077_safety_and_markers():
     assert "gl_vouchers" in src
 
 def test_clx077_has_15_scenarios_and_controls():
-    src=Path("app/clx077_dummy_bank.py").read_text()
+    src=Path("app/clx077_dummy_bank.py").read_text(encoding="utf-8")
     for key in [
       "EXPORT_FCL_RECEIPT","IMPORT_FCL_RECEIPT","AGENT_COST_PAYMENT","CARRIER_COST_PAYMENT",
       "REPOSITION_COST","MR_COST","LEASE_SETTLEMENT","DETENTION_CHARGE","CREDIT_REFUND",
@@ -52,7 +52,7 @@ def test_clx077_has_15_scenarios_and_controls():
     assert "unbalanced_vouchers" in src
 
 def test_clx077_ui_and_artifacts():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     assert "Dummy Bank Review" in html
     assert "TEST BANK — SIMULATION ONLY — NO REAL MONEY" in html
     for p in [

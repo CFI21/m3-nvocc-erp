@@ -23,6 +23,6 @@ def test_agent_master_syncs_to_existing_operational_projection(tmp_path,monkeypa
 
 def test_projection_sync_does_not_create_new_master_model():
     from pathlib import Path
-    schema=Path('app/schema.sql').read_text().lower()
+    schema=Path('app/schema.sql').read_text(encoding="utf-8").lower()
     assert 'create table if not exists agent_projection' not in schema
     assert 'create table if not exists customer_agent' not in schema

@@ -142,7 +142,7 @@ def test_jobs_50001_50005_complete_cross_domain_business_day(isolated):
     assert integ["live_providers"] is False and integ["real_money"] is False
 
 def test_web_shell_interaction_contract():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     for marker in (
         "function calcRows", "openDrawer(", "loadRelated(", "loadAudit(",
         "renderQuickActions(", "showClx049Workspace(", "openClx49Link(",

@@ -41,7 +41,7 @@ def test_residual_shortage_becomes_lease_on_hire():
     assert r[0]["qty"]==1 and r[1]["qty"]==3
 
 def test_migration_does_not_create_parallel_inventory_or_action_queue():
-    sql=Path("migrations/CLX072_001_equipment_network.sql").read_text()
+    sql=Path("migrations/CLX072_001_equipment_network.sql").read_text(encoding="utf-8")
     assert "equipment_network_targets" in sql
     assert "equipment_network_policy" in sql
     assert "CREATE TABLE IF NOT EXISTS public.containers" not in sql
@@ -49,7 +49,7 @@ def test_migration_does_not_create_parallel_inventory_or_action_queue():
     assert "public.containers remains authoritative" in sql
 
 def test_native_ui_contains_network_control():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     assert "Network Control" in html
     assert "/api/clx072/network/position" in html
     assert "Stock Balancing" in html
@@ -57,7 +57,7 @@ def test_native_ui_contains_network_control():
     assert "No separate ERP model or duplicate container inventory" in html
 
 def test_manifest_keeps_production_locked():
-    m=Path("CLX072_ACCEPTANCE_MANIFEST.json").read_text()
+    m=Path("CLX072_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8")
     assert '"production_traffic": "OFF"' in m
     assert '"live_providers": "OFF"' in m
     assert '"real_money": "OFF"' in m

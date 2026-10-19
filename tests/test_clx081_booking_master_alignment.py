@@ -21,7 +21,7 @@ def test_required_basic_fields_present():
 def test_reference_is_explicit_review_later():
     b=booking_block()
     assert "Reference #',{review:true}" in b
-    m=json.loads((ROOT/'CLX081_BOOKING_FIELD_MATRIX.json').read_text())
+    m=json.loads((ROOT/'CLX081_BOOKING_FIELD_MATRIX.json').read_text(encoding="utf-8"))
     ref=next(x for x in m['fields'] if x['reference']=='Reference #')
     assert ref['status']=='REVIEW_LATER' and ref['blocking'] is False
 
@@ -66,14 +66,14 @@ def test_charge_grid_exact_column_contract():
     assert "no new data model" in HTML
 
 def test_no_new_booking_model_or_schema():
-    m=json.loads((ROOT/'CLX081_BOOKING_FIELD_MATRIX.json').read_text())
-    a=json.loads((ROOT/'CLX081_UI_ACCEPTANCE.json').read_text())
+    m=json.loads((ROOT/'CLX081_BOOKING_FIELD_MATRIX.json').read_text(encoding="utf-8"))
+    a=json.loads((ROOT/'CLX081_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert m['backend_model_changed'] is False
     assert m['duplicate_fields_created'] is False
     assert a['backend_model_changed'] is False
     assert a['database_changed'] is False
 
 def test_safety():
-    a=json.loads((ROOT/'CLX081_UI_ACCEPTANCE.json').read_text())
+    a=json.loads((ROOT/'CLX081_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert a['REAL_MONEY_READY'] is False
     assert a['REAL_PROVIDER_READY'] is False

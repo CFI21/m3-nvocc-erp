@@ -5,7 +5,7 @@ from app.screen_catalog import build_catalog
 ROOT = Path(__file__).resolve().parents[1]
 
 def load_manifest():
-    return json.loads((ROOT / "CLX054_ACCEPTANCE_MANIFEST.json").read_text())
+    return json.loads((ROOT / "CLX054_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8"))
 
 def test_clx054_final_acceptance_after_plus60():
     m=load_manifest()

@@ -18,7 +18,7 @@ SERVER_ONLY_RLS_TABLES={
 }
 
 def test_clx050_is_frozen_parent_and_196_screens_preserved():
-    m=json.loads((ROOT/"CLX050_ACCEPTANCE_MANIFEST.json").read_text())
+    m=json.loads((ROOT/"CLX050_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8"))
     assert m["status"]=="ACCEPTED" and m["freeze"] is True
     assert m["scope"]["screenBaseline"]==196
     assert build_catalog()["screen_count"]==196
@@ -34,14 +34,14 @@ def test_only_approved_m3_supabase_target_is_accepted(monkeypatch):
     assert db.approved_database_target() is False
 
 def test_production_runtime_has_no_silent_sqlite_fallback_contract():
-    source=(ROOT/"app/db.py").read_text()
+    source=(ROOT/"app/db.py").read_text(encoding="utf-8")
     assert "if using_postgres():" in source
     assert "assert_approved_database_target()" in source
     assert "DATABASE_URL_TARGET_REJECTED" in source
     assert "return PostgresConnectionCompat(DATABASE_URL)" in source
 
 def test_web_api_security_and_traffic_lock_contract():
-    source=(ROOT/"app/main.py").read_text()
+    source=(ROOT/"app/main.py").read_text(encoding="utf-8")
     assert "https://m3-nvocc-web-latest.onrender.com" in source
     assert "M3_PRODUCTION_TRAFFIC" in source
     assert "PRODUCTION_TRAFFIC_LOCKED" in source
@@ -51,13 +51,13 @@ def test_web_api_security_and_traffic_lock_contract():
     assert "Referrer-Policy" in source
     assert "Strict-Transport-Security" in source
     assert "X-Request-Id" in source and "X-Correlation-Id" in source
-    nginx=(ROOT/"web/nginx.conf").read_text()
+    nginx=(ROOT/"web/nginx.conf").read_text(encoding="utf-8")
     assert "Content-Security-Policy" in nginx
     assert "Strict-Transport-Security" in nginx
     assert "https://m3-nvocc-api-latest-1.onrender.com" in nginx
 
 def test_provider_and_real_money_hard_stops_remain_inherited():
-    m=json.loads((ROOT/"CLX050_ACCEPTANCE_MANIFEST.json").read_text())
+    m=json.loads((ROOT/"CLX050_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8"))
     assert m["controls"]["liveProviders"] is False
     assert m["controls"]["realMoney"] is False
     assert m["controls"]["productionTraffic"] is False
@@ -67,7 +67,7 @@ def test_clx051_security_gate_inventory_is_exact_and_non_business_scope():
     assert all(x.startswith(("provider_","operations_","management_")) for x in SERVER_ONLY_RLS_TABLES)
 
 def test_rollback_target_is_immutable_clx050_deploy_evidence():
-    m=json.loads((ROOT/"CLX050_ACCEPTANCE_MANIFEST.json").read_text())
+    m=json.loads((ROOT/"CLX050_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8"))
     assert m["evidence"]["webDeploy"]=="LIVE"
     assert m["evidence"]["apiDeploy"]=="LIVE"
     assert m["evidence"]["webImageDigest"].startswith("sha256:")

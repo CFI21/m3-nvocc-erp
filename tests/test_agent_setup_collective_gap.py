@@ -11,7 +11,7 @@ def test_agent_setup_routes_and_no_duplicate_models():
         '/api/agent-setup/booking/{job_ref}/eligibility',
     ]:
         assert p in paths
-    src=Path('app/agent_setup.py').read_text()
+    src=Path('app/agent_setup.py').read_text(encoding="utf-8")
     assert "md_records WHERE domain='configuration'" in src
     assert 'CREATE TABLE' not in src
     assert 'BOOKING_COUNT' in src
@@ -20,7 +20,7 @@ def test_agent_setup_routes_and_no_duplicate_models():
     assert 'server_side_enforcement' in src
 
 def test_booking_server_side_agent_rule_enforcement_hook():
-    src=Path('app/main.py').read_text()
+    src=Path('app/main.py').read_text(encoding="utf-8")
     assert "from .agent_setup import router as agent_setup_router, assert_booking_rules" in src
     import re
     assert re.search(r"if module=='booking':\s*\n(?:[^\n]*\n)*?\s*assert_booking_rules\(conn,ctx,body.fields,None\)", src)
@@ -29,7 +29,7 @@ def test_booking_server_side_agent_rule_enforcement_hook():
     assert 'CRT_REQUIRED_AFTER_APPROVAL' in src
 
 def test_agent_setup_ui_uses_existing_masters_only():
-    html=Path('web/index.html').read_text()
+    html=Path('web/index.html').read_text(encoding="utf-8")
     for x in [
         "label:'Agent Relation'",
         "label:'Agent Volume Restriction'",

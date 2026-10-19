@@ -15,7 +15,7 @@ def test_sandbox_mfa_allowed_only_when_production_traffic_off(monkeypatch):
 
 def test_login_enforces_boundary_before_accepting_sandbox_mfa():
     from pathlib import Path
-    source = (Path(__file__).resolve().parents[1] / 'app' / 'admin.py').read_text()
+    source = (Path(__file__).resolve().parents[1] / 'app' / 'admin.py').read_text(encoding="utf-8")
     assert "if u['mfa_required'] and not sandbox_mfa_allowed():" in source
     assert source.index("if u['mfa_required'] and not sandbox_mfa_allowed():") < source.index("if u['mfa_required'] and b.mfa_code!='123456':")
     assert "'SANDBOX_MFA_DISABLED'" in source

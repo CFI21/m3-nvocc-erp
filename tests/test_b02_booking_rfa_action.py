@@ -21,7 +21,7 @@ def test_approval_issuance_remains_blocked_until_governed_reference_ready():
 
 def test_booking_ui_exposes_governed_rfa_action():
     from pathlib import Path
-    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     assert 'async function clx81SubmitBookingRfa(id,version)' in html
     assert '/actions/submit-rfa' in html
     assert 'Save Draft</button>' in html
@@ -30,7 +30,7 @@ def test_booking_ui_exposes_governed_rfa_action():
 
 def test_rfa_prevents_unsaved_browser_values():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     fn=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('async function clx49RenderBooking(tab){',1)[0]
     assert "Unsaved Booking fields detected. Save Draft before Submit RFA." in fn
     assert "clx81BookingDraft?.key===draftKey" in fn
@@ -72,7 +72,7 @@ def test_booking_edits_locked_after_rfa():
     assert "BOOKING_DRAFT_ONLY_EDIT" in source
     assert source.index("BOOKING_DRAFT_ONLY_EDIT")<source.index("payload.update(body.fields)")
     from pathlib import Path
-    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     booking=html.split('async function clx49RenderBooking(tab){',1)[1].split("if(tab==='Booking Info')",1)[0]
     assert "String(r.status||p.Status||'').toLowerCase()==='draft'" in booking
 
@@ -115,7 +115,7 @@ def test_booking_rfa_records_trusted_maker_and_approval_enforces_four_eyes():
 
 def test_booking_rfa_checker_approval_ui_wired_to_existing_api():
     from pathlib import Path
-    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    html=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     assert 'async function clx81ApproveBookingRfa(id,version)' in html
     assert '/api/v1/booking/' in html
     assert "['ADMIN','SUPER_ADMIN'].includes(state.role)" in html
@@ -255,7 +255,7 @@ def test_booking_rfa_missing_session_identity_fails_closed():
 
 def test_approved_booking_readonly_audit_visible_in_reference_workspace():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     grid=ui.split('function clx81BookingReferenceGrid(w,r){',1)[1].split('\nfunction ',1)[0]
     assert 'const approvalAudit=approved?' in grid
     for key in ('Approval #','Approved By','Approved At'):
@@ -266,7 +266,7 @@ def test_approved_booking_readonly_audit_visible_in_reference_workspace():
 
 def test_booking_reference_grid_locks_editable_inputs_after_draft():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     grid=ui.split('function clx81BookingReferenceGrid(w,r){',1)[1].split('\nfunction ',1)[0]
     assert "const bookingLocked=saved&&String(r?.status||p.Status||'').trim().toLowerCase()!=='draft'" in grid
     assert "locked=viewerReadOnly()||bookingLocked" in grid
@@ -274,7 +274,7 @@ def test_booking_reference_grid_locks_editable_inputs_after_draft():
 
 def test_grid_change_refuses_mutation_outside_booking_draft():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     handler=ui.split('function clx81GridChange(el){',1)[1].split('\nfunction ',1)[0]
     assert "String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in handler
     assert handler.index("!=='draft'") < handler.index("clx81BookingDraft.values[key]=el.value")
@@ -282,7 +282,7 @@ def test_grid_change_refuses_mutation_outside_booking_draft():
 
 def test_booking_cargo_popup_is_readonly_after_draft():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     cargo=ui.split('function clx81OpenCargoDetails(){',1)[1].split('// Requested nine external',1)[0]
     assert "const cargoLocked=viewerReadOnly()||String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in cargo
     assert "(cargoLocked?' disabled':'')" in cargo
@@ -291,7 +291,7 @@ def test_booking_cargo_popup_is_readonly_after_draft():
 
 def test_cargo_capture_handler_rejects_non_draft_booking():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     fn=ui.split('function clx81CaptureCargoDetails(){',1)[1].split('\nfunction ',1)[0]
     assert "String(r.status||r.fields?.Status||'').trim().toLowerCase()!=='draft'" in fn
     assert fn.index("!=='draft'")<fn.index("clx81BookingDraft.values[el.dataset.clx81Cargo]")
@@ -299,7 +299,7 @@ def test_cargo_capture_handler_rejects_non_draft_booking():
 
 def test_cargo_popup_hides_apply_button_after_draft():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     popup=ui.split('function clx81OpenCargoDetails(){',1)[1].split('// Requested nine external',1)[0]
     assert "cargoLocked?'':" in popup
     assert "Apply to Booking Draft</button>" in popup
@@ -307,7 +307,7 @@ def test_cargo_popup_hides_apply_button_after_draft():
 
 def test_rfa_unsaved_grid_guard_is_scoped_to_current_booking():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     fn=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('async function clx49RenderBooking',1)[0]
     assert 'clx81BookingDraft?.key===draftKey' in fn
     assert 'if(dirty||gridDirty||pendingGridEdits)' in fn
@@ -315,7 +315,7 @@ def test_rfa_unsaved_grid_guard_is_scoped_to_current_booking():
 
 def test_rfa_allows_unchanged_grid_draft_values():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     fn=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('async function clx49RenderBooking(tab){',1)[0]
     assert "Object.entries(clx81BookingDraft.values||{}).some" in fn
     assert "String(value??'')!==String(w.booking.fields?.[key]??'')" in fn
@@ -323,7 +323,7 @@ def test_rfa_allows_unchanged_grid_draft_values():
 
 def test_submit_rfa_rechecks_live_reference_grid_inputs():
     from pathlib import Path
-    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text()
+    ui=(Path(__file__).resolve().parents[1]/'web'/'index.html').read_text(encoding="utf-8")
     submit=ui.split('async function clx81SubmitBookingRfa(id,version){',1)[1].split('\nfunction clx49RenderBooking',1)[0]
     assert "data-clx81-grid-field" in submit
     assert "const gridDirty=" in submit

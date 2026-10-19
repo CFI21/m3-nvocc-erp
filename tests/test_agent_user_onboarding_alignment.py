@@ -1,8 +1,8 @@
 from pathlib import Path
 
 def test_agent_user_alignment_source_contract():
-    admin=Path('app/admin.py').read_text()
-    web=Path('web/index.html').read_text()
+    admin=Path('app/admin.py').read_text(encoding="utf-8")
+    web=Path('web/index.html').read_text(encoding="utf-8")
     assert "/agents/{agent_code}/users" in admin
     assert "party_type='AGENT'" in admin
     assert "shared_login_allowed" in admin
@@ -13,7 +13,7 @@ def test_agent_user_alignment_source_contract():
     assert "Shared generic logins are not created" in web
 
 def test_no_duplicate_agent_user_model():
-    schema=Path('app/schema.sql').read_text()
+    schema=Path('app/schema.sql').read_text(encoding="utf-8")
     assert 'CREATE TABLE IF NOT EXISTS iam_users' in schema
     assert 'CREATE TABLE IF NOT EXISTS iam_party_access' in schema
     assert 'CREATE TABLE IF NOT EXISTS iam_user_roles' in schema

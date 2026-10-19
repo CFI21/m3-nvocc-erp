@@ -55,7 +55,7 @@ def test_drill_down_uses_existing_container_filters():
     assert '/api/clx070/container-control/containers?' in HTML
 
 def test_safety_acceptance():
-    x=json.loads((ROOT/'CLX079_UI_ACCEPTANCE.json').read_text())
+    x=json.loads((ROOT/'CLX079_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert x['REAL_MONEY_READY'] is False
     assert x['REAL_PROVIDER_READY'] is False
     assert x['backend_model_changed'] is False

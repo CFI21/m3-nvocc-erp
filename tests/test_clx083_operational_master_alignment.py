@@ -42,8 +42,8 @@ def test_governance_exceptions_links_and_preview():
     assert "data-clx42-field" not in preview and "data-clx49-field" not in preview
 
 def test_acceptance_safety_flags_and_no_new_models():
-    m=json.loads((ROOT/'CLX083_OPERATIONAL_FIELD_MATRIX.json').read_text())
-    a=json.loads((ROOT/'CLX083_UI_ACCEPTANCE.json').read_text())
+    m=json.loads((ROOT/'CLX083_OPERATIONAL_FIELD_MATRIX.json').read_text(encoding="utf-8"))
+    a=json.loads((ROOT/'CLX083_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert m['baseline']=='8b047979a439cbda9686327e2ad41a329297ee7f'
     assert m['backend_model_changed'] is False and m['database_changed'] is False
     assert m['duplicate_operational_model_created'] is False

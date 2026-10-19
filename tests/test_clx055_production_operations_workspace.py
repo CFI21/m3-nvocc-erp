@@ -35,7 +35,7 @@ def test_clx055_related_screen_routes_are_existing_catalog_screens():
         assert _target_screen(category,module) in ids
 
 def test_clx055_ui_has_daily_views_and_same_page_actions():
-    html=(ROOT/"web"/"index.html").read_text()
+    html=(ROOT/"web"/"index.html").read_text(encoding="utf-8")
     for marker in [
       "CLX-055 Production Operations Workspace",
       "showOpsWorkbench('today')",

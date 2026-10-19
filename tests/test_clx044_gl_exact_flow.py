@@ -13,7 +13,7 @@ from app.screen_catalog import build_catalog
 from app.clx044_gl_exact_flow import GL_SETUP_ORDER, GL_TRANSACTION_ORDER, FLOW, gl_flow
 from app.gl import MODULES, validate, CreateBody, create
 
-HTML=Path("web/index.html").read_text()
+HTML=Path("web/index.html").read_text(encoding="utf-8")
 
 class FakeRequest:
     def __init__(self,payload): self.payload=payload

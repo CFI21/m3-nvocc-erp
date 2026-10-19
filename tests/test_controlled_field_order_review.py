@@ -13,7 +13,7 @@ def test_screen_baseline_and_no_parallel_models():
     from app.screen_catalog import build_catalog
     c=build_catalog()
     assert c['screen_count']==196
-    review=json.loads((ROOT/'M3_CONTROLLED_FIELD_ORDER_REVIEW.json').read_text())
+    review=json.loads((ROOT/'M3_CONTROLLED_FIELD_ORDER_REVIEW.json').read_text(encoding="utf-8"))
     assert review['screen_count']==196
     assert review['database_changed'] is False
     assert review['api_contract_changed'] is False
@@ -72,7 +72,7 @@ def test_existing_bl_gate_and_order_are_preserved():
       'Parties','Cargo & Equipment','Freight & Commercial Context'
     ]:
         assert x in b,x
-    freeze=json.loads((ROOT/'M3_BACKEND_FREEZE_ACCEPTANCE.json').read_text())
+    freeze=json.loads((ROOT/'M3_BACKEND_FREEZE_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert freeze['production_baseline_guard']['source_unclassified']==355
 
 def test_cro_trt_release_do_keep_existing_authoritative_master():
@@ -96,7 +96,7 @@ def test_container_and_finance_governance_preserved():
         assert x in HTML,x
 
 def test_real_money_and_providers_stay_off():
-    review=json.loads((ROOT/'M3_CONTROLLED_FIELD_ORDER_REVIEW.json').read_text())
+    review=json.loads((ROOT/'M3_CONTROLLED_FIELD_ORDER_REVIEW.json').read_text(encoding="utf-8"))
     assert review['real_money'] is False
     assert review['dummy_bank']=='SIMULATION_ONLY'
     assert review['providers']=={'TRUE_LAYER':False,'OXR':False,'AVALARA':False}

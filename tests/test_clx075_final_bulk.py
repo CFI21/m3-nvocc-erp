@@ -38,7 +38,7 @@ def test_lease_accrual_honors_minimum_hire_free_days_and_fixed_costs():
     assert amount==69
 
 def test_clx075_migration_is_additive_and_reuses_authoritative_models():
-    sql=Path("migrations/CLX075_001_final_bulk_readiness.sql").read_text()
+    sql=Path("migrations/CLX075_001_final_bulk_readiness.sql").read_text(encoding="utf-8")
     assert "equipment_lease_contracts" in sql
     assert "equipment_lease_allocations" in sql
     assert "clx075_cutover_rehearsals" in sql
@@ -49,7 +49,7 @@ def test_clx075_migration_is_additive_and_reuses_authoritative_models():
     assert "CREATE TABLE IF NOT EXISTS public.jobs" not in sql
 
 def test_lease_finance_reuses_existing_container_ledger():
-    src=Path("app/clx075_lease.py").read_text()
+    src=Path("app/clx075_lease.py").read_text(encoding="utf-8")
     assert "INSERT INTO container_financial_ledger" in src
     assert "lease_contract_ref" in src
     assert "MAKER_CHECKER_CONFLICT" in src
@@ -69,7 +69,7 @@ def test_final_artifacts_and_hard_stops_exist():
     ]
     for p in required: assert Path(p).exists(), p
     import json
-    m=json.loads(Path("CLX075_FINAL_ACCEPTANCE_MANIFEST.json").read_text())
+    m=json.loads(Path("CLX075_FINAL_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8"))
     assert m["production_traffic"]=="OFF"
     assert m["live_providers"]=="OFF"
     assert m["real_money"]=="OFF"
@@ -77,14 +77,14 @@ def test_final_artifacts_and_hard_stops_exist():
     assert m["architecture"]["new_erp_shell"] is False
 
 def test_ui_preserves_shell_and_adds_lease_control():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     assert "Lease Control" in html
     assert "/api/clx075/lease/kpis" in html
     assert "Depot &amp; M&amp;R" in html
     assert "Cost Optimization" in html
 
 def test_final_readiness_has_activation_hard_stop():
-    src=Path("app/clx075_readiness.py").read_text()
+    src=Path("app/clx075_readiness.py").read_text(encoding="utf-8")
     assert '"production_traffic":"OFF"' in src
     assert '"live_providers":"OFF"' in src
     assert '"real_money":"OFF"' in src

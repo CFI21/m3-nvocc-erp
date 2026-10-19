@@ -22,7 +22,7 @@ def test_cost_scoring_prefers_lower_cost_and_lead():
     assert score_option(1000,2,1) < score_option(1000,5,1)
 
 def test_migration_does_not_add_parallel_rate_or_inventory_model():
-    sql=Path("migrations/CLX073_001_equipment_cost_optimization.sql").read_text()
+    sql=Path("migrations/CLX073_001_equipment_cost_optimization.sql").read_text(encoding="utf-8")
     assert "equipment_optimization_runs" in sql
     assert "equipment_optimization_options" in sql
     assert "equipment_execution_variance" in sql
@@ -32,7 +32,7 @@ def test_migration_does_not_add_parallel_rate_or_inventory_model():
     assert "rate master" in sql.lower()
 
 def test_manifest_keeps_production_locked_and_rate_model_single():
-    m=Path("CLX073_ACCEPTANCE_MANIFEST.json").read_text()
+    m=Path("CLX073_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8")
     assert '"production_traffic": "OFF"' in m
     assert '"live_providers": "OFF"' in m
     assert '"real_money": "OFF"' in m
@@ -40,7 +40,7 @@ def test_manifest_keeps_production_locked_and_rate_model_single():
     assert '"duplicate_container_inventory": false' in m
 
 def test_native_ui_has_cost_optimization():
-    html=Path("web/index.html").read_text()
+    html=Path("web/index.html").read_text(encoding="utf-8")
     assert "Cost Optimization" in html
     assert "/api/clx073/optimization/compare" in html
     assert "Planned vs Actual" in html
@@ -48,7 +48,7 @@ def test_native_ui_has_cost_optimization():
 
 
 def test_exception_insert_placeholder_count_and_scope_guards():
-    src=Path("app/clx073_equipment_optimization.py").read_text()
+    src=Path("app/clx073_equipment_optimization.py").read_text(encoding="utf-8")
     assert "VALUES(?,?,?,?,?,?,'OPEN',?,?,?,?)" in src
     assert "def work_item_in_scope" in src
     assert "require_run_scope(c,a,r)" in src

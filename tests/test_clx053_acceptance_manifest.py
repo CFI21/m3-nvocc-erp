@@ -5,7 +5,7 @@ from app.screen_catalog import build_catalog
 ROOT = Path(__file__).resolve().parents[1]
 
 def manifest():
-    return json.loads((ROOT / "CLX053_ACCEPTANCE_MANIFEST.json").read_text())
+    return json.loads((ROOT / "CLX053_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8"))
 
 def test_clx053_manifest_acceptance_and_freeze():
     m = manifest()

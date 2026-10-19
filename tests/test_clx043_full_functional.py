@@ -8,7 +8,7 @@ from app.admin import Login, login
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data, quick_actions, action_route
 
-HTML=Path("web/index.html").read_text()
+HTML=Path("web/index.html").read_text(encoding="utf-8")
 
 @pytest.fixture()
 def isolated(tmp_path,monkeypatch):

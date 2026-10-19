@@ -103,7 +103,7 @@ def test_forms_remain_extension_safe_dense_layout():
     assert 'No empty future sections are rendered' in HTML
 
 def test_acceptance_safety():
-    a=json.loads((ROOT/'M3_NAVIGATION_EXTENSION_ACCEPTANCE.json').read_text())
+    a=json.loads((ROOT/'M3_NAVIGATION_EXTENSION_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert a['screen_count']==196
     assert a['new_screens']==[]
     assert a['new_fields']==[]

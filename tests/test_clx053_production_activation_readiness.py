@@ -7,7 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def parent():
-    return json.loads((ROOT / "CLX052_ACCEPTANCE_MANIFEST.json").read_text())
+    return json.loads((ROOT / "CLX052_ACCEPTANCE_MANIFEST.json").read_text(encoding="utf-8"))
 
 
 def test_clx052_is_frozen_accepted_parent():

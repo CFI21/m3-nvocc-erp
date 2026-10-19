@@ -46,8 +46,8 @@ def test_data_consistency_and_no_manual_override():
     assert "No manual KPI override, secondary audit log, KPI ledger, exception model or management summary table" in b
 
 def test_matrix_and_acceptance_safety():
-    m=json.loads((ROOT/'CLX085_KPI_SOURCE_MATRIX.json').read_text())
-    a=json.loads((ROOT/'CLX085_UI_ACCEPTANCE.json').read_text())
+    m=json.loads((ROOT/'CLX085_KPI_SOURCE_MATRIX.json').read_text(encoding="utf-8"))
+    a=json.loads((ROOT/'CLX085_UI_ACCEPTANCE.json').read_text(encoding="utf-8"))
     assert m['baseline']=='e6aec0503929783b22d835dcec0221013b5a43cd'
     assert m['backend_model_changed'] is False and m['database_changed'] is False
     assert m['new_management_model_created'] is False and m['new_kpi_ledger_created'] is False and m['new_exception_model_created'] is False
