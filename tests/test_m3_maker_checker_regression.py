@@ -103,3 +103,32 @@ def test_checker_cannot_withdraw_maker_request(harness):
     c=harness()
     assert c.execute("SELECT status FROM md_change_requests WHERE change_ref='MDC-UAT-01'").fetchone()["status"]=="PENDING"
     c.close()
+
+
+def test_independent_checker_approves_and_versions_master(harness, monkeypatch):
+    _pending(harness)
+    # Operational projections are integration-tested separately; this test
+    # isolates approval governance and version/audit persistence.
+    monkeypatch.setattr(md, "sync_operational_projection", lambda *args, **kwargs: None)
+    result=md.decide("MDC-UAT-01", md.Decision(decision="APPROVE", comment="UAT approved"), x_m3_session="checker")
+    assert result=={"status":"APPROVED","version":1}
+    c=harness()
+    change=c.execute("SELECT status,maker,checker,applied_at FROM md_change_requests WHERE change_ref='MDC-UAT-01'").fetchone()
+    assert change["status"]=="APPROVED"
+    assert change["maker"]=="USER-MAKER"
+    assert change["checker"]=="USER-CHECKER"
+    assert change["applied_at"]
+    master=c.execute("SELECT version,status,approved_by,display_name FROM md_records WHERE domain='unit' AND record_key='UAT-UNIT-01'").fetchone()
+    assert master["version"]==1 and master["status"]=="ACTIVE"
+    assert master["approved_by"]=="USER-CHECKER"
+    assert master["display_name"]=="UAT regression unit"
+    version=c.execute("SELECT version,changed_by,change_ref FROM md_versions WHERE domain='unit' AND record_key='UAT-UNIT-01'").fetchone()
+    assert version["version"]==1
+    assert version["changed_by"]=="USER-CHECKER"
+    assert version["change_ref"]=="MDC-UAT-01"
+    assert c.execute("SELECT COUNT(*) AS n FROM md_audit WHERE action='CHANGE_APPROVE_APPLY'").fetchone()["n"]==1
+    c.close()
+    with pytest.raises(HTTPException) as exc:
+        md.decide("MDC-UAT-01", md.Decision(decision="APPROVE"), x_m3_session="checker")
+    assert exc.value.status_code==409
+    assert _error_code(exc)=="CHANGE_ALREADY_DECIDED"
