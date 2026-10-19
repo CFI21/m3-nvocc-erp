@@ -100,6 +100,8 @@ def isolated_uat_diagnostic(x_m3_uat_diagnostic_token: str = Header('', alias='X
     try:
         identity = c.execute("SELECT current_database() AS database_name, inet_server_addr()::text AS server_address").fetchone()
         user = c.execute("SELECT status,mfa_required FROM iam_users WHERE username='admin'").fetchone()
+        recent = c.execute("SELECT ts,outcome,detail_json FROM iam_login_audit WHERE username=? ORDER BY id DESC LIMIT 5",('admin',)).fetchall()
+        recent_outcomes = [{'ts':r['ts'], 'outcome':r['outcome'], 'reason':json.loads(r['detail_json'] or '{}').get('reason')} for r in recent]
         return {
             'backend':'postgres',
             'configured_host_matches_expected':target.hostname == 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech',
@@ -108,6 +110,7 @@ def isolated_uat_diagnostic(x_m3_uat_diagnostic_token: str = Header('', alias='X
             'admin_status':user['status'] if user else None,
             'admin_mfa_required':bool(user['mfa_required']) if user else None,
             'admin_password_initialized':None,
+            'recent_login_outcomes':recent_outcomes,
             'note':'Password hashes and connection secrets are never returned; password initialization is not asserted.'
         }
     finally:
