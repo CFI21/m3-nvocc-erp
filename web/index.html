@@ -4732,14 +4732,15 @@ async function m3EnsureIamLogin(){
     username.addEventListener('input',()=>{accountType.value=['admin','md.maker','md.checker'].includes(username.value.trim())?username.value.trim():'';});
     const password=document.createElement('input');password.type='password';password.placeholder='Password';password.autocomplete='current-password';password.required=true;
     const mfa=document.createElement('input');mfa.placeholder='MFA code, if required';mfa.autocomplete='one-time-code';
+    const uatAccess=document.createElement('input');uatAccess.type='password';uatAccess.placeholder='Isolated UAT access token';uatAccess.autocomplete='off';
     const message=document.createElement('p');message.style.cssText='margin:0;color:#b42318;font-size:12px';
     const submit=document.createElement('button');submit.type='submit';submit.textContent='Sign in';submit.className='btn primary';
-    for(const input of [accountType,username,password,mfa])input.style.cssText='height:36px;padding:7px;border:1px solid #94a3b8;border-radius:4px';
-    card.append(title,intro,accountType,username,password,mfa,message,submit);cover.append(card);document.body.append(cover);
+    for(const input of [accountType,username,password,mfa,uatAccess])input.style.cssText='height:36px;padding:7px;border:1px solid #94a3b8;border-radius:4px';
+    card.append(title,intro,accountType,username,password,mfa,uatAccess,message,submit);cover.append(card);document.body.append(cover);
     card.addEventListener('submit',async event=>{
       event.preventDefault();submit.disabled=true;message.textContent='';
       try{
-        const res=await fetch('/api/admin/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:username.value.trim(),password:password.value,mfa_code:mfa.value.trim()||null})});
+        const res=await fetch('/api/admin/auth/login',{method:'POST',headers:{'Content-Type':'application/json','X-M3-UAT-Token':uatAccess.value.trim()},body:JSON.stringify({username:username.value.trim(),password:password.value,mfa_code:mfa.value.trim()||null})});
         if(!res.ok){let reason='';try{const body=await res.json();reason=String(body?.detail?.code||body?.detail?.reason||'')}catch(_error){}const attempted=username.value.trim();const hint=reason==='INVALID_CREDENTIALS'?'Account password was rejected.':reason==='MFA_REQUIRED'?'MFA verification was rejected.':'Check credentials and UAT API status.';throw Error('Sign-in failed for '+attempted+' (HTTP '+res.status+(reason?', '+reason:'')+'). '+hint+'');}
         const result=await res.json();
         if(!result.session_token)throw Error('Login returned no IAM session');
