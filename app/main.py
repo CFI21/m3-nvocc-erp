@@ -21,6 +21,7 @@ from .bulk_permission_governance import (
 )
 from .admin_seed import run as admin_seed_run
 from .masterdata import router as masterdata_router
+from .uat_approval_page import router as uat_approval_router
 from .masterdata_seed import run as masterdata_seed_run
 from .screen_integration import router as screen_integration_router
 from .business_day import router as business_day_router
@@ -120,6 +121,7 @@ app.include_router(business_day_router)
 app.include_router(screen_integration_router)
 app.include_router(admin_router)
 app.include_router(masterdata_router)
+app.include_router(uat_approval_router)
 app.include_router(bulk_router)
 app.include_router(integration_router)
 app.include_router(treasury_router)
@@ -499,12 +501,13 @@ async def security_headers(request, call_next):
     recovery_page_exempt=(request.url.path=='/api/admin/auth/uat-recovery-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
     login_page_exempt=(request.url.path=='/api/admin/auth/uat-login-verify-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
     maker_checker_page_exempt=(request.url.path=='/api/admin/auth/uat-maker-checker-verify-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
+    approval_page_exempt=(request.url.path=='/api/admin/auth/uat-masterdata-approval-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
     production_traffic=os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()
     uat_token=os.getenv('M3_UAT_TOKEN','')
     supplied_uat=request.headers.get('X-M3-UAT-Token','')
     uat_allowed=bool(uat_token and supplied_uat and hmac.compare_digest(uat_token,supplied_uat))
     try:
-        if production_traffic!='ON' and not health_exempt and not setup_exempt and not recovery_page_exempt and not login_page_exempt and not maker_checker_page_exempt and not uat_allowed:
+        if production_traffic!='ON' and not health_exempt and not setup_exempt and not recovery_page_exempt and not login_page_exempt and not maker_checker_page_exempt and not approval_page_exempt and not uat_allowed:
             response=JSONResponse({'detail':{'code':'PRODUCTION_TRAFFIC_LOCKED','uat_header':'X-M3-UAT-Token'}},status_code=503)
         elif not health_exempt and runtime_mode=='MAINTENANCE':
             response=JSONResponse({'detail':{'code':'MAINTENANCE_MODE'}},status_code=503)
