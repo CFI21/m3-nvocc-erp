@@ -132,3 +132,16 @@ def test_independent_checker_approves_and_versions_master(harness, monkeypatch):
         md.decide("MDC-UAT-01", md.Decision(decision="APPROVE"), x_m3_session="checker")
     assert exc.value.status_code==409
     assert _error_code(exc)=="CHANGE_ALREADY_DECIDED"
+
+
+def test_checker_recovery_disabled_by_default(monkeypatch):
+    from app import admin
+    monkeypatch.delenv("M3_ALLOW_CHECKER_RECOVERY", raising=False)
+    # The flag must be evaluated before any database connection or credential update.
+    with pytest.raises(HTTPException) as exc:
+        admin.isolated_uat_checker_reset(
+            admin.UATCheckerPasswordReset(new_password="A-placeholder-strong-password"),
+            x_m3_session=None,
+        )
+    assert exc.value.status_code == 404
+    assert _error_code(exc) == "NOT_FOUND"
