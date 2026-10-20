@@ -145,3 +145,29 @@ def test_checker_recovery_disabled_by_default(monkeypatch):
         )
     assert exc.value.status_code == 404
     assert _error_code(exc) == "NOT_FOUND"
+
+
+def test_maker_submit_then_independent_checker_approve_end_to_end(harness, monkeypatch):
+    """Exercise real change submission and decision handlers, not seeded pending rows."""
+    monkeypatch.setattr(md, "sync_operational_projection", lambda *args, **kwargs: None)
+    created=md.create_change(
+        md.Change(domain="unit",record_key="UAT-E2E-UNIT",operation="CREATE",
+                  payload={"name":"UAT E2E isolated unit"},reason="Synthetic workflow test"),
+        x_m3_session="maker")
+    assert created["status"]=="PENDING" and created["base_version"]==0
+    ref=created["change_ref"]
+    c=harness()
+    assert c.execute("SELECT COUNT(*) AS n FROM md_records").fetchone()["n"]==0
+    assert c.execute("SELECT COUNT(*) AS n FROM md_audit WHERE action='CHANGE_REQUEST_CREATE'").fetchone()["n"]==1
+    c.close()
+    with pytest.raises(HTTPException) as ex:
+        md.decide(ref,md.Decision(decision="APPROVE"),x_m3_session="maker")
+    assert _error_code(ex)=="CHECKER_PERMISSION_DENIED"
+    approved=md.decide(ref,md.Decision(decision="APPROVE",comment="Independent review"),x_m3_session="checker")
+    assert approved=={"status":"APPROVED","version":1}
+    c=harness()
+    record=c.execute("SELECT approved_by,version,status FROM md_records WHERE domain='unit' AND record_key='UAT-E2E-UNIT'").fetchone()
+    assert (record["approved_by"],record["version"],record["status"])==("USER-CHECKER",1,"ACTIVE")
+    assert c.execute("SELECT COUNT(*) AS n FROM md_versions WHERE change_ref=?",(ref,)).fetchone()["n"]==1
+    assert c.execute("SELECT COUNT(*) AS n FROM md_audit WHERE change_ref=?",(ref,)).fetchone()["n"]==2
+    c.close()
