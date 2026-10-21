@@ -24,7 +24,7 @@ GOVERNANCE_SCREENS=['dashboard','change-requests','approval-queue','versions','d
 SCREENS=['dashboard']+[d+'s' if not d.endswith('s') else d for d in DOMAINS]+GOVERNANCE_SCREENS[1:]
 
 class Change(BaseModel):
-    domain:str; record_key:str; operation:str=Field(pattern='^(CREATE|UPDATE|DEACTIVATE|ACTIVATE)$'); payload:dict[str,Any]=Field(default_factory=dict); reason:str
+    domain:str; record_key:str; operation:str=Field(pattern=r'^(CREATE|UPDATE|DEACTIVATE|ACTIVATE|REACTIVATE)$'); payload:dict[str,Any]=Field(default_factory=dict); reason:str
 class Decision(BaseModel): decision:str=Field(pattern='^(APPROVE|REJECT)$'); comment:Optional[str]=None
 class SequenceNext(BaseModel): sequence_code:str
 class AliasMerge(BaseModel): domain:str; source_key:str; target_key:str; reason:str
@@ -49,6 +49,9 @@ def audit(c,actor,action,domain=None,key=None,change_ref=None,before=None,after=
     c.execute('INSERT INTO md_audit(event_ref,ts,actor,action,domain,record_key,change_ref,before_json,after_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?,?,?)',(event,ts,actor,action,domain,key,change_ref,j(before) if before is not None else None,j(after) if after is not None else None,h(base)))
 def authenticated_actor(c,token):
     sess=iam_session(c,token)
+    # IAM returns sqlite3.Row in SQLite and mapping rows in PostgreSQL.
+    # Normalize only after the server has validated the session token.
+    sess=dict(sess)
     roles={r['role_code'] for r in iam_roles_for(c,sess['user_id'])}
     return sess,roles
 
@@ -59,25 +62,64 @@ def validate_payload(domain,payload,existing=None):
     if domain not in ('configuration','reference-sequence') and not (merged.get('name') or merged.get('display_name')): errs.append('DISPLAY_NAME_REQUIRED')
     ef=merged.get('effective_from'); et=merged.get('effective_to')
     if ef and et and et<ef: errs.append('INVALID_EFFECTIVE_DATES')
+    if domain=='configuration':
+        kind=str(merged.get('config_type') or '').upper()
+        required=()
+        if kind=='AGENT_OFFICE_ASSIGNMENT':
+            required=('agent_code','office_code')
+        elif kind=='AGENT_EMAIL':
+            required=('agent_code','port_code','email')
+            from email.utils import parseaddr
+            email=str(merged.get('email') or '').strip()
+            if email and (parseaddr(email)[1]!=email or '@' not in email or '.' not in email.rsplit('@',1)[-1]):
+                errs.append('AGENT_EMAIL_INVALID')
+        elif kind=='AGENT_NETWORK' and str(merged.get('network_type') or '').upper()=='PORT_COVERAGE':
+            required=('agent_code','office_code','scope','port_code')
+            if str(merged.get('scope') or '').upper() not in ('POL','POD','TS'):
+                errs.append('AGENT_PORT_SCOPE_INVALID')
+            import re
+            if not re.fullmatch(r'[A-Z0-9]{3,8}',str(merged.get('port_code') or '').strip().upper()):
+                errs.append('AGENT_PORT_CODE_INVALID')
+        if required and any(not str(merged.get(k) or '').strip() for k in required):
+            errs.append('AGENT_CONFIGURATION_REQUIRED_FIELDS')
     if domain=='currency' and merged.get('iso') and len(str(merged['iso']))!=3: errs.append('CURRENCY_ISO_INVALID')
     if domain=='port' and merged.get('unlocode') and len(str(merged['unlocode']))!=5: errs.append('UNLOCODE_INVALID')
     if domain=='bank-account' and not merged.get('currency'): errs.append('BANK_ACCOUNT_CURRENCY_REQUIRED')
     if domain=='route' and merged.get('pol') and merged.get('pod') and merged.get('pol')==merged.get('pod'): errs.append('ROUTE_POL_POD_SAME')
     return errs
 
+def _canonical_display_name(value):
+    return " ".join(str(value or "").split()).casefold()
+
 def duplicate_name(c,domain,name,exclude_key=None):
-    if not name:return None
-    q="SELECT record_key FROM md_records WHERE domain=? AND lower(display_name)=lower(?) AND status='ACTIVE'"; args=[domain,name]
-    if exclude_key:q+=' AND record_key<>?';args.append(exclude_key)
-    return c.execute(q,args).fetchone()
+    canonical=_canonical_display_name(name)
+    if not canonical:return None
+    # Compare canonical values in Python so internal whitespace and Unicode case
+    # variants cannot bypass the existing active-record duplicate barrier.
+    for row in c.execute(
+        "SELECT record_key,display_name FROM md_records WHERE domain=? AND status='ACTIVE'",
+        (domain,),
+    ):
+        if exclude_key and row['record_key']==exclude_key:
+            continue
+        if _canonical_display_name(row['display_name'])==canonical:
+            return row
+    return None
 
 def pending_duplicate_name(c,domain,name,exclude_key=None):
-    if not name:return None
-    for r in c.execute("SELECT record_key,payload_json FROM md_change_requests WHERE domain=? AND status='PENDING' AND operation IN ('CREATE','UPDATE')",(domain,)):
-        if exclude_key and r['record_key']==exclude_key: continue
-        p=json.loads(r['payload_json'] or '{}')
-        n=p.get('name') or p.get('display_name')
-        if n and str(n).strip().lower()==str(name).strip().lower(): return r
+    canonical=_canonical_display_name(name)
+    if not canonical:return None
+    for row in c.execute(
+        "SELECT record_key,payload_json FROM md_change_requests "
+        "WHERE domain=? AND status='PENDING' AND operation IN ('CREATE','UPDATE')",
+        (domain,),
+    ):
+        if exclude_key and row['record_key']==exclude_key:
+            continue
+        payload=json.loads(row['payload_json'] or '{}')
+        other=payload.get('name') or payload.get('display_name')
+        if _canonical_display_name(other)==canonical:
+            return row
     return None
 
 def active_master(c,domain,key):
@@ -86,6 +128,38 @@ def active_master(c,domain,key):
 
 def reference_errors(c,domain,payload):
     errs=[]
+    if domain=='configuration':
+        kind=str(payload.get('config_type') or '').upper()
+        if kind in ('AGENT_OFFICE_ASSIGNMENT','AGENT_EMAIL','AGENT_NETWORK'):
+            agent_code=str(payload.get('agent_code') or '').strip()
+            if agent_code and not active_master(c,'agent',agent_code):
+                errs.append('AGENT_REFERENCE_NOT_ACTIVE')
+        if kind=='AGENT_OFFICE_ASSIGNMENT':
+            office_code=str(payload.get('office_code') or '').strip()
+            if office_code:
+                office=c.execute("""SELECT o.id, co.country_code
+                   FROM iam_offices o JOIN iam_countries co ON co.id=o.country_id
+                   WHERE o.office_code=? AND o.status='ACTIVE' AND co.status='ACTIVE'""",(office_code,)).fetchone()
+                if not office:
+                    errs.append('AGENT_OFFICE_REFERENCE_NOT_ACTIVE')
+                elif payload.get('country_code') and str(payload['country_code']).upper()!=str(office['country_code']).upper():
+                    errs.append('AGENT_OFFICE_COUNTRY_MISMATCH')
+        if kind=='AGENT_NETWORK' and str(payload.get('network_type') or '').upper()=='PORT_COVERAGE' and str(payload.get('scope') or '').upper()=='POL':
+            office=str(payload.get('office_code') or '').strip()
+            port=str(payload.get('port_code') or '').strip().upper()
+            location=c.execute("SELECT co.country_code FROM iam_offices o JOIN iam_countries co ON co.id=o.country_id WHERE o.office_code=? AND o.status='ACTIVE' AND co.status='ACTIVE'",(office,)).fetchone()
+            if not location: errs.append('AGENT_NETWORK_OFFICE_NOT_ACTIVE')
+            elif port and location['country_code']!=port[:2]: errs.append('AGENT_NETWORK_OFFICE_COUNTRY_MISMATCH')
+            master=c.execute("SELECT payload_json FROM md_records WHERE domain='port' AND record_key=? AND status='ACTIVE'",(port,)).fetchone()
+            if not master: errs.append('AGENT_NETWORK_PORT_NOT_ACTIVE')
+            elif str(json.loads(master['payload_json'] or '{}').get('unlocode') or port).upper()!=port:
+                errs.append('AGENT_NETWORK_PORT_CODE_MISMATCH')
+            if not c.execute("SELECT 1 FROM iam_countries WHERE country_code=? AND status='ACTIVE'",(port[:2],)).fetchone():
+                errs.append('AGENT_NETWORK_COUNTRY_NOT_ACTIVE')
+        if kind=='AGENT_EMAIL':
+            port_code=str(payload.get('port_code') or '').strip()
+            if port_code and not active_master(c,'port',port_code):
+                errs.append('AGENT_EMAIL_PORT_REFERENCE_NOT_ACTIVE')
     if domain=='bank-account':
         if payload.get('bank') and not active_master(c,'bank',payload.get('bank')): errs.append('BANK_REFERENCE_NOT_ACTIVE')
         if payload.get('currency') and not active_master(c,'currency',payload.get('currency')): errs.append('CURRENCY_REFERENCE_NOT_ACTIVE')
@@ -112,30 +186,281 @@ def usage_count(c,domain,key):
     elif domain=='voyage': n+=c.execute('SELECT COUNT(*) n FROM jobs j JOIN voyages v ON v.id=j.voyage_id WHERE v.voyage_no=?',(key,)).fetchone()['n']
     return n
 
+@router.get('/agent-office-countries')
+def agent_office_countries(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Read-only countries for approved Agent office assignments; never grants IAM membership."""
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_READ_SCOPE_NOT_AUTHORIZED'})
+        result=[]
+        seen=set()
+        for r in c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+            p=json.loads(r['payload_json'] or '{}')
+            if str(p.get('config_type') or '').upper()!='AGENT_OFFICE_ASSIGNMENT':
+                continue
+            agent=str(p.get('agent_code') or '').strip()
+            office=str(p.get('office_code') or '').strip()
+            if not agent or not office or not active_master(c,'agent',agent):
+                continue
+            resolved=c.execute("""SELECT o.office_code,country.country_code,country.name AS country_name
+                FROM iam_offices o JOIN iam_countries country ON country.id=o.country_id
+                WHERE o.office_code=? AND o.status='ACTIVE' AND country.status='ACTIVE'""",(office,)).fetchone()
+            if not resolved: continue
+            key=(agent,resolved['office_code'],resolved['country_code'])
+            if key in seen: continue
+            seen.add(key)
+            result.append({'agent_code':agent,'office_code':resolved['office_code'],
+                           'source':'OFFICE','country_code':resolved['country_code'],'country_name':resolved['country_name']})
+        for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+            p=json.loads(rec['payload_json'] or '{}')
+            if p.get('config_type')!='AGENT_NETWORK' or p.get('network_type')!='PORT_COVERAGE' or p.get('scope')!='POL': continue
+            agent=p.get('agent_code'); office=p.get('office_code'); port=p.get('port_code')
+            if not agent or not office or not port or not active_master(c,'agent',agent): continue
+            master=c.execute("SELECT payload_json FROM md_records WHERE domain='port' AND record_key=? AND status='ACTIVE'",(port,)).fetchone()
+            if not master or str(json.loads(master['payload_json'] or '{}').get('unlocode') or port).upper()!=str(port).upper(): continue
+            country=c.execute("SELECT co.country_code,co.name FROM iam_offices o JOIN iam_countries co ON co.id=o.country_id WHERE o.office_code=? AND o.status='ACTIVE' AND co.status='ACTIVE'",(office,)).fetchone()
+            if not country or country['country_code']!=port[:2]: continue
+            key=('POL',str(agent).upper(),str(office).upper(),str(port).upper())
+            if key in seen: continue
+            seen.add(key)
+            result.append({'agent_code':agent,'office_code':office,'port_code':port,'source':'POL','record_key':rec['record_key'],'country_code':country['country_code'],'country_name':country['name']})
+        # Deterministic display order independent of database scan order.
+        # Do not alter source configurations or IAM membership.
+        return sorted(result,key=lambda row:(str(row['agent_code']).upper(),str(row['country_code']).upper(),str(row['office_code']).upper(),str(row['source']).upper(),str(row.get('port_code') or '').upper()))
+    finally:
+        c.close()
+
+
+# Uploaded reference catalog is intentionally separate from approved Port Master.
+# Booking permissions continue to require approved ACTIVE md_records.
+def _unlocode_catalog():
+    from .unlocode_release import catalog
+    return catalog()
+
+@router.get('/unlocode/catalog')
+def unlocode_catalog(q:str='',country:str='',limit:int=100,
+                   x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_READ_SCOPE_NOT_AUTHORIZED'})
+        if not 1<=limit<=200:
+            raise HTTPException(422,{'code':'UNLOCODE_LIMIT_INVALID'})
+        needle=q.strip().upper()
+        country=country.strip().upper()
+        if country and (len(country)!=2 or not country.isalpha()):
+            raise HTTPException(422,{'code':'UNLOCODE_COUNTRY_INVALID'})
+        matches=[
+            item for item in _unlocode_catalog()
+            if (not country or item['country_code']==country)
+            and (not needle or needle in (' '.join(str(value) for value in item.values())).upper())
+        ]
+        sources={str(item.get('source') or 'uploaded_unlocode_reference') for item in matches}
+        return {'total':len(matches),'items':matches[:limit],
+                'source':next(iter(sources)) if len(sources)==1 else ('mixed' if sources else 'none'),
+                'booking_grant':False}
+    finally:
+        c.close()
+
+@router.post('/unlocode/stage/{code}')
+def unlocode_stage(code:str,reason:str='UNLOCODE catalog onboarding',
+                   x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    import re
+    if not isinstance(code,str) or not re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}',code.strip().upper()):
+        raise HTTPException(422,{'code':'UNLOCODE_INVALID'})
+    key=code.strip().upper()
+    matches=[row for row in _unlocode_catalog() if row['unlocode']==key]
+    if len(matches)!=1:
+        raise HTTPException(404,{'code':'UNLOCODE_NOT_FOUND'})
+    row=matches[0]
+    if row.get('eligible_for_activation') is False:
+        raise HTTPException(409,{'code':'UNLOCODE_DELETED_NOT_ACTIVATABLE'})
+    payload={'name':row['port_name'],'display_name':row['port_name'],
+             'unlocode':key,'country_code':row['country_code'],
+             'country_name':row['country_name'],'port_code':row['port_code'],
+             'subdivision_code':row.get('subdivision_code') or '',
+             'function':row.get('function') or '',
+             'unlocode_status':row.get('unlocode_status') or '',
+             'iata_code':row.get('iata_code') or '',
+             'coordinates':row.get('coordinates') or '',
+             'source':row.get('source') or 'uploaded_unlocode_reference'}
+    # Use the existing authenticated maker/checker workflow, not direct DB writes.
+    return create_change(Change(domain='port',record_key=key,
+                                operation='CREATE',payload=payload,reason=reason),
+                         x_m3_session=x_m3_session)
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','domains':DOMAINS,'domain_count':len(DOMAINS),'screens':SCREENS,'screen_count':len(SCREENS),'governance':'MAKER_CHECKER_VERSIONED','delete_mode':'PROTECTED_NO_HARD_DELETE'}
 @router.get('/overview')
 def overview():
     c=connect();init_schema(c);out={'records':c.execute('SELECT COUNT(*) n FROM md_records').fetchone()['n'],'pending_changes':c.execute("SELECT COUNT(*) n FROM md_change_requests WHERE status='PENDING'").fetchone()['n'],'quality_issues':c.execute("SELECT COUNT(*) n FROM md_quality_issues WHERE status='OPEN'").fetchone()['n'],'domains':len(DOMAINS),'screens':len(SCREENS),'aliases':c.execute("SELECT COUNT(*) n FROM md_aliases WHERE status='ACTIVE'").fetchone()['n']};out['by_domain']={r['domain']:r['n'] for r in c.execute('SELECT domain,COUNT(*) n FROM md_records GROUP BY domain')};c.close();return out
 @router.get('/records/{domain}')
-def records(domain:str):
+def records(domain:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     if domain not in DOMAINS:raise HTTPException(404,'Unknown domain')
-    c=connect();
-    if not using_postgres(): init_schema(c)
-    rows=[]
-    for r in c.execute('SELECT * FROM md_records WHERE domain=? ORDER BY record_key',(domain,)):
-        d=dict(r);d['payload']=json.loads(d.pop('payload_json'));rows.append(d)
-    c.close();return rows
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        # Fail closed for cross-organization masters pending row-level IAM relationship validation.
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_READ_SCOPE_NOT_AUTHORIZED'})
+        rows=[]
+        for r in c.execute('SELECT * FROM md_records WHERE domain=? ORDER BY record_key',(domain,)):
+            d=dict(r);d['payload']=json.loads(d.pop('payload_json'));rows.append(d)
+        return rows
+    finally:
+        c.close()
 @router.post('/changes')
 def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess.get('user_ref') if isinstance(sess,dict) else None
     if b.domain not in DOMAINS:c.close();raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
     if not can_make_roles(roles):c.close();raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+    if not str(user or '').strip():
+        c.close()
+        raise HTTPException(403,{'code':'MAKER_IDENTITY_REQUIRED'})
+    if not isinstance(sess,dict) or not str(sess.get('username') or '').strip():
+        c.close()
+        raise HTTPException(403,{'code':'MAKER_SESSION_USERNAME_REQUIRED'})
+    # Isolated B01 role separation: fail closed for checker-initiated Agent changes.
+    import os
+    strict_b01 = (
+        os.getenv('M3_PRODUCTION_TRAFFIC', 'OFF').strip().upper() != 'ON'
+        and os.getenv('M3_B01_STRICT_MAKER_CHECKER', 'false').strip().casefold() == 'true'
+    )
+    if strict_b01 and str(sess.get('username') or '').strip().casefold() == 'md.checker':
+        protected_types = {'AGENT_EMAIL', 'AGENT_OFFICE_ASSIGNMENT', 'AGENT_NETWORK'}
+        agent_configuration = False
+        if b.domain == 'configuration':
+            requested_type = str(b.payload.get('config_type') or '').strip().upper()
+            prior_type = ''
+            if b.operation != 'CREATE':
+                prior = c.execute(
+                    'SELECT payload_json FROM md_records WHERE domain=? AND record_key=?',
+                    ('configuration', b.record_key),
+                ).fetchone()
+                if prior:
+                    prior_type = str(
+                        json.loads(prior['payload_json'] or '{}').get('config_type') or ''
+                    ).strip().upper()
+            agent_configuration = requested_type in protected_types or prior_type in protected_types
+        if b.domain == 'agent' or agent_configuration:
+            c.close()
+            raise HTTPException(403, {'code': 'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
+
+    # Semantic identity guard: randomized AGCFG keys must not permit a second
+    # Office assignment for the same Agent + Office (or identical Email route).
+    if b.domain=='configuration' and b.operation=='CREATE':
+        kind=str(b.payload.get('config_type') or '').strip().upper()
+        if kind=='AGENT_NETWORK' and str(b.payload.get('network_type') or '').strip().upper()=='PORT_COVERAGE':
+            for table,extra in (('md_records',"status='ACTIVE'"),('md_change_requests',"status='PENDING' AND operation='CREATE'")):
+                for rec in c.execute("SELECT record_key,payload_json FROM "+table+" WHERE domain='configuration' AND "+extra):
+                    prior=json.loads(rec['payload_json'] or '{}')
+                    keys=('config_type','network_type','agent_code','office_code','scope','port_code')
+                    if all(str(prior.get(k) or '').strip().upper()==str(b.payload.get(k) or '').strip().upper() for k in keys):
+                        c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':rec['record_key']})
+        if kind in ('AGENT_OFFICE_ASSIGNMENT','AGENT_EMAIL'):
+            agent=str(b.payload.get('agent_code') or '').strip().upper()
+            office=str(b.payload.get('office_code') or '').strip().upper()
+            port=str(b.payload.get('port_code') or '').strip().upper()
+            email=str(b.payload.get('email') or '').strip().lower()
+            if agent:
+                for table,status_filter in (('md_records',"status='ACTIVE'"),('md_change_requests',"status='PENDING' AND operation='CREATE'")):
+                    for prior in c.execute("SELECT record_key,payload_json FROM "+table+" WHERE domain='configuration' AND "+status_filter):
+                        value=json.loads(prior['payload_json'] or '{}')
+                        if str(value.get('config_type') or '').strip().upper()!=kind or str(value.get('agent_code') or '').strip().upper()!=agent:
+                            continue
+                        duplicate=(kind=='AGENT_OFFICE_ASSIGNMENT' and office and str(value.get('office_code') or '').strip().upper()==office) or (kind=='AGENT_EMAIL' and port and email and str(value.get('port_code') or '').strip().upper()==port and str(value.get('email') or '').strip().lower()==email)
+                        if duplicate:
+                            c.close()
+                            raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':prior['record_key']})
     existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
     if b.operation=='CREATE' and existing:c.close();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
     if b.operation!='CREATE' and not existing:c.close();raise HTTPException(404,{'code':'MASTER_RECORD_NOT_FOUND'})
+    if existing and b.operation in ('UPDATE','DEACTIVATE') and existing['status']!='ACTIVE':
+        c.close()
+        raise HTTPException(409,{'code':'MASTER_RECORD_NOT_ACTIVE','record_key':b.record_key})
+    if existing and b.operation in ('ACTIVATE','REACTIVATE') and existing['status']!='INACTIVE':
+        c.close()
+        raise HTTPException(409,{'code':'MASTER_RECORD_NOT_INACTIVE','record_key':b.record_key})
+    if existing and b.operation in ('ACTIVATE','REACTIVATE') and b.domain=='configuration':
+        restored=json.loads(existing['payload_json'] or '{}')
+        errors=validate_payload(b.domain,{},restored)+reference_errors(c,b.domain,restored)
+        if errors:
+            c.close()
+            raise HTTPException(422,{'codes':sorted(set(errors))})
+    if existing and b.operation in ('ACTIVATE','REACTIVATE') and b.domain=='configuration':
+        restored=json.loads(existing['payload_json'] or '{}')
+        kind=str(restored.get('config_type') or '').strip().upper()
+        agent=str(restored.get('agent_code') or '').strip().upper()
+        office=str(restored.get('office_code') or '').strip().upper()
+        port=str(restored.get('port_code') or '').strip().upper()
+        email=str(restored.get('email') or '').strip().lower()
+        if kind in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'):
+            for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if row['record_key']==b.record_key: continue
+                other=json.loads(row['payload_json'] or '{}')
+                if str(other.get('config_type') or '').strip().upper()!=kind: continue
+                if str(other.get('agent_code') or '').strip().upper()!=agent: continue
+                match=(bool(office) and str(other.get('office_code') or '').strip().upper()==office) if kind=='AGENT_OFFICE_ASSIGNMENT' else (bool(port) and bool(email) and str(other.get('port_code') or '').strip().upper()==port and str(other.get('email') or '').strip().lower()==email)
+                if match:
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
+    if existing and b.operation in ('ACTIVATE','REACTIVATE') and b.domain=='configuration':
+        restored=json.loads(existing['payload_json'] or '{}')
+        if (str(restored.get('config_type') or '').strip().upper()=='AGENT_NETWORK'
+            and str(restored.get('network_type') or '').strip().upper()=='PORT_COVERAGE'):
+            fields=('config_type','network_type','agent_code','office_code','scope','port_code')
+            for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if row['record_key']==b.record_key: continue
+                other=json.loads(row['payload_json'] or '{}')
+                if (str(other.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+                    str(other.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
+                    all(str(other.get(field) or '').strip().upper()==str(restored.get(field) or '').strip().upper() for field in fields)):
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
+    if (b.domain=='configuration' and b.operation=='UPDATE' and
+        str(({**existing_payload,**b.payload}).get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+        str(({**existing_payload,**b.payload}).get('network_type') or '').strip().upper()=='PORT_COVERAGE'):
+        candidate={**existing_payload,**b.payload}
+        fields=('config_type','network_type','agent_code','office_code','scope','port_code')
+        for item in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+            if item['record_key']==b.record_key: continue
+            p=json.loads(item['payload_json'] or '{}')
+            if (str(p.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+                str(p.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
+                all(str(p.get(k) or '').strip().upper()==str(candidate.get(k) or '').strip().upper() for k in fields)):
+                c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':item['record_key']})
+    # Reject Agent Email / Office UPDATE collisions before creating a pending
+    # change. Checker approval independently rechecks the same identities.
+    if b.domain=='configuration' and b.operation=='UPDATE':
+        candidate={**existing_payload,**b.payload}
+        kind=str(candidate.get('config_type') or '').strip().upper()
+        if kind in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'):
+            agent=str(candidate.get('agent_code') or '').strip().upper()
+            office=str(candidate.get('office_code') or '').strip().upper()
+            port=str(candidate.get('port_code') or '').strip().upper()
+            email=str(candidate.get('email') or '').strip().lower()
+            for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if row['record_key']==b.record_key:
+                    continue
+                other=json.loads(row['payload_json'] or '{}')
+                if (str(other.get('config_type') or '').strip().upper()!=kind or
+                    str(other.get('agent_code') or '').strip().upper()!=agent):
+                    continue
+                collision=(bool(office) and str(other.get('office_code') or '').strip().upper()==office) if kind=='AGENT_OFFICE_ASSIGNMENT' else (
+                    bool(port) and bool(email) and
+                    str(other.get('port_code') or '').strip().upper()==port and
+                    str(other.get('email') or '').strip().lower()==email)
+                if collision:
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     errs=validate_payload(b.domain,b.payload,existing_payload) if b.operation in ('CREATE','UPDATE') else []
     if b.operation in ('CREATE','UPDATE'): errs+=reference_errors(c,b.domain,{**existing_payload,**b.payload})
     if b.operation=='DEACTIVATE' and usage_count(c,b.domain,b.record_key)>0:
@@ -149,24 +474,167 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     ref='MDC-'+uuid.uuid4().hex[:10].upper();base=existing['version'] if existing else 0
     c.execute('INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) VALUES(?,?,?,?,?,?,?,?,?)',(ref,b.domain,b.record_key,b.operation,j(b.payload),b.reason,user,now(),base));audit(c,user,'CHANGE_REQUEST_CREATE',b.domain,b.record_key,ref,None,b.payload);c.close();return {'change_ref':ref,'status':'PENDING','base_version':base}
 @router.get('/changes')
-def changes(status:Optional[str]=None):
-    c=connect();init_schema(c);q='SELECT * FROM md_change_requests';args=[]
-    if status:q+=' WHERE status=?';args=[status]
-    q+=' ORDER BY id DESC';out=[]
-    for r in c.execute(q,args):d=dict(r);d['payload']=json.loads(d.pop('payload_json'));out.append(d)
-    c.close();return out
+def changes(status:Optional[str]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_CHANGE_READ_NOT_AUTHORIZED'})
+        q='SELECT * FROM md_change_requests';args=[]
+        if status:q+=' WHERE status=?';args=[status]
+        q+=' ORDER BY id DESC';out=[]
+        for r in c.execute(q,args):
+            d=dict(r);d['payload']=json.loads(d.pop('payload_json'));out.append(d)
+        return out
+    finally:
+        c.close()
+class Withdrawal(BaseModel):
+    reason:str=Field(min_length=3)
+
+@router.post('/changes/{change_ref}/withdraw')
+def withdraw_change(change_ref:str,b:Withdrawal,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Allow only the original maker to withdraw an undecided change.
+
+    Withdrawal is not approval or rejection; it never modifies md_records or
+    md_versions and leaves the independent checker rule intact.
+    """
+    c=connect()
+    try:
+        sess,roles=authenticated_actor(c,x_m3_session)
+        if not can_make_roles(roles):
+            raise HTTPException(403,{'code':'MASTER_CHANGE_WITHDRAW_DENIED'})
+        change=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
+        if not change:
+            raise HTTPException(404,{'code':'MASTER_CHANGE_NOT_FOUND'})
+        if change['maker']!=sess['user_ref']:
+            raise HTTPException(403,{'code':'WITHDRAW_MAKER_ONLY'})
+        if change['status']!='PENDING':
+            raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
+        cursor=c.execute("UPDATE md_change_requests SET status='WITHDRAWN',decision_comment=?,decided_at=? WHERE id=? AND status='PENDING'",
+                         (b.reason.strip(),now(),change['id']))
+        if cursor.rowcount!=1:
+            raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
+        audit(c,sess['user_ref'],'CHANGE_WITHDRAW',change['domain'],change['record_key'],change_ref,
+              before={'status':'PENDING'},after={'status':'WITHDRAWN','reason':b.reason.strip()})
+        return {'change_ref':change_ref,'status':'WITHDRAWN'}
+    finally:
+        c.close()
+
 @router.post('/changes/{change_ref}/decision')
 def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
+    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess.get('user_ref') if isinstance(sess,dict) else None
     if not can_approve_roles(roles):c.close();raise HTTPException(403,{'code':'CHECKER_PERMISSION_DENIED'})
+    if not str(user or '').strip():
+        c.close()
+        raise HTTPException(403,{'code':'CHECKER_IDENTITY_REQUIRED'})
+    if not isinstance(sess,dict) or not str(sess.get('username') or '').strip():
+        c.close()
+        raise HTTPException(403,{'code':'CHECKER_SESSION_USERNAME_REQUIRED'})
     ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
     if not ch:c.close();raise HTTPException(404,'Change not found')
     if ch['status']!='PENDING':c.close();raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
-    if ch['maker']==user:c.close();raise HTTPException(409,{'code':'FOUR_EYES_VIOLATION'})
+    maker_ref=str(ch['maker'] or '').strip().casefold()
+    checker_ref=str(user or '').strip().casefold()
+    if not maker_ref or not checker_ref or maker_ref==checker_ref:
+        c.close()
+        raise HTTPException(409,{'code':'FOUR_EYES_VIOLATION'})
+    if b.decision=='APPROVE' and ch['operation'] not in ('CREATE','UPDATE','DEACTIVATE','ACTIVATE','REACTIVATE'):
+        c.close()
+        raise HTTPException(422,{'code':'INVALID_MASTER_OPERATION','operation':ch['operation']})
     if b.decision=='REJECT':c.execute("UPDATE md_change_requests SET status='REJECTED',checker=?,decision_comment=?,decided_at=? WHERE id=?",(user,b.comment,now(),ch['id']));audit(c,user,'CHANGE_REJECT',ch['domain'],ch['record_key'],change_ref);c.close();return {'status':'REJECTED'}
     current=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(ch['domain'],ch['record_key'])).fetchone()
+    if ch['operation']=='CREATE' and current:
+        c.close()
+        raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY','record_key':ch['record_key']})
+    if ch['operation']!='CREATE' and not current:
+        c.close()
+        raise HTTPException(409,{'code':'MASTER_RECORD_NOT_FOUND','record_key':ch['record_key']})
+    if ch['operation']=='UPDATE' and current and current['status']!='ACTIVE':
+        c.close()
+        raise HTTPException(409,{'code':'MASTER_RECORD_NOT_ACTIVE','record_key':ch['record_key']})
+    if ch['operation']=='DEACTIVATE' and current and current['status']!='ACTIVE':
+        c.close()
+        raise HTTPException(409,{'code':'MASTER_RECORD_NOT_ACTIVE','record_key':ch['record_key']})
+    if ch['operation'] in ('ACTIVATE','REACTIVATE') and current and current['status']!='INACTIVE':
+        c.close()
+        raise HTTPException(409,{'code':'MASTER_RECORD_NOT_INACTIVE','record_key':ch['record_key']})
+    if ch['operation'] in ('ACTIVATE','REACTIVATE') and current and ch['domain']=='configuration':
+        restored=json.loads(current['payload_json'] or '{}')
+        errors=validate_payload(ch['domain'],{},restored)+reference_errors(c,ch['domain'],restored)
+        if errors:
+            c.close()
+            raise HTTPException(422,{'codes':sorted(set(errors))})
+    if ch['operation'] in ('ACTIVATE','REACTIVATE') and current and ch['domain']=='configuration':
+        restored=json.loads(current['payload_json'] or '{}')
+        kind=str(restored.get('config_type') or '').strip().upper()
+        if kind in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'):
+            agent=str(restored.get('agent_code') or '').strip().upper()
+            office=str(restored.get('office_code') or '').strip().upper()
+            port=str(restored.get('port_code') or '').strip().upper()
+            email=str(restored.get('email') or '').strip().lower()
+            for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if row['record_key']==ch['record_key']: continue
+                other=json.loads(row['payload_json'] or '{}')
+                if str(other.get('config_type') or '').strip().upper()!=kind or str(other.get('agent_code') or '').strip().upper()!=agent: continue
+                duplicate=(bool(office) and str(other.get('office_code') or '').strip().upper()==office) if kind=='AGENT_OFFICE_ASSIGNMENT' else (bool(port) and bool(email) and str(other.get('port_code') or '').strip().upper()==port and str(other.get('email') or '').strip().lower()==email)
+                if duplicate:
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
+    if ch['operation'] in ('ACTIVATE','REACTIVATE') and current and ch['domain']=='configuration':
+        restored=json.loads(current['payload_json'] or '{}')
+        if (str(restored.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+            str(restored.get('network_type') or '').strip().upper()=='PORT_COVERAGE'):
+            fields=('config_type','network_type','agent_code','office_code','scope','port_code')
+            for row in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if row['record_key']==ch['record_key']: continue
+                other=json.loads(row['payload_json'] or '{}')
+                if (str(other.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+                    str(other.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
+                    all(str(other.get(k) or '').strip().upper()==str(restored.get(k) or '').strip().upper() for k in fields)):
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if current and current['version']!=ch['base_version']:c.close();raise HTTPException(409,{'code':'MASTER_VERSION_CONFLICT','current_version':current['version'],'base_version':ch['base_version']})
     payload=json.loads(ch['payload_json']);ts=now();before=dict(current) if current else None
+    # Final independent-checker uniqueness barrier protects against competing pending requests.
+    if ch['domain']=='configuration' and ch['operation'] in ('CREATE','UPDATE'):
+        proposed={**(json.loads(current['payload_json']) if current else {}),**payload}
+        # Revalidate related-record semantic uniqueness at approval time.
+        # Two different pending keys may have been submitted concurrently; only
+        # the first checker-approved relationship may become authoritative.
+        kind=str(proposed.get('config_type') or '').strip().upper()
+        if kind in ('AGENT_EMAIL','AGENT_OFFICE_ASSIGNMENT'):
+            agent=str(proposed.get('agent_code') or '').strip().upper()
+            office=str(proposed.get('office_code') or '').strip().upper()
+            port=str(proposed.get('port_code') or '').strip().upper()
+            email=str(proposed.get('email') or '').strip().lower()
+            for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if rec['record_key']==ch['record_key']:
+                    continue
+                prev=json.loads(rec['payload_json'] or '{}')
+                if str(prev.get('config_type') or '').strip().upper()!=kind:
+                    continue
+                if str(prev.get('agent_code') or '').strip().upper()!=agent:
+                    continue
+                if kind=='AGENT_OFFICE_ASSIGNMENT':
+                    duplicate=bool(office) and str(prev.get('office_code') or '').strip().upper()==office
+                else:
+                    duplicate=(bool(port) and bool(email)
+                        and str(prev.get('port_code') or '').strip().upper()==port
+                        and str(prev.get('email') or '').strip().lower()==email)
+                if duplicate:
+                    c.close()
+                    raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':rec['record_key']})
+        if (str(proposed.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+            str(proposed.get('network_type') or '').strip().upper()=='PORT_COVERAGE'):
+            fields=('config_type','network_type','agent_code','office_code','scope','port_code')
+            for rec in c.execute("SELECT record_key,payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'"):
+                if rec['record_key']==ch['record_key']: continue
+                existing_values=json.loads(rec['payload_json'] or '{}')
+                if (str(existing_values.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
+                    str(existing_values.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
+                    all(str(existing_values.get(k) or '').strip().upper()==str(proposed.get(k) or '').strip().upper() for k in fields)):
+                    c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP'})
     if ch['operation']=='CREATE':
         errs=validate_payload(ch['domain'],payload,{})+reference_errors(c,ch['domain'],payload)
         dup=duplicate_name(c,ch['domain'],payload.get('name') or payload.get('display_name'),ch['record_key'])
@@ -200,11 +668,33 @@ def sync_agent_projections(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     return {'domain':'agent','projection':'agents','synced':synced,'authoritative_source':'md_records','new_master_model':False}
 
 @router.get('/versions/{domain}/{record_key}')
-def versions(domain:str,record_key:str):c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_versions WHERE domain=? AND record_key=? ORDER BY version DESC',(domain,record_key))];c.close();return x
+def versions(domain:str,record_key:str):
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        return [dict(r) for r in c.execute('SELECT * FROM md_versions WHERE domain=? AND record_key=? ORDER BY version DESC',(domain,record_key))]
+    finally: c.close()
+
 @router.get('/quality')
-def quality():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_quality_issues ORDER BY id DESC')];c.close();return x
+def quality():
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        return [dict(r) for r in c.execute('SELECT * FROM md_quality_issues ORDER BY id DESC')]
+    finally: c.close()
+
 @router.get('/duplicates')
-def duplicates():c=connect();init_schema(c);x=[dict(r) for r in c.execute("SELECT domain,lower(display_name) norm,COUNT(*) n,GROUP_CONCAT(record_key) keys FROM md_records WHERE status='ACTIVE' GROUP BY domain,lower(display_name) HAVING COUNT(*)>1")];c.close();return x
+def duplicates():
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        grouped={}
+        for row in c.execute("SELECT domain,display_name,record_key FROM md_records WHERE status='ACTIVE' ORDER BY domain,record_key"):
+            key=(row['domain'],row['display_name'].lower() if row['display_name'] is not None else None)
+            grouped.setdefault(key,[]).append(str(row['record_key']))
+        return [{'domain':domain,'norm':normalized,'n':len(keys),'keys':','.join(keys)}
+                for (domain,normalized),keys in sorted(grouped.items(),key=lambda kv:(kv[0][0],kv[0][1] or '')) if len(keys)>1]
+    finally: c.close()
 @router.get('/usage/{domain}/{record_key}')
 def usage(domain:str,record_key:str):c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_usage WHERE domain=? AND record_key=?',(domain,record_key))];c.close();return x
 @router.get('/delete-check/{domain}/{record_key}')
@@ -232,9 +722,23 @@ def sequence_next(b:SequenceNext,x_m3_session:Optional[str]=Header(None,alias='X
     if not r:c.execute('ROLLBACK');c.close();raise HTTPException(404,'Sequence not found')
     n=r['next_number'];val=f"{r['prefix']}{n:0{r['width']}d}";c.execute('UPDATE md_sequences SET next_number=next_number+1,version=version+1 WHERE id=?',(r['id'],));c.execute('COMMIT');c.close();return {'value':val,'sequence_code':b.sequence_code}
 @router.get('/sequences')
-def sequences():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_sequences ORDER BY sequence_code')];c.close();return x
+def sequences(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        init_schema(c)
+        _,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):raise HTTPException(403,{'code':'SEQUENCE_READ_DENIED'})
+        return [dict(r) for r in c.execute('SELECT * FROM md_sequences ORDER BY sequence_code')]
+    finally:c.close()
 @router.get('/configuration')
-def configuration():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_config ORDER BY config_key')];c.close();return x
+def configuration(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        init_schema(c)
+        _,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):raise HTTPException(403,{'code':'CONFIG_READ_DENIED'})
+        return [dict(r) for r in c.execute('SELECT * FROM md_config ORDER BY config_key')]
+    finally:c.close()
 @router.get('/integrity')
 def integrity():
     c=connect();init_schema(c);issues=[]

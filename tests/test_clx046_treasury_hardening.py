@@ -41,8 +41,10 @@ def test_all_existing_treasury_screens_load_and_keep_readonly_boundaries(isolate
     c=build_catalog()
     screens=[x for x in c['screens'] if x['domain']=='Treasury / AR-AP']
     assert len(screens)==37
+    from app.admin import Login, login
+    token=login(Login(username='admin',password='Admin123!',mfa_code='123456'))['session_token']
     for s in screens:
-        d=screen_data(s['screen_id'],x_role='ADMIN')
+        d=screen_data(s['screen_id'],x_role='ADMIN',x_m3_session=token)
         assert 'rows' in d
         a=set(quick_actions(s['screen_id'],'ADMIN')['visible_actions'])
         if s['key'] in READ_ONLY_MODULES or s['submenu'] in {'Overview','Work Queues','Reports & Reconciliation'}:

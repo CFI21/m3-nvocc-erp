@@ -8,6 +8,7 @@ from app.masterdata_seed import run as masterdata_seed_run
 from app.business_day import propagation
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data, related, workflow
+from tests.iam_personas import persona_session
 from app.clx049_booking_bl_workspace import verify as verify_clx049
 from app.clx046_treasury_hardening import verify as verify_clx046
 from app.clx045_gl_reporting import control_summary as gl_control_summary
@@ -38,18 +39,21 @@ def test_preserve_196_authoritative_screens():
 
 def test_core_operational_flow_access_by_real_roles(isolated):
     for screen_id,role in FLOW_SCREENS:
-        out=screen_data(screen_id,x_role=role)
+        out=screen_data(screen_id,x_role=role,x_m3_session=persona_session(role=role))
         assert isinstance(out["rows"],list), (screen_id,role)
 
 def test_agent_scope_preserved_on_end_to_end_context(isolated):
-    ok=related("50001",x_role="AGENT",x_agent_scope="CLX-AGT-SIN")
+    token=persona_session(role="AGENT",agent_code="CLX-AGT-SIN",office_code="RTM")
+    ok=related("50001",x_m3_session=token)
     assert ok["identity"]["job_ref"]=="50001"
+    other=persona_session(role="AGENT",agent_code="WRONG-AGENT",office_code="RTM")
     with pytest.raises(HTTPException) as exc:
-        related("50001",x_role="AGENT",x_agent_scope="WRONG-AGENT")
+        related("50001",x_m3_session=other)
     assert exc.value.status_code==404
 
+
 def test_booking_job_bl_cro_container_release_do_chain_present(isolated):
-    wf=workflow("50001",x_role="OPS")
+    wf=workflow("50001",x_role="OPS",x_m3_session=persona_session(role="OPS"))
     by_module={x["module"]:x for x in wf["steps"]}
     for module in ("booking","planning","bl","cro","container-activity","delivery-order"):
         assert by_module[module]["present"] is True, module

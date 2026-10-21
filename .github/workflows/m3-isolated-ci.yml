@@ -1,0 +1,79 @@
+name: M3 Isolated CI
+
+on:
+  push:
+    branches:
+      - preview-pr124-booking-isolated
+      - m3-dev-sprint-2
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-isolated-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    if: github.head_ref == 'preview-pr124-booking-isolated' || github.ref_name == 'preview-pr124-booking-isolated' || github.head_ref == 'm3-dev-sprint-2' || github.ref_name == 'm3-dev-sprint-2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONUNBUFFERED: "1"
+      PYTHONPATH: .
+      DATABASE_URL: ""
+      ENVIRONMENT: test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Syntax validation
+        run: python -m compileall -q app
+      - name: Run regression tests
+        id: pytest
+        shell: bash
+        run: |
+          mkdir -p ci-proof
+          set +e
+          python -m pytest -q 2>&1 | tee ci-proof/pytest.log
+          result=${PIPESTATUS[0]}
+          printf '%s\n' "$result" > ci-proof/pytest-exit-code.txt
+          exit "$result"
+      - name: Publish concise failure evidence
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "## M3 Pytest verification"
+            if test -f ci-proof/pytest-exit-code.txt; then
+              echo "Exit code: $(cat ci-proof/pytest-exit-code.txt)"
+            else
+              echo "Exit code: UNKNOWN"
+            fi
+            echo '~~~'
+            if test -f ci-proof/pytest.log; then
+              grep -E '^FAILED |^[0-9]+ failed|^[0-9]+ passed|^ERROR ' ci-proof/pytest.log | tail -n 80 || true
+            else
+              echo "pytest log unavailable"
+            fi
+            echo '~~~'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload pytest evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-results
+          path: ci-proof/
+          if-no-files-found: error
+          retention-days: 7

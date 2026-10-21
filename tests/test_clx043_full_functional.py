@@ -4,6 +4,7 @@ from app import db
 from app.seed import run as seed_run
 from app.masterdata_seed import run as masterdata_seed_run
 from app.admin_seed import run as admin_seed_run
+from app.admin import Login, login
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data, quick_actions, action_route
 
@@ -26,15 +27,17 @@ def test_frozen_baseline_and_menu_order():
     ]
 
 def test_every_catalog_screen_loads_without_server_error(isolated):
+    token = login(Login(username='admin', password='Admin123!', mfa_code='123456'))['session_token']
     for s in build_catalog()['screens']:
-        out=screen_data(s['screen_id'],x_role='ADMIN')
+        out=screen_data(s['screen_id'],x_role='ADMIN',x_m3_session=token)
         assert out['screen']['screen_id']==s['screen_id']
         assert isinstance(out['rows'],list)
 
 def test_verified_dashboards_and_master_audit_are_bound(isolated):
-    assert screen_data('administration::dashboard',x_role='ADMIN')['count']>0
-    assert screen_data('master-data::dashboard',x_role='ADMIN')['count']>0
-    assert screen_data('master-data::audit',x_role='ADMIN')['count']>0
+    token = login(Login(username='admin', password='Admin123!', mfa_code='123456'))['session_token']
+    assert screen_data('administration::dashboard',x_role='ADMIN',x_m3_session=token)['count']>0
+    assert screen_data('master-data::dashboard',x_role='ADMIN',x_m3_session=token)['count']>0
+    assert screen_data('master-data::audit',x_role='ADMIN',x_m3_session=token)['count']>0
 
 def test_gl_treasury_mutations_route_to_real_v1_apis():
     assert action_route('gl-accounts::voucher','approve',1,1,role='ADMIN')['path'].startswith('/api/v1/gl/')

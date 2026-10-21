@@ -21,6 +21,7 @@ from .bulk_permission_governance import (
 )
 from .admin_seed import run as admin_seed_run
 from .masterdata import router as masterdata_router
+from .uat_approval_page import router as uat_approval_router
 from .masterdata_seed import run as masterdata_seed_run
 from .screen_integration import router as screen_integration_router
 from .business_day import router as business_day_router
@@ -71,7 +72,7 @@ CLX086_FINAL_BUILD_BASELINE='cc4963e73dcad8d584218b0a5aab445318a61885'
 app=FastAPI(title='M3 NVOCC ERP CLX-018 Production Web/API Integration',version='0.86.0',description='Dedicated M3 production web/API integration. Production traffic, live providers and real money remain blocked.')
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['https://m3-nvocc-web-latest.onrender.com'],
+    allow_origins=['https://m3-dev-sprint2-isolated-ui.onrender.com'],
     allow_credentials=False,
     allow_methods=['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
     allow_headers=['*'],
@@ -120,6 +121,7 @@ app.include_router(business_day_router)
 app.include_router(screen_integration_router)
 app.include_router(admin_router)
 app.include_router(masterdata_router)
+app.include_router(uat_approval_router)
 app.include_router(bulk_router)
 app.include_router(integration_router)
 app.include_router(treasury_router)
@@ -142,6 +144,167 @@ ROLE_PERMS={
 RELEASE_MODULES={'trt','export-trt','import-trt','transshipment-trt','delivery-order','import-bl','cro'}
 GOVERNED_POST_APPROVAL_MODULES={'booking','trt','export-trt','import-trt','transshipment-trt'}
 POST_APPROVAL_LOCK_STATUSES={'approved','released','issued','completed','closed'}
+
+# Cycle 24: formatting policy only. Issuance must remain within a governed
+# RFA action after session, agent/port scope and unique-number checks.
+BOOKING_AGENT_REFERENCE_PREFIXES={
+    'POL_EXPORT':'SE',
+    'POD_IMPORT':'SI',
+    'TRANSSHIPMENT':'TS',
+    'PRINCIPAL':'PR',
+}
+
+def booking_agent_reference_prefix(operational_responsibility: str) -> str:
+    key=str(operational_responsibility or '').strip().upper()
+    if key not in BOOKING_AGENT_REFERENCE_PREFIXES:
+        raise HTTPException(422, {'code':'UNRECOGNIZED_AGENT_RESPONSIBILITY'})
+    return BOOKING_AGENT_REFERENCE_PREFIXES[key]
+
+
+def booking_port_allowed(port_code, allowed_ports, *, all_ports_granted=False):
+    """Fail closed unless a verified permission grant covers this exact port.
+
+    Caller must obtain allowed_ports/all_ports_granted from authoritative IAM,
+    not from submitted Booking payloads or caller-supplied headers.
+    """
+    if not isinstance(port_code,str):
+        return False
+    port=port_code.strip().upper()
+    if not port or not re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}', port):
+        return False
+    if all_ports_granted is True:
+        return True
+    if not isinstance(allowed_ports,(set,list,tuple,frozenset)):
+        return False
+    return port in {p.strip().upper() for p in allowed_ports if isinstance(p,str) and re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}',p.strip().upper())}
+
+
+def booking_iam_agent_granted(conn, user_id, agent_code):
+    """Verify an active agent-party assignment; no implicit global grant."""
+    if not isinstance(user_id,int) or isinstance(user_id,bool) or user_id<=0:
+        return False
+    if not isinstance(agent_code,str):
+        return False
+    code=agent_code.strip()
+    if not code or any(ch.isspace() for ch in code):
+        return False
+    row=conn.execute("""SELECT 1 FROM iam_party_access
+        WHERE user_id=? AND party_type='AGENT' AND party_key=?
+        AND status='ACTIVE' LIMIT 1""",(user_id,code)).fetchone()
+    return bool(row)
+
+
+def booking_validate_authorized_ports(fields, grants):
+    """Validate Booking ports against verified, per-field IAM grants.
+
+    A missing grant denies a populated field; the caller may not supply grants
+    from request payload. Principal/HO all-port access requires an explicit
+    trusted Boolean True for that field.
+    """
+    mapping={'POL':'POL','POD':'POD','POT (1)':'TS','POT (2)':'TS'}
+    if not isinstance(fields,dict):
+        raise HTTPException(422,{'code':'BOOKING_FIELDS_INVALID'})
+    if not isinstance(grants,dict):
+        raise HTTPException(403,{'code':'BOOKING_PORT_PERMISSION_MISSING'})
+    for field,scope in mapping.items():
+        value=fields.get(field)
+        if value is None or value=='':
+            continue
+        if not isinstance(value,str) or not value.strip() or not re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}',value.strip().upper()):
+            raise HTTPException(422,{'code':'BOOKING_PORT_INVALID','field':field})
+        rule=grants.get(scope)
+        if not isinstance(rule,dict) or not booking_port_allowed(
+            value.strip().upper(),rule.get('ports'),all_ports_granted=rule.get('all_ports') is True
+        ):
+            raise HTTPException(403,{'code':'BOOKING_PORT_NOT_AUTHORIZED','field':field})
+    return True
+
+
+def booking_agent_port_grants(conn,user_id,agent_code):
+    """Derive explicit scoped port grants from existing IAM and Agent Network masters.
+
+    No user-supplied fields or headers can grant access. Port coverage must
+    identify the agent, a verified operating office, a scope and an exact port.
+    """
+    from .admin import _assigned_agent_offices
+    grants={scope:{'ports':set(),'all_ports':False} for scope in ('POL','POD','TS')}
+    if not isinstance(user_id,int) or isinstance(user_id,bool) or user_id<=0 or not isinstance(agent_code,str) or not agent_code.strip():
+        return grants
+    assigned=_assigned_agent_offices(conn,user_id,agent_code)
+    # Deny offices with conflicting country grants, regardless of row order.
+    offices={}
+    ambiguous_offices=set()
+    for item in (assigned or ()):
+        if not hasattr(item,'keys') or 'office_code' not in item.keys() or 'country_code' not in item.keys():
+            continue
+        office=item['office_code']
+        country=item['country_code']
+        if not isinstance(office,str) or not isinstance(country,str):
+            continue
+        office=office.strip().upper()
+        country=country.strip().upper()
+        if not office or not re.fullmatch(r'[A-Z]{2}',country):
+            continue
+        if office in ambiguous_offices:
+            continue
+        if office in offices and offices[office]!=country:
+            ambiguous_offices.add(office)
+            offices.pop(office,None)
+        else:
+            offices[office]=country
+    for office in ambiguous_offices:
+        offices.pop(office,None)
+    if not offices:
+        return grants
+    rows=conn.execute("""SELECT payload_json FROM md_records
+        WHERE domain='configuration' AND status='ACTIVE'""").fetchall()
+    for row in rows:
+        try:
+            config=json.loads(row['payload_json'] or '{}')
+        except (ValueError,TypeError):
+            continue
+        if not isinstance(config,dict):
+            continue
+        if (str(config.get('config_type') or '').strip().upper()!='AGENT_NETWORK'
+                or str(config.get('network_type') or '').strip().upper()!='PORT_COVERAGE'
+                or str(config.get('agent_code') or '').strip().upper()!=str(agent_code or '').strip().upper()
+                or str(config.get('office_code') or '').strip().upper() not in offices):
+            continue
+        active_day=datetime.datetime.now(datetime.timezone.utc).date().isoformat()
+        start=str(config.get('effective_from') or '0001-01-01')
+        end=str(config.get('effective_to') or '9999-12-31')
+        # Only ISO dates are eligible; malformed effective periods cannot grant access.
+        if not re.fullmatch(r'\d{4}-\d{2}-\d{2}',start) or not re.fullmatch(r'\d{4}-\d{2}-\d{2}',end):
+            continue
+        try:
+            datetime.date.fromisoformat(start)
+            datetime.date.fromisoformat(end)
+        except ValueError:
+            continue
+        if start>end or not start<=active_day<=end:
+            continue
+        scope=str(config.get('scope') or '').strip().upper()
+        port=str(config.get('port_code') or '').strip().upper()
+        office_code=str(config.get('office_code') or '').strip().upper()
+        # Network configuration never grants rights without a matching active
+        # IAM country/office and a separately approved, active Port Master.
+        if scope not in grants or not re.fullmatch(r'[A-Z]{2}[A-Z0-9]{3}',port):
+            continue
+        if offices.get(office_code)!=port[:2]:
+            continue
+        master=conn.execute("""SELECT payload_json FROM md_records
+            WHERE domain='port' AND record_key=? AND status='ACTIVE'""",(port,)).fetchone()
+        if not master:
+            continue
+        try:
+            code=str(json.loads(master['payload_json'] or '{}').get('unlocode') or '').strip().upper()
+        except (ValueError,TypeError,AttributeError):
+            continue
+        if code!=port:
+            continue
+        grants[scope]['ports'].add(port)
+    return grants
+
 
 class CreateBody(BaseModel):
     job_ref:str=Field(pattern=r'^\d{5}$')
@@ -170,7 +333,9 @@ def governed_job_actor(conn,session_token,job_ref,action):
     s=iam_session(conn,session_token)
     out=bulk_assert_job_access(conn,s['user_id'],job_ref,'agent-tasks',action)
     roles=[m['role'] for m in out.get('matches',[]) if m.get('effect')=='ALLOW']
-    role=roles[0] if roles else 'SUPER_ADMIN'
+    if not roles:
+        raise HTTPException(403,{'code':'GOVERNED_JOB_ROLE_NOT_GRANTED'})
+    role=roles[0]
     return {'session':s,'role':role,'access':out}
 
 def scope_clause(role,agent_scope,customer_scope):
@@ -221,6 +386,31 @@ def validate_fields(module,job,fields):
         try:
             if float(fields.get('Allocated',0))>float(fields.get('Booked',0)): errs.append('OVER_ALLOCATION')
         except Exception: errs.append('INVALID_ALLOCATION')
+    if module=='booking' and 'Equipment Lines' in fields:
+        lines=fields['Equipment Lines']
+        if not isinstance(lines,list) or len(lines)>500:
+            errs.append('INVALID_EQUIPMENT_LINES')
+        else:
+            selected_types=set()
+            for line in lines:
+                if not isinstance(line,dict):
+                    errs.append('INVALID_EQUIPMENT_LINE'); break
+                size=str(line.get('size','')).replace("'","")
+                selected_key=(size,str(line.get('type','')).strip().upper())
+                if selected_key in selected_types:
+                    errs.append('DUPLICATE_EQUIPMENT_TYPE'); break
+                selected_types.add(selected_key)
+                try:
+                    qty_raw=line.get('quantity')
+                    if isinstance(qty_raw,bool) or not str(qty_raw).isdigit(): raise ValueError('Invalid quantity')
+                    qty=int(qty_raw)
+                    teu=float(line.get('teu'))
+                    expected=qty*(1 if size=='20' else 2)
+                    valid=qty>=1 and qty<=9999 and size in ('20','40','45') and abs(teu-expected)<0.001
+                except (ValueError,TypeError,OverflowError):
+                    valid=False
+                if not valid:
+                    errs.append('INVALID_EQUIPMENT_LINE'); break
     if module=='booking':
         if fields.get('Booking No.') and fields.get('Booking No.')!=job['booking_ref']: errs.append('BOOKING_MASTER_MISMATCH')
         if fields.get('POL') and fields.get('POL')!=job['pol']: errs.append('POL_JOB_MISMATCH')
@@ -304,12 +494,20 @@ async def security_headers(request, call_next):
     error_class=None
     runtime_mode=get_runtime_mode_value()
     health_exempt=request.method.upper()=='OPTIONS' or request.url.path in {'/api/v1/health','/api/clx013/runtime-mode','/api/clx013/health','/api/clx013/readiness','/api/clx016/readiness'}
+    # One-time Admin setup is independently protected by a private 32+ character token,
+    # host-pinned Neon UAT target, and an INACTIVE-only administrator check.
+    setup_path=request.url.path=='/api/admin/auth/uat-admin-setup'
+    setup_exempt=setup_path and request.method.upper() in {'GET','POST'}
+    recovery_page_exempt=(request.url.path=='/api/admin/auth/uat-recovery-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
+    login_page_exempt=(request.url.path=='/api/admin/auth/uat-login-verify-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
+    maker_checker_page_exempt=(request.url.path=='/api/admin/auth/uat-maker-checker-verify-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
+    approval_page_exempt=(request.url.path=='/api/admin/auth/uat-masterdata-approval-page' and request.method.upper()=='GET' and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()=='OFF')
     production_traffic=os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()
     uat_token=os.getenv('M3_UAT_TOKEN','')
     supplied_uat=request.headers.get('X-M3-UAT-Token','')
     uat_allowed=bool(uat_token and supplied_uat and hmac.compare_digest(uat_token,supplied_uat))
     try:
-        if production_traffic!='ON' and not health_exempt and not uat_allowed:
+        if production_traffic!='ON' and not health_exempt and not setup_exempt and not recovery_page_exempt and not login_page_exempt and not maker_checker_page_exempt and not approval_page_exempt and not uat_allowed:
             response=JSONResponse({'detail':{'code':'PRODUCTION_TRAFFIC_LOCKED','uat_header':'X-M3-UAT-Token'}},status_code=503)
         elif not health_exempt and runtime_mode=='MAINTENANCE':
             response=JSONResponse({'detail':{'code':'MAINTENANCE_MODE'}},status_code=503)
@@ -384,59 +582,92 @@ def modules(): return list(MODULES.values())
 @app.get('/api/v1/{module}')
 def list_records(module:str,job_ref:Optional[str]=None,status:Optional[str]=None,q:Optional[str]=None,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); conn=connect()
-    if bulk_permission_enabled():
-        if not x_m3_session: conn.close(); raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_JOB_SCOPE'})
-        ss=iam_session(conn,x_m3_session); role='SESSION';ascope=cscope=None;clause='';args=[]
-    else:
-        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); clause,args=scope_clause(role,ascope,cscope)
-    where,vals=module_where(module)
-    if job_ref: where+=' AND j.job_ref=?'; vals.append(job_ref)
-    if status: where+=' AND t.status=?'; vals.append(status)
-    rows=conn.execute(tx_query(where)+clause+' ORDER BY t.id',vals+args).fetchall()
-    if bulk_permission_enabled():
-        filtered=[]
-        for r in rows:
-            a=bulk_authorize_job(conn,ss['user_id'],r['job_ref'],'agent-tasks','view')
-            if a['allowed']: filtered.append(r)
-        rows=filtered
-    conn.close()
-    out=[serialize_tx(r) for r in rows]
-    if q:
-        qq=q.lower(); out=[r for r in out if qq in json.dumps(r).lower()]
-    return {'module':module,'count':len(out),'records':out}
+    try:
+        governed=bulk_permission_enabled()
+        if governed:
+            if not x_m3_session:
+                raise HTTPException(401,{'code':'SESSION_REQUIRED_FOR_JOB_SCOPE'})
+            ss=iam_session(conn,x_m3_session)
+            clause='';args=[]
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            clause,args=scope_clause(role,ascope,cscope)
+        where,vals=module_where(module)
+        if job_ref: where+=' AND j.job_ref=?'; vals.append(job_ref)
+        if status: where+=' AND t.status=?'; vals.append(status)
+        rows=conn.execute(tx_query(where)+clause+' ORDER BY t.id',vals+args).fetchall()
+        if governed:
+            filtered=[]
+            for record in rows:
+                authorization=bulk_authorize_job(conn,ss['user_id'],record['job_ref'],'agent-tasks','view')
+                if authorization['allowed']:
+                    filtered.append(record)
+            rows=filtered
+        out=[serialize_tx(record) for record in rows]
+        if q:
+            qq=q.lower()
+            out=[record for record in out if qq in json.dumps(record).lower()]
+        return {'module':module,'count':len(out),'records':out}
+    finally:
+        conn.close()
 
 @app.get('/api/v1/{module}/{tid}')
 def get_record(module:str,tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); conn=connect()
-    if bulk_permission_enabled():
-        mw,margs=module_where(module)
-        r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
-        if not r: conn.close(); raise HTTPException(404,'Transaction not found')
-        ga=governed_job_actor(conn,x_m3_session,r['job_ref'],'view'); role=ga['role'];ascope=cscope=None
-    else:
-        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope); r=get_tx(conn,module,tid,role,ascope,cscope)
-    out=serialize_tx(r); conn.close(); return out
+    try:
+        if bulk_permission_enabled():
+            mw,margs=module_where(module)
+            r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
+            if not r:
+                raise HTTPException(404,'Transaction not found')
+            governed_job_actor(conn,x_m3_session,r['job_ref'],'view')
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            r=get_tx(conn,module,tid,role,ascope,cscope)
+        return serialize_tx(r)
+    finally:
+        conn.close()
 
 @app.post('/api/v1/{module}',status_code=201)
 async def create_record(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); conn=connect()
-    if bulk_permission_enabled():
-        ga=governed_job_actor(conn,x_m3_session,body.job_ref,'create'); role=ga['role'];ascope=cscope=None
-    else:
-        role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
-        if not role_ok(role,'create'): conn.close(); raise HTTPException(403,'Role cannot create')
-    raw=await request.body(); rh=hashlib.sha256(raw).hexdigest(); tx(conn)
     try:
+        if bulk_permission_enabled():
+            ga=governed_job_actor(conn,x_m3_session,body.job_ref,'create'); role=ga['role'];ascope=cscope=None
+        else:
+            role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
+            if not role_ok(role,'create'): raise HTTPException(403,'Role cannot create')
+        raw=await request.body(); rh=hashlib.sha256(raw).hexdigest(); tx(conn)
+    except BaseException:
+        conn.close()
+        raise
+    try:
+        # Revoked agent/port access must also block idempotent create replays.
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT':
+            replay_ctx=job_context(conn,body.job_ref)
+            if not booking_iam_agent_granted(conn,ga['session']['user_id'],replay_ctx['agent_code']):
+                raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+            booking_validate_authorized_ports(
+                body.fields,booking_agent_port_grants(conn,ga['session']['user_id'],replay_ctx['agent_code']))
         if idempotency_key:
             prior=conn.execute('SELECT * FROM idempotency_keys WHERE actor_role=? AND idem_key=?',(role,idempotency_key)).fetchone()
             if prior:
                 if prior['request_hash']!=rh: raise HTTPException(409,'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
                 conn.execute('COMMIT'); return JSONResponse(json.loads(prior['response_json']),status_code=prior['status_code'])
         ctx=job_context(conn,body.job_ref)
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT' and not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
+            raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT':
+            booking_validate_authorized_ports(body.fields,booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
         if role=='AGENT' and ctx['agent_code']!=ascope: raise HTTPException(403,'Job outside agent scope')
         errs=validate_fields(module,ctx,body.fields)
         if errs: raise HTTPException(422,{'codes':errs})
-        if module=='booking': assert_booking_rules(conn,ctx,body.fields,None)
+        if module=='booking':
+            if str(body.fields.get('Status','Draft')).strip().lower() != 'draft':
+                raise HTTPException(409,{'code':'BOOKING_STATUS_ACTION_REQUIRED'})
+            if any(k in body.fields for k in ('Approval #','Approval Ref','Approval Reference','Approved By','Approved At','RFA Submitted By')):
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ACTION_REQUIRED'})
+            assert_booking_rules(conn,ctx,body.fields,None)
         ext=body.external_ref or f"CLX-{module.upper()}-{body.job_ref}-{uuid.uuid4().hex[:8].upper()}"
         if conn.execute('SELECT 1 FROM transaction_records WHERE module=? AND external_ref=?',(module,ext)).fetchone(): raise HTTPException(409,'DUPLICATE_TRANSACTION')
         payload=dict(body.fields); payload.setdefault('Job Ref',body.job_ref); payload.setdefault('Agent',ctx['agent_code']); payload.setdefault('Customer',ctx['customer_name']); payload.setdefault('Status','Draft')
@@ -469,9 +700,22 @@ def update_record(module:str,tid:int,body:UpdateBody,x_role:str=Header('VIEWER')
             if not role_ok(role,'edit'): raise HTTPException(403,'Role cannot edit')
             r=get_tx(conn,module,tid,role,ascope,cscope)
         before=serialize_tx(r); ctx=job_context(conn,r['job_ref'])
+        if module=='booking' and str(r['status']).strip().lower()!='draft':
+            raise HTTPException(409,{'code':'BOOKING_DRAFT_ONLY_EDIT','current_status':r['status']})
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT' and not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
+            raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+        if module=='booking' and bulk_permission_enabled() and role=='AGENT':
+            booking_validate_authorized_ports({**json.loads(r['payload_json']),**body.fields},booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
+        if module=='booking':
+            previous_fields=json.loads(r['payload_json'])
+            for reference_field in ('Approval #','Approval Ref','Approval Reference','Approved By','Approved At','RFA Submitted By'):
+                if reference_field in body.fields and str(body.fields[reference_field] or '').strip()!=str(previous_fields.get(reference_field) or '').strip():
+                    raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ACTION_REQUIRED'})
+        if module=='booking' and 'Status' in body.fields and str(body.fields['Status']).strip().lower()!=str(r['status']).strip().lower():
+            raise HTTPException(409,{'code':'BOOKING_STATUS_ACTION_REQUIRED'})
         payload=json.loads(r['payload_json']); payload.update(body.fields); errs=validate_fields(module,ctx,payload)
         if errs: raise HTTPException(422,{'codes':errs})
         if module=='booking': assert_booking_rules(conn,ctx,payload,tid)
@@ -497,6 +741,8 @@ def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Head
             role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
             if role not in {'ADMIN','SUPER_ADMIN'}: raise HTTPException(403,'ADMIN only delete')
             r=get_tx(conn,module,tid,role,ascope,cscope)
+        if module=='booking' and str(r['status']).strip().lower()!='draft':
+            raise HTTPException(409,{'code':'BOOKING_DELETE_REQUIRES_DRAFT','current_status':r['status']})
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid})
         if r['version']!=version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
@@ -508,6 +754,12 @@ def delete_record(module:str,tid:int,version:int=Query(...,ge=1),x_role:str=Head
 @app.post('/api/v1/{module}/{tid}/actions/{action}')
 def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Header('VIEWER'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); action=action.lower()
+    if action=='submit-rfa' and module!='booking':
+        raise HTTPException(422,{'code':'BOOKING_RFA_ACTION_ONLY'})
+    if module=='booking' and action in {'submit-rfa','approve'} and not bulk_permission_enabled():
+        raise HTTPException(403,{'code':'BOOKING_APPROVAL_FLOW_REQUIRES_IAM'})
+    if module=='booking' and action not in {'submit-rfa','approve','hold','cancel','amend'}:
+        raise HTTPException(422,{'code':'BOOKING_ACTION_NOT_SUPPORTED'})
     if action=='release' and module not in RELEASE_MODULES: raise HTTPException(422,{'code':'MODULE_NOT_RELEASABLE'})
     conn=connect(); tx(conn)
     try:
@@ -515,21 +767,95 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
             mw,margs=module_where(module)
             r=conn.execute(tx_query('t.id=? AND '+mw),[tid]+margs).fetchone()
             if not r: raise HTTPException(404,'Transaction not found')
-            ga=governed_job_actor(conn,x_m3_session,r['job_ref'],action); role=ga['role'];ascope=cscope=None
+            ga=governed_job_actor(conn,x_m3_session,r['job_ref'],'edit' if module=='booking' and action=='submit-rfa' else action); role=ga['role'];ascope=cscope=None
         else:
             role,ascope,cscope=actor(x_role,x_agent_scope,x_customer_scope)
-            if not role_ok(role,action): raise HTTPException(403,f'Role cannot {action}')
+            if not role_ok(role,'edit' if module=='booking' and action=='submit-rfa' else action): raise HTTPException(403,f'Role cannot {action}')
             r=get_tx(conn,module,tid,role,ascope,cscope)
         before=serialize_tx(r)
         if module in GOVERNED_POST_APPROVAL_MODULES and str(r['status']).lower() in POST_APPROVAL_LOCK_STATUSES and action in {'amend','reissue','cancel','reverse'}:
             raise HTTPException(409,{'code':'CRT_REQUIRED_AFTER_APPROVAL','module':module,'record_id':tid,'action':action})
         if r['version']!=body.version: raise HTTPException(409,{'code':'OPTIMISTIC_LOCK_CONFLICT','current_version':r['version']})
         ctx=job_context(conn,r['job_ref']); payload=json.loads(r['payload_json']); new_status=r['status']
-        if ctx['closed'] and action in {'approve','release','hold','cancel','amend','reissue','advance'}:
+        if ctx['closed'] and action in {'submit-rfa','approve','release','hold','cancel','amend','reissue','advance'}:
             audit(conn,role,ascope or cscope,'CLOSED_JOB_BLOCKED',module,tid,r['job_id'],before,before,{'attempted_action':action})
             conn.execute('COMMIT')
             return JSONResponse({'detail':{'code':'JOB_CLOSED','action':action}},status_code=422)
-        if action=='advance':
+        if module=='booking' and action in {'hold','cancel'} and str(r['status']).strip().lower() not in {'draft','rfa'}:
+            raise HTTPException(409,{'code':'BOOKING_TERMINAL_STATUS_LOCK','current_status':r['status']})
+        if module=='booking' and action=='submit-rfa':
+            if str(r['status']).strip().lower()!='draft':
+                raise HTTPException(409,{'code':'BOOKING_DRAFT_REQUIRED_FOR_RFA'})
+            if bulk_permission_enabled() and role=='AGENT':
+                if not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
+                    raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+                booking_validate_authorized_ports(
+                    payload,booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
+            errs=validate_fields(module,ctx,payload)
+            if errs: raise HTTPException(422,{'codes':errs})
+            assert_booking_rules(conn,ctx,payload,tid)
+        if module=='booking' and action=='amend':
+            if str(r['status']).strip().lower()!='rfa':
+                raise HTTPException(409,{'code':'BOOKING_RFA_REQUIRED_FOR_AMEND'})
+            if bulk_permission_enabled() and role=='AGENT':
+                if not booking_iam_agent_granted(conn,ga['session']['user_id'],ctx['agent_code']):
+                    raise HTTPException(403,{'code':'BOOKING_AGENT_LOGIN_NOT_AUTHORIZED'})
+                booking_validate_authorized_ports(
+                    payload,booking_agent_port_grants(conn,ga['session']['user_id'],ctx['agent_code']))
+        if module=='booking' and action=='approve' and str(r['status']).strip().lower()!='rfa':
+            raise HTTPException(409,{'code':'BOOKING_RFA_REQUIRED_BEFORE_APPROVAL'})
+        if module=='booking' and action=='approve':
+            # Approval references are allocated transactionally from the existing
+            # governed sequence. Never accept a client-supplied approval number.
+            if role not in {'ADMIN','SUPER_ADMIN'} or not bulk_permission_enabled():
+                raise HTTPException(403,{'code':'BOOKING_INDEPENDENT_APPROVER_REQUIRED'})
+            submitting_user=str(payload.get('RFA Submitted By') or '').strip()
+            checker_user=str(ga['session'].get('user_ref') or '').strip()
+            if not submitting_user:
+                raise HTTPException(409,{'code':'BOOKING_RFA_MAKER_IDENTITY_REQUIRED'})
+            if not checker_user or submitting_user==checker_user:
+                raise HTTPException(403,{'code':'BOOKING_FOUR_EYES_VIOLATION'})
+            approval_errors=validate_fields(module,ctx,payload)
+            if approval_errors:
+                raise HTTPException(422,{'codes':approval_errors})
+            assert_booking_rules(conn,ctx,payload,tid)
+            if any(str(payload.get(k) or '').strip() for k in ('Approval #','Approval Ref','Approval Reference')):
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ALREADY_SET'})
+            # Legacy standalone UAT databases may not have Master Data schema yet.
+            # Missing governed sequence infrastructure is a conflict, never a server 500.
+            sequence_table=conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='md_sequences'").fetchone()
+            if not sequence_table:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED'})
+            seq=conn.execute("SELECT id,prefix,next_number,width FROM md_sequences WHERE sequence_code='BOOKING_APPROVAL' AND status='ACTIVE'").fetchone()
+            if not seq:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED'})
+            prefix=str(seq['prefix'] or '').strip()
+            next_number=seq['next_number']
+            width=seq['width']
+            if not prefix or not isinstance(next_number,int) or next_number<1 or not isinstance(width,int) or not (1<=width<=12) or len(str(next_number))>width:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_INVALID'})
+            number=prefix+f"{next_number:0{width}d}"
+            # Protect historical references if a governed sequence was reset or imported.
+            duplicate=conn.execute(
+                "SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.\"Approval #\"') ELSE NULL END = ? LIMIT 1",
+                (tid,number)).fetchone()
+            if duplicate:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_DUPLICATE'})
+            updated=conn.execute("UPDATE md_sequences SET next_number=next_number+1,version=version+1 WHERE id=? AND next_number=?",(seq['id'],seq['next_number']))
+            if updated.rowcount!=1:
+                raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_CONFLICT'})
+            payload['Approval #']=number
+            payload['Approved By']=checker_user
+            payload['Approved At']=now()
+        if module=='booking' and action=='submit-rfa':
+            if not bulk_permission_enabled():
+                raise HTTPException(403,{'code':'BOOKING_RFA_REQUIRES_IAM_SESSION'})
+            maker_user=str(ga['session'].get('user_ref') or '').strip()
+            if not maker_user:
+                raise HTTPException(403,{'code':'BOOKING_RFA_MAKER_IDENTITY_MISSING'})
+            payload['RFA Submitted By']=maker_user
+            new_status='RFA'
+        elif action=='advance':
             if module!='special-rates-request': raise HTTPException(422,{'code':'ADVANCE_ONLY_SPECIAL_RATE'})
             stages=['Requested','Pricing Review','Carrier Response','Approved','Linked']; curstage=payload.get('Stage','Requested'); idx=stages.index(curstage) if curstage in stages else 0; nextstage=stages[min(idx+1,len(stages)-1)]
             if nextstage in ('Approved','Linked') and not payload.get('Approved Rate'): raise HTTPException(422,{'code':'APPROVED_RATE_REQUIRED'})
@@ -676,3 +1002,40 @@ def exception_list(job_ref:Optional[str]=None,limit:int=100,x_role:str=Header('V
     if job_ref:q+=' AND j.job_ref=?';args.append(job_ref)
     sc,sa=_system_event_scope_sql(role,agent_scope,customer_scope,x_office_scope,x_branch_scope,x_depot_scope,'j');q+=sc;args+=sa
     q+=' ORDER BY e.id DESC LIMIT ?';args.append(min(limit,500));rows=[dict(r) for r in conn.execute(q,args)];conn.close();return rows
+@app.get('/api/admin/auth/uat-recovery-page', response_class=HTMLResponse, include_in_schema=False)
+def isolated_uat_recovery_page():
+    from . import db
+    from urllib.parse import urlparse
+    enabled = (os.getenv('M3_ALLOW_ADMIN_RECOVERY','').lower() == 'true'
+               and os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper() == 'OFF'
+               and os.getenv('M3_UAT_PRESERVE_DATA') == '1'
+               and db.using_postgres() and db._uat_target_approved()
+               and urlparse(db.DATABASE_URL).hostname == 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech')
+    if not enabled:
+        raise HTTPException(404, 'NOT_FOUND')
+    html = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>M3 Isolated UAT Admin Recovery</title><style>body{font:16px system-ui,sans-serif;background:#f4f6f9;color:#111827;max-width:520px;margin:40px auto;padding:20px}main{background:white;padding:28px;border-radius:12px;box-shadow:0 3px 16px #0001}label{display:block;margin-top:16px;font-weight:600}input{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:6px;font:inherit;border:1px solid #9ca3af;border-radius:6px}button{margin-top:22px;padding:13px 18px;background:#173f67;color:white;border:0;border-radius:6px;font:inherit;cursor:pointer}button:disabled{opacity:.5}#out{white-space:pre-wrap;overflow-wrap:anywhere}small{color:#4b5563}h1{font-size:24px}</style></head><body><main><h1>M3 — Isolated UAT Admin Recovery</h1><p>Enter existing Render secrets privately. They are submitted only to this same-origin isolated API; they are not stored by this page. Run recovery only once.</p><form id="f" autocomplete="off"><label>UAT access token<input id="uat" type="password" required autocomplete="off"></label><label>UAT diagnostic token<input id="diag" type="password" required autocomplete="off"></label><label>Recovery secret<input id="rec" type="password" required autocomplete="off"></label><label>New Admin password<input id="pw" type="password" required minlength="12" autocomplete="new-password"></label><button id="go" type="submit">Recover Admin — once</button></form><p id="out" role="status" aria-live="polite"></p><small>Production and other services are not targeted. Never share secrets or session tokens in chat.</small></main><script>const f=document.getElementById('f'),o=document.getElementById('out'),go=document.getElementById('go');f.addEventListener('submit',async e=>{e.preventDefault();go.disabled=true;o.textContent='Submitting one recovery request…';const u=document.getElementById('uat').value.trim(),d=document.getElementById('diag').value.trim(),r=document.getElementById('rec').value.trim(),p=document.getElementById('pw').value;try{const x=await fetch('/api/admin/auth/uat-recover-password',{method:'POST',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json','X-M3-UAT-Token':u,'X-M3-UAT-Diagnostic-Token':d,'X-M3-Recovery-Secret':r},body:JSON.stringify({new_password:p})});let b=await x.json().catch(()=>({}));o.textContent=x.ok?'RECOVERED — contact ChatGPT to disable recovery and verify login.':'HTTP '+x.status+' — '+(b.detail?.code||b.detail||'Request failed');}catch(err){o.textContent='Network failure — do not retry without checking server logs.'}finally{for(const id of ['uat','diag','rec','pw'])document.getElementById(id).value='';}});</script></body></html>'''
+    return HTMLResponse(html, headers={'Cache-Control':'no-store, max-age=0','Pragma':'no-cache','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"})
+
+@app.get('/api/admin/auth/uat-login-verify-page',response_class=HTMLResponse,include_in_schema=False)
+def isolated_uat_login_verify_page():
+    from . import db
+    from urllib.parse import urlparse
+    if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper() != 'OFF'
+            or os.getenv('M3_UAT_PRESERVE_DATA') != '1'
+            or not db.using_postgres() or not db._uat_target_approved()
+            or urlparse(db.DATABASE_URL).hostname != 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech'):
+        raise HTTPException(404,'NOT_FOUND')
+    html = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>M3 Isolated Admin Login Verification</title><style>body{font:16px system-ui,sans-serif;background:#f4f6f9;color:#111827;max-width:520px;margin:40px auto;padding:20px}main{background:#fff;padding:28px;border-radius:12px}label{display:block;margin-top:16px;font-weight:600}input{display:block;box-sizing:border-box;width:100%;padding:12px;margin-top:6px;font:inherit;border:1px solid #9ca3af;border-radius:6px}button{margin-top:22px;padding:13px 18px;background:#173f67;color:white;border:0;border-radius:6px;font:inherit;cursor:pointer}button:disabled{opacity:.5}#out{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><main><h2>M3 — Isolated Admin Login Verification</h2><p>Runs one login with the new Admin password, sandbox MFA and session verification. Credentials and session tokens will not appear in the result.</p><form id="f" autocomplete="off"><label>UAT access token<input id="uat" type="password" required autocomplete="off"></label><label>New Admin password<input id="pw" type="password" required autocomplete="new-password"></label><label>Sandbox MFA code<input id="mfa" value="123456" required inputmode="numeric" autocomplete="off"></label><button id="go" type="submit">Verify Admin Login</button></form><p id="out" role="status" aria-live="polite"></p></main><script>const f=document.getElementById('f'),o=document.getElementById('out'),go=document.getElementById('go');f.addEventListener('submit',async e=>{e.preventDefault();go.disabled=true;const u=document.getElementById('uat').value.trim(),p=document.getElementById('pw').value,m=document.getElementById('mfa').value.trim();o.textContent='Checking login and permissions…';try{let x=await fetch('/api/admin/auth/login',{method:'POST',credentials:'omit',cache:'no-store',headers:{'Content-Type':'application/json','X-M3-UAT-Token':u},body:JSON.stringify({username:'admin',password:p,mfa_code:m})});let b=await x.json().catch(()=>({}));if(!x.ok){o.textContent='LOGIN FAILED: HTTP '+x.status+' '+(b.detail?.code||b.detail||'');return}if(!b.session_token){o.textContent='Login response missing session token';return}const h={'X-M3-UAT-Token':u,'X-M3-Session':b.session_token};const who=await fetch('/api/admin/auth/whoami',{headers:h,credentials:'omit',cache:'no-store'});const w=await who.json().catch(()=>({}));o.textContent='Login: SUCCESS\\nMFA verified: '+(b.mfa_verified===true?'YES':'NO')+'\\nSession validation: '+(who.ok?'PASS':'FAIL')+'\\nUsername: '+(w.username||'unknown')+'\\nSUPER_ADMIN role: '+(Array.isArray(w.roles)&&w.roles.includes('SUPER_ADMIN')?'PASS':'FAIL');}catch(err){o.textContent='Network error: login not verified'}finally{document.getElementById('uat').value='';document.getElementById('pw').value='';go.disabled=false}});</script></body></html>"""
+    return HTMLResponse(html,headers={'Cache-Control':'no-store, max-age=0','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'"})
+
+@app.get('/api/admin/auth/uat-maker-checker-verify-page',response_class=HTMLResponse,include_in_schema=False)
+def isolated_uat_maker_checker_page():
+    from . import db
+    from urllib.parse import urlparse
+    if (os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper() != 'OFF'
+        or os.getenv('M3_UAT_PRESERVE_DATA') != '1' or not db.using_postgres()
+        or not db._uat_target_approved()
+        or urlparse(db.DATABASE_URL).hostname != 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech'):
+        raise HTTPException(404,'NOT_FOUND')
+    html = """<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>M3 UAT Maker Checker Verification</title><style>body{font:16px system-ui,sans-serif;background:#f5f6fa;color:#111827;max-width:550px;margin:36px auto;padding:18px}main{background:white;border-radius:12px;padding:25px}label{display:block;margin-top:15px;font-weight:600}input,select{display:block;box-sizing:border-box;width:100%;padding:11px;margin-top:6px;font:inherit;border:1px solid #94a3b8;border-radius:7px}button{margin-top:20px;background:#223963;color:white;border:0;border-radius:6px;padding:12px 16px;font:inherit}button:disabled{opacity:.5}#result{white-space:pre-wrap;overflow-wrap:anywhere}</style></head><body><main><h2>M3 — Maker / Checker UAT</h2><p>Check existing credentials, MFA, session validity and role isolation. This page does not reset any password or grant permissions.</p><form id="f" autocomplete="off"><label>Account<select id="account"><option value="md.maker">md.maker — Maker</option><option value="md.checker">md.checker — Checker</option></select></label><label>UAT access token<input id="uat" type="password" required autocomplete="off"></label><label>Existing account password<input id="pw" type="password" required autocomplete="off"></label><label>Sandbox MFA code<input id="mfa" value="123456" required autocomplete="off" inputmode="numeric"></label><button id="go" type="submit">Verify selected account</button></form><p role="status" aria-live="polite" id="result"></p><small>No secrets or session tokens are shown. Do not share them in chat.</small></main><script>const f=document.getElementById('f'),out=document.getElementById('result'),btn=document.getElementById('go');f.addEventListener('submit',async e=>{e.preventDefault();btn.disabled=true;const name=document.getElementById('account').value,uat=document.getElementById('uat').value.trim(),pw=document.getElementById('pw').value,mfa=document.getElementById('mfa').value.trim(),head={'X-M3-UAT-Token':uat};out.textContent='Checking account…';try{let res=await fetch('/api/admin/auth/login',{method:'POST',credentials:'omit',cache:'no-store',headers:{...head,'Content-Type':'application/json'},body:JSON.stringify({username:name,password:pw,mfa_code:mfa})});let login=await res.json().catch(()=>({}));if(!res.ok){out.textContent='Login: FAIL (HTTP '+res.status+') '+(login.detail?.code||login.detail||'');return;}if(!login.session_token){out.textContent='Login succeeded but session token missing';return;}let auth={...head,'X-M3-Session':login.session_token};let whoRes=await fetch('/api/admin/auth/whoami',{headers:auth,credentials:'omit',cache:'no-store'}),who=await whoRes.json().catch(()=>({}));let roles=Array.isArray(who.roles)?who.roles:[];let ok=whoRes.ok&&who.username===name, noAdmin=!roles.includes('SUPER_ADMIN');out.textContent='Login: PASS\\nMFA: '+(login.mfa_verified===true?'PASS':'FAIL')+'\\nSession / username: '+(ok?'PASS':'FAIL')+'\\nRoles: '+roles.join(', ')+'\\nSUPER_ADMIN isolation: '+(noAdmin?'PASS':'FAIL');await fetch('/api/admin/auth/logout',{method:'POST',headers:auth,credentials:'omit',cache:'no-store'}).catch(()=>{});}catch(err){out.textContent='Network error; verification incomplete';}finally{document.getElementById('uat').value='';document.getElementById('pw').value='';btn.disabled=false;}});</script></body></html>"""
+    return HTMLResponse(html,headers={'Cache-Control':'no-store, max-age=0','X-Frame-Options':'DENY','Referrer-Policy':'no-referrer','Content-Security-Policy':"default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'"})

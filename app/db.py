@@ -9,6 +9,9 @@ from typing import Any, Iterable
 DB_PATH = Path(__file__).resolve().parent.parent / 'm3_clx013_test.db'
 DATABASE_URL = os.getenv('DATABASE_URL', '').strip()
 APPROVED_PROJECT_REF = 'ozupgknqaqgvprliewxe'
+# Dedicated UAT connections must be explicitly opted into and host-pinned.
+# Never broaden production authorization or use an arbitrary DATABASE_URL.
+M3_UAT_DB_HOST = os.getenv('M3_UAT_DB_HOST', '').strip().lower()
 
 try:
     import psycopg
@@ -22,13 +25,43 @@ def using_postgres() -> bool:
     return bool(DATABASE_URL)
 
 
+def _uat_target_approved() -> bool:
+    if os.getenv('M3_UAT_PRESERVE_DATA', '').strip() != '1' or not M3_UAT_DB_HOST:
+        return False
+    from urllib.parse import urlparse
+    try:
+        target = urlparse(DATABASE_URL)
+        host = (target.hostname or '').lower()
+        return (target.scheme in ('postgres', 'postgresql')
+                and host == M3_UAT_DB_HOST
+                and host.endswith('.neon.tech')
+                and target.username is not None
+                and target.path not in ('', '/')
+                and APPROVED_PROJECT_REF not in DATABASE_URL)
+    except (TypeError, ValueError):
+        return False
+
+
+def _production_target_approved() -> bool:
+    # Preserve the existing approved production target without accepting a
+    # spoofed host, username, password, or query-string substring.
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(DATABASE_URL)
+        host = (parsed.hostname or '').lower()
+        return (parsed.scheme in ('postgres', 'postgresql')
+                and host == 'db.' + APPROVED_PROJECT_REF + '.supabase.co')
+    except (TypeError, ValueError):
+        return False
+
+
 def approved_database_target() -> bool:
-    return (not DATABASE_URL) or (APPROVED_PROJECT_REF in DATABASE_URL)
+    return (not DATABASE_URL) or _production_target_approved() or _uat_target_approved()
 
 
 def assert_approved_database_target() -> None:
-    if DATABASE_URL and APPROVED_PROJECT_REF not in DATABASE_URL:
-        raise RuntimeError('DATABASE_URL_TARGET_REJECTED: only M3-NVOCC-PROD ozupgknqaqgvprliewxe is approved for CLX-016')
+    if not approved_database_target():
+        raise RuntimeError('DATABASE_URL_TARGET_REJECTED: only approved production or explicitly host-pinned isolated M3 UAT targets are permitted')
 
 
 def backend_name() -> str:

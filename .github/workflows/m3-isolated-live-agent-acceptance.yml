@@ -1,0 +1,65 @@
+name: M3 isolated live Agent A/B acceptance
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: m3-isolated-live-agent-acceptance
+  cancel-in-progress: false
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: m3-isolated-uat
+    env:
+      M3_PRODUCTION_TRAFFIC: 'OFF'
+      M3_UAT_API_URL: https://m3-pr124-booking-api-preview.onrender.com
+      M3_AGENT_A_SESSION: ${{ secrets.M3_AGENT_A_SESSION }}
+      M3_AGENT_B_SESSION: ${{ secrets.M3_AGENT_B_SESSION }}
+      M3_BOOKING_A_ID: ${{ vars.M3_BOOKING_A_ID }}
+      M3_BOOKING_B_ID: ${{ vars.M3_BOOKING_B_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Run offline security runner regression before live probing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install pytest
+          python -m compileall -q scripts/m3_cross_agent_smoke.py tests/test_m3_cross_agent_smoke.py
+          python -m pytest -q tests/test_m3_cross_agent_smoke.py \
+            --junitxml=m3-live-runner-unit.xml
+      - name: Validate isolated preview and distinct accounts
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "${GITHUB_REF_NAME}" = "preview-pr124-booking-isolated"
+          test -n "${M3_AGENT_A_SESSION}" && test -n "${M3_AGENT_B_SESSION}"
+          test "${M3_AGENT_A_SESSION}" != "${M3_AGENT_B_SESSION}"
+          [[ "${M3_BOOKING_A_ID}" =~ ^[0-9]+$ ]]
+          [[ "${M3_BOOKING_B_ID}" =~ ^[0-9]+$ ]]
+          test "${M3_BOOKING_A_ID}" != "${M3_BOOKING_B_ID}"
+      - name: Run eight authenticated and unauthenticated access scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/m3_cross_agent_smoke.py \
+            --api-url "${M3_UAT_API_URL}" \
+            --commit-sha "${GITHUB_SHA}" \
+            --booking-a "${M3_BOOKING_A_ID}" \
+            --booking-b "${M3_BOOKING_B_ID}" \
+            --output m3-live-agent-security.json
+      - name: Preserve redacted security evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-isolated-live-agent-security
+          path: |
+            m3-live-agent-security.json
+            m3-live-runner-unit.xml
+          if-no-files-found: warn
+          retention-days: 14

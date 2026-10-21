@@ -83,8 +83,8 @@ BUSINESS_NAV_ALIASES = {
         {'label':'Commodity','target':'master-data::commoditys','search_terms':['commodity','cargo']},
         {'label':'Units','target':'master-data::units','search_terms':['unit','uom']},
         {'label':'Sales Person','target':'master-data::sales-persons','search_terms':['sales person','sales']},
-        {'label':'Equipment Type','target':'master-data::equipment-types','search_terms':['equipment type','container type']},
-        {'label':'Container Type','target':'master-data::container-types','search_terms':['container type','equipment']},
+        {'label':'Equipment Size & Type','target':'master-data::equipment-types','search_terms':['equipment type','container type']},
+        {'label':'Container Category','target':'master-data::container-types','search_terms':['container type','equipment']},
         {'label':'Branch / Office Master (Expanded)','target':'administration::branches','workspace_key':'branch-profile','search_terms':['branch master','office master','branch type','port role']},
         {'label':'Legal Entity Master (Expanded)','target':'administration::legal-entities','workspace_key':'legal-entity-profile','search_terms':['legal entity','intercompany','consolidation group']},
         {'label':'Depot Master','target':'master-data::locations','workspace_key':'depot-master','search_terms':['depot master','yard','carrier depot','terminal']},
@@ -117,8 +117,8 @@ BUSINESS_NAV_ALIASES = {
         {'label':'Container Master / Activity','target':'agent-tasks::container-activity','search_terms':['container master','container','equipment']},
         {'label':'Detention Collection','target':'agent-tasks::detention-collection','search_terms':['detention','free days']},
         {'label':'Storage Cost','target':'agent-tasks::storage-cost','search_terms':['storage','demurrage']},
-        {'label':'Equipment Type Setup','target':'master-data::equipment-types','search_terms':['equipment type','size type']},
-        {'label':'Container Type Setup','target':'master-data::container-types','search_terms':['container type','iso type']},
+        {'label':'Equipment Size & Type Setup','target':'master-data::equipment-types','search_terms':['equipment type','size type']},
+        {'label':'Container Category Setup','target':'master-data::container-types','search_terms':['container type','iso type']},
     ],
     'Finance': [
         {'label':'Customer Invoice','target':'gl-accounts::invoice','search_terms':['invoice','sales invoice','ar']},
@@ -384,13 +384,17 @@ def build_catalog() -> dict[str, Any]:
     for key in MASTER_SCREENS:
         is_governance=key in governance_names
         name=governance_names.get(key,master_names.get(key,_humanize(key)))
-        screens.append(_base_screen(
+        screen=_base_screen(
             'master-data','Master Data','Governance' if is_governance else 'Master Records',
             key,name,f'/master-data/{"governance" if is_governance else "records"}/{key}',
             COMMON_READ + ['change-request','approve','reject','activate','deactivate','version-history'],
             (['Record Key','Name','Status','Effective From','Effective To','Version','Module Fields'] if not is_governance else ['Reference','Domain','Status','Maker','Checker','Reason','Created At','Updated At']),
             (['Record Key','Name','Status','Effective From','Effective To'] if not is_governance else ['Reference','Domain','Status','Created At'])
-        ))
+        )
+        # Catalog visibility follows existing Master Data API governance;
+        # exposing a screen never grants a backend mutation or approval right.
+        screen['roles']=['ADMIN','MASTER_DATA','MASTER_DATA_MANAGER','AUDITOR','VIEWER']
+        screens.append(screen)
 
     # Stable menu derived from the rebuilt catalog.
     # CLX-031 adds HO Tasks as navigation aliases only. Alias targets must already exist.

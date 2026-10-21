@@ -1,0 +1,210 @@
+name: M3 B01 wider regression gate
+on:
+  push:
+    branches: [preview-pr124-booking-isolated]
+    paths:
+      - '.github/workflows/m3-b01-wider-regression.yml'
+      - 'app/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'web/index.html'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: m3-b01-wider-validation
+  cancel-in-progress: false
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      M3_PRODUCTION_TRAFFIC: 'OFF'
+      M3_B01_STRICT_MAKER_CHECKER: 'true'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Compile backend and targeted regressions
+        run: python -m compileall -q app tests
+      - name: Reject unsafe equipment / MRG authorization contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          equipment=Path('app/clx070_container_master_control.py').read_text()
+          mrg=Path('app/mrg.py').read_text()
+          assert 'EQUIPMENT_SESSION_REQUIRED' in equipment
+          assert 'MRG_SESSION_REQUIRED' in mrg
+          assert 'EQUIPMENT_TRUSTED_SCOPE_REQUIRED' in equipment
+          assert 'EQUIPMENT_ROLE_SCOPE_DENIED' in equipment
+          assert 'EQUIPMENT_AMBIGUOUS_AGENT_GRANTS' in equipment
+          assert 'EQUIPMENT_AMBIGUOUS_DEPOT_GRANTS' in equipment
+          assert 'def _trusted_scope(' in equipment
+          PY
+      - name: Validate IAM session row contracts before regression suite
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          admin=Path('app/admin.py').read_text()
+          equipment=Path('app/clx070_container_master_control.py').read_text()
+          mrg=Path('app/mrg.py').read_text()
+          assert 'def session(c,token)' in admin
+          assert 'fetchone()' in admin.split('def session(c,token)',1)[1].split('@router.get',1)[0]
+          for source in (equipment,mrg):
+              assert 'hasattr(s, "keys")' in source
+              assert '"user_id" not in s.keys()' in source
+          test=Path('tests/test_m3_unsigned_header_authorization.py').read_text()
+          assert 'def test_mrg_sqlite_session_row(' in test
+          assert 'def test_equipment_sqlite_session_row(' in test
+          PY
+      - name: Unsigned role and equipment scope security regressions
+        run: |
+          set -o pipefail
+          python -m pytest -q -ra --tb=short \
+            tests/test_m3_unsigned_header_authorization.py \
+            --junitxml=m3-security-auth.xml 2>&1 | tee m3-security-auth.log
+      - name: Focused B01 / B02 authorization and maker-checker gates
+        run: |
+          set -o pipefail
+          python -m pytest -q -ra --tb=short \
+            tests/test_b01_email_port_gate.py \
+            tests/test_b01_office_approval_duplicate.py \
+            tests/test_b01_agent_countries_iam_resolution.py \
+            tests/test_b02_booking_port_authorization.py \
+            tests/test_b02_agent_booking_boundary_integration.py \
+            tests/test_m3_p0_lifecycle_contract.py \
+            tests/test_m3_cross_agent_smoke.py \
+            tests/test_m3_cross_agent_resource_cleanup.py \
+            tests/test_unlocode_master_catalog.py \
+            tests/test_unlocode_release_adapter.py \
+            --junitxml=m3-b01-b02-focused.xml 2>&1 | tee b01-focused.log
+      - name: Isolated cross-agent booking authorization gate
+        run: |
+          set -o pipefail
+          python -m pytest -q -ra --tb=short \
+            tests/test_b02_agent_booking_boundary_integration.py \
+            --junitxml=m3-cross-agent-integration.xml 2>&1 | tee m3-cross-agent-integration.log
+      - name: Validate Python test discovery and collection
+        run: |
+          set -o pipefail
+          python -m pytest --collect-only -q \
+            tests/test_b02_booking_port_authorization.py \
+            tests/test_b02_agent_booking_boundary_integration.py \
+            2>&1 | tee m3-b02-collection.log
+      - name: Wider regression in disposable runner
+        run: |
+          set -o pipefail
+          python -m pytest -q -ra --tb=short --junitxml=m3-full-regression.xml 2>&1 | tee b01-regression.log
+
+      - name: Verify structural contracts
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          ui=Path('web/index.html').read_text()
+          backend=Path('app/masterdata.py').read_text()
+          assert "['Agent Detail','Emails','Countries','Offices','CRO Detail','B/L Template']" in ui
+          assert "api('/api/masterdata/agent-office-countries')" in ui
+          assert 'def agent_office_countries(' in backend
+          endpoint=backend.split('def agent_office_countries(',1)[1].split("@router.get('/meta')",1)[0]
+          assert "authenticated_actor(c,x_m3_session)" in endpoint
+          assert "country.status='ACTIVE'" in endpoint
+          for forbidden in ('INSERT INTO', 'UPDATE iam_user_roles', 'DELETE FROM'):
+              assert forbidden not in endpoint
+          PY
+
+      - name: Deadline acceptance evidence summary
+        if: always()
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          reports=['m3-security-auth.xml','m3-b01-b02-focused.xml','m3-cross-agent-integration.xml','m3-full-regression.xml']
+          lines=['# M3 October 20 validation evidence','']
+          blocked=False
+          for name in reports:
+              path=Path(name)
+              if not path.exists():
+                  lines.append(f'- {name}: BLOCKED (no test report)')
+                  blocked=True
+                  continue
+              try:
+                  root=ET.parse(path).getroot()
+              except (ET.ParseError, OSError) as err:
+                  lines.append(f'- {name}: BLOCKED (invalid JUnit report: {err})')
+                  blocked=True
+                  continue
+              if root.tag=='testsuite':
+                  suites=[root]
+              elif root.tag=='testsuites':
+                  suites=[e for e in root if e.tag=='testsuite']
+              else:
+                  lines.append(f'- {name}: BLOCKED (unexpected JUnit root: {root.tag})')
+                  blocked=True
+                  continue
+              if not suites:
+                  lines.append(f'- {name}: BLOCKED (empty JUnit suite collection)')
+                  blocked=True
+                  continue
+              totals={k:sum(int(e.attrib.get(k,0)) for e in suites) for k in ('tests','failures','errors','skipped')}
+              if any(value < 0 for value in totals.values()):
+                  lines.append(f'- {name}: BLOCKED (invalid negative test count)')
+                  blocked=True
+                  continue
+              status='PASS' if totals['tests']>0 and totals['failures']==0 and totals['errors']==0 else 'FAIL'
+              blocked|=status!='PASS'
+              lines.append(f"- {name}: {status} | "+', '.join(f'{k}={v}' for k,v in totals.items()))
+          lines += ['', '## Scope', 'B01/B02 and available backend regression only; no live ERP or 196-screen UAT claimed.', 'Acceptance: '+('BLOCKED' if blocked else 'TEST GATES PASS; UAT STILL REQUIRED')]
+          Path('m3-oct20-evidence.md').write_text('\n'.join(lines)+'\n')
+          with Path(__import__('os').environ['GITHUB_STEP_SUMMARY']).open('a') as out:
+              out.write('\n'.join(lines)+'\n')
+          PY
+      - name: Oct 20 acceptance validator unit tests
+        if: always()
+        run: |
+          set -o pipefail
+          python -m pytest -q tests/test_m3_oct20_acceptance.py \
+            --junitxml=m3-acceptance-validator.xml 2>&1 | tee m3-acceptance-validator.log
+      - name: Generate fail-closed release verdict
+        if: always()
+        run: |
+          mkdir -p acceptance-evidence
+          for report in m3-security-auth.xml m3-b01-b02-focused.xml m3-cross-agent-integration.xml m3-full-regression.xml; do
+            if [ -f "$report" ]; then cp "$report" acceptance-evidence/; fi
+          done
+          python scripts/m3_oct20_acceptance.py \
+            --commit-sha "${GITHUB_SHA}" \
+            --evidence-dir acceptance-evidence \
+            --output m3-oct20-acceptance.json \
+            || echo "Release verdict: BLOCKED pending full evidence"
+      - name: Summarize failed tests without exposing response contents
+        if: always()
+        run: |
+          python -m pytest -q tests/test_m3_ci_triage.py --junitxml=m3-ci-triage-tests.xml
+          python scripts/m3_ci_triage.py --dir . --output m3-ci-triage.json || true
+      - name: Preserve B01/B02 and full regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-b01-b02-regression-evidence
+          path: |
+            b01-focused.log
+            m3-security-auth.log
+            m3-security-auth.xml
+            b01-regression.log
+            m3-b01-b02-focused.xml
+            m3-full-regression.xml
+            m3-cross-agent-integration.xml
+            m3-cross-agent-integration.log
+            m3-b02-collection.log
+            m3-oct20-evidence.md
+            m3-oct20-acceptance.json
+            m3-ci-triage.json
+            m3-ci-triage-tests.xml
+            acceptance-evidence/**
+            m3-acceptance-validator.xml
+            m3-acceptance-validator.log
+          if-no-files-found: warn
+          retention-days: 14

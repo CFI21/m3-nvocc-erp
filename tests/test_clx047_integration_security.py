@@ -6,6 +6,7 @@ from app import db
 from app.seed import run as seed_run
 from app.masterdata_seed import run as masterdata_seed_run
 from app.admin_seed import run as admin_seed_run
+from app.admin import Login, login
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data,quick_actions
 from app.integration import (
@@ -46,8 +47,9 @@ def test_all_integration_screens_load_and_ui_stays_readonly(isolated):
     c=build_catalog()
     screens=[x for x in c['screens'] if x['domain']=='Integration & Security']
     assert len(screens)==20
+    token=login(Login(username='admin',password='Admin123!',mfa_code='123456'))['session_token']
     for s in screens:
-        d=screen_data(s['screen_id'],x_role='ADMIN')
+        d=screen_data(s['screen_id'],x_role='ADMIN',x_m3_session=token)
         assert 'rows' in d
         actions=set(quick_actions(s['screen_id'],'ADMIN')['visible_actions'])
         assert not ({'create','edit','approve','release','reverse','cancel','amend'} & actions)

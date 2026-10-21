@@ -35,7 +35,7 @@ def test_booking_groups_follow_operational_order():
     for field in [
         'Booking No.','Booking Date','Booking Status','Sales Person',
         'Customer / Booking Party','Shipper','Consignee','Notify Party','Billing Party',
-        'Origin / Sending Agent','POT Agent','Destination / Receiving Agent',
+        'POL Agent','TS Agent (1)','POD Agent',
         'Carrier / Shipping Line','Container Owner','Equipment Provider',
         'POL','POT (1)','TS Agent (1)','POD','Vessel','Voyage',
         'Commodity','Cargo Description','Packages','Gross Weight',
@@ -55,7 +55,7 @@ def test_booking_duplicate_ui_fields_removed_from_operational_control():
 
 def test_pot_agent_is_conditioned_by_pot():
     b=booking_block()
-    assert "clx78Field(r,'POT Agent','POT Agent',{disabled:!hasPot1})" in b
+    assert "clx78Field(r,'TS Agent (1)','Via Agent (1)',{disabled:!hasPot1})" in b
     assert "pot.disabled=!(via||trans)" in HTML
     assert "if(pot1)pot.disabled=false" in HTML
     assert "if(ts1)ts1.disabled=!pot1" in HTML
