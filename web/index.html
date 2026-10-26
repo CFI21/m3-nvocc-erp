@@ -3464,8 +3464,20 @@ async function openAgentForm(mode){
   html+='<div class="formActions"><button class="btn" onclick="openDrawer(\'details\')">Cancel</button>'+writeUi('<button class="btn primary" onclick="saveAgentForm(\''+mode+'\')">Save</button>')+'</div></div>';
   $('tab-details').innerHTML=html;drawerTabs('details');$('drawer').classList.add('open');
 }
+// One in-flight save per form; retries reuse the same key for identical payloads.
+const m3SaveState={agent:{busy:false,fingerprint:null,key:null},finance:{busy:false,fingerprint:null,key:null}};
+function m3SaveKey(scope,payload){
+  const slot=m3SaveState[scope],fingerprint=JSON.stringify(payload);
+  if(slot.fingerprint!==fingerprint){
+    slot.fingerprint=fingerprint;
+    slot.key='M3-'+scope+'-'+(globalThis.crypto?.randomUUID?.()||Date.now()+'-'+Math.random().toString(36).slice(2));
+  }
+  return slot.key;
+}
 async function saveAgentForm(mode){
   if(viewerReadOnly())return;
+  if(m3SaveState.agent.busy)return;
+  m3SaveState.agent.busy=true;
   try{
     const schema=await api('/api/clx042/form-schema?screen_id='+encodeURIComponent(state.current.screen_id)+'&mode='+mode);
     if(schema.kind==='AGENT_TRANSACTION'){
@@ -3478,7 +3490,7 @@ async function saveAgentForm(mode){
       if(mode==='create'){
         const jr=$('clx42Job').value.trim();if(!/^\d{5}$/.test(jr))throw new Error('Job Ref must be exactly 5 digits');
         path=schema.create_api;method='POST';body={job_ref:jr,external_ref:$('clx42External').value.trim()||null,fields};
-        headers['Idempotency-Key']='CLX042-'+schema.module+'-'+jr+'-'+Date.now();
+        headers['Idempotency-Key']=m3SaveKey('agent',{path,body});
       }else{
         if(!state.selected?.id)throw new Error('Select a record to edit');
         path=schema.edit_api_template.replace('{id}',state.selected.id);method='PUT';body={version:state.selected.version,fields};
@@ -3490,8 +3502,10 @@ async function saveAgentForm(mode){
       const payload={name};document.querySelectorAll('[data-clx42-master]').forEach(el=>{if(el.value.trim())payload[el.dataset.clx42Master]=el.value.trim()});
       await api(schema.change_api,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:schema.master_domain,record_key:key,operation:mode==='create'?'CREATE':'UPDATE',payload,reason:'CLX-042 governed Agent Setup form'})});
     }
+    m3SaveState.agent.fingerprint=null;m3SaveState.agent.key=null;
     $('drawer').classList.remove('open');await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
+  finally{m3SaveState.agent.busy=false}
 }
 async function changeAgentSetupStatus(operation){
   if(!state.selected?.record_key)return alert('Select a setup master record first');
@@ -3741,6 +3755,8 @@ async function openFinanceForm(mode){
 async function saveFinanceForm(mode){
   if(viewerReadOnly())return;
   const kind=financeDomain();if(!kind)return;
+  if(m3SaveState.finance.busy)return;
+  m3SaveState.finance.busy=true;
   try{
     const fields={};document.querySelectorAll('[data-clx43-field]').forEach(el=>fields[el.dataset.clx43Field]=el.value);
     const lineEls=[...document.querySelectorAll('[data-clx44-line-row]')];if(lineEls.length){const lines=[];for(const el of lineEls){const i=Number(el.dataset.clx44LineRow);lines[i]=lines[i]||{};lines[i][el.dataset.clx44LineCol]=el.value}fields['Account Lines']=lines.filter(x=>Object.values(x).some(v=>String(v).trim()!==''));}
@@ -3753,14 +3769,16 @@ async function saveFinanceForm(mode){
         body.source_type=detentionFinanceContext.source_type;
         body.source_ref=detentionFinanceContext.source_ref;
       }
-      headers['Idempotency-Key']='CLX043-'+kind+'-'+state.current.key+'-'+Date.now();
+      headers['Idempotency-Key']=m3SaveKey('finance',{path,body});
     }else{
       path+='/'+state.selected.id;method='PUT';body={version:state.selected.version,fields};
     }
     await api(path,{method,headers,body:JSON.stringify(body)});
     if(mode==='create'&&kind==='gl'&&detentionFinanceContext?.module===state.current.key)detentionFinanceContext=null;
+    m3SaveState.finance.fingerprint=null;m3SaveState.finance.key=null;
     $('drawer').classList.remove('open');await openScreen(state.current.screen_id,state.navContext);
   }catch(e){alert(e.message)}
+  finally{m3SaveState.finance.busy=false}
 }
 async function executeFinanceAction(a){
   const kind=financeDomain();if(!kind||!state.selected?.id)return alert('Select a record first');
