@@ -39,8 +39,8 @@ def test_operational_action_handlers_reject_stale_versions_before_side_effects()
     base=Path(__file__).resolve().parents[1]/"app"
     gl=(base/"gl.py").read_text()
     treasury=(base/"treasury.py").read_text()
-    gl_action=gl[gl.index("def action(module:"):gl.index("@router.",gl.index("def action(module:")+1)]
-    treasury_action=treasury[treasury.index("def action(module:"):treasury.index("@router.",treasury.index("def action(module:")+1)]
+    gl_action=gl[gl.index("def action(module:"):]
+    treasury_action=treasury[treasury.index("def action(module:"):]
     for code in (gl_action,treasury_action):
         assert "OPTIMISTIC_LOCK_CONFLICT" in code
         assert "tx(" in code
