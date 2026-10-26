@@ -628,6 +628,37 @@ def get_record(module:str,tid:int,x_role:str=Header('VIEWER'),x_agent_scope:Opti
     finally:
         conn.close()
 
+@app.get('/api/v1/cro/agent-defaults/{job_ref}')
+def cro_agent_defaults_for_job(job_ref:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Read-only, IAM-scoped preview of approved Agent defaults for a CRO draft."""
+    from .cro_agent_defaults import CROAgentLinkError,map_agent_cro_defaults
+    if not bulk_permission_enabled():
+        raise HTTPException(403,{'code':'CRO_IAM_REQUIRED'})
+    conn=connect()
+    try:
+        governed_job_actor(conn,x_m3_session,job_ref,'view')
+        ctx=job_context(conn,job_ref)
+        row=conn.execute(
+            "SELECT record_key,status,version,payload_json FROM md_records "
+            "WHERE domain='agent' AND record_key=? AND status='ACTIVE'",
+            (ctx['agent_code'],)
+        ).fetchone()
+        if not row:
+            raise HTTPException(409,{'code':'CRO_APPROVED_AGENT_MASTER_NOT_FOUND'})
+        try:
+            mapped=map_agent_cro_defaults(
+                booking_agent_code=ctx['agent_code'],
+                agent_record_key=row['record_key'],
+                agent_status=row['status'],
+                agent_version=int(row['version']),
+                approved_agent_payload=json.loads(row['payload_json'] or '{}'),
+            )
+        except (CROAgentLinkError,ValueError,TypeError) as exc:
+            raise HTTPException(409,{'code':'CRO_AGENT_DEFAULTS_INVALID'}) from exc
+        return {'job_ref':job_ref,'booking_ref':ctx['booking_ref'],**mapped}
+    finally:
+        conn.close()
+
 @app.post('/api/v1/{module}',status_code=201)
 async def create_record(module:str,body:CreateBody,request:Request,x_role:str=Header('VIEWER'),idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),x_agent_scope:Optional[str]=Header(None),x_customer_scope:Optional[str]=Header(None),x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     require_module(module); conn=connect()
