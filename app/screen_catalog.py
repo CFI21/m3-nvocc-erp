@@ -28,29 +28,6 @@ AGENT_SETUP_ALIASES = [
 
 # CLX-031: legacy HO Tasks navigation aliases only.
 # These entries reference existing accepted screens; they do not increase the 196-screen catalog.
-# HO-only navigation aliases. Targets are existing Agent Tasks screens; no duplicate persistence.
-HO_OPERATIONAL_TRANSACTION_ALIASES = [
-    {'label':'Special Rate Request','target':'agent-tasks::special-rates-request'},
-    {'label':'Booking','target':'agent-tasks::booking'},
-    {'label':'B/L','target':'agent-tasks::bl'},
-    {'label':'Switch B/L','target':'agent-tasks::switch-bl'},
-    {'label':'Split B/L','target':'agent-tasks::split-bl'},
-    {'label':'Container Activity','target':'agent-tasks::container-activity'},
-    {'label':'CRT / TRT','target':'agent-tasks::trt'},
-    {'label':'Export CRT / TRT','target':'agent-tasks::export-trt'},
-    {'label':'Import CRT / TRT','target':'agent-tasks::import-trt'},
-    {'label':'Transshipment CRT / TRT','target':'agent-tasks::transshipment-trt'},
-    {'label':'Detention Collection','target':'agent-tasks::detention-collection'},
-    {'label':'Vessel Lock','target':'agent-tasks::vessel-lock'},
-    {'label':'Agent Receipt / Payment','target':'agent-tasks::agent-receipt-pay'},
-    {'label':'SOA Process','target':'agent-tasks::soa'},
-    {'label':'Planning','target':'agent-tasks::planning'},
-    {'label':'Storage Cost','target':'agent-tasks::storage-cost'},
-    {'label':'Delivery Order','target':'agent-tasks::delivery-order'},
-    {'label':'Import B/L','target':'agent-tasks::import-bl'},
-    {'label':'CRO','target':'agent-tasks::cro'},
-]
-
 HO_TRANSACTION_ALIASES = [
     {'label':'Agent Opening','target':'master-data::agents'},
     {'label':'Vendor Opening','target':'master-data::carriers'},
@@ -422,7 +399,7 @@ def build_catalog() -> dict[str, Any]:
     # Stable menu derived from the rebuilt catalog.
     # CLX-031 adds HO Tasks as navigation aliases only. Alias targets must already exist.
     screen_ids={s['screen_id'] for s in screens}
-    for item in AGENT_SETUP_ALIASES + HO_TRANSACTION_ALIASES + HO_OPERATIONAL_TRANSACTION_ALIASES + HO_UTILITY_ALIASES:
+    for item in AGENT_SETUP_ALIASES + HO_TRANSACTION_ALIASES + HO_UTILITY_ALIASES:
         if item['target'] not in screen_ids:
             raise RuntimeError(f"M3_HO_ALIAS_TARGET_MISSING:{item['label']}->{item['target']}")
     for items in BUSINESS_NAV_ALIASES.values():
@@ -435,11 +412,11 @@ def build_catalog() -> dict[str, Any]:
     menu=[{
         'domain':'HO Tasks',
         'submenus':[
-            {'name':'Transaction','screens':[],'items':HO_OPERATIONAL_TRANSACTION_ALIASES + HO_TRANSACTION_ALIASES},
+            {'name':'Transaction','screens':[],'items':HO_TRANSACTION_ALIASES},
             {'name':'Utilities','screens':[],'items':HO_UTILITY_ALIASES},
         ],
         'screen_count':0,
-        'navigation_alias_count':len(HO_OPERATIONAL_TRANSACTION_ALIASES)+len(HO_TRANSACTION_ALIASES)+len(HO_UTILITY_ALIASES),
+        'navigation_alias_count':len(HO_TRANSACTION_ALIASES)+len(HO_UTILITY_ALIASES),
         'navigation_only':True,
     },{
         'domain':'Agent Tasks',
