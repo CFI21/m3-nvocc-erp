@@ -12,7 +12,8 @@ from app import operational_grouping as grouping
 
 @pytest.fixture
 def isolated_links(monkeypatch):
-    conn=sqlite3.connect(":memory:")
+    uri="file:m3_cro_link_uat?mode=memory&cache=shared"
+    conn=sqlite3.connect(uri,uri=True)
     conn.row_factory=sqlite3.Row
     conn.executescript("""
         CREATE TABLE transaction_records(id INTEGER PRIMARY KEY, job_id INTEGER, module TEXT);
@@ -29,7 +30,11 @@ def isolated_links(monkeypatch):
         INSERT INTO containers(id,job_id) VALUES(21,100),(22,200);
     """)
     monkeypatch.setattr(grouping,"enabled",lambda: True)
-    monkeypatch.setattr(grouping,"connect",lambda: conn)
+    def connection_per_request():
+        c=sqlite3.connect(uri,uri=True)
+        c.row_factory=sqlite3.Row
+        return c
+    monkeypatch.setattr(grouping,"connect",connection_per_request)
     monkeypatch.setattr(grouping,"tx",lambda c: c.execute("BEGIN IMMEDIATE"))
     yield conn
     conn.close()
