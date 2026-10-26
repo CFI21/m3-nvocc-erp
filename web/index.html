@@ -1909,9 +1909,10 @@ async function renderClx083OperationalMaster(){
   const epoch=state.viewEpoch,screenId=state.current.screen_id,role=state.role;
   const base={...rowPayload(state.selected)};
   const jr=selectedJob()||clx83Pick(base,'Job Ref','Job');
-  let related=null,equipment=null;
+  let related=null,equipment=null,croAgentDefaults=null;
   try{if(jr)related=await api('/api/clx011/related/'+encodeURIComponent(jr))}catch(_){}
   try{if(jr)equipment=await api('/api/clx070/container-control/booking-context/'+encodeURIComponent(jr))}catch(_){}
+  if(state.current.key==='cro'&&jr){try{croAgentDefaults=await api('/api/v1/cro/agent-defaults/'+encodeURIComponent(jr))}catch(_){croAgentDefaults=null}}
   if(!viewCurrent(epoch,screenId,role))return false;
   const ident=related?.identity||{};
   const key=state.current.key;
@@ -1920,6 +1921,15 @@ async function renderClx083OperationalMaster(){
   const isDo=key==='delivery-order';
   let out='<div class="clx78Workspace">';
   if(isCro){
+    if(croAgentDefaults){const defaults=croAgentDefaults.agent_cro_defaults_snapshot||{};out+=clx83Section('Approved Agent Master CRO Defaults · Read only',clx83Grid([
+      clx83RO('Agent Code',croAgentDefaults.agent_code),
+      clx83RO('Approved Agent Version',croAgentDefaults.agent_master_version),
+      clx83RO('BS Code',defaults.bs_code),
+      clx83RO('Operator Code',defaults.operator_code),
+      clx83RO('CRO Remarks',defaults.cro_remarks,{full:true,textarea:true}),
+      clx83RO('NOC Note',defaults.noc_note,{full:true,textarea:true})
+    ])+'<div class="equipNote">Values come from the ACTIVE approved Agent Master for this Booking/Job. They are read-only defaults; no CRO approval or equipment release is implied.</div>');}
+    else out+=clx83Section('Approved Agent Master CRO Defaults','<div class="equipNote">Approved Agent defaults are unavailable or access is not authorized for this Job. No substitute values are shown.</div>');
     out+=clx83Section('CRO Basic Info / Routing',clx83Grid([
       clx83RO('CRO No.',clx83Pick(base,'CRO No.','CRO No','CRO')),
       clx83RO('Booking No.',clx83Pick(base,'Booking No.','Booking')),
