@@ -34,8 +34,7 @@ def test_identical_booking_create_replay_never_creates_second_record(client):
     headers={"Idempotency-Key":"uat-retry-booking-001"}
     before=_count()
     first=client.post("/api/v1/booking",json=request,headers=headers)
-    if first.status_code!=201:
-        pytest.skip(f"Booking create requires additional governed fixture: {first.status_code}")
+    assert first.status_code==201, first.text
     second=client.post("/api/v1/booking",json=request,headers=headers)
     assert second.status_code==201,second.text
     assert second.json()["id"]==first.json()["id"]
