@@ -17,7 +17,7 @@ def test_bulk_preview_requires_valid_active_iam_session_and_maker_role(tmp_path,
     c=connect()
     c.executescript("""
       CREATE TABLE iam_offices(id INTEGER PRIMARY KEY,office_code TEXT);
-      CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER);
+      CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_sessions(id INTEGER PRIMARY KEY,user_id INTEGER,session_token TEXT,status TEXT,
                                  revoked_at TEXT,expires_at TEXT,last_seen_at TEXT);
       CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT);
@@ -25,8 +25,8 @@ def test_bulk_preview_requires_valid_active_iam_session_and_maker_role(tmp_path,
                                    country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT);
     """)
     c.execute("INSERT INTO iam_offices VALUES(1,'UAT')")
-    c.execute("INSERT INTO iam_users VALUES(1,'maker-1','md.maker',1)")
-    c.execute("INSERT INTO iam_users VALUES(2,'viewer-2','viewer',1)")
+    c.execute("INSERT INTO iam_users(id,user_ref,username,home_office_id) VALUES(1,'maker-1','md.maker',1)")
+    c.execute("INSERT INTO iam_users(id,user_ref,username,home_office_id) VALUES(2,'viewer-2','viewer',1)")
     c.execute("INSERT INTO iam_roles VALUES(1,'MASTER_DATA')")
     c.execute("INSERT INTO iam_roles VALUES(2,'VIEWER')")
     c.execute("INSERT INTO iam_user_roles VALUES(1,1,1,1,NULL,NULL,'ACTIVE',NULL)")
@@ -69,7 +69,7 @@ def test_bulk_full_lifecycle_with_real_iam_sessions(tmp_path,monkeypatch):
     md.init_schema(c)
     c.executescript("""
       CREATE TABLE iam_offices(id INTEGER PRIMARY KEY,office_code TEXT);
-      CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER);
+      CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_sessions(id INTEGER PRIMARY KEY,user_id INTEGER,session_token TEXT,status TEXT,
                                  revoked_at TEXT,expires_at TEXT,last_seen_at TEXT);
       CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT);
@@ -77,7 +77,7 @@ def test_bulk_full_lifecycle_with_real_iam_sessions(tmp_path,monkeypatch):
                                    country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT);
     """)
     c.executemany("INSERT INTO iam_offices VALUES(?,?)",[(1,"UAT")])
-    c.executemany("INSERT INTO iam_users VALUES(?,?,?,?)",[
+    c.executemany("INSERT INTO iam_users(id,user_ref,username,home_office_id) VALUES(?,?,?,?)",[
         (1,"maker-001","md.maker",1),(2,"checker-002","md.checker",1)])
     c.executemany("INSERT INTO iam_roles VALUES(?,?)",[
         (1,"MASTER_DATA"),(2,"MASTER_DATA_MANAGER")])
