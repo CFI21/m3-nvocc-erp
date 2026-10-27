@@ -820,3 +820,50 @@ def bulk_submit(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M3
     return {'domain':b.domain,'total':len(result),'pending':sum(x['status']=='PENDING' for x in result),
             'rejected':sum(x['status']=='REJECT' for x in result),'rows':result,
             'note':'Pending change requests only. Checker approval required. Partial submission is possible.'}
+
+
+# Excel parsing is strictly read-only; client still calls governed preview/submit.
+class BulkXlsxInput(BaseModel):
+    content_base64:str=Field(min_length=1,max_length=1500000)
+
+@router.post('/bulk/parse-xlsx')
+def bulk_parse_xlsx(b:BulkXlsxInput,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    import base64,io,binascii
+    from openpyxl import load_workbook
+    c=connect()
+    try:
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        if not can_make_roles(roles):
+            raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+    finally:
+        c.close()
+    try:
+        data=base64.b64decode(b.content_base64,validate=True)
+    except (binascii.Error,ValueError):
+        raise HTTPException(422,{'code':'INVALID_XLSX_ENCODING'})
+    if len(data)>1024*1024 or not data.startswith(b'PK'):
+        raise HTTPException(422,{'code':'INVALID_XLSX_SIZE_OR_FORMAT'})
+    try:
+        wb=load_workbook(io.BytesIO(data),read_only=True,data_only=True,keep_links=False)
+        try:
+            ws=wb.active
+            if ws.max_row and ws.max_row>102:
+                raise HTTPException(422,{'code':'BULK_MAX_100_ROWS'})
+            if ws.max_column and ws.max_column>60:
+                raise HTTPException(422,{'code':'BULK_MAX_60_COLUMNS'})
+            rows=[]
+            for i,raw in enumerate(ws.iter_rows(values_only=True)):
+                if i>100:raise HTTPException(422,{'code':'BULK_MAX_100_ROWS'})
+                cells=['' if v is None else str(v).strip() for v in raw]
+                if any(cells):rows.append(cells)
+            if not rows or len(rows)>101:
+                raise HTTPException(422,{'code':'BULK_ROW_COUNT_INVALID'})
+            header=[x.lower().strip() for x in rows[0]]
+            if len(header)!=len(set(header)) or any(not x for x in header):
+                raise HTTPException(422,{'code':'INVALID_XLSX_HEADERS'})
+            return {'columns':header,'rows':rows[1:],'total':len(rows)-1,
+                    'note':'Read-only parse; invoke bulk preview and submit separately.'}
+        finally:wb.close()
+    except HTTPException:raise
+    except Exception:
+        raise HTTPException(422,{'code':'INVALID_XLSX_WORKBOOK'})
