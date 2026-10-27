@@ -28,7 +28,7 @@ def test_revoked_expired_checker_and_role_cannot_approve_pending_bulk(
     md.init_schema(c)
     c.executescript("""
       CREATE TABLE iam_offices(id INTEGER PRIMARY KEY,office_code TEXT);
-      CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER);
+      CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_sessions(id INTEGER PRIMARY KEY,user_id INTEGER,session_token TEXT,status TEXT,
                                  revoked_at TEXT,expires_at TEXT,last_seen_at TEXT);
       CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT);
@@ -36,7 +36,7 @@ def test_revoked_expired_checker_and_role_cannot_approve_pending_bulk(
                                    country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT);
     """)
     c.execute("INSERT INTO iam_offices VALUES(1,'UAT')")
-    c.executemany("INSERT INTO iam_users VALUES(?,?,?,?)", [
+    c.executemany("INSERT INTO iam_users(id,user_ref,username,home_office_id) VALUES(?,?,?,?)", [
         (1, "synthetic-maker", "md.maker", 1),
         (2, "synthetic-checker", "md.checker", 1),
     ])
@@ -74,10 +74,32 @@ def test_revoked_expired_checker_and_role_cannot_approve_pending_bulk(
             md.bulk_submit(request, x_m3_session=token)
         assert err.value.status_code == 401
 
+    # Deactivation invalidates a pre-existing active session immediately.
+    c = connect()
+    c.execute("UPDATE iam_users SET status='INACTIVE' WHERE id=1")
+    c.close()
+    with pytest.raises(HTTPException) as error:
+        md.bulk_submit(request, x_m3_session="maker-active")
+    assert error.value.status_code == 401
+    c = connect()
+    c.execute("UPDATE iam_users SET status='ACTIVE' WHERE id=1")
+    c.close()
+
     submitted = md.bulk_submit(request, x_m3_session="maker-active")
     assert submitted["pending"] == 1 and submitted["rejected"] == 0
     change_ref = submitted["rows"][0]["change_ref"]
     decision = md.Decision(decision="APPROVE")
+
+    # Deactivation also invalidates a checker's pre-existing active session.
+    c = connect()
+    c.execute("UPDATE iam_users SET status='INACTIVE' WHERE id=2")
+    c.close()
+    with pytest.raises(HTTPException) as error:
+        md.decide(change_ref, decision, x_m3_session="checker-active")
+    assert error.value.status_code == 401
+    c = connect()
+    c.execute("UPDATE iam_users SET status='ACTIVE' WHERE id=2")
+    c.close()
 
     for token in ("checker-expired", "checker-revoked"):
         with pytest.raises(HTTPException) as err:
