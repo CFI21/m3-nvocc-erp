@@ -791,7 +791,7 @@ def bulk_preview(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M
             errors.extend(reference_errors(c,b.domain,{**previous,**row.payload}))
             display_name=row.payload.get('name') or row.payload.get('display_name') or previous.get('name')
             if display_name:
-                normalized_name=str(display_name).strip().casefold()
+                normalized_name=_canonical_display_name(display_name)
                 prior_key=seen_names.get(normalized_name)
                 if prior_key is not None and prior_key.casefold()!=key.casefold():
                     errors.append('DUPLICATE_DISPLAY_NAME_IN_FILE')
