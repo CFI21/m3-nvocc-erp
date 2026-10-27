@@ -4827,8 +4827,9 @@ if(m3UatToken()){
 <script>
 (()=>{
 const byId=id=>document.getElementById(id), status=msg=>{byId('m3-bulk-status').textContent=msg};
-let request=null,report=null;
+let request=null,report=null,previewGeneration=0;
 function invalidatePreview(){
+ previewGeneration++;
  request=null;report=null;
  byId('m3-bulk-submit').disabled=true;
  byId('m3-bulk-report').disabled=true;
@@ -4862,6 +4863,7 @@ byId('m3-bulk-close').onclick=()=>{byId('m3-bulk-panel').hidden=true};
 byId('m3-bulk-template').onclick=()=>download('m3-master-bulk-template.csv',
  'record_key,operation,name,reason\nAG001,CREATE,Example agent,Initial import\n');
 byId('m3-bulk-preview').onclick=async()=>{
+ const generation=++previewGeneration;
  request=null;report=null;byId('m3-bulk-submit').disabled=true;byId('m3-bulk-report').disabled=true;
  try{
   const file=byId('m3-bulk-file').files[0];if(!file)throw Error('Choose a CSV, TSV or XLSX file');
@@ -4894,10 +4896,11 @@ byId('m3-bulk-preview').onclick=async()=>{
   });
   const candidate={domain:byId('m3-bulk-domain').value,rows};
   const result=await api('/api/masterdata/bulk/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(candidate)});
+  if(generation!==previewGeneration)return;
   report=result;draw(result);request=result.rejected===0?candidate:null;
   byId('m3-bulk-submit').disabled=!request;byId('m3-bulk-report').disabled=false;
   status(result.valid+' valid / '+result.rejected+' rejected. Preview does not reserve records.');
- }catch(e){status('Preview failed: '+e.message)}
+ }catch(e){if(generation===previewGeneration)status('Preview failed: '+e.message)}
 };
 byId('m3-bulk-submit').onclick=async()=>{
  if(!request)return;byId('m3-bulk-submit').disabled=true;
