@@ -44,3 +44,19 @@ def test_duplicate_display_name_prevents_batch_submission(monkeypatch):
     except HTTPException as e:
         assert e.status_code==422
         assert e.detail["code"]=="BULK_PREVIEW_REJECTED"
+
+def test_bulk_preview_rejects_collapsed_internal_whitespace_duplicate(monkeypatch):
+    monkeypatch.setattr(md, "connect", lambda: FakeConn())
+    monkeypatch.setattr(md, "authenticated_actor", lambda c,t: ({"user_ref":"maker"}, {"MASTER_DATA"}))
+    monkeypatch.setattr(md, "validate_payload", lambda *args: [])
+    monkeypatch.setattr(md, "reference_errors", lambda *args: [])
+    monkeypatch.setattr(md, "duplicate_name", lambda *args: None)
+    monkeypatch.setattr(md, "pending_duplicate_name", lambda *args: None)
+    rows = [
+        {"record_key":"EQ-001","operation":"CREATE","payload":{"name":"High Cube"},"reason":"Synthetic fixture"},
+        {"record_key":"EQ-002","operation":"CREATE","payload":{"name":"high   cube"},"reason":"Synthetic fixture"},
+    ]
+    request=md.BulkRequest(domain="equipment-type",rows=rows)
+    preview=md.bulk_preview(request,x_m3_session="synthetic-session")
+    assert preview["rejected"] == 1
+    assert "DUPLICATE_DISPLAY_NAME_IN_FILE" in preview["rows"][1]["errors"]
