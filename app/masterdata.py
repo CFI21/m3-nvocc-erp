@@ -774,7 +774,7 @@ def bulk_preview(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M
         _sess,roles=authenticated_actor(c,x_m3_session)
         if not can_make_roles(roles):
             raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
-        seen=set();out=[]
+        seen=set();seen_names={};out=[]
         for idx,row in enumerate(b.rows,1):
             key=row.record_key.strip()
             errors=[]
@@ -791,6 +791,12 @@ def bulk_preview(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M
             errors.extend(reference_errors(c,b.domain,{**previous,**row.payload}))
             display_name=row.payload.get('name') or row.payload.get('display_name') or previous.get('name')
             if display_name:
+                normalized_name=str(display_name).strip().casefold()
+                prior_key=seen_names.get(normalized_name)
+                if prior_key is not None and prior_key.casefold()!=key.casefold():
+                    errors.append('DUPLICATE_DISPLAY_NAME_IN_FILE')
+                else:
+                    seen_names[normalized_name]=key
                 if duplicate_name(c,b.domain,display_name,key):errors.append('DUPLICATE_DISPLAY_NAME')
                 if pending_duplicate_name(c,b.domain,display_name,key):errors.append('PENDING_DUPLICATE_DISPLAY_NAME')
             out.append({'row':idx,'record_key':key,'operation':row.operation,
