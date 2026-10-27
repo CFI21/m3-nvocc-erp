@@ -259,8 +259,8 @@ def login(b:Login):
     token=secrets.token_urlsafe(24); exp=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=int(policy(c,'session_minutes','60')))).isoformat(); c.execute('INSERT INTO iam_sessions(session_token,user_id,created_at,expires_at,last_seen_at,mfa_verified,status) VALUES(?,?,?,?,?,?,?)',(token,u['id'],ts,exp,ts,1,'ACTIVE')); c.execute('UPDATE iam_users SET failed_attempts=0,last_login_at=? WHERE id=?',(ts,u['id'])); h=ih(event+ts+b.username+'PASS'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','PASS','{}',h)); out={'session_token':token,'user_ref':u['user_ref'],'username':u['username'],'office':u['office_code'],'roles':[x['role_code'] for x in roles_for(c,u['id'])],'mfa_verified':True,'expires_at':exp}; c.close(); return out
 def session(c,token):
     if not token:raise HTTPException(401,{'code':'SESSION_REQUIRED'})
-    s=c.execute('''SELECT s.*,u.user_ref,u.username,u.home_office_id,o.office_code FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id WHERE s.session_token=?''',(token,)).fetchone()
-    if not s or s['status']!='ACTIVE' or s['revoked_at'] or s['expires_at']<now():raise HTTPException(401,{'code':'SESSION_INVALID'})
+    s=c.execute('''SELECT s.*,u.user_ref,u.username,u.status AS user_status,u.home_office_id,o.office_code FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id WHERE s.session_token=?''',(token,)).fetchone()
+    if not s or s['status']!='ACTIVE' or s['user_status']!='ACTIVE' or s['revoked_at'] or s['expires_at']<now():raise HTTPException(401,{'code':'SESSION_INVALID'})
     c.execute('UPDATE iam_sessions SET last_seen_at=? WHERE id=?',(now(),s['id'])); return s
 
 @router.get('/auth/whoami')
