@@ -4811,4 +4811,80 @@ async function m3PreviewInitWithTimeout(){
 if(m3UatToken()){
   m3PreviewInitWithTimeout().catch(e=>{m3PreviewAccessPrompt('Preview could not finish loading: '+(e.message||'unknown error')+'. Re-enter your existing preview token to retry.');});
 }else m3PreviewAccessPrompt();
-</script><!-- CLX-070 native Equipment Control integrated in current M3 shell --></body></html>
+</script><!-- CLX-070 native Equipment Control integrated in current M3 shell -->
+<!-- Isolated Master Data bulk staging workspace (CSV/TSV; XLSX export as CSV). -->
+<div id="m3-bulk-shell" style="position:fixed;bottom:16px;right:16px;z-index:1400;font:14px system-ui">
+<button id="m3-bulk-open" type="button" style="background:#173d5e;color:white;border:0;border-radius:10px;padding:12px 16px;cursor:pointer">Bulk Data Management</button>
+<section id="m3-bulk-panel" hidden aria-label="Bulk Data Management" style="position:absolute;bottom:50px;right:0;background:white;color:#142337;border:1px solid #c9d3dc;box-shadow:0 8px 30px #0003;border-radius:12px;padding:16px;width:min(650px,92vw);max-height:75vh;overflow:auto">
+<div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Bulk Data Management</h3><button type="button" id="m3-bulk-close">Close</button></div>
+<p>Import CSV/TSV exported from Excel. Rows create pending maker/checker change requests only (100 per batch).</p>
+<label>Master data domain <select id="m3-bulk-domain"><option value="agent">Agents</option><option value="customer">Customers</option><option value="equipment-type">Equipment Types</option><option value="container-type">Container Types</option></select></label>
+<button type="button" id="m3-bulk-template">Download CSV template</button>
+<p><input id="m3-bulk-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values"></p>
+<p><button type="button" id="m3-bulk-preview">Preview and validate</button> <button type="button" id="m3-bulk-submit" disabled>Submit pending changes</button> <button type="button" id="m3-bulk-report" disabled>Download results</button></p>
+<p id="m3-bulk-status" role="status"></p><div id="m3-bulk-results" style="max-height:280px;overflow:auto"></div>
+</section></div>
+<script>
+(()=>{
+const byId=id=>document.getElementById(id), status=msg=>{byId('m3-bulk-status').textContent=msg};
+let request=null,report=null;
+const csvCell=v=>'"'+String(v??'').replaceAll('"','""')+'"';
+const download=(name,text)=>{const url=URL.createObjectURL(new Blob([text],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)};
+function parseDelimited(text,sep){
+ const rows=[];let row=[],field='',quoted=false;
+ for(let i=0;i<text.length;i++){const c=text[i];
+  if(quoted){if(c==='"'&&text[i+1]==='"'){field+='"';i++}else if(c==='"')quoted=false;else field+=c}
+  else if(c==='"'&&field==='')quoted=true;
+  else if(c===sep){row.push(field);field=''}
+  else if(c==='\n'){row.push(field);rows.push(row);row=[];field=''}
+  else if(c!=='\r')field+=c;else if(text[i+1]!=='\n')field+=c;
+ }
+ if(quoted)throw Error('Unclosed CSV quotation');
+ if(row.length||field){row.push(field);rows.push(row)}
+ return rows.filter(r=>r.some(v=>v.trim()));
+}
+function draw(result){
+ const target=byId('m3-bulk-results');target.replaceChildren();
+ const pre=document.createElement('pre');pre.style.whiteSpace='pre-wrap';pre.style.fontSize='12px';
+ pre.textContent=JSON.stringify(result,null,2);target.append(pre);
+}
+byId('m3-bulk-open').onclick=()=>{byId('m3-bulk-panel').hidden=false};
+byId('m3-bulk-close').onclick=()=>{byId('m3-bulk-panel').hidden=true};
+byId('m3-bulk-template').onclick=()=>download('m3-master-bulk-template.csv',
+ 'record_key,operation,name,reason\nAG001,CREATE,Example agent,Initial import\n');
+byId('m3-bulk-preview').onclick=async()=>{
+ request=null;report=null;byId('m3-bulk-submit').disabled=true;byId('m3-bulk-report').disabled=true;
+ try{
+  const file=byId('m3-bulk-file').files[0];if(!file)throw Error('Choose a CSV or TSV file');
+  if(file.size>1024*1024)throw Error('Maximum file size is 1 MB');
+  const body=await file.text(),sep=file.name.toLowerCase().endsWith('.tsv')?'\t':',';
+  const table=parseDelimited(body.replace(/^\uFEFF/,''),sep),columns=(table.shift()||[]).map(x=>x.trim().toLowerCase());
+  for(const x of ['record_key','operation','reason'])if(!columns.includes(x))throw Error('Missing column '+x);
+  if(!table.length||table.length>100)throw Error('Select between 1 and 100 rows');
+  const keys=new Set(),rows=table.map((cells,i)=>{
+   const obj=Object.fromEntries(columns.map((k,j)=>[k,(cells[j]||'').trim()]));
+   if(cells.length!==columns.length)throw Error('Invalid column count on row '+(i+2));
+   if(!obj.record_key||!obj.reason)throw Error('Missing key/reason on row '+(i+2));
+   if(!['CREATE','UPDATE'].includes(obj.operation))throw Error('Invalid operation on row '+(i+2));
+   if(keys.has(obj.record_key.toLowerCase()))throw Error('Duplicate key on row '+(i+2));
+   keys.add(obj.record_key.toLowerCase());
+   const payload={};for(const [k,v]of Object.entries(obj))if(!['record_key','operation','reason'].includes(k)&&v)payload[k]=v;
+   return {record_key:obj.record_key,operation:obj.operation,payload,reason:obj.reason};
+  });
+  const candidate={domain:byId('m3-bulk-domain').value,rows};
+  const result=await api('/api/masterdata/bulk/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(candidate)});
+  report=result;draw(result);request=result.rejected===0?candidate:null;
+  byId('m3-bulk-submit').disabled=!request;byId('m3-bulk-report').disabled=false;
+  status(result.valid+' valid / '+result.rejected+' rejected. Preview does not reserve records.');
+ }catch(e){status('Preview failed: '+e.message)}
+};
+byId('m3-bulk-submit').onclick=async()=>{
+ if(!request)return;byId('m3-bulk-submit').disabled=true;
+ try{const result=await api('/api/masterdata/bulk/submit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(request)});
+ report=result;draw(result);status(result.pending+' staged for checker approval; '+result.rejected+' rejected.');byId('m3-bulk-report').disabled=false;request=null;
+ }catch(e){status('Submit failed: '+e.message)}
+};
+byId('m3-bulk-report').onclick=()=>{if(report)download('m3-bulk-results.csv',
+ 'row,record_key,status,details\n'+(report.rows||[]).map(r=>[r.row,r.record_key,r.status||'',JSON.stringify(r.errors||r.error||r.change_ref||'')].map(csvCell).join(',')).join('\n'))};
+})();
+</script></body></html>
