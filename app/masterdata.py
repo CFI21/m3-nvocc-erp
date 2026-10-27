@@ -781,9 +781,11 @@ def bulk_preview(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M
             identity=(b.domain,key.casefold())
             if identity in seen:errors.append('DUPLICATE_KEY_IN_FILE')
             seen.add(identity)
-            existing=c.execute('SELECT payload_json FROM md_records WHERE domain=? AND record_key=?',(b.domain,key)).fetchone()
+            existing=c.execute('SELECT payload_json,status FROM md_records WHERE domain=? AND record_key=?',(b.domain,key)).fetchone()
             if row.operation=='CREATE' and existing:errors.append('RECORD_ALREADY_EXISTS')
             if row.operation=='UPDATE' and not existing:errors.append('RECORD_NOT_FOUND')
+            if row.operation=='UPDATE' and existing and existing['status']!='ACTIVE':
+                errors.append('MASTER_RECORD_NOT_ACTIVE')
             if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,key)).fetchone():
                 errors.append('PENDING_CHANGE_EXISTS')
             previous=json.loads(existing['payload_json']) if existing else {}
