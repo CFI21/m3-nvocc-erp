@@ -4812,15 +4812,15 @@ if(m3UatToken()){
   m3PreviewInitWithTimeout().catch(e=>{m3PreviewAccessPrompt('Preview could not finish loading: '+(e.message||'unknown error')+'. Re-enter your existing preview token to retry.');});
 }else m3PreviewAccessPrompt();
 </script><!-- CLX-070 native Equipment Control integrated in current M3 shell -->
-<!-- Isolated Master Data bulk staging workspace (CSV/TSV; XLSX export as CSV). -->
+<!-- Isolated Master Data bulk staging workspace (CSV/TSV/XLSX). -->
 <div id="m3-bulk-shell" style="position:fixed;bottom:16px;right:16px;z-index:1400;font:14px system-ui">
 <button id="m3-bulk-open" type="button" style="background:#173d5e;color:white;border:0;border-radius:10px;padding:12px 16px;cursor:pointer">Bulk Data Management</button>
 <section id="m3-bulk-panel" hidden aria-label="Bulk Data Management" style="position:absolute;bottom:50px;right:0;background:white;color:#142337;border:1px solid #c9d3dc;box-shadow:0 8px 30px #0003;border-radius:12px;padding:16px;width:min(650px,92vw);max-height:75vh;overflow:auto">
 <div style="display:flex;justify-content:space-between;align-items:center"><h3 style="margin:0">Bulk Data Management</h3><button type="button" id="m3-bulk-close">Close</button></div>
-<p>Import CSV/TSV exported from Excel. Rows create pending maker/checker change requests only (100 per batch).</p>
+<p>Import CSV, TSV or Excel XLSX. Rows create pending maker/checker change requests only (100 per batch).</p>
 <label>Master data domain <select id="m3-bulk-domain"><option value="agent">Agents</option><option value="customer">Customers</option><option value="equipment-type">Equipment Types</option><option value="container-type">Container Types</option></select></label>
 <button type="button" id="m3-bulk-template">Download CSV template</button>
-<p><input id="m3-bulk-file" type="file" accept=".csv,.tsv,text/csv,text/tab-separated-values"></p>
+<p><input id="m3-bulk-file" type="file" accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></p>
 <p><button type="button" id="m3-bulk-preview">Preview and validate</button> <button type="button" id="m3-bulk-submit" disabled>Submit pending changes</button> <button type="button" id="m3-bulk-report" disabled>Download results</button></p>
 <p id="m3-bulk-status" role="status"></p><div id="m3-bulk-results" style="max-height:280px;overflow:auto"></div>
 </section></div>
@@ -4855,10 +4855,22 @@ byId('m3-bulk-template').onclick=()=>download('m3-master-bulk-template.csv',
 byId('m3-bulk-preview').onclick=async()=>{
  request=null;report=null;byId('m3-bulk-submit').disabled=true;byId('m3-bulk-report').disabled=true;
  try{
-  const file=byId('m3-bulk-file').files[0];if(!file)throw Error('Choose a CSV or TSV file');
+  const file=byId('m3-bulk-file').files[0];if(!file)throw Error('Choose a CSV, TSV or XLSX file');
   if(file.size>1024*1024)throw Error('Maximum file size is 1 MB');
-  const body=await file.text(),sep=file.name.toLowerCase().endsWith('.tsv')?'\t':',';
-  const table=parseDelimited(body.replace(/^\uFEFF/,''),sep),columns=(table.shift()||[]).map(x=>x.trim().toLowerCase());
+  const extension=file.name.toLowerCase().split('.').pop();
+  if(!['csv','tsv','xlsx'].includes(extension))throw Error('Supported formats: CSV, TSV, XLSX');
+  let table,columns;
+  if(extension==='xlsx'){
+   const bytes=new Uint8Array(await file.arrayBuffer());let binary='';
+   for(let i=0;i<bytes.length;i+=8192)binary+=String.fromCharCode(...bytes.subarray(i,i+8192));
+   const parsed=await api('/api/masterdata/bulk/parse-xlsx',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({content_base64:btoa(binary)})});
+   columns=parsed.columns;table=parsed.rows;
+  }else{
+   const body=await file.text(),sep=extension==='tsv'?'\t':',';
+   table=parseDelimited(body.replace(/^\uFEFF/,''),sep);
+   columns=(table.shift()||[]).map(x=>x.trim().toLowerCase());
+  }
+  if(columns.length!==new Set(columns).size)throw Error('Duplicate column headings');
   for(const x of ['record_key','operation','reason'])if(!columns.includes(x))throw Error('Missing column '+x);
   if(!table.length||table.length>100)throw Error('Select between 1 and 100 rows');
   const keys=new Set(),rows=table.map((cells,i)=>{
