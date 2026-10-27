@@ -95,6 +95,17 @@ def test_bulk_full_lifecycle_with_real_iam_sessions(tmp_path,monkeypatch):
         "record_key":"IAM-UAT-001","operation":"CREATE",
         "payload":{"name":"Synthetic IAM Agent"},"reason":"Disposable IAM UAT"
     }])
+    # All three bulk entry points must reject invalid sessions before parsing or mutation.
+    for token in (None,"invalid-session"):
+        with pytest.raises(HTTPException) as denied:
+            md.bulk_submit(request,x_m3_session=token)
+        assert denied.value.status_code==401
+        with pytest.raises(HTTPException) as denied:
+            md.bulk_parse_xlsx(md.BulkXlsxInput(content_base64="YWJj"),x_m3_session=token)
+        assert denied.value.status_code==401
+    c=connect()
+    assert c.execute("SELECT COUNT(*) FROM md_change_requests").fetchone()[0]==0
+    c.close()
     preview=md.bulk_preview(request,x_m3_session="maker-valid")
     assert preview["valid"]==1 and preview["rejected"]==0
     submitted=md.bulk_submit(request,x_m3_session="maker-valid")
