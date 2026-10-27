@@ -751,3 +751,72 @@ def hardcoded_scan():
     c=connect();init_schema(c);cfg=c.execute('SELECT COUNT(*) n FROM md_config').fetchone()['n'];seq=c.execute('SELECT COUNT(*) n FROM md_sequences').fetchone()['n'];c.close();return {'status':'PASS','critical_hardcoded_values':0,'controlled_configuration_items':cfg,'central_sequences':seq,'note':'Runtime business references are represented through governed master-data/configuration/sequence stores in the CLX-010 test stack.'}
 @router.get('/audit')
 def audit_list():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_audit ORDER BY id DESC LIMIT 300')];c.close();return x
+
+
+# Isolated bulk staging: preview rows and create governed PENDING change requests.
+# Deliberately never applies direct master-data mutations or automatic approvals.
+class BulkRow(BaseModel):
+    record_key:str=Field(min_length=1,max_length=120)
+    operation:str=Field(pattern=r'^(CREATE|UPDATE)$')
+    payload:dict[str,Any]=Field(default_factory=dict)
+    reason:str=Field(min_length=3,max_length=500)
+
+class BulkRequest(BaseModel):
+    domain:str
+    rows:list[BulkRow]=Field(min_length=1,max_length=100)
+
+@router.post('/bulk/preview')
+def bulk_preview(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if b.domain not in {'agent','customer','equipment-type','container-type'}:
+        raise HTTPException(422,{'code':'BULK_DOMAIN_NOT_SUPPORTED'})
+    c=connect()
+    try:
+        _sess,roles=authenticated_actor(c,x_m3_session)
+        if not can_make_roles(roles):
+            raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+        seen=set();out=[]
+        for idx,row in enumerate(b.rows,1):
+            key=row.record_key.strip()
+            errors=[]
+            identity=(b.domain,key.casefold())
+            if identity in seen:errors.append('DUPLICATE_KEY_IN_FILE')
+            seen.add(identity)
+            existing=c.execute('SELECT payload_json FROM md_records WHERE domain=? AND record_key=?',(b.domain,key)).fetchone()
+            if row.operation=='CREATE' and existing:errors.append('RECORD_ALREADY_EXISTS')
+            if row.operation=='UPDATE' and not existing:errors.append('RECORD_NOT_FOUND')
+            if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,key)).fetchone():
+                errors.append('PENDING_CHANGE_EXISTS')
+            previous=json.loads(existing['payload_json']) if existing else {}
+            errors.extend(validate_payload(b.domain,row.payload,previous))
+            errors.extend(reference_errors(c,b.domain,{**previous,**row.payload}))
+            display_name=row.payload.get('name') or row.payload.get('display_name') or previous.get('name')
+            if display_name:
+                if duplicate_name(c,b.domain,display_name,key):errors.append('DUPLICATE_DISPLAY_NAME')
+                if pending_duplicate_name(c,b.domain,display_name,key):errors.append('PENDING_DUPLICATE_DISPLAY_NAME')
+            out.append({'row':idx,'record_key':key,'operation':row.operation,
+                        'status':'VALID' if not errors else 'REJECT',
+                        'errors':sorted(set(errors))})
+        return {'domain':b.domain,'total':len(out),'valid':sum(x['status']=='VALID' for x in out),
+                'rejected':sum(x['status']=='REJECT' for x in out),'rows':out,
+                'note':'Preview does not reserve records; submission revalidates every row.'}
+    finally:
+        c.close()
+
+@router.post('/bulk/submit')
+def bulk_submit(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    preview=bulk_preview(b,x_m3_session)
+    if preview['rejected']:
+        raise HTTPException(422,{'code':'BULK_PREVIEW_REJECTED','preview':preview})
+    result=[]
+    for idx,row in enumerate(b.rows,1):
+        try:
+            change=create_change(Change(domain=b.domain,record_key=row.record_key.strip(),
+                                        operation=row.operation,payload=row.payload,reason=row.reason),
+                                 x_m3_session=x_m3_session)
+            result.append({'row':idx,'record_key':row.record_key.strip(),'status':'PENDING',
+                           'change_ref':change['change_ref']})
+        except HTTPException as ex:
+            result.append({'row':idx,'record_key':row.record_key.strip(),'status':'REJECT','error':ex.detail})
+    return {'domain':b.domain,'total':len(result),'pending':sum(x['status']=='PENDING' for x in result),
+            'rejected':sum(x['status']=='REJECT' for x in result),'rows':result,
+            'note':'Pending change requests only. Checker approval required. Partial submission is possible.'}
