@@ -1,4 +1,4 @@
-from fastapi import APIRouter,HTTPException,Header
+from fastapi import APIRouter,HTTPException,Header,Depends
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel,Field
 from typing import Optional
@@ -84,9 +84,31 @@ class AgentUserActivate(BaseModel):
 
 ADMIN_SCREENS=['dashboard','users','user-status','roles','permission-matrix','role-assignments','organizations','countries','legal-entities','offices','branches','departments','office-membership','data-scope-rules','customer-agent-access','approval-limits','maker-checker','approval-delegations','temporary-access','access-reviews','sessions','password-policy','mfa-policy','sso-readiness','login-audit','service-accounts','api-clients','audit']
 
+def require_iam_read(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Authenticate every IAM metadata read; honor effective role and office scope."""
+    c=connect()
+    try:
+        actor=session(c,x_m3_session)
+        if not (permission(c,actor['user_id'],'identity','view',actor['office_code'])
+                or permission(c,actor['user_id'],'identity','admin',actor['office_code'])):
+            raise HTTPException(403,{'code':'IAM_READ_NOT_AUTHORIZED'})
+    finally:
+        c.close()
+
+def require_iam_admin(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Protect personal/session and security-governance data with identity:admin."""
+    c=connect()
+    try:
+        actor=session(c,x_m3_session)
+        if not permission(c,actor['user_id'],'identity','admin',actor['office_code']):
+            raise HTTPException(403,{'code':'IAM_ADMIN_READ_NOT_AUTHORIZED'})
+    finally:
+        c.close()
+
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','screens':ADMIN_SCREENS,'screen_count':len(ADMIN_SCREENS),'deny_by_default':True,'mfa_sso_readiness':True}
-@router.get('/overview')
+@router.get('/overview',dependencies=[Depends(require_iam_read)])
 def overview():
     c=connect(); out={k:c.execute(f'SELECT COUNT(*) n FROM {t}').fetchone()['n'] for k,t in [('users','iam_users'),('roles','iam_roles'),('offices','iam_offices'),('countries','iam_countries'),('legal_entities','iam_legal_entities'),('branches','iam_branches'),('departments','iam_departments'),('scope_rules','iam_scope_rules'),('approval_limits','iam_approval_limits')]}; out['screens']=len(ADMIN_SCREENS); c.close(); return out
 @router.get('/auth/uat-diagnostic', include_in_schema=False)
@@ -288,7 +310,7 @@ def logout(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c.close()
     return {'status':'LOGGED_OUT'}
 
-@router.get('/users')
+@router.get('/users',dependencies=[Depends(require_iam_admin)])
 def users():
     c=connect(); x=[dict(r) for r in c.execute('''SELECT u.id,u.user_ref,u.username,u.display_name,u.email,u.status,o.office_code,u.mfa_required,u.last_login_at,u.version FROM iam_users u JOIN iam_offices o ON o.id=u.home_office_id ORDER BY u.id''')]; c.close(); return x
 @router.post('/users/{username}/status')
@@ -475,7 +497,7 @@ def activate_agent_user_invite(b:AgentUserActivate):
     audit(c,u['user_ref'],'AGENT_USER_ACTIVATE','USER',u['user_ref'],before={'status':u['status']},after={'status':'ACTIVE','mfa_required':True},scope={'review_ref':match['review_ref']})
     c.close(); return {'status':'ACTIVE','user_ref':u['user_ref'],'mfa_required':True,'agent_code':scope['agent_code']}
 
-@router.get('/agents/{agent_code}/users')
+@router.get('/agents/{agent_code}/users',dependencies=[Depends(require_iam_admin)])
 def agent_users(agent_code:str):
     c=connect()
     agent=_agent_master(c,agent_code)
@@ -513,25 +535,25 @@ def agent_users(agent_code:str):
          'shared_login_allowed':False,'multiple_named_users_allowed':True}
     c.close(); return out
 
-@router.get('/roles')
+@router.get('/roles',dependencies=[Depends(require_iam_read)])
 def roles(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_roles ORDER BY id')];c.close();return x
-@router.get('/permissions')
+@router.get('/permissions',dependencies=[Depends(require_iam_read)])
 def permissions(): c=connect();x=[dict(r) for r in c.execute('''SELECT r.role_code,p.permission_code,p.module,p.action,p.sensitive,rp.effect FROM iam_role_permissions rp JOIN iam_roles r ON r.id=rp.role_id JOIN iam_permissions p ON p.id=rp.permission_id ORDER BY r.role_code,p.module,p.action''')];c.close();return x
-@router.get('/organizations')
+@router.get('/organizations',dependencies=[Depends(require_iam_read)])
 def organizations(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_organizations')];c.close();return x
-@router.get('/countries')
+@router.get('/countries',dependencies=[Depends(require_iam_read)])
 def countries(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_countries')];c.close();return x
-@router.get('/legal-entities')
+@router.get('/legal-entities',dependencies=[Depends(require_iam_read)])
 def legal_entities(): c=connect();x=[dict(r) for r in c.execute('''SELECT e.*,o.org_code,c.country_code FROM iam_legal_entities e JOIN iam_organizations o ON o.id=e.organization_id JOIN iam_countries c ON c.id=e.country_id ORDER BY e.id''')];c.close();return x
-@router.get('/offices')
+@router.get('/offices',dependencies=[Depends(require_iam_read)])
 def offices(): c=connect();x=[dict(r) for r in c.execute('''SELECT o.*,g.org_code,c.country_code FROM iam_offices o JOIN iam_organizations g ON g.id=o.organization_id JOIN iam_countries c ON c.id=o.country_id ORDER BY o.id''')];c.close();return x
-@router.get('/branches')
+@router.get('/branches',dependencies=[Depends(require_iam_read)])
 def branches(): c=connect();x=[dict(r) for r in c.execute('''SELECT b.*,o.office_code FROM iam_branches b JOIN iam_offices o ON o.id=b.office_id ORDER BY b.id''')];c.close();return x
-@router.get('/departments')
+@router.get('/departments',dependencies=[Depends(require_iam_read)])
 def departments(): c=connect();x=[dict(r) for r in c.execute('''SELECT d.*,b.branch_code FROM iam_departments d JOIN iam_branches b ON b.id=d.branch_id ORDER BY d.id''')];c.close();return x
-@router.get('/office-membership')
+@router.get('/office-membership',dependencies=[Depends(require_iam_admin)])
 def membership(): c=connect();x=[dict(r) for r in c.execute('''SELECT m.*,u.user_ref,o.office_code FROM iam_office_membership m JOIN iam_users u ON u.id=m.user_id JOIN iam_offices o ON o.id=m.office_id ORDER BY m.id''')];c.close();return x
-@router.get('/scope-rules')
+@router.get('/scope-rules',dependencies=[Depends(require_iam_read)])
 def scopes(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_scope_rules ORDER BY priority,id')];c.close();return x
 @router.get('/bulk-job-access')
 def bulk_job_access(resource:str='agent-tasks',action:str='view',x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
@@ -541,15 +563,15 @@ def bulk_job_access(resource:str='agent-tasks',action:str='view',x_m3_session:Op
     if not permission(c,s['user_id'],'identity','view',s['office_code']) and not permission(c,s['user_id'],'identity','admin',s['office_code']):
         c.close(); raise HTTPException(403,{'code':'PERMISSION_DENIED'})
     out=bulk_validate(c,resource,action); c.close(); return out
-@router.get('/party-access')
+@router.get('/party-access',dependencies=[Depends(require_iam_admin)])
 def party_access(): c=connect();x=[dict(r) for r in c.execute('''SELECT p.*,u.user_ref,u.username FROM iam_party_access p JOIN iam_users u ON u.id=p.user_id ORDER BY p.id''')];c.close();return x
-@router.get('/approval-limits')
+@router.get('/approval-limits',dependencies=[Depends(require_iam_read)])
 def approval_limits(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_approval_limits ORDER BY role_code,currency,action')];c.close();return x
-@router.get('/maker-checker')
+@router.get('/maker-checker',dependencies=[Depends(require_iam_read)])
 def maker_checker(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_sod_conflicts ORDER BY id')];c.close();return {'four_eyes':True,'conflicts':x}
-@router.get('/delegations')
+@router.get('/delegations',dependencies=[Depends(require_iam_admin)])
 def delegations(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_delegations ORDER BY id')];c.close();return x
-@router.get('/temporary-access')
+@router.get('/temporary-access',dependencies=[Depends(require_iam_admin)])
 def temporary_access(): c=connect();x=[dict(r) for r in c.execute('''SELECT t.*,u.user_ref,u.username FROM iam_temporary_access t JOIN iam_users u ON u.id=t.user_id ORDER BY t.id''')];c.close();return x
 @router.post('/temporary-access')
 def create_temp(b:TempAccess,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
@@ -561,21 +583,21 @@ def create_temp(b:TempAccess,x_m3_session:Optional[str]=Header(None,alias='X-M3-
     if b.valid_to<=b.valid_from or b.valid_to<=now(): c.close(); raise HTTPException(422,{'code':'INVALID_EFFECTIVE_DATES'})
     if u['id']==s['user_id'] and p['sensitive']: c.close(); raise HTTPException(409,{'code':'FOUR_EYES_SELF_TEMP_ACCESS_BLOCKED'})
     ref='TMP-'+uuid.uuid4().hex[:8].upper(); c.execute('INSERT INTO iam_temporary_access(temp_ref,user_id,permission_code,valid_from,valid_to,reason,approved_by) VALUES(?,?,?,?,?,?,?)',(ref,u['id'],b.permission_code,b.valid_from,b.valid_to,b.reason,s['user_ref'])); audit(c,s['user_ref'],'TEMP_ACCESS_CREATE','USER',u['user_ref'],after={'permission':b.permission_code,'valid_to':b.valid_to}); c.close(); return {'temp_ref':ref,'status':'ACTIVE'}
-@router.get('/access-reviews')
+@router.get('/access-reviews',dependencies=[Depends(require_iam_admin)])
 def reviews(): c=connect();x=[dict(r) for r in c.execute('''SELECT ar.*,u.user_ref,u.username FROM iam_access_reviews ar JOIN iam_users u ON u.id=ar.user_id ORDER BY ar.id''')];c.close();return x
-@router.get('/sessions')
+@router.get('/sessions',dependencies=[Depends(require_iam_admin)])
 def sessions(): c=connect();x=[dict(r) for r in c.execute('''SELECT s.id,u.user_ref,u.username,o.office_code,s.created_at,s.expires_at,s.last_seen_at,s.mfa_verified,s.status,s.revoked_at FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id ORDER BY s.id DESC''')];c.close();return x
-@router.get('/policies')
+@router.get('/policies',dependencies=[Depends(require_iam_read)])
 def policies(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_security_policies ORDER BY policy_key')];c.close();return x
-@router.get('/sso-readiness')
+@router.get('/sso-readiness',dependencies=[Depends(require_iam_read)])
 def sso_readiness(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_sso_readiness ORDER BY provider_key')];c.close();return x
-@router.get('/login-audit')
+@router.get('/login-audit',dependencies=[Depends(require_iam_admin)])
 def login_audit(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_login_audit ORDER BY id DESC LIMIT 100')];c.close();return x
-@router.get('/service-accounts')
+@router.get('/service-accounts',dependencies=[Depends(require_iam_admin)])
 def service_accounts(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_service_accounts ORDER BY id')];c.close();return x
-@router.get('/api-clients')
+@router.get('/api-clients',dependencies=[Depends(require_iam_admin)])
 def api_clients(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_api_clients ORDER BY id')];c.close();return x
-@router.get('/audit')
+@router.get('/audit',dependencies=[Depends(require_iam_read)])
 def iam_audit(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_audit_events ORDER BY id DESC LIMIT 100')];c.close();return x
 @router.post('/role-assignments')
 def assign(b:Assign,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
