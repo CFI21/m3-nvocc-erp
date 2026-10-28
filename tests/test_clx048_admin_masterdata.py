@@ -9,7 +9,7 @@ from app.masterdata_seed import run as masterdata_seed_run
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data,quick_actions
 from app.admin import Login,Assign,TempAccess,UserStatus,login,assign,create_temp,set_user_status,permission,roles_for
-from app.masterdata import Change,Decision,Withdrawal,create_change,decide,withdraw_change,records,duplicates,audit_list
+from app.masterdata import Change,Decision,Withdrawal,create_change,decide,withdraw_change,records,duplicates,audit_list,versions
 from app.clx048_admin_masterdata_hardening import workspace,job_master_trace,integrity_summary,user_access,verify
 
 @pytest.fixture()
@@ -139,7 +139,7 @@ def test_unreferenced_master_four_eyes_version_and_audit(isolated):
     assert done['version']==2
     row=next(x for x in records('carrier',x_m3_session=admin_session()) if x['record_key']=='CLX-NEW-CARRIER')
     assert row['status']=='INACTIVE'
-    assert any(x['record_key']=='CLX-NEW-CARRIER' for x in audit_list())
+    assert any(x['record_key']=='CLX-NEW-CARRIER' for x in audit_list(x_m3_session=checker_session()))
 
 def test_master_and_iam_audits_are_immutable(isolated):
     token=admin_session()
@@ -338,3 +338,35 @@ def test_b01_rejects_semantic_duplicate_agent_office_pending_and_active(isolated
     with pytest.raises(HTTPException) as active:
         create_change(same,x_m3_session=maker)
     assert active.value.detail['code']=='DUPLICATE_AGENT_RELATIONSHIP'
+
+
+def test_masterdata_audit_and_versions_are_authentication_protected(isolated):
+    """Audit and history must never be available to anonymous or invalid sessions."""
+    key='UAT-HISTORY-SECURE'
+    made=create_change(
+        Change(domain='unit',record_key=key,operation='CREATE',
+               payload={'name':'Synthetic governed audit history'},reason='isolated regression'),
+        x_m3_session=maker_session(),
+    )
+    done=decide(
+        made['change_ref'],Decision(decision='APPROVE',comment='independent checker'),
+        x_m3_session=checker_session(),
+    )
+    assert done['status']=='APPROVED'
+    for fn in (
+        lambda token: audit_list(x_m3_session=token),
+        lambda token: versions('unit',key,x_m3_session=token),
+    ):
+        for token in (None,'not-a-valid-session'):
+            with pytest.raises(HTTPException) as denied:
+                fn(token)
+            assert denied.value.status_code==401
+
+    for token in (maker_session(),checker_session()):
+        audits=audit_list(x_m3_session=token)
+        history=versions('unit',key,x_m3_session=token)
+        assert any(row['action']=='CHANGE_APPROVE_APPLY'
+                   and row['change_ref']==made['change_ref'] for row in audits)
+        assert len(history)==1
+        assert history[0]['change_ref']==made['change_ref']
+        assert history[0]['version']==1
