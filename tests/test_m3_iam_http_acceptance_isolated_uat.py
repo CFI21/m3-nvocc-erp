@@ -203,3 +203,86 @@ def test_http_audit_access_fails_after_role_or_user_deactivation(client):
         headers=session_headers(checker),
     )
     assert revoked.status_code == 401, revoked.text
+
+
+def test_http_administration_reads_require_scoped_iam_access(client):
+    """Traffic-lock bypass and spoofed role headers never replace IAM checks."""
+    identity_read = (
+        "/api/admin/overview",
+        "/api/admin/roles",
+        "/api/admin/permissions",
+        "/api/admin/organizations",
+        "/api/admin/countries",
+        "/api/admin/legal-entities",
+        "/api/admin/offices",
+        "/api/admin/branches",
+        "/api/admin/departments",
+        "/api/admin/scope-rules",
+        "/api/admin/approval-limits",
+        "/api/admin/maker-checker",
+        "/api/admin/policies",
+        "/api/admin/sso-readiness",
+        "/api/admin/audit",
+    )
+    identity_admin = (
+        "/api/admin/users",
+        "/api/admin/office-membership",
+        "/api/admin/party-access",
+        "/api/admin/delegations",
+        "/api/admin/temporary-access",
+        "/api/admin/access-reviews",
+        "/api/admin/sessions",
+        "/api/admin/login-audit",
+        "/api/admin/service-accounts",
+        "/api/admin/api-clients",
+        "/api/admin/agents/UAT-AGENT-001/users",
+    )
+    maker = login(client, "md.maker", "Maker123!")
+    checker = login(client, "md.checker", "Checker123!")
+    auditor_response = client.post(
+        "/api/admin/auth/login",
+        json={"username": "auditor", "password": "Audit123!", "mfa_code": "123456"},
+    )
+    assert auditor_response.status_code == 200, auditor_response.text
+    auditor = auditor_response.json()["session_token"]
+    admin_response = client.post(
+        "/api/admin/auth/login",
+        json={"username": "admin", "password": "Admin123!", "mfa_code": "123456"},
+    )
+    assert admin_response.status_code == 200, admin_response.text
+    admin = admin_response.json()["session_token"]
+
+    for url in (*identity_read, *identity_admin):
+        anon = client.get(url)
+        assert anon.status_code == 401, (url, anon.text)
+        spoof = client.get(url, headers={"X-Role": "SUPER_ADMIN", "X-Office": "RTM"})
+        assert spoof.status_code == 401, (url, spoof.text)
+        for token in (maker, checker):
+            denied = client.get(url, headers=session_headers(token))
+            assert denied.status_code == 403, (url, denied.text)
+
+    for url in identity_read:
+        assert client.get(url, headers=session_headers(auditor)).status_code == 200, url
+        assert client.get(url, headers=session_headers(admin)).status_code == 200, url
+
+    for url in identity_admin:
+        denied = client.get(url, headers=session_headers(auditor))
+        assert denied.status_code == 403, (url, denied.text)
+        allowed = client.get(url, headers=session_headers(admin))
+        assert allowed.status_code in (
+            (200, 404) if "/agents/" in url else (200,)
+        ), (url, allowed.text)
+
+    # User deactivation blocks the same session without a new login.
+    with db.connect() as conn:
+        conn.execute("UPDATE iam_users SET status='INACTIVE' WHERE username='admin'")
+        conn.commit()
+    assert client.get("/api/admin/users", headers=session_headers(admin)).status_code == 401
+
+
+def test_http_iam_metadata_visibility_keeps_public_meta_only(client):
+    public = client.get("/api/admin/meta")
+    assert public.status_code == 200, public.text
+    assert "screen_count" in public.json()
+    for url in ("/api/admin/users", "/api/admin/sessions", "/api/admin/login-audit"):
+        assert client.get(url).status_code == 401
