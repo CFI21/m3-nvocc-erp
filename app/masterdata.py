@@ -482,7 +482,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     if pdup:c.close();raise HTTPException(409,{'code':'PENDING_DUPLICATE_DISPLAY_NAME','record_key':pdup['record_key']})
     ref='MDC-'+uuid.uuid4().hex[:10].upper();base=existing['version'] if existing else 0
     c.execute('INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) VALUES(?,?,?,?,?,?,?,?,?)',(ref,b.domain,b.record_key,b.operation,j(b.payload),b.reason,user,now(),base));audit(c,user,'CHANGE_REQUEST_CREATE',b.domain,b.record_key,ref,None,b.payload);
-    if using_postgres(): c.commit()
+    if using_postgres(): c.execute('COMMIT')
     c.close();return {'change_ref':ref,'status':'PENDING','base_version':base}
 @router.get('/changes')
 def changes(status:Optional[str]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
@@ -535,7 +535,7 @@ def withdraw_change(change_ref:str,b:Withdrawal,x_m3_session:Optional[str]=Heade
             raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
         audit(c,sess['user_ref'],'CHANGE_WITHDRAW',change['domain'],change['record_key'],change_ref,
               before={'status':'PENDING'},after={'status':'WITHDRAWN','reason':b.reason.strip()})
-        if using_postgres(): c.commit()
+        if using_postgres(): c.execute('COMMIT')
         return {'change_ref':change_ref,'status':'WITHDRAWN'}
     finally:
         c.close()
@@ -570,7 +570,7 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     if b.decision=='REJECT':
         c.execute("UPDATE md_change_requests SET status='REJECTED',checker=?,decision_comment=?,decided_at=? WHERE id=?",(user,b.comment,now(),ch['id']))
         audit(c,user,'CHANGE_REJECT',ch['domain'],ch['record_key'],change_ref)
-        if using_postgres(): c.commit()
+        if using_postgres(): c.execute('COMMIT')
         c.close();return {'status':'REJECTED'}
     current=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(ch['domain'],ch['record_key'])).fetchone()
     if ch['operation']=='CREATE' and (current or c.execute(
@@ -685,7 +685,7 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     else:
         ver=current['version']+1;c.execute("UPDATE md_records SET status='ACTIVE',version=?,effective_to=NULL,approved_by=?,approved_at=?,updated_at=? WHERE id=?",(ver,user,ts,ts,current['id']));payload=json.loads(current['payload_json'])
     status='INACTIVE' if ch['operation']=='DEACTIVATE' else 'ACTIVE';sync_operational_projection(c,ch['domain'],ch['record_key'],payload,status);c.execute('INSERT INTO md_versions(domain,record_key,version,payload_json,status,changed_by,change_ref,ts) VALUES(?,?,?,?,?,?,?,?)',(ch['domain'],ch['record_key'],ver,j(payload),status,user,change_ref,ts));c.execute("UPDATE md_change_requests SET status='APPROVED',checker=?,decision_comment=?,decided_at=?,applied_at=? WHERE id=?",(user,b.comment,ts,ts,ch['id']));audit(c,user,'CHANGE_APPROVE_APPLY',ch['domain'],ch['record_key'],change_ref,before,payload);
-    if using_postgres(): c.commit()
+    if using_postgres(): c.execute('COMMIT')
     c.close();return {'status':'APPROVED','version':ver}
 @router.post('/projections/agents/sync')
 def sync_agent_projections(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
