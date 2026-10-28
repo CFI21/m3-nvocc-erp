@@ -31,13 +31,20 @@ def ensure_uat_ready():
         ).fetchone()
         if identities["n"] != 2:
             raise RuntimeError("UAT_IAM_INITIALIZATION_REQUIRED: independent maker/checker accounts missing")
+        # Match runtime roles_for() authorization: user, role and grant must
+        # all be active, and the assignment must be within its effective dates.
+        from datetime import datetime, timezone
+        ts = datetime.now(timezone.utc).isoformat()
         role_rows = conn.execute(
-            "SELECT u.username, u.status, r.role_code "
+            "SELECT u.username, r.role_code "
             "FROM iam_users u JOIN iam_user_roles ur ON ur.user_id=u.id "
             "JOIN iam_roles r ON r.id=ur.role_id "
-            "WHERE u.username IN ('md.maker','md.checker')"
+            "WHERE u.username IN ('md.maker','md.checker') "
+            "AND u.status='ACTIVE' AND r.status='ACTIVE' AND ur.status='ACTIVE' "
+            "AND ur.valid_from<=? AND (ur.valid_to IS NULL OR ur.valid_to>=?)",
+            (ts, ts),
         ).fetchall()
-        assigned = {(row["username"], row["role_code"]) for row in role_rows if row["status"] == "ACTIVE"}
+        assigned = {(row["username"], row["role_code"]) for row in role_rows}
         required = {("md.maker", "MASTER_DATA"), ("md.checker", "MASTER_DATA_MANAGER")}
         if assigned != required:
             raise RuntimeError("UAT_IAM_ROLE_SEPARATION_REQUIRED: active independent maker/checker roles missing or invalid")
