@@ -753,13 +753,22 @@ def integrity():
 def hardcoded_scan():
     c=connect();init_schema(c);cfg=c.execute('SELECT COUNT(*) n FROM md_config').fetchone()['n'];seq=c.execute('SELECT COUNT(*) n FROM md_sequences').fetchone()['n'];c.close();return {'status':'PASS','critical_hardcoded_values':0,'controlled_configuration_items':cfg,'central_sequences':seq,'note':'Runtime business references are represented through governed master-data/configuration/sequence stores in the CLX-010 test stack.'}
 @router.get('/audit')
-def audit_list(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+def audit_list(change_ref:Optional[str]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect()
     try:
         if not using_postgres(): init_schema(c)
         _session,roles=authenticated_actor(c,x_m3_session)
         if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
             raise HTTPException(403,{'code':'MASTER_AUDIT_READ_NOT_AUTHORIZED'})
+        if change_ref is not None:
+            # A specific governed change has a small, finite audit trail.
+            # Filter server-side so recent unrelated events cannot hide UAT evidence.
+            import re
+            if not re.fullmatch(r'MDC-[A-F0-9]{10}',change_ref):
+                raise HTTPException(422,{'code':'INVALID_MASTER_CHANGE_REFERENCE'})
+            return [dict(r) for r in c.execute(
+                'SELECT * FROM md_audit WHERE change_ref=? ORDER BY id ASC',
+                (change_ref,))]
         return [dict(r) for r in c.execute('SELECT * FROM md_audit ORDER BY id DESC LIMIT 300')]
     finally: c.close()
 

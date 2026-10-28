@@ -53,7 +53,7 @@ $('review').onclick=()=>run(async()=>{
   const [units,history,events]=await Promise.all([
     request('/api/masterdata/records/unit','checker'),
     request('/api/masterdata/versions/unit/'+encodeURIComponent(key),'checker'),
-    request('/api/masterdata/audit','checker')
+    request('/api/masterdata/audit?change_ref='+encodeURIComponent(ref),'checker')
   ]);
   const record=units.find(x=>x.record_key===key)||null;
   const relatedAudit=events.filter(x=>x.change_ref===ref);

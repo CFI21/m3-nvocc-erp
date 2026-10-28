@@ -140,9 +140,25 @@ def test_http_maker_checker_approval_and_audit_evidence(client):
     assert any(row["change_ref"] == change_ref and row["version"] == record["version"]
                for row in version.json())
 
-    audit = client.get("/api/masterdata/audit", headers=session_headers(checker))
+    # Scoped evidence must be complete and contain no unrelated audit events.
+    audit = client.get(
+        "/api/masterdata/audit",
+        params={"change_ref": change_ref},
+        headers=session_headers(checker),
+    )
     assert audit.status_code == 200, audit.text
-    related = [row for row in audit.json() if row["change_ref"] == change_ref]
+    related = audit.json()
+    assert related
+    assert all(row["change_ref"] == change_ref for row in related)
+    assert client.get(
+        "/api/masterdata/audit",
+        params={"change_ref": "INVALID-REF"},
+        headers=session_headers(checker),
+    ).status_code == 422
+    assert client.get(
+        "/api/masterdata/audit",
+        params={"change_ref": change_ref},
+    ).status_code == 401
     assert "CHANGE_REQUEST_CREATE" in {row["action"] for row in related}
     assert any(row["action"] == "CHANGE_APPROVE_APPLY"
                and row["actor"] == change["checker"] for row in related)
