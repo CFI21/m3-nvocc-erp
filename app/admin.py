@@ -20,7 +20,12 @@ def audit(c,actor,action,rt,rr=None,before=None,after=None,scope=None):
     c.execute('INSERT INTO iam_audit_events(event_ref,ts,actor_user_ref,action,resource_type,resource_ref,scope_json,before_json,after_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?,?,?)',(str(uuid.uuid4()),ts,actor,action,rt,rr,json.dumps(scope or {},sort_keys=True),json.dumps(before,sort_keys=True) if before is not None else None,json.dumps(after,sort_keys=True) if after is not None else None,ih(base)))
 def policy(c,k,default):
     r=c.execute('SELECT policy_value FROM iam_security_policies WHERE policy_key=?',(k,)).fetchone(); return r['policy_value'] if r else default
-def roles_for(c,uid): return [dict(r) for r in c.execute('''SELECT r.role_code,ur.office_id,ur.country_id,ur.organization_id FROM iam_user_roles ur JOIN iam_roles r ON r.id=ur.role_id WHERE ur.user_id=? AND ur.status='ACTIVE' AND (ur.valid_to IS NULL OR ur.valid_to>=?)''',(uid,now()))]
+def roles_for(c,uid):
+    ts=now()
+    return [dict(r) for r in c.execute('''SELECT r.role_code,ur.office_id,ur.country_id,ur.organization_id
+      FROM iam_user_roles ur JOIN iam_roles r ON r.id=ur.role_id
+      WHERE ur.user_id=? AND ur.status='ACTIVE' AND r.status='ACTIVE'
+        AND ur.valid_from<=? AND (ur.valid_to IS NULL OR ur.valid_to>=?)''',(uid,ts,ts))]
 def permission(c,uid,module,action,office_code=None):
     ts=now()
     direct=c.execute('''SELECT 1 FROM iam_temporary_access t JOIN iam_permissions p ON p.permission_code=t.permission_code
