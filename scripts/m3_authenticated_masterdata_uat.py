@@ -263,7 +263,7 @@ def main():
             result["status"] = "FAIL"
         # Evidence contains only UAT identifiers and verification outcomes,
         # never login credentials, bearer tokens or MFA codes.
-        EVIDENCE_PATH.write_text(json.dumps(result, indent=2) + "\\n", encoding="utf-8")
+        EVIDENCE_PATH.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     require(result["status"] == "PASS", "Live acceptance or session revocation failed")
     return result
 
@@ -275,6 +275,5 @@ if __name__ == "__main__":
         # Do not print request payloads, credential values or bearer tokens.
         print("M3_ISOLATED_AUTHENTICATED_UAT_FAIL: " + str(exc), file=sys.stderr)
         sys.exit(1)
-    EVIDENCE_PATH.write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
     print("M3_ISOLATED_AUTHENTICATED_UAT_PASS")
     print("Evidence written to " + str(EVIDENCE_PATH))
