@@ -51,6 +51,12 @@ def request(path, *, method="GET", payload=None, token=None, status=200):
         headers["Content-Type"] = "application/json"
     if token:
         headers["X-M3-Session"] = token
+    # The isolated API refuses all protected routes while production traffic is
+    # OFF unless the separate, server-side UAT gate token matches. This token
+    # is not the IAM session; BOTH controls are required for authenticated UAT.
+    uat_gate = os.getenv("M3_UAT_TOKEN", "")
+    if uat_gate:
+        headers["X-M3-UAT-Token"] = uat_gate
     req = urllib.request.Request(API + path, data=data, headers=headers, method=method)
     try:
         with HTTP.open(req, timeout=25) as response:
@@ -93,6 +99,10 @@ def authorize():
         mfa = os.getenv(f"M3_UAT_{label}_MFA_CODE", "")
         require(bool(password and mfa), f"Missing secured {label} login configuration")
         credentials[label] = (password, mfa)
+    # The middleware requires a distinct 32+-character shared UAT gate token,
+    # even for IAM login, while the sandbox production-traffic lock stays OFF.
+    require(len(os.getenv("M3_UAT_TOKEN", "")) >= 32,
+            "Missing secured isolated UAT access-token configuration")
     return credentials
 
 

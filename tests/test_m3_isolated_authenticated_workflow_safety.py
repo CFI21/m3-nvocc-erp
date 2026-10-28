@@ -25,8 +25,9 @@ def test_workflow_is_manual_branch_limited_and_environment_gated():
     assert "cancel-in-progress: false" in source
     assert "persist-credentials: false" in source
     assert 'test "$GITHUB_REF" = ' in source
-    for name in ("M3_UAT_MAKER_PASSWORD", "M3_UAT_CHECKER_PASSWORD",
-                 "M3_UAT_MAKER_MFA_CODE", "M3_UAT_CHECKER_MFA_CODE"):
+    for name in ("M3_UAT_TOKEN", "M3_UAT_MAKER_PASSWORD",
+                 "M3_UAT_CHECKER_PASSWORD", "M3_UAT_MAKER_MFA_CODE",
+                 "M3_UAT_CHECKER_MFA_CODE"):
         assert "secrets." + name in source
     assert "if: always()" in source
     assert "actions/upload-artifact@v4" in source
@@ -36,9 +37,9 @@ def test_workflow_is_manual_branch_limited_and_environment_gated():
 
 def test_missing_confirmation_and_credentials_fail_without_network(monkeypatch):
     runner = load_runner()
-    for key in ("M3_UAT_CONFIRM", "M3_UAT_MAKER_PASSWORD",
-                "M3_UAT_CHECKER_PASSWORD", "M3_UAT_MAKER_MFA_CODE",
-                "M3_UAT_CHECKER_MFA_CODE"):
+    for key in ("M3_UAT_CONFIRM", "M3_UAT_TOKEN",
+                "M3_UAT_MAKER_PASSWORD", "M3_UAT_CHECKER_PASSWORD",
+                "M3_UAT_MAKER_MFA_CODE", "M3_UAT_CHECKER_MFA_CODE"):
         monkeypatch.delenv(key, raising=False)
     with pytest.raises(runner.UATFailure, match="confirmation missing"):
         runner.authorize()
@@ -100,3 +101,46 @@ def test_unexpected_exception_details_never_enter_evidence_or_stderr():
     assert "private-test-placeholder" not in runner.safe_failure(exc)
     assert runner.safe_failure(runner.UATFailure("Missing secured MAKER login configuration")) == (
         "Missing secured MAKER login configuration")
+
+
+def test_uat_gate_token_required_separately_from_iam_secrets(monkeypatch):
+    runner = load_runner()
+    monkeypatch.setenv("M3_UAT_CONFIRM", "ISOLATED_UAT_WRITE_ONLY")
+    for label in ("MAKER", "CHECKER"):
+        monkeypatch.setenv(f"M3_UAT_{label}_PASSWORD", "disposable-offline-placeholder")
+        monkeypatch.setenv(f"M3_UAT_{label}_MFA_CODE", "disposable-offline-mfa")
+    monkeypatch.delenv("M3_UAT_TOKEN", raising=False)
+    with pytest.raises(runner.UATFailure, match="UAT access-token configuration"):
+        runner.authorize()
+    monkeypatch.setenv("M3_UAT_TOKEN", "short")
+    with pytest.raises(runner.UATFailure, match="UAT access-token configuration"):
+        runner.authorize()
+    monkeypatch.setenv("M3_UAT_TOKEN", "a" * 32)
+    assert sorted(runner.authorize()) == ["CHECKER", "MAKER"]
+
+
+def test_pinned_isolated_request_forwards_distinct_uat_header(monkeypatch):
+    runner = load_runner()
+    test_gate = "offline-u-a-t-gate-" + "x" * 40
+    monkeypatch.setenv("M3_UAT_TOKEN", test_gate)
+    captured = []
+    class Response:
+        status = 200
+        def __enter__(self): return self
+        def __exit__(self, *_args): return False
+        def read(self): return b'{"ok":true}'
+    class Opener:
+        def open(self, req, timeout):
+            captured.append({"url": req.full_url,
+                             "method": req.get_method(),
+                             "headers": dict(req.header_items())})
+            return Response()
+    monkeypatch.setattr(runner, "HTTP", Opener())
+    assert runner.request("/api/admin/auth/whoami", token="offline-session") == {"ok": True}
+    assert len(captured) == 1
+    req = captured[0]
+    assert req["url"] == "https://m3-dev-sprint2-isolated-api.onrender.com/api/admin/auth/whoami"
+    assert req["method"] == "GET"
+    headers = {k.lower(): v for k, v in req["headers"].items()}
+    assert headers["x-m3-uat-token"] == test_gate
+    assert headers["x-m3-session"] == "offline-session"

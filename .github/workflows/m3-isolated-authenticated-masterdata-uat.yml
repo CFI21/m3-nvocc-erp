@@ -51,6 +51,7 @@ jobs:
         # Session credentials are exposed only to this step and never echoed.
         env:
           M3_UAT_CONFIRM: ${{ inputs.confirmation }}
+          M3_UAT_TOKEN: ${{ secrets.M3_UAT_TOKEN }}
           M3_UAT_MAKER_PASSWORD: ${{ secrets.M3_UAT_MAKER_PASSWORD }}
           M3_UAT_CHECKER_PASSWORD: ${{ secrets.M3_UAT_CHECKER_PASSWORD }}
           M3_UAT_MAKER_MFA_CODE: ${{ secrets.M3_UAT_MAKER_MFA_CODE }}
