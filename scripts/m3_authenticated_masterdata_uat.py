@@ -28,6 +28,16 @@ class UATFailure(RuntimeError):
     pass
 
 
+class ForbidRedirect(urllib.request.HTTPRedirectHandler):
+    """Credentials must never be forwarded to redirected destinations."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise UATFailure("Isolated API returned a forbidden redirect")
+
+
+HTTP = urllib.request.build_opener(ForbidRedirect)
+
+
 def require(condition, message):
     if not condition:
         raise UATFailure(message)
@@ -43,7 +53,7 @@ def request(path, *, method="GET", payload=None, token=None, status=200):
         headers["X-M3-Session"] = token
     req = urllib.request.Request(API + path, data=data, headers=headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=25) as response:
+        with HTTP.open(req, timeout=25) as response:
             actual, raw = response.status, response.read()
     except urllib.error.HTTPError as error:
         actual, raw = error.code, error.read()
@@ -236,9 +246,11 @@ def main():
         result["change_references"] = [
             pending_first, pending_second, update_ref, withdraw_ref, self_ref, cleanup_ref]
         result["status"] = "PASS"
+    except Exception as exc:
+        result["failure"] = str(exc)
+        raise
     finally:
-        # On test failure, retain the governed record for review rather than
-        # attempting destructive cleanup or an unaudited direct database edit.
+        # Keep governed records visible for review on failure; no direct DB edits.
         if live_record:
             result["active_test_record_needing_review"] = live_record
         for label, token in (("maker", maker_token), ("checker", checker_token)):
@@ -247,8 +259,12 @@ def main():
                     request("/api/admin/auth/logout", method="POST", token=token)
                 except Exception:
                     result.setdefault("logout_errors", []).append(label)
-    require(result["status"] == "PASS" and not result.get("logout_errors"),
-            "Live acceptance or session revocation did not complete")
+        if result.get("logout_errors"):
+            result["status"] = "FAIL"
+        # Evidence contains only UAT identifiers and verification outcomes,
+        # never login credentials, bearer tokens or MFA codes.
+        EVIDENCE_PATH.write_text(json.dumps(result, indent=2) + "\\n", encoding="utf-8")
+    require(result["status"] == "PASS", "Live acceptance or session revocation failed")
     return result
 
 
