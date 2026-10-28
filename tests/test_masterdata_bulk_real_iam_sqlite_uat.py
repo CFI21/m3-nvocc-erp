@@ -20,17 +20,17 @@ def test_bulk_preview_requires_valid_active_iam_session_and_maker_role(tmp_path,
       CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_sessions(id INTEGER PRIMARY KEY,user_id INTEGER,session_token TEXT,status TEXT,
                                  revoked_at TEXT,expires_at TEXT,last_seen_at TEXT);
-      CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT);
+      CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_user_roles(id INTEGER PRIMARY KEY,user_id INTEGER,role_id INTEGER,office_id INTEGER,
-                                   country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT);
+                                   country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT,valid_from TEXT NOT NULL DEFAULT '2000-01-01T00:00:00+00:00');
     """)
     c.execute("INSERT INTO iam_offices VALUES(1,'UAT')")
     c.execute("INSERT INTO iam_users(id,user_ref,username,home_office_id) VALUES(1,'maker-1','md.maker',1)")
     c.execute("INSERT INTO iam_users(id,user_ref,username,home_office_id) VALUES(2,'viewer-2','viewer',1)")
-    c.execute("INSERT INTO iam_roles VALUES(1,'MASTER_DATA')")
-    c.execute("INSERT INTO iam_roles VALUES(2,'VIEWER')")
-    c.execute("INSERT INTO iam_user_roles VALUES(1,1,1,1,NULL,NULL,'ACTIVE',NULL)")
-    c.execute("INSERT INTO iam_user_roles VALUES(2,2,2,1,NULL,NULL,'ACTIVE',NULL)")
+    c.execute("INSERT INTO iam_roles(id,role_code) VALUES(1,'MASTER_DATA')")
+    c.execute("INSERT INTO iam_roles(id,role_code) VALUES(2,'VIEWER')")
+    c.execute("INSERT INTO iam_user_roles(id,user_id,role_id,office_id,country_id,organization_id,status,valid_to) VALUES(1,1,1,1,NULL,NULL,'ACTIVE',NULL)")
+    c.execute("INSERT INTO iam_user_roles(id,user_id,role_id,office_id,country_id,organization_id,status,valid_to) VALUES(2,2,2,1,NULL,NULL,'ACTIVE',NULL)")
     future=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=2)).isoformat()
     past=(datetime.datetime.now(datetime.timezone.utc)-datetime.timedelta(hours=2)).isoformat()
     c.execute("INSERT INTO iam_sessions VALUES(1,1,'maker-good','ACTIVE',NULL,?,NULL)",(future,))
@@ -72,16 +72,16 @@ def test_bulk_full_lifecycle_with_real_iam_sessions(tmp_path,monkeypatch):
       CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_sessions(id INTEGER PRIMARY KEY,user_id INTEGER,session_token TEXT,status TEXT,
                                  revoked_at TEXT,expires_at TEXT,last_seen_at TEXT);
-      CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT);
+      CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_user_roles(id INTEGER PRIMARY KEY,user_id INTEGER,role_id INTEGER,office_id INTEGER,
-                                   country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT);
+                                   country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT,valid_from TEXT NOT NULL DEFAULT '2000-01-01T00:00:00+00:00');
     """)
     c.executemany("INSERT INTO iam_offices VALUES(?,?)",[(1,"UAT")])
     c.executemany("INSERT INTO iam_users(id,user_ref,username,home_office_id) VALUES(?,?,?,?)",[
         (1,"maker-001","md.maker",1),(2,"checker-002","md.checker",1)])
-    c.executemany("INSERT INTO iam_roles VALUES(?,?)",[
+    c.executemany("INSERT INTO iam_roles(id,role_code) VALUES(?,?)",[
         (1,"MASTER_DATA"),(2,"MASTER_DATA_MANAGER")])
-    c.executemany("INSERT INTO iam_user_roles VALUES(?,?,?,?,?,?,?,?)",[
+    c.executemany("INSERT INTO iam_user_roles(id,user_id,role_id,office_id,country_id,organization_id,status,valid_to) VALUES(?,?,?,?,?,?,?,?)",[
         (1,1,1,1,None,None,"ACTIVE",None),
         (2,2,2,1,None,None,"ACTIVE",None)])
     future=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(hours=2)).isoformat()
