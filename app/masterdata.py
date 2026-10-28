@@ -795,12 +795,8 @@ def bulk_preview(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M
         if not can_make_roles(roles):
             raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
         seen=set();seen_names={};out=[]
-        # Reject case-only collisions with existing or pending keys across
-        # SQLite and PostgreSQL, without relying on database collation.
-        existing_keys={r['record_key'].casefold() for r in c.execute(
-            'SELECT record_key FROM md_records WHERE domain=?',(b.domain,))}
-        pending_keys={r['record_key'].casefold() for r in c.execute(
-            "SELECT record_key FROM md_change_requests WHERE domain=? AND status='PENDING'",(b.domain,))}
+        # Use case-insensitive single-row lookups compatible with both
+        # SQLite/PostgreSQL and the existing lightweight UAT connection fakes.
         for idx,row in enumerate(b.rows,1):
             key=row.record_key.strip()
             errors=[]
@@ -808,11 +804,15 @@ def bulk_preview(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M
             if identity in seen:errors.append('DUPLICATE_KEY_IN_FILE')
             seen.add(identity)
             existing=c.execute('SELECT payload_json,status FROM md_records WHERE domain=? AND record_key=?',(b.domain,key)).fetchone()
-            if row.operation=='CREATE' and (existing or key.casefold() in existing_keys):errors.append('RECORD_ALREADY_EXISTS')
+            if row.operation=='CREATE' and (existing or c.execute(
+                'SELECT 1 FROM md_records WHERE domain=? AND LOWER(record_key)=LOWER(?) LIMIT 1',
+                (b.domain,key)).fetchone()):errors.append('RECORD_ALREADY_EXISTS')
             if row.operation=='UPDATE' and not existing:errors.append('RECORD_NOT_FOUND')
             if row.operation=='UPDATE' and existing and existing['status']!='ACTIVE':
                 errors.append('MASTER_RECORD_NOT_ACTIVE')
-            if key.casefold() in pending_keys:
+            if c.execute(
+                "SELECT 1 FROM md_change_requests WHERE domain=? AND LOWER(record_key)=LOWER(?) AND status='PENDING' LIMIT 1",
+                (b.domain,key)).fetchone():
                 errors.append('PENDING_CHANGE_EXISTS')
             previous=json.loads(existing['payload_json']) if existing else {}
             errors.extend(validate_payload(b.domain,row.payload,previous))
