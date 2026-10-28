@@ -79,7 +79,7 @@ jobs:
           retention-days: 7
   isolated-public-smoke:
     # Never execute against preview-pr124 or production.
-    if: github.ref_name == 'm3-dev-sprint-2' && github.event_name == 'push'
+    if: github.head_ref == 'm3-dev-sprint-2' || github.ref_name == 'm3-dev-sprint-2'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
