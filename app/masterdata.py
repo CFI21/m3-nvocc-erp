@@ -352,6 +352,15 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
             c.close()
             raise HTTPException(403, {'code': 'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
 
+    # PostgreSQL autocommit alone makes the pending-change lookup vulnerable to
+    # concurrent submissions. A transaction-scoped, per-domain advisory lock
+    # serializes key, display-name and relationship checks with the INSERT.
+    # xact locks are compatible with Neon transaction pooling; session locks are not.
+    if using_postgres():
+        c.execute('BEGIN')
+        c.execute('SELECT pg_advisory_xact_lock(hashtext(?),hashtext(?))',
+                  ('M3_MASTER_CHANGE', b.domain.casefold()))
+
     # Semantic identity guard: randomized AGCFG keys must not permit a second
     # Office assignment for the same Agent + Office (or identical Email route).
     if b.domain=='configuration' and b.operation=='CREATE':
@@ -472,7 +481,9 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     pdup=pending_duplicate_name(c,b.domain,name,b.record_key)
     if pdup:c.close();raise HTTPException(409,{'code':'PENDING_DUPLICATE_DISPLAY_NAME','record_key':pdup['record_key']})
     ref='MDC-'+uuid.uuid4().hex[:10].upper();base=existing['version'] if existing else 0
-    c.execute('INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) VALUES(?,?,?,?,?,?,?,?,?)',(ref,b.domain,b.record_key,b.operation,j(b.payload),b.reason,user,now(),base));audit(c,user,'CHANGE_REQUEST_CREATE',b.domain,b.record_key,ref,None,b.payload);c.close();return {'change_ref':ref,'status':'PENDING','base_version':base}
+    c.execute('INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) VALUES(?,?,?,?,?,?,?,?,?)',(ref,b.domain,b.record_key,b.operation,j(b.payload),b.reason,user,now(),base));audit(c,user,'CHANGE_REQUEST_CREATE',b.domain,b.record_key,ref,None,b.payload);
+    if using_postgres(): c.commit()
+    c.close();return {'change_ref':ref,'status':'PENDING','base_version':base}
 @router.get('/changes')
 def changes(status:Optional[str]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect()
@@ -504,9 +515,16 @@ def withdraw_change(change_ref:str,b:Withdrawal,x_m3_session:Optional[str]=Heade
         sess,roles=authenticated_actor(c,x_m3_session)
         if not can_make_roles(roles):
             raise HTTPException(403,{'code':'MASTER_CHANGE_WITHDRAW_DENIED'})
+        if using_postgres(): c.execute('BEGIN')
         change=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
         if not change:
             raise HTTPException(404,{'code':'MASTER_CHANGE_NOT_FOUND'})
+        if using_postgres():
+            c.execute('SELECT pg_advisory_xact_lock(hashtext(?),hashtext(?))',
+                      ('M3_MASTER_CHANGE', change['domain'].casefold()))
+            change=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
+            if not change:
+                raise HTTPException(404,{'code':'MASTER_CHANGE_NOT_FOUND'})
         if change['maker']!=sess['user_ref']:
             raise HTTPException(403,{'code':'WITHDRAW_MAKER_ONLY'})
         if change['status']!='PENDING':
@@ -517,6 +535,7 @@ def withdraw_change(change_ref:str,b:Withdrawal,x_m3_session:Optional[str]=Heade
             raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
         audit(c,sess['user_ref'],'CHANGE_WITHDRAW',change['domain'],change['record_key'],change_ref,
               before={'status':'PENDING'},after={'status':'WITHDRAWN','reason':b.reason.strip()})
+        if using_postgres(): c.commit()
         return {'change_ref':change_ref,'status':'WITHDRAWN'}
     finally:
         c.close()
@@ -531,8 +550,14 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     if not isinstance(sess,dict) or not str(sess.get('username') or '').strip():
         c.close()
         raise HTTPException(403,{'code':'CHECKER_SESSION_USERNAME_REQUIRED'})
+    if using_postgres(): c.execute('BEGIN')
     ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
     if not ch:c.close();raise HTTPException(404,'Change not found')
+    if using_postgres():
+        c.execute('SELECT pg_advisory_xact_lock(hashtext(?),hashtext(?))',
+                  ('M3_MASTER_CHANGE', ch['domain'].casefold()))
+        ch=c.execute('SELECT * FROM md_change_requests WHERE change_ref=?',(change_ref,)).fetchone()
+        if not ch:c.close();raise HTTPException(404,'Change not found')
     if ch['status']!='PENDING':c.close();raise HTTPException(409,{'code':'CHANGE_ALREADY_DECIDED'})
     maker_ref=str(ch['maker'] or '').strip().casefold()
     checker_ref=str(user or '').strip().casefold()
@@ -542,7 +567,11 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
     if b.decision=='APPROVE' and ch['operation'] not in ('CREATE','UPDATE','DEACTIVATE','ACTIVATE','REACTIVATE'):
         c.close()
         raise HTTPException(422,{'code':'INVALID_MASTER_OPERATION','operation':ch['operation']})
-    if b.decision=='REJECT':c.execute("UPDATE md_change_requests SET status='REJECTED',checker=?,decision_comment=?,decided_at=? WHERE id=?",(user,b.comment,now(),ch['id']));audit(c,user,'CHANGE_REJECT',ch['domain'],ch['record_key'],change_ref);c.close();return {'status':'REJECTED'}
+    if b.decision=='REJECT':
+        c.execute("UPDATE md_change_requests SET status='REJECTED',checker=?,decision_comment=?,decided_at=? WHERE id=?",(user,b.comment,now(),ch['id']))
+        audit(c,user,'CHANGE_REJECT',ch['domain'],ch['record_key'],change_ref)
+        if using_postgres(): c.commit()
+        c.close();return {'status':'REJECTED'}
     current=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(ch['domain'],ch['record_key'])).fetchone()
     if ch['operation']=='CREATE' and (current or c.execute(
         'SELECT 1 FROM md_records WHERE domain=? AND LOWER(record_key)=LOWER(?) LIMIT 1',
@@ -655,7 +684,9 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
         ver=current['version']+1;c.execute("UPDATE md_records SET status='INACTIVE',version=?,effective_to=COALESCE(?,?),approved_by=?,approved_at=?,updated_at=? WHERE id=?",(ver,payload.get('effective_to'),ts[:10],user,ts,ts,current['id']));payload=json.loads(current['payload_json'])
     else:
         ver=current['version']+1;c.execute("UPDATE md_records SET status='ACTIVE',version=?,effective_to=NULL,approved_by=?,approved_at=?,updated_at=? WHERE id=?",(ver,user,ts,ts,current['id']));payload=json.loads(current['payload_json'])
-    status='INACTIVE' if ch['operation']=='DEACTIVATE' else 'ACTIVE';sync_operational_projection(c,ch['domain'],ch['record_key'],payload,status);c.execute('INSERT INTO md_versions(domain,record_key,version,payload_json,status,changed_by,change_ref,ts) VALUES(?,?,?,?,?,?,?,?)',(ch['domain'],ch['record_key'],ver,j(payload),status,user,change_ref,ts));c.execute("UPDATE md_change_requests SET status='APPROVED',checker=?,decision_comment=?,decided_at=?,applied_at=? WHERE id=?",(user,b.comment,ts,ts,ch['id']));audit(c,user,'CHANGE_APPROVE_APPLY',ch['domain'],ch['record_key'],change_ref,before,payload);c.close();return {'status':'APPROVED','version':ver}
+    status='INACTIVE' if ch['operation']=='DEACTIVATE' else 'ACTIVE';sync_operational_projection(c,ch['domain'],ch['record_key'],payload,status);c.execute('INSERT INTO md_versions(domain,record_key,version,payload_json,status,changed_by,change_ref,ts) VALUES(?,?,?,?,?,?,?,?)',(ch['domain'],ch['record_key'],ver,j(payload),status,user,change_ref,ts));c.execute("UPDATE md_change_requests SET status='APPROVED',checker=?,decision_comment=?,decided_at=?,applied_at=? WHERE id=?",(user,b.comment,ts,ts,ch['id']));audit(c,user,'CHANGE_APPROVE_APPLY',ch['domain'],ch['record_key'],change_ref,before,payload);
+    if using_postgres(): c.commit()
+    c.close();return {'status':'APPROVED','version':ver}
 @router.post('/projections/agents/sync')
 def sync_agent_projections(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess['user_ref']
