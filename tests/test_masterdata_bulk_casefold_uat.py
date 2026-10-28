@@ -96,3 +96,62 @@ def test_direct_change_rejects_case_variant_existing_and_pending_keys(tmp_path, 
     db = connect()
     assert db.execute("SELECT COUNT(*) FROM md_change_requests").fetchone()[0] == 1
     db.close()
+
+
+def test_checker_rejects_case_variant_race_and_self_approval(tmp_path, monkeypatch):
+    import pytest
+    from fastapi import HTTPException
+
+    db_path = str(tmp_path / "checker_casefold.db")
+
+    def connect():
+        db = sqlite3.connect(db_path)
+        db.row_factory = sqlite3.Row
+        return db
+
+    db = connect()
+    masterdata.init_schema(db)
+    db.execute(
+        "INSERT INTO md_records(domain,record_key,display_name,payload_json,status,created_at,updated_at) "
+        "VALUES(?,?,?,?,?,?,?)",
+        ("agent", "AGENT-001", "Original Agent", '{"name":"Original Agent"}',
+         "ACTIVE", "2026-10-28", "2026-10-28"),
+    )
+    db.execute(
+        "INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,status,maker,created_at) "
+        "VALUES(?,?,?,?,?,?,?,?,?)",
+        ("MDC-CASE-RACE", "agent", "agent-001", "CREATE",
+         '{"name":"Another Agent"}', "Pre-existing pending race",
+         "PENDING", "maker.user", "2026-10-28"),
+    )
+    db.commit()
+    db.close()
+    monkeypatch.setattr(masterdata, "connect", connect)
+
+    def actor(c, token):
+        identity = "maker.user" if token == "maker" else "checker.user"
+        return {"username": identity, "user_ref": identity}, {"MASTER_DATA_MANAGER"}
+
+    monkeypatch.setattr(masterdata, "authenticated_actor", actor)
+
+    with pytest.raises(HTTPException) as same_actor:
+        masterdata.decide("MDC-CASE-RACE",
+                          masterdata.Decision(decision="APPROVE"),
+                          x_m3_session="maker")
+    assert same_actor.value.status_code == 409
+    assert same_actor.value.detail["code"] == "FOUR_EYES_VIOLATION"
+
+    with pytest.raises(HTTPException) as duplicate:
+        masterdata.decide("MDC-CASE-RACE",
+                          masterdata.Decision(decision="APPROVE"),
+                          x_m3_session="checker")
+    assert duplicate.value.status_code == 409
+    assert duplicate.value.detail["code"] == "DUPLICATE_MASTER_KEY"
+
+    db = connect()
+    assert db.execute(
+        "SELECT status FROM md_change_requests WHERE change_ref='MDC-CASE-RACE'"
+    ).fetchone()[0] == "PENDING"
+    assert db.execute("SELECT COUNT(*) FROM md_versions").fetchone()[0] == 0
+    assert db.execute("SELECT COUNT(*) FROM md_records").fetchone()[0] == 1
+    db.close()
