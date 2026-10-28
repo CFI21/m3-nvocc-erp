@@ -22,11 +22,20 @@ def test_startup_requires_active_separate_maker_checker(monkeypatch, roles, shou
 
     class FakeDB:
         closed = False
-        def execute(self, query):
+        def execute(self, query, params=()):
             if "FROM iam_users WHERE username IN" in query:
                 return Cursor([{"n": 2}])
             if "JOIN iam_user_roles" in query:
-                return Cursor([{"username": name, "status": status, "role_code": role} for name, status, role in roles])
+                # Mirror the effective-role filter of the parameterized SQL.
+                assert len(params) == 2 and params[0] == params[1]
+                assert "u.status='ACTIVE'" in query
+                assert "r.status='ACTIVE'" in query
+                assert "ur.status='ACTIVE'" in query
+                assert "ur.valid_from<=?" in query
+                return Cursor([
+                    {"username": name, "role_code": role}
+                    for name, status, role in roles if status == "ACTIVE"
+                ])
             return Cursor([{"n": 0}])
         def close(self): self.closed = True
 
