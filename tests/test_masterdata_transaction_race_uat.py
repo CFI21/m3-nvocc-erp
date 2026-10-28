@@ -36,6 +36,10 @@ def transaction_pooler_contract(tmp_path, monkeypatch):
             if query.strip().upper() == "BEGIN":
                 self.begin_requested = True
                 return self.raw.execute("SELECT 1")
+            if query.strip().upper() == "COMMIT":
+                self.raw.execute("COMMIT")
+                self._release()
+                return self.raw.execute("SELECT 1")
             if "pg_advisory_xact_lock" in query:
                 assert query.startswith("SELECT pg_advisory_xact_lock")
                 key = tuple(params)
@@ -53,8 +57,7 @@ def transaction_pooler_contract(tmp_path, monkeypatch):
                 self.held.pop().release()
 
         def commit(self):
-            self.raw.commit()
-            self._release()
+            raise AssertionError("Explicit SQL COMMIT required on autocommit adapter")
 
         def rollback(self):
             self.raw.rollback()
