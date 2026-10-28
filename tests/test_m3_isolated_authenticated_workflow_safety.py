@@ -70,3 +70,33 @@ def test_redirect_handler_rejects_cross_host_redirects():
     with pytest.raises(runner.UATFailure, match="forbidden redirect"):
         runner.ForbidRedirect().redirect_request(
             None, None, 302, "redirect", {}, "https://untrusted.invalid/")
+
+
+def test_login_identity_failure_revokes_issued_session(monkeypatch):
+    runner = load_runner()
+    calls = []
+    def fake_request(path, *, method="GET", payload=None, token=None, status=200):
+        calls.append((path, method, token))
+        if path == "/api/admin/auth/login":
+            return {"username": "md.maker", "mfa_verified": True,
+                    "roles": ["MASTER_DATA"], "user_ref": "isolated-maker",
+                    "session_token": "test-disposable-token"}
+        if path == "/api/admin/auth/whoami":
+            return {"username": "other-user", "roles": ["MASTER_DATA"],
+                    "user_ref": "other-identity"}
+        if path == "/api/admin/auth/logout":
+            return {"status": "LOGGED_OUT"}
+        raise AssertionError("Unrecognized request")
+    monkeypatch.setattr(runner, "request", fake_request)
+    with pytest.raises(runner.UATFailure, match="IAM session identity verification failed"):
+        runner.login("md.maker", "unused-password", "unused-mfa", "MASTER_DATA")
+    assert calls[-1] == ("/api/admin/auth/logout", "POST", "test-disposable-token")
+
+
+def test_unexpected_exception_details_never_enter_evidence_or_stderr():
+    runner = load_runner()
+    exc = RuntimeError("PASSWORD=private-test-placeholder SESSION=secret-token")
+    assert runner.safe_failure(exc) == "UNEXPECTED_RuntimeError"
+    assert "private-test-placeholder" not in runner.safe_failure(exc)
+    assert runner.safe_failure(runner.UATFailure("Missing secured MAKER login configuration")) == (
+        "Missing secured MAKER login configuration")

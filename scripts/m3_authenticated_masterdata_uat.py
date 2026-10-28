@@ -72,6 +72,13 @@ def error_code(body):
     return detail.get("code") if isinstance(detail, dict) else None
 
 
+def safe_failure(exc):
+    """Evidence must never echo arbitrary exception data or secrets."""
+    if isinstance(exc, UATFailure):
+        return str(exc)
+    return "UNEXPECTED_" + type(exc).__name__
+
+
 def assert_denied(path, *, method, payload, token, status, code):
     body = request(path, method=method, payload=payload, token=token, status=status)
     require(error_code(body) == code, f"Expected denial {code}")
@@ -113,10 +120,21 @@ def login(username, password, mfa_code, required_role):
             and required_role in response.get("roles", [])
             and bool(response.get("session_token")), "IAM login/MFA/role verification failed")
     token = response["session_token"]
-    who = request("/api/admin/auth/whoami", token=token)
-    require(who.get("username") == username
-            and who.get("user_ref") == response.get("user_ref")
-            and required_role in who.get("roles", []), "IAM session identity verification failed")
+    try:
+        who = request("/api/admin/auth/whoami", token=token)
+        require(who.get("username") == username
+                and who.get("user_ref") == response.get("user_ref")
+                and required_role in who.get("roles", []),
+                "IAM session identity verification failed")
+    except Exception:
+        # The token was issued but is not yet owned by main(). Revoke it
+        # before re-raising so an unsuccessful identity check cannot leave
+        # a silent valid session behind.
+        try:
+            request("/api/admin/auth/logout", method="POST", token=token)
+        except Exception:
+            pass  # Preserve the original failure; revocation is best-effort.
+        raise
     return token, response["user_ref"]
 
 
@@ -247,7 +265,7 @@ def main():
             pending_first, pending_second, update_ref, withdraw_ref, self_ref, cleanup_ref]
         result["status"] = "PASS"
     except Exception as exc:
-        result["failure"] = str(exc)
+        result["failure"] = safe_failure(exc)
         raise
     finally:
         # Keep governed records visible for review on failure; no direct DB edits.
@@ -273,7 +291,8 @@ if __name__ == "__main__":
         result = main()
     except Exception as exc:
         # Do not print request payloads, credential values or bearer tokens.
-        print("M3_ISOLATED_AUTHENTICATED_UAT_FAIL: " + str(exc), file=sys.stderr)
+        print("M3_ISOLATED_AUTHENTICATED_UAT_FAIL: " + safe_failure(exc),
+              file=sys.stderr)
         sys.exit(1)
     print("M3_ISOLATED_AUTHENTICATED_UAT_PASS")
     print("Evidence written to " + str(EVIDENCE_PATH))
