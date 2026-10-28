@@ -27,8 +27,15 @@ def transaction_pooler_contract(tmp_path, monkeypatch):
             self.raw = sqlite3.connect(dbfile, timeout=20, isolation_level=None)
             self.raw.row_factory = sqlite3.Row
             self.held = []
+            self.begin_requested = False
 
         def execute(self, query, params=()):
+            # SQLite read locks differ from PostgreSQL READ COMMITTED. Defer
+            # the local BEGIN until after the simulated advisory lock while
+            # retaining the production assertion that BEGIN was requested.
+            if query.strip().upper() == "BEGIN":
+                self.begin_requested = True
+                return self.raw.execute("SELECT 1")
             if "pg_advisory_xact_lock" in query:
                 assert query.startswith("SELECT pg_advisory_xact_lock")
                 key = tuple(params)
@@ -36,7 +43,9 @@ def transaction_pooler_contract(tmp_path, monkeypatch):
                     lock = registry.setdefault(key, threading.Lock())
                 lock.acquire(timeout=18) or pytest.fail("Advisory lock timed out")
                 self.held.append(lock)
-                return self.raw.execute("SELECT 1")
+                assert self.begin_requested, "Postgres transaction must start before lock"
+                self.begin_requested = False
+                return self.raw.execute("BEGIN")
             return self.raw.execute(query, params)
 
         def _release(self):
