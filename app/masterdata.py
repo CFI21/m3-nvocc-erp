@@ -668,10 +668,13 @@ def sync_agent_projections(x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     return {'domain':'agent','projection':'agents','synced':synced,'authoritative_source':'md_records','new_master_model':False}
 
 @router.get('/versions/{domain}/{record_key}')
-def versions(domain:str,record_key:str):
+def versions(domain:str,record_key:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect()
     try:
         if not using_postgres(): init_schema(c)
+        _session,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_HISTORY_READ_NOT_AUTHORIZED'})
         return [dict(r) for r in c.execute('SELECT * FROM md_versions WHERE domain=? AND record_key=? ORDER BY version DESC',(domain,record_key))]
     finally: c.close()
 
@@ -750,7 +753,15 @@ def integrity():
 def hardcoded_scan():
     c=connect();init_schema(c);cfg=c.execute('SELECT COUNT(*) n FROM md_config').fetchone()['n'];seq=c.execute('SELECT COUNT(*) n FROM md_sequences').fetchone()['n'];c.close();return {'status':'PASS','critical_hardcoded_values':0,'controlled_configuration_items':cfg,'central_sequences':seq,'note':'Runtime business references are represented through governed master-data/configuration/sequence stores in the CLX-010 test stack.'}
 @router.get('/audit')
-def audit_list():c=connect();init_schema(c);x=[dict(r) for r in c.execute('SELECT * FROM md_audit ORDER BY id DESC LIMIT 300')];c.close();return x
+def audit_list(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        if not using_postgres(): init_schema(c)
+        _session,roles=authenticated_actor(c,x_m3_session)
+        if not (roles & {'SUPER_ADMIN','MASTER_DATA','MASTER_DATA_MANAGER'}):
+            raise HTTPException(403,{'code':'MASTER_AUDIT_READ_NOT_AUTHORIZED'})
+        return [dict(r) for r in c.execute('SELECT * FROM md_audit ORDER BY id DESC LIMIT 300')]
+    finally: c.close()
 
 
 # Isolated bulk staging: preview rows and create governed PENDING change requests.
