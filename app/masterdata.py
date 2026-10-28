@@ -379,7 +379,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                             c.close()
                             raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':prior['record_key']})
     existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
-    if b.operation=='CREATE' and existing:c.close();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
+    if b.operation=='CREATE' and (existing or c.execute('SELECT 1 FROM md_records WHERE domain=? AND LOWER(record_key)=LOWER(?) LIMIT 1',(b.domain,b.record_key)).fetchone()):c.close();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
     if b.operation!='CREATE' and not existing:c.close();raise HTTPException(404,{'code':'MASTER_RECORD_NOT_FOUND'})
     if existing and b.operation in ('UPDATE','DEACTIVATE') and existing['status']!='ACTIVE':
         c.close()
@@ -423,7 +423,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                     all(str(other.get(field) or '').strip().upper()==str(restored.get(field) or '').strip().upper() for field in fields)):
                     c.close()
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
-    if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND record_key=? AND status='PENDING'",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
+    if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND LOWER(record_key)=LOWER(?) AND status='PENDING' LIMIT 1",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
     if (b.domain=='configuration' and b.operation=='UPDATE' and
         str(({**existing_payload,**b.payload}).get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
