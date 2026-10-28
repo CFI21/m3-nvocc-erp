@@ -544,7 +544,9 @@ def decide(change_ref:str,b:Decision,x_m3_session:Optional[str]=Header(None,alia
         raise HTTPException(422,{'code':'INVALID_MASTER_OPERATION','operation':ch['operation']})
     if b.decision=='REJECT':c.execute("UPDATE md_change_requests SET status='REJECTED',checker=?,decision_comment=?,decided_at=? WHERE id=?",(user,b.comment,now(),ch['id']));audit(c,user,'CHANGE_REJECT',ch['domain'],ch['record_key'],change_ref);c.close();return {'status':'REJECTED'}
     current=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(ch['domain'],ch['record_key'])).fetchone()
-    if ch['operation']=='CREATE' and current:
+    if ch['operation']=='CREATE' and (current or c.execute(
+        'SELECT 1 FROM md_records WHERE domain=? AND LOWER(record_key)=LOWER(?) LIMIT 1',
+        (ch['domain'],ch['record_key'])).fetchone()):
         c.close()
         raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY','record_key':ch['record_key']})
     if ch['operation']!='CREATE' and not current:
