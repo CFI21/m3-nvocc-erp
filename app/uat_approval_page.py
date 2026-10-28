@@ -43,7 +43,37 @@ async function decide(action){const ref=$('ref').value.trim();await assertSynthe
 $('approve').onclick=()=>run(()=>decide('APPROVE'));
 $('reject').onclick=()=>run(()=>decide('REJECT'));
 $('withdraw').onclick=()=>run(async()=>{const ref=$('ref').value.trim();await assertSynthetic(ref);return request('/api/masterdata/changes/'+encodeURIComponent(ref)+'/withdraw','maker','POST',{reason:'Synthetic UAT withdrawal'});});
-$('review').onclick=()=>run(async()=>{const changes=await request('/api/masterdata/changes','checker');const ref=$('ref').value.trim();const matching=changes.find(x=>x.change_ref===ref);const units=await request('/api/masterdata/records/unit','checker');return {change:matching||null,record:lastKey?units.find(x=>x.record_key===lastKey)||null:null};});
+$('review').onclick=()=>run(async()=>{
+  const ref=$('ref').value.trim();
+  const changes=await request('/api/masterdata/changes','checker');
+  const matching=changes.find(x=>x.change_ref===ref);
+  if(!matching||matching.domain!=='unit'||!String(matching.record_key||'').startsWith('UAT-BROWSER-'))
+    throw Error('Select a synthetic UAT-BROWSER- unit change reference');
+  const key=matching.record_key;
+  const [units,history,events]=await Promise.all([
+    request('/api/masterdata/records/unit','checker'),
+    request('/api/masterdata/versions/unit/'+encodeURIComponent(key),'checker'),
+    request('/api/masterdata/audit','checker')
+  ]);
+  const record=units.find(x=>x.record_key===key)||null;
+  const relatedAudit=events.filter(x=>x.change_ref===ref);
+  const checks={
+    maker_identified:!!matching.maker,
+    request_audited:relatedAudit.some(x=>x.action==='CHANGE_REQUEST_CREATE'),
+    independent_checker:matching.status==='APPROVED'
+      ? !!matching.checker&&matching.checker.toLowerCase()!==matching.maker.toLowerCase()
+      : null,
+    version_linked:matching.status==='APPROVED'
+      ? history.some(x=>x.change_ref===ref&&x.version===record?.version)
+      : null,
+    approval_audited:matching.status==='APPROVED'
+      ? relatedAudit.some(x=>x.action==='CHANGE_APPROVE_APPLY'&&x.actor===matching.checker)
+      : null
+  };
+  return {change:matching,record,versions:history.map(x=>({version:x.version,change_ref:x.change_ref,status:x.status,changed_by:x.changed_by})),
+    audit_events:relatedAudit.map(x=>({action:x.action,actor:x.actor,ts:x.ts,change_ref:x.change_ref})),
+    acceptance:checks,verified:matching.status==='APPROVED'&&Object.values(checks).every(x=>x===true)};
+});
 $('duplicate').onclick=()=>run(async()=>{const agent='UAT-AGENT-001',office='RTM';const before=await request('/api/masterdata/changes','maker');const key='AGCFG-UATDUP-'+crypto.randomUUID().slice(0,10).toUpperCase();const payload={domain:'configuration',record_key:key,operation:'CREATE',payload:{config_type:'AGENT_OFFICE_ASSIGNMENT',agent_code:agent,office_code:office,address:'B01 isolated duplicate safety test'},reason:'B01 UAT duplicate rejection expected'};const response=await fetch('/api/masterdata/changes',{method:'POST',headers:headers('maker'),body:JSON.stringify(payload),credentials:'omit',cache:'no-store'});const data=await response.json().catch(()=>({}));const after=await request('/api/masterdata/changes','maker');const created=after.some(x=>x.record_key===key);const passed=response.status===409&&data.detail?.code==='DUPLICATE_AGENT_RELATIONSHIP'&&!created&&after.length===before.length;return {test:'Agent Office duplicate prevention',status:passed?'PASS':'FAIL',http_status:response.status,error_code:data.detail?.code||null,record_created:created,change_count_before:before.length,change_count_after:after.length};});
 $('emailDuplicate').onclick=()=>run(async()=>{if(!sessions.maker||!sessions.checker)throw Error('Both Maker and Checker must be signed in');const suffix=crypto.randomUUID().slice(0,12).toUpperCase(),portKey='UAT-PORT-'+suffix,emailKey='AGCFG-UATEMAIL-'+suffix,duplicateKey='AGCFG-UATEMAIL-DUP-'+suffix,email='uat-'+suffix.toLowerCase()+'@example.invalid';let portChange='',emailChange='';const steps=[];try{const port=await request('/api/masterdata/changes','maker','POST',{domain:'port',record_key:portKey,operation:'CREATE',payload:{name:'Synthetic UAT Port '+suffix},reason:'Isolated B01 Agent Email duplicate UAT'});portChange=port.change_ref;steps.push('synthetic port submitted');const approved=await request('/api/masterdata/changes/'+encodeURIComponent(portChange)+'/decision','checker','POST',{decision:'APPROVE',comment:'Synthetic B01 email UAT prerequisite'});steps.push('synthetic port approved');const base={config_type:'AGENT_EMAIL',agent_code:'UAT-AGENT-001',port_code:portKey,email};const original=await request('/api/masterdata/changes','maker','POST',{domain:'configuration',record_key:emailKey,operation:'CREATE',payload:base,reason:'B01 pending Agent Email duplicate test'});emailChange=original.change_ref;steps.push('original Agent Email pending');const before=await request('/api/masterdata/changes','maker');const duplicate=await fetch('/api/masterdata/changes',{method:'POST',headers:headers('maker'),body:JSON.stringify({domain:'configuration',record_key:duplicateKey,operation:'CREATE',payload:base,reason:'Expected duplicate rejection'}),credentials:'omit',cache:'no-store'});const response=await duplicate.json().catch(()=>({}));const after=await request('/api/masterdata/changes','maker');const noExtra=before.length===after.length&&!after.some(x=>x.record_key===duplicateKey);const rejected=duplicate.status===409&&response.detail?.code==='DUPLICATE_AGENT_RELATIONSHIP'&&noExtra;steps.push('duplicate request checked');await request('/api/masterdata/changes/'+encodeURIComponent(emailChange)+'/withdraw','maker','POST',{reason:'B01 synthetic email UAT cleanup'});const finished=await request('/api/masterdata/changes','checker');const withdrawn=finished.some(x=>x.change_ref===emailChange&&x.status==='WITHDRAWN');return {test:'Agent Email duplicate prevention',status:rejected&&withdrawn?'PASS':'FAIL',http_status:duplicate.status,error_code:response.detail?.code||null,duplicate_created:!noExtra,original_withdrawn:withdrawn,port_change:portChange,email_change:emailChange,steps};}catch(e){return {status:'INCOMPLETE',error:e.message,port_change:portChange,email_change:emailChange,steps,notice:'Synthetic prerequisites may remain; do not rerun until inspected'};}});
 </script></body></html>'''
