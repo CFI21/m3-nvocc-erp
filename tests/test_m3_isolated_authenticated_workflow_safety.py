@@ -144,3 +144,36 @@ def test_pinned_isolated_request_forwards_distinct_uat_header(monkeypatch):
     headers = {k.lower(): v for k, v in req["headers"].items()}
     assert headers["x-m3-uat-token"] == test_gate
     assert headers["x-m3-session"] == "offline-session"
+
+
+def test_login_response_role_mismatch_revokes_issued_session(monkeypatch):
+    runner = load_runner()
+    calls = []
+    def stub(path, *, method="GET", payload=None, token=None, status=200):
+        calls.append((path, method, token))
+        if path == "/api/admin/auth/login":
+            return {"username": "md.maker", "mfa_verified": True,
+                    "roles": ["VIEWER"], "user_ref": "test-maker",
+                    "session_token": "issued-disposable-session"}
+        if path == "/api/admin/auth/logout":
+            return {"status": "LOGGED_OUT"}
+        raise AssertionError("No whoami should occur with wrong role")
+    monkeypatch.setattr(runner, "request", stub)
+    with pytest.raises(runner.UATFailure, match="IAM login/MFA/role verification failed"):
+        runner.login("md.maker", "never-a-real-password", "not-a-real-mfa", "MASTER_DATA")
+    assert calls[-1] == ("/api/admin/auth/logout", "POST", "issued-disposable-session")
+    assert not any(path == "/api/admin/auth/whoami" for path, _, _ in calls)
+
+
+def test_login_without_issued_token_does_not_attempt_logout(monkeypatch):
+    runner = load_runner()
+    calls = []
+    def stub(path, *, method="GET", payload=None, token=None, status=200):
+        calls.append((path, method, token))
+        assert path == "/api/admin/auth/login"
+        return {"username": "md.maker", "mfa_verified": True,
+                "roles": ["MASTER_DATA"], "user_ref": "test-maker"}
+    monkeypatch.setattr(runner, "request", stub)
+    with pytest.raises(runner.UATFailure, match="IAM login/MFA/role verification failed"):
+        runner.login("md.maker", "never-a-real-password", "not-a-real-mfa", "MASTER_DATA")
+    assert len(calls) == 1

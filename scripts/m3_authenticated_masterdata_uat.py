@@ -125,25 +125,26 @@ def login(username, password, mfa_code, required_role):
     response = request("/api/admin/auth/login", method="POST",
                        payload={"username": username, "password": password,
                                 "mfa_code": mfa_code})
-    require(response.get("username") == username
-            and response.get("mfa_verified") is True
-            and required_role in response.get("roles", [])
-            and bool(response.get("session_token")), "IAM login/MFA/role verification failed")
-    token = response["session_token"]
+    token = response.get("session_token")
     try:
+        require(response.get("username") == username
+                and response.get("mfa_verified") is True
+                and required_role in response.get("roles", [])
+                and bool(token), "IAM login/MFA/role verification failed")
         who = request("/api/admin/auth/whoami", token=token)
         require(who.get("username") == username
                 and who.get("user_ref") == response.get("user_ref")
                 and required_role in who.get("roles", []),
                 "IAM session identity verification failed")
     except Exception:
-        # The token was issued but is not yet owned by main(). Revoke it
-        # before re-raising so an unsuccessful identity check cannot leave
-        # a silent valid session behind.
-        try:
-            request("/api/admin/auth/logout", method="POST", token=token)
-        except Exception:
-            pass  # Preserve the original failure; revocation is best-effort.
+        # Any issued token is still owned by login() until full response and
+        # whoami validation succeeds. Revoke on ANY validation failure,
+        # including mismatched username/role/MFA in the login response.
+        if token:
+            try:
+                request("/api/admin/auth/logout", method="POST", token=token)
+            except Exception:
+                pass  # Preserve the original failure; revocation is best-effort.
         raise
     return token, response["user_ref"]
 
