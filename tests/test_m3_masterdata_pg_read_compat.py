@@ -28,8 +28,20 @@ def test_duplicate_review_works_without_sqlite_aggregate(monkeypatch):
 def test_read_views_do_not_initialize_sqlite_on_postgres(monkeypatch):
     monkeypatch.setattr(masterdata, "using_postgres", lambda: True)
     monkeypatch.setattr(masterdata, "init_schema", lambda c: (_ for _ in ()).throw(AssertionError("SQLite schema forbidden")))
-    for fn, args in [(masterdata.versions, ("agent", "A01")), (masterdata.quality, ())]:
+
+    def synthetic_authorized_actor(conn, token):
+        # Only the test fixture bypasses IAM; production endpoint authorization stays intact.
+        assert token == "synthetic-iam-test-session"
+        return {"user_ref": "uat-read-compat"}, {"MASTER_DATA"}
+
+    monkeypatch.setattr(masterdata, "authenticated_actor", synthetic_authorized_actor)
+    for fn, args, kwargs in [
+        (masterdata.versions, ("agent", "A01"), {"x_m3_session": "synthetic-iam-test-session"}),
+        (masterdata.audit_list, (), {"x_m3_session": "synthetic-iam-test-session"}),
+        (masterdata.quality, (), {}),
+    ]:
         conn = FakeConnection([])
         monkeypatch.setattr(masterdata, "connect", lambda: conn)
-        assert fn(*args) == []
+        assert fn(*args, **kwargs) == []
+        assert all("sqlite_master" not in statement for statement in conn.statements)
         assert conn.closed
