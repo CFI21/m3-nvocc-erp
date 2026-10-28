@@ -31,19 +31,19 @@ def test_revoked_expired_checker_and_role_cannot_approve_pending_bulk(
       CREATE TABLE iam_users(id INTEGER PRIMARY KEY,user_ref TEXT,username TEXT,home_office_id INTEGER,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_sessions(id INTEGER PRIMARY KEY,user_id INTEGER,session_token TEXT,status TEXT,
                                  revoked_at TEXT,expires_at TEXT,last_seen_at TEXT);
-      CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT);
+      CREATE TABLE iam_roles(id INTEGER PRIMARY KEY,role_code TEXT,status TEXT NOT NULL DEFAULT 'ACTIVE');
       CREATE TABLE iam_user_roles(id INTEGER PRIMARY KEY,user_id INTEGER,role_id INTEGER,office_id INTEGER,
-                                   country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT);
+                                   country_id INTEGER,organization_id INTEGER,status TEXT,valid_to TEXT,valid_from TEXT NOT NULL DEFAULT '2000-01-01T00:00:00+00:00');
     """)
     c.execute("INSERT INTO iam_offices VALUES(1,'UAT')")
     c.executemany("INSERT INTO iam_users(id,user_ref,username,home_office_id) VALUES(?,?,?,?)", [
         (1, "synthetic-maker", "md.maker", 1),
         (2, "synthetic-checker", "md.checker", 1),
     ])
-    c.executemany("INSERT INTO iam_roles VALUES(?,?)", [
+    c.executemany("INSERT INTO iam_roles(id,role_code) VALUES(?,?)", [
         (1, "MASTER_DATA"), (2, "MASTER_DATA_MANAGER")
     ])
-    c.executemany("INSERT INTO iam_user_roles VALUES(?,?,?,?,?,?,?,?)", [
+    c.executemany("INSERT INTO iam_user_roles(id,user_id,role_id,office_id,country_id,organization_id,status,valid_to) VALUES(?,?,?,?,?,?,?,?)", [
         (1, 1, 1, 1, None, None, "ACTIVE", None),
         (2, 2, 2, 1, None, None, "ACTIVE", None),
     ])
@@ -112,6 +112,27 @@ def test_revoked_expired_checker_and_role_cannot_approve_pending_bulk(
     with pytest.raises(HTTPException) as err:
         md.decide(change_ref, decision, x_m3_session="checker-active")
     assert err.value.status_code == 403
+
+    # Active role assignment cannot grant permission before its valid_from date.
+    c = connect()
+    c.execute("UPDATE iam_user_roles SET status='ACTIVE',valid_from=? WHERE user_id=2", (future,))
+    c.close()
+    with pytest.raises(HTTPException) as err:
+        md.decide(change_ref, decision, x_m3_session="checker-active")
+    assert err.value.status_code == 403
+
+    # Disabling a role globally must invalidate otherwise-valid assignments.
+    c = connect()
+    c.execute("UPDATE iam_user_roles SET valid_from=? WHERE user_id=2", (past,))
+    c.execute("UPDATE iam_roles SET status='INACTIVE' WHERE role_code='MASTER_DATA_MANAGER'")
+    c.close()
+    with pytest.raises(HTTPException) as err:
+        md.decide(change_ref, decision, x_m3_session="checker-active")
+    assert err.value.status_code == 403
+
+    c = connect()
+    c.execute("UPDATE iam_roles SET status='ACTIVE' WHERE role_code='MASTER_DATA_MANAGER'")
+    c.close()
 
     c = connect()
     assert c.execute(
