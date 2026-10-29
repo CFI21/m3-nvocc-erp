@@ -571,7 +571,7 @@ def bulk_job_access(resource:str='agent-tasks',action:str='view',x_m3_session:Op
                   and len({str(r['job_ref']) for r in admin_rows}) == len(expected)
                   and all(r.get('allowed') is expected[str(r['job_ref'])] for r in admin_rows))
         import logging
-        logging.getLogger(__name__).info(
+        logging.getLogger('uvicorn.error').info(
             'M3_ISOLATED_ADMIN_JOB_SCOPE_UAT result=%s checks=%d/5',
             'PASS' if passed else 'FAIL', len(admin_rows))
     c.close()
