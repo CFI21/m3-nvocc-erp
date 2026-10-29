@@ -562,7 +562,20 @@ def bulk_job_access(resource:str='agent-tasks',action:str='view',x_m3_session:Op
     c=connect(); s=session(c,x_m3_session)
     if not permission(c,s['user_id'],'identity','view',s['office_code']) and not permission(c,s['user_id'],'identity','admin',s['office_code']):
         c.close(); raise HTTPException(403,{'code':'PERMISSION_DENIED'})
-    out=bulk_validate(c,resource,action); c.close(); return out
+    out=bulk_validate(c,resource,action)
+    if resource == 'agent-tasks' and action == 'approve':
+        expected = {'50001': True, '50002': False, '50003': False, '50004': False, '50005': True}
+        admin_rows = [r for r in out.get('results', []) if r.get('username') == 'admin'
+                      and str(r.get('job_ref')) in expected]
+        passed = (len(admin_rows) == len(expected)
+                  and len({str(r['job_ref']) for r in admin_rows}) == len(expected)
+                  and all(r.get('allowed') is expected[str(r['job_ref'])] for r in admin_rows))
+        import logging
+        logging.getLogger(__name__).info(
+            'M3_ISOLATED_ADMIN_JOB_SCOPE_UAT result=%s checks=%d/5',
+            'PASS' if passed else 'FAIL', len(admin_rows))
+    c.close()
+    return out
 @router.get('/party-access',dependencies=[Depends(require_iam_admin)])
 def party_access(): c=connect();x=[dict(r) for r in c.execute('''SELECT p.*,u.user_ref,u.username FROM iam_party_access p JOIN iam_users u ON u.id=p.user_id ORDER BY p.id''')];c.close();return x
 @router.get('/approval-limits',dependencies=[Depends(require_iam_read)])
