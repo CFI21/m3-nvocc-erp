@@ -441,7 +441,7 @@ def job_context(conn,jr):
     r=conn.execute('''SELECT j.*,c.code customer_code,c.name customer_name,a.code agent_code,b.booking_ref,v.voyage_no,vs.name vessel_name,
        f.payment_status,f.currency,f.outstanding,f.credit_hold,co.container_no,bl.bill_no hbl_no,w.documentation_status,w.vgm_status,w.customs_status,w.transshipment_status,w.release_status,w.closed,w.version workflow_version
        FROM jobs j JOIN customers c ON c.id=j.customer_id JOIN agents a ON a.id=j.agent_id JOIN bookings b ON b.id=j.booking_id JOIN voyages v ON v.id=j.voyage_id JOIN vessels vs ON vs.id=v.vessel_id
-       JOIN finance_states f ON f.job_id=j.id JOIN containers co ON co.job_id=j.id LEFT JOIN bills bl ON bl.job_id=j.id AND bl.kind='HBL' JOIN workflow_states w ON w.job_id=j.id WHERE j.job_ref=?''',(jr,)).fetchone()
+       JOIN finance_states f ON f.job_id=j.id LEFT JOIN containers co ON co.id=(SELECT MIN(c2.id) FROM containers c2 WHERE c2.job_id=j.id) LEFT JOIN bills bl ON bl.id=(SELECT MIN(b2.id) FROM bills b2 WHERE b2.job_id=j.id AND b2.kind='HBL') JOIN workflow_states w ON w.job_id=j.id WHERE j.job_ref=?''',(jr,)).fetchone()
     if not r: raise HTTPException(404,'Unknown job')
     d=dict(r); d['holds']=[x['code'] for x in conn.execute('SELECT code FROM workflow_holds WHERE job_id=? AND active=1',(r['id'],))]; return d
 
@@ -854,7 +854,9 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_ALREADY_SET'})
             # Legacy standalone UAT databases may not have Master Data schema yet.
             # Missing governed sequence infrastructure is a conflict, never a server 500.
-            sequence_table=conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='md_sequences'").fetchone()
+            sequence_table=conn.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='md_sequences'" if using_postgres()
+                else "SELECT 1 FROM sqlite_master WHERE type='table' AND name='md_sequences'").fetchone()
             if not sequence_table:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_NOT_CONFIGURED'})
             seq=conn.execute("SELECT id,prefix,next_number,width FROM md_sequences WHERE sequence_code='BOOKING_APPROVAL' AND status='ACTIVE'").fetchone()
@@ -867,9 +869,12 @@ def action_record(module:str,tid:int,action:str,body:ActionBody,x_role:str=Heade
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_SEQUENCE_INVALID'})
             number=prefix+f"{next_number:0{width}d}"
             # Protect historical references if a governed sequence was reset or imported.
-            duplicate=conn.execute(
-                "SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.\"Approval #\"') ELSE NULL END = ? LIMIT 1",
-                (tid,number)).fetchone()
+            approval_duplicate_sql=(
+                "SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND CASE WHEN pg_input_is_valid(payload_json, 'jsonb') THEN payload_json::jsonb ->> 'Approval #' ELSE NULL END = ? LIMIT 1"
+                if using_postgres() else
+                "SELECT id FROM transaction_records WHERE module='booking' AND id<>? AND CASE WHEN json_valid(payload_json) THEN json_extract(payload_json, '$.\"Approval #\"') ELSE NULL END = ? LIMIT 1"
+            )
+            duplicate=conn.execute(approval_duplicate_sql,(tid,number)).fetchone()
             if duplicate:
                 raise HTTPException(409,{'code':'BOOKING_APPROVAL_REFERENCE_DUPLICATE'})
             updated=conn.execute("UPDATE md_sequences SET next_number=next_number+1,version=version+1 WHERE id=? AND next_number=?",(seq['id'],seq['next_number']))
