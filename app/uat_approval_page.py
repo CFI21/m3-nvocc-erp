@@ -11,7 +11,7 @@ def uat_approval_page():
     if (os.getenv("M3_PRODUCTION_TRAFFIC","OFF").upper()!="OFF"
         or os.getenv("M3_UAT_PRESERVE_DATA")!="1"
         or not db.using_postgres() or not db._uat_target_approved()
-        or urlparse(db.DATABASE_URL).hostname!="ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech"):
+        or urlparse(db.DATABASE_URL).hostname!=db.M3_UAT_DB_HOST):
         raise HTTPException(404,{"code":"NOT_FOUND"})
     html='''<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>M3 Isolated Maker Checker Approval UAT</title><style>body{font:15px system-ui;max-width:720px;margin:20px auto;padding:12px;color:#172033}main{padding:22px;border:1px solid #ccd;border-radius:10px}label{display:block;margin:12px 0}input,select,button{font:inherit;padding:8px;max-width:100%;box-sizing:border-box}input{width:100%}button{margin:6px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#f2f5fa;padding:12px}section{border-top:1px solid #ddd;margin-top:18px;padding-top:12px}</style></head><body><main>
