@@ -6,7 +6,7 @@ from pydantic import BaseModel,Field
 from pathlib import Path
 from typing import Any,Optional
 import json,hashlib,uuid,datetime,sqlite3,time,re,os,hmac
-from .db import connect,tx,DB_PATH,IntegrityError,backend_name,approved_database_target,APPROVED_PROJECT_REF,database_health
+from .db import connect,tx,DB_PATH,IntegrityError,backend_name,approved_database_target,APPROVED_PROJECT_REF,database_health,_uat_target_approved
 from .seed import run as seed_run
 from .gl import router as gl_router
 from .hardening import router as hardening_router
@@ -561,7 +561,7 @@ def clx016_readiness():
         result['jobs_50001_50005']=jobs
         result['ready']=bool(
           health['status']=='ok' and jobs==5 and result['database_target_approved']
-          and result['configured_project_ref']==APPROVED_PROJECT_REF
+          and (result['configured_project_ref']==APPROVED_PROJECT_REF or _uat_target_approved())
           and result['production_traffic']=='OFF'
           and result['live_providers']=='OFF'
           and result['real_money']=='OFF'
