@@ -316,15 +316,22 @@ def records(domain:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Sessio
     finally:
         c.close()
 @router.post('/changes')
+@router.post('/changes')
 def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
-    c=connect();sess,roles=authenticated_actor(c,x_m3_session);user=sess.get('user_ref') if isinstance(sess,dict) else None
-    if b.domain not in DOMAINS:c.close();raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
-    if not can_make_roles(roles):c.close();raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+    return _create_change_worker(b,x_m3_session)
+
+def _create_change_worker(b:Change,x_m3_session,c=None,owns_transaction=True):
+    c=c if c is not None else connect()
+    def finish():
+        if owns_transaction: c.close()
+    sess,roles=authenticated_actor(c,x_m3_session);user=sess.get('user_ref') if isinstance(sess,dict) else None
+    if b.domain not in DOMAINS:finish();raise HTTPException(400,{'code':'UNKNOWN_DOMAIN'})
+    if not can_make_roles(roles):finish();raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
     if not str(user or '').strip():
-        c.close()
+        finish()
         raise HTTPException(403,{'code':'MAKER_IDENTITY_REQUIRED'})
     if not isinstance(sess,dict) or not str(sess.get('username') or '').strip():
-        c.close()
+        finish()
         raise HTTPException(403,{'code':'MAKER_SESSION_USERNAME_REQUIRED'})
     # Isolated B01 role separation: fail closed for checker-initiated Agent changes.
     import os
@@ -349,7 +356,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                     ).strip().upper()
             agent_configuration = requested_type in protected_types or prior_type in protected_types
         if b.domain == 'agent' or agent_configuration:
-            c.close()
+            finish()
             raise HTTPException(403, {'code': 'B01_UAT_CHECKER_CANNOT_SUBMIT_AGENT_CHANGE'})
 
     # PostgreSQL autocommit alone makes the pending-change lookup vulnerable to
@@ -357,7 +364,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
     # serializes key, display-name and relationship checks with the INSERT.
     # xact locks are compatible with Neon transaction pooling; session locks are not.
     if using_postgres():
-        c.execute('BEGIN')
+        if owns_transaction: c.execute('BEGIN')
         c.execute('SELECT pg_advisory_xact_lock(hashtext(?),hashtext(?))',
                   ('M3_MASTER_CHANGE', b.domain.casefold()))
 
@@ -371,7 +378,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                     prior=json.loads(rec['payload_json'] or '{}')
                     keys=('config_type','network_type','agent_code','office_code','scope','port_code')
                     if all(str(prior.get(k) or '').strip().upper()==str(b.payload.get(k) or '').strip().upper() for k in keys):
-                        c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':rec['record_key']})
+                        finish();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':rec['record_key']})
         if kind in ('AGENT_OFFICE_ASSIGNMENT','AGENT_EMAIL'):
             agent=str(b.payload.get('agent_code') or '').strip().upper()
             office=str(b.payload.get('office_code') or '').strip().upper()
@@ -385,22 +392,22 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                             continue
                         duplicate=(kind=='AGENT_OFFICE_ASSIGNMENT' and office and str(value.get('office_code') or '').strip().upper()==office) or (kind=='AGENT_EMAIL' and port and email and str(value.get('port_code') or '').strip().upper()==port and str(value.get('email') or '').strip().lower()==email)
                         if duplicate:
-                            c.close()
+                            finish()
                             raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':prior['record_key']})
     existing=c.execute('SELECT * FROM md_records WHERE domain=? AND record_key=?',(b.domain,b.record_key)).fetchone()
-    if b.operation=='CREATE' and (existing or c.execute('SELECT 1 FROM md_records WHERE domain=? AND LOWER(record_key)=LOWER(?) LIMIT 1',(b.domain,b.record_key)).fetchone()):c.close();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
-    if b.operation!='CREATE' and not existing:c.close();raise HTTPException(404,{'code':'MASTER_RECORD_NOT_FOUND'})
+    if b.operation=='CREATE' and (existing or c.execute('SELECT 1 FROM md_records WHERE domain=? AND LOWER(record_key)=LOWER(?) LIMIT 1',(b.domain,b.record_key)).fetchone()):finish();raise HTTPException(409,{'code':'DUPLICATE_MASTER_KEY'})
+    if b.operation!='CREATE' and not existing:finish();raise HTTPException(404,{'code':'MASTER_RECORD_NOT_FOUND'})
     if existing and b.operation in ('UPDATE','DEACTIVATE') and existing['status']!='ACTIVE':
-        c.close()
+        finish()
         raise HTTPException(409,{'code':'MASTER_RECORD_NOT_ACTIVE','record_key':b.record_key})
     if existing and b.operation in ('ACTIVATE','REACTIVATE') and existing['status']!='INACTIVE':
-        c.close()
+        finish()
         raise HTTPException(409,{'code':'MASTER_RECORD_NOT_INACTIVE','record_key':b.record_key})
     if existing and b.operation in ('ACTIVATE','REACTIVATE') and b.domain=='configuration':
         restored=json.loads(existing['payload_json'] or '{}')
         errors=validate_payload(b.domain,{},restored)+reference_errors(c,b.domain,restored)
         if errors:
-            c.close()
+            finish()
             raise HTTPException(422,{'codes':sorted(set(errors))})
     if existing and b.operation in ('ACTIVATE','REACTIVATE') and b.domain=='configuration':
         restored=json.loads(existing['payload_json'] or '{}')
@@ -417,7 +424,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                 if str(other.get('agent_code') or '').strip().upper()!=agent: continue
                 match=(bool(office) and str(other.get('office_code') or '').strip().upper()==office) if kind=='AGENT_OFFICE_ASSIGNMENT' else (bool(port) and bool(email) and str(other.get('port_code') or '').strip().upper()==port and str(other.get('email') or '').strip().lower()==email)
                 if match:
-                    c.close()
+                    finish()
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     if existing and b.operation in ('ACTIVATE','REACTIVATE') and b.domain=='configuration':
         restored=json.loads(existing['payload_json'] or '{}')
@@ -430,9 +437,9 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                 if (str(other.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
                     str(other.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
                     all(str(other.get(field) or '').strip().upper()==str(restored.get(field) or '').strip().upper() for field in fields)):
-                    c.close()
+                    finish()
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
-    if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND LOWER(record_key)=LOWER(?) AND status='PENDING' LIMIT 1",(b.domain,b.record_key)).fetchone():c.close();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
+    if c.execute("SELECT 1 FROM md_change_requests WHERE domain=? AND LOWER(record_key)=LOWER(?) AND status='PENDING' LIMIT 1",(b.domain,b.record_key)).fetchone():finish();raise HTTPException(409,{'code':'PENDING_CHANGE_EXISTS'})
     existing_payload=json.loads(existing['payload_json']) if existing else {}
     if (b.domain=='configuration' and b.operation=='UPDATE' and
         str(({**existing_payload,**b.payload}).get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
@@ -445,7 +452,7 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
             if (str(p.get('config_type') or '').strip().upper()=='AGENT_NETWORK' and
                 str(p.get('network_type') or '').strip().upper()=='PORT_COVERAGE' and
                 all(str(p.get(k) or '').strip().upper()==str(candidate.get(k) or '').strip().upper() for k in fields)):
-                c.close();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':item['record_key']})
+                finish();raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':item['record_key']})
     # Reject Agent Email / Office UPDATE collisions before creating a pending
     # change. Checker approval independently rechecks the same identities.
     if b.domain=='configuration' and b.operation=='UPDATE':
@@ -468,22 +475,22 @@ def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Se
                     str(other.get('port_code') or '').strip().upper()==port and
                     str(other.get('email') or '').strip().lower()==email)
                 if collision:
-                    c.close()
+                    finish()
                     raise HTTPException(409,{'code':'DUPLICATE_AGENT_RELATIONSHIP','existing_record_key':row['record_key']})
     errs=validate_payload(b.domain,b.payload,existing_payload) if b.operation in ('CREATE','UPDATE') else []
     if b.operation in ('CREATE','UPDATE'): errs+=reference_errors(c,b.domain,{**existing_payload,**b.payload})
     if b.operation=='DEACTIVATE' and usage_count(c,b.domain,b.record_key)>0:
-        c.close();raise HTTPException(409,{'code':'MASTER_IN_USE','record_key':b.record_key})
-    if errs:c.close();raise HTTPException(422,{'codes':sorted(set(errs))})
+        finish();raise HTTPException(409,{'code':'MASTER_IN_USE','record_key':b.record_key})
+    if errs:finish();raise HTTPException(422,{'codes':sorted(set(errs))})
     name=b.payload.get('name') or b.payload.get('display_name') or existing_payload.get('name') or (existing['display_name'] if existing else None)
     dup=duplicate_name(c,b.domain,name,b.record_key)
-    if dup:c.close();raise HTTPException(409,{'code':'DUPLICATE_DISPLAY_NAME','record_key':dup['record_key']})
+    if dup:finish();raise HTTPException(409,{'code':'DUPLICATE_DISPLAY_NAME','record_key':dup['record_key']})
     pdup=pending_duplicate_name(c,b.domain,name,b.record_key)
-    if pdup:c.close();raise HTTPException(409,{'code':'PENDING_DUPLICATE_DISPLAY_NAME','record_key':pdup['record_key']})
+    if pdup:finish();raise HTTPException(409,{'code':'PENDING_DUPLICATE_DISPLAY_NAME','record_key':pdup['record_key']})
     ref='MDC-'+uuid.uuid4().hex[:10].upper();base=existing['version'] if existing else 0
     c.execute('INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) VALUES(?,?,?,?,?,?,?,?,?)',(ref,b.domain,b.record_key,b.operation,j(b.payload),b.reason,user,now(),base));audit(c,user,'CHANGE_REQUEST_CREATE',b.domain,b.record_key,ref,None,b.payload);
-    if using_postgres(): c.execute('COMMIT')
-    c.close();return {'change_ref':ref,'status':'PENDING','base_version':base}
+    if using_postgres() and owns_transaction: c.execute('COMMIT')
+    finish();return {'change_ref':ref,'status':'PENDING','base_version':base}
 @router.get('/changes')
 def changes(status:Optional[str]=None,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c=connect()
