@@ -896,6 +896,97 @@ def bulk_submit(b:BulkRequest,x_m3_session:Optional[str]=Header(None,alias='X-M3
             'note':'Pending change requests only. Checker approval required. Partial submission is possible.'}
 
 
+# Explicit atomic v2 endpoint. Legacy /bulk/submit retains its documented
+# partial-row contract; clients must opt into this all-or-nothing variant.
+@router.post('/bulk/submit-atomic')
+def bulk_submit_atomic(b:BulkRequest,
+                       idempotency_key:Optional[str]=Header(None,alias='Idempotency-Key'),
+                       x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not idempotency_key or not (8<=len(idempotency_key)<=128):
+        raise HTTPException(422,{'code':'BULK_IDEMPOTENCY_KEY_REQUIRED'})
+    if b.domain not in {'agent','customer','equipment-type','container-type'}:
+        raise HTTPException(422,{'code':'BULK_DOMAIN_NOT_SUPPORTED'})
+    canonical=j({'domain':b.domain,'rows':[r.model_dump() for r in b.rows]})
+    request_hash=h(canonical)
+    c=connect()
+    try:
+        c.execute('BEGIN' if using_postgres() else 'BEGIN IMMEDIATE')
+        sess,roles=authenticated_actor(c,x_m3_session)
+        if not can_make_roles(roles):
+            raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+        maker=str(sess.get('user_ref') or '').strip()
+        scope=str(sess.get('office_code') or '').strip()
+        if not maker or not scope:
+            raise HTTPException(403,{'code':'BULK_MAKER_SCOPE_REQUIRED'})
+        # The ledger must already exist via the approved isolated migration.
+        # Never install new schema implicitly from an API request.
+        from .db import table_exists
+        if not table_exists(c,'md_bulk_idempotency'):
+            raise HTTPException(503,{'code':'BULK_LEDGER_MIGRATION_REQUIRED'})
+        if using_postgres():
+            c.execute('SELECT pg_advisory_xact_lock(hashtext(?),hashtext(?))',
+                      ('M3_BULK_ATOMIC',maker+'|'+scope+'|'+idempotency_key))
+        prior=c.execute('SELECT request_hash,response_json FROM md_bulk_idempotency WHERE maker=? AND scope=? AND idem_key=?',
+                        (maker,scope,idempotency_key)).fetchone()
+        if prior:
+            if prior['request_hash']!=request_hash:
+                raise HTTPException(409,{'code':'BULK_IDEMPOTENCY_PAYLOAD_CONFLICT'})
+            result=json.loads(prior['response_json'])
+            c.execute('COMMIT')
+            return result
+        seen=set()
+        for row in b.rows:
+            key=(b.domain,row.record_key.strip().casefold())
+            if key in seen:
+                raise HTTPException(422,{'code':'DUPLICATE_KEY_IN_FILE','record_key':row.record_key})
+            seen.add(key)
+        results=[]
+        for idx,row in enumerate(b.rows,1):
+            change=_create_change_worker(
+                Change(domain=b.domain,record_key=row.record_key.strip(),
+                       operation=row.operation,payload=row.payload,reason=row.reason),
+                x_m3_session,c=c,owns_transaction=False)
+            results.append({'row':idx,'record_key':row.record_key.strip(),
+                            'status':'PENDING','change_ref':change['change_ref']})
+        result={'domain':b.domain,'total':len(results),'pending':len(results),
+                'rejected':0,'rows':results,'atomic':True}
+        c.execute('INSERT INTO md_bulk_idempotency(maker,scope,idem_key,request_hash,response_json,created_at) VALUES(?,?,?,?,?,?)',
+                  (maker,scope,idempotency_key,request_hash,j(result),now()))
+        c.execute('COMMIT')
+        return result
+    except BaseException:
+        c.execute('ROLLBACK')
+        raise
+    finally:
+        c.close()
+
+
+@router.get('/bulk/submit-atomic/recovery')
+def bulk_atomic_recovery(idempotency_key:str,
+                         x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    if not (8<=len(idempotency_key)<=128):
+        raise HTTPException(422,{'code':'BULK_IDEMPOTENCY_KEY_REQUIRED'})
+    c=connect()
+    try:
+        sess,roles=authenticated_actor(c,x_m3_session)
+        if not can_make_roles(roles):
+            raise HTTPException(403,{'code':'MAKER_PERMISSION_DENIED'})
+        maker=str(sess.get('user_ref') or '').strip()
+        scope=str(sess.get('office_code') or '').strip()
+        if not maker or not scope:
+            raise HTTPException(403,{'code':'BULK_MAKER_SCOPE_REQUIRED'})
+        from .db import table_exists
+        if not table_exists(c,'md_bulk_idempotency'):
+            raise HTTPException(503,{'code':'BULK_LEDGER_MIGRATION_REQUIRED'})
+        row=c.execute('SELECT response_json FROM md_bulk_idempotency WHERE maker=? AND scope=? AND idem_key=?',
+                      (maker,scope,idempotency_key)).fetchone()
+        if not row:
+            raise HTTPException(404,{'code':'BULK_IDEMPOTENCY_NOT_FOUND'})
+        return json.loads(row['response_json'])
+    finally:
+        c.close()
+
+
 # Excel parsing is strictly read-only; client still calls governed preview/submit.
 class BulkXlsxInput(BaseModel):
     content_base64:str=Field(min_length=1,max_length=1500000)
