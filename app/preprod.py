@@ -48,6 +48,15 @@ def sha256_file(path:Path):
     return h.hexdigest()
 
 def init_schema(c):
+    if using_postgres():
+        required = ('clx013_schema_versions', 'clx013_request_log', 'clx013_backup_manifests', 'clx013_deployment_runs', 'clx013_runtime_events', 'clx013_runtime_mode')
+        missing = [name for name in required if not db_table_exists(c, name)]
+        if missing:
+            raise RuntimeError('CLX013_POSTGRES_MIGRATION_REQUIRED: ' + ', '.join(missing))
+        checksum = hashlib.sha256(MIGRATION.read_bytes()).hexdigest()
+        c.execute('INSERT INTO clx013_schema_versions(version,applied_at,checksum,destructive) VALUES(?,?,?,0) ON CONFLICT(version) DO NOTHING', ('CLX013_001', now(), checksum))
+        c.execute("INSERT INTO clx013_runtime_mode(id,mode,reason,updated_at,updated_by) VALUES(1,'NORMAL','default',?,?) ON CONFLICT(id) DO NOTHING", (now(), 'system'))
+        return
     sql=MIGRATION.read_text()
     c.executescript(sql)
     checksum=hashlib.sha256(sql.encode()).hexdigest()
@@ -358,7 +367,23 @@ def set_runtime_mode(body:ModeBody,x_role:str=Header('VIEWER'),x_actor_id:str=He
 def failure_drills():return failure_drill_matrix()
 
 @router.get('/readiness')
-def readiness():return readiness_status()
+def readiness():
+    try:
+        return readiness_status()
+    except HTTPException as exc:
+        if using_postgres() and exc.status_code == 404 and exc.detail == 'Unknown job':
+            raise HTTPException(status_code=503, detail={
+                'code': 'UAT_CANONICAL_JOBS_NOT_SEEDED',
+                'message': 'Isolated PostgreSQL UAT is missing the five required synthetic business-day jobs; seed through the approved UAT fixture process.',
+            }) from None
+        raise
+    except sqlite3.OperationalError as exc:
+        if not using_postgres() and 'no such table' in str(exc).lower():
+            raise HTTPException(status_code=503, detail={
+                'code': 'ISOLATED_UAT_DATABASE_NOT_CONFIGURED',
+                'message': 'Readiness requires the configured isolated PostgreSQL database, not an empty SQLite fallback.',
+            }) from None
+        raise
 
 @router.post('/production/promote')
 def production_promote():

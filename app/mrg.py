@@ -51,13 +51,33 @@ def ensure(c):
 def actor(c,token,x_role):
     if token:
         s=iam_session(c,token)
+        if not hasattr(s, "keys") or "user_id" not in s.keys() or not s["user_id"]:
+            raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
         rs=iam_roles_for(c,s["user_id"])
-        roles={str(r["role_code"]).upper() for r in rs}
-        role=next(iter(roles), "VIEWER")
-        return {"user":s["user_ref"],"role":role,"roles":roles}
-    role=(x_role or "VIEWER").upper()
-    if role=="SUPER_ADMIN": role="ADMIN"
-    return {"user":"header-"+role,"role":role,"roles":{role}}
+        if not isinstance(rs, (list, tuple)) or not rs:
+            raise HTTPException(403, {"code": "MRG_IAM_ROLE_NOT_AUTHORIZED"})
+        # IAM returns sqlite3.Row as well as dict rows; accept keyed records only.
+        roles={
+            str(r["role_code"] or "").strip().upper()
+            for r in rs
+            if hasattr(r, "keys") and "role_code" in r.keys()
+        }
+        roles.discard("")
+        if "user_ref" not in s.keys() or not str(s["user_ref"] or "").strip():
+            raise HTTPException(403, {"code": "MRG_IAM_IDENTITY_REQUIRED"})
+        if not roles:
+            raise HTTPException(403, {"code": "MRG_IAM_ROLE_NOT_AUTHORIZED"})
+        # Stable audit identity when IAM assigns more than one approved role.
+        priority=("ADMIN", "MASTER_DATA_MANAGER", "FINANCE", "GL_MANAGER",
+                  "EQUIPMENT_MANAGER", "OPS", "AUDITOR", "AGENT", "DOCS", "VIEWER")
+        role=next((name for name in priority if name in (roles & (MAKER | CHECKER | VIEW))), None)
+        if role is None:
+            raise HTTPException(403, {"code": "MRG_IAM_ROLE_NOT_AUTHORIZED"})
+        authorized_roles=roles & (MAKER | CHECKER | VIEW)
+        if not authorized_roles:
+            raise HTTPException(403, {"code": "MRG_IAM_ROLE_NOT_AUTHORIZED"})
+        return {"user":s["user_ref"],"role":role,"roles":authorized_roles}
+    raise HTTPException(401, {"code": "MRG_SESSION_REQUIRED"})
 
 def require(a,allowed):
     if not (a["roles"]&allowed): raise HTTPException(403,{"code":"MRG_ROLE_DENIED"})

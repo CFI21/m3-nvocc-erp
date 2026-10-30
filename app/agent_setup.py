@@ -47,7 +47,17 @@ def _matches(p:dict[str,Any],ctx:dict[str,Any],fields:dict[str,Any]):
         if rule not in (None,"") and str(rule)!=str(v or ""): return False
     return True
 
+def _equipment_lines(fields):
+    """Read Booking equipment selections from its existing payload, not another table."""
+    lines=fields.get("Equipment Lines")
+    if lines is None: return None
+    if not isinstance(lines,list): return []
+    return lines
+
 def _qty(fields):
+    lines=_equipment_lines(fields)
+    if lines is not None:
+        return sum(int(r["quantity"]) for r in lines if isinstance(r,dict) and str(r.get("quantity","")).isdigit() and int(r["quantity"])>0)
     for k in ("Equipment Qty","Container Qty","Quantity","Qty","Booked","Containers"):
         try:
             if fields.get(k) not in (None,""): return max(0,int(float(fields[k])))
@@ -55,10 +65,13 @@ def _qty(fields):
     return 0
 
 def _teu(fields):
+    lines=_equipment_lines(fields)
+    if lines is not None:
+        return sum(int(r["quantity"])*(1 if str(r.get("size","")).replace("'","")=="20" else 2 if str(r.get("size","")).replace("'","") in ("40","45") else 0) for r in lines if isinstance(r,dict) and str(r.get("quantity","")).isdigit())
     qty=_qty(fields)
     raw=str(fields.get("Equipment") or fields.get("Container Type") or fields.get("Size Type") or "").upper()
     if "20" in raw:return qty
-    if "40" in raw:return qty*2
+    if "40" in raw or "45" in raw:return qty*2
     return 0
 
 def _period(p,fields):

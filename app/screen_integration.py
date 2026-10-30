@@ -160,8 +160,10 @@ def _read_actor(c,x_role,x_m3_session,x_agent_scope,x_branch_scope,x_depot_scope
     x_depot_scope=x_depot_scope if isinstance(x_depot_scope,str) else None
     x_office_scope=x_office_scope if isinstance(x_office_scope,str) else None
     a=scope_actor(c,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope)
-    if x_office_scope and not a.get('office'): a['office']=x_office_scope
-    role=str(a.get('role') or x_role or 'VIEWER').upper()
+    # Office scope must originate from the verified IAM actor, never a caller header.
+    role=str(a.get('role') or '').strip().upper()
+    if not role:
+        raise HTTPException(403, {'code': 'SCREEN_IAM_ROLE_REQUIRED'})
     a['role']=role
     if role=='AGENT' and not a.get('agent'):
         raise HTTPException(403,'AGENT requires X-Agent-Scope')
@@ -211,6 +213,19 @@ def _require_job_scope(c,job_ref,a,customer_scope=None):
 
 def safe_rows(c,sql,args=(),limit=100):
     return [dict(r) for r in c.execute(sql,args).fetchmany(limit)]
+
+def duplicate_review_rows(c):
+    # Aggregate in Python so the screen behaves identically on SQLite and PostgreSQL.
+    grouped={}
+    for r in c.execute("SELECT domain,display_name,record_key FROM md_records WHERE status='ACTIVE' ORDER BY domain,record_key"):
+        domain=r['domain']; name=r['display_name']
+        normalized=name.lower() if isinstance(name,str) else None
+        grouped.setdefault((domain,normalized),[]).append(str(r['record_key']))
+    rows=[]
+    for (domain,normalized),keys in sorted(grouped.items(),key=lambda item:(str(item[0][0]),str(item[0][1] or ''))):
+        if len(keys)>1:
+            rows.append({'domain':domain,'normalized_name':normalized,'n':len(keys),'record_keys':','.join(keys)})
+    return rows[:100]
 
 def job_e2e(c,job_ref):
     j=c.execute('''SELECT j.*,b.booking_ref,c.code customer_code,c.name customer_name,a.code agent_code,v.voyage_no,vs.name vessel_name
@@ -328,7 +343,7 @@ def screen_data(screen_id:str=Query(...),job_ref:Optional[str]=None,x_role:str=H
             elif s['screen_id']=='master-data::dashboard':
                 rows=[{'Metric':'Master Records','Value':c.execute('SELECT COUNT(*) n FROM md_records').fetchone()['n']},{'Metric':'Pending Changes','Value':c.execute("SELECT COUNT(*) n FROM md_change_requests WHERE status='PENDING'").fetchone()['n']},{'Metric':'Quality Issues','Value':c.execute("SELECT COUNT(*) n FROM md_quality_issues WHERE status!='RESOLVED'").fetchone()['n']}]
             elif s['key']=='approval-queue': rows=safe_rows(c,"SELECT * FROM md_change_requests WHERE status='PENDING' ORDER BY id DESC")
-            elif s['key']=='duplicate-review': rows=safe_rows(c,"SELECT domain,lower(display_name) normalized_name,COUNT(*) n,GROUP_CONCAT(record_key) record_keys FROM md_records WHERE status='ACTIVE' GROUP BY domain,lower(display_name) HAVING COUNT(*)>1")
+            elif s['key']=='duplicate-review': rows=duplicate_review_rows(c)
             elif s['key']=='integrity-scan':
                 issues=[]
                 for r in c.execute('SELECT j.job_ref,c.code customer_code,a.code agent_code,j.pol,j.pod FROM jobs j JOIN customers c ON c.id=j.customer_id JOIN agents a ON a.id=j.agent_id'):
