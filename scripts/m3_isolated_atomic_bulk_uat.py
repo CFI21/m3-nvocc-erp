@@ -47,7 +47,7 @@ def normalize_uat_token(raw):
     """Strip only accidental copy/paste whitespace; reject all other controls."""
     if not raw:
         raise RuntimeError("M3_UAT_TOKEN required")
-    allowed_whitespace = " \\t\\r\\n\\v\\f"
+    allowed_whitespace = " \t\r\n\v\f"
     if any((ord(ch) < 33 or ord(ch) > 126) and ch not in allowed_whitespace for ch in raw):
         raise RuntimeError("M3_UAT_TOKEN has unsafe non-ASCII or control characters")
     cleaned = "".join(ch for ch in raw if ch not in allowed_whitespace)
