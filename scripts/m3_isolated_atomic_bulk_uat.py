@@ -75,9 +75,17 @@ def login(username, password, mfa, token):
     require(status == 200 and isinstance(info.get("session_token"), str),
             f"{username} login blocked: {safe_error(status, info)}")
     session = info["session_token"]
-    status, who = call("/api/admin/auth/whoami", token=token, session=session)
-    require(status == 200 and who.get("username") == username, "Identity check failed")
-    return session, who.get("roles", [])
+    try:
+        status, who = call("/api/admin/auth/whoami", token=token, session=session)
+        require(status == 200 and who.get("username") == username, "Identity check failed")
+        return session, who.get("roles", [])
+    except Exception:
+        # A successful login must not leave an orphan session if identity checks fail.
+        try:
+            call("/api/admin/auth/logout", method="POST", token=token, session=session)
+        except Exception:
+            pass
+        raise
 
 def main():
     parser = argparse.ArgumentParser()
@@ -119,7 +127,7 @@ def main():
                 return error.code,json.load(error)
         code, first = submit(body)
         require(code == 200 and first.get("atomic") is True and first.get("pending")==2,
-                f"Atomic submit failed: HTTP {code} {first}")
+                f"Atomic submit failed: {safe_error(code, first)}")
         code, replay = submit(body)
         require(code == 200 and replay == first, f"Replay failed: HTTP {code}")
         recovery_status, recovery = call("/api/masterdata/bulk/submit-atomic/recovery?idempotency_key="+key,
@@ -146,7 +154,7 @@ def main():
                 f"Checker rejection failed: HTTP {approved}")
         print("PASS: atomic submission, idempotent replay, recovery, payload conflict")
         print("PASS: Maker decision denied; independent Checker rejected both UAT changes")
-        print("Pending change refs:", [r.get("change_ref") for r in first["rows"]])
+        print("Disposable UAT changes rejected: 2")
         print("HOLD: Checker APPROVE and rollback-on-late-failure require separate governed tests")
         return 0
     finally:
