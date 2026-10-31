@@ -99,9 +99,25 @@ def main():
         changed["rows"][0]["payload"]["name"] += " altered"
         code, conflict = submit(changed)
         require(code == 409, f"Conflicting replay should be 409, got {code}")
+        # Verify Maker cannot decide its own change, then have the independent
+        # Checker reject only disposable UAT changes (no active master records).
+        refs = [r.get("change_ref") for r in first["rows"]]
+        require(len(refs) == 2 and all(refs), "Missing UAT change references")
+        for ref in refs:
+            path = "/api/masterdata/changes/" + ref + "/decision"
+            denied, _ = call(path, method="POST", token=token,
+                session=maker_session,
+                body={"decision":"REJECT","comment":"UAT four-eyes negative test"})
+            require(denied == 403, f"Maker decision should be 403, got {denied}")
+            approved, result = call(path, method="POST", token=token,
+                session=checker_session,
+                body={"decision":"REJECT","comment":"Disposable isolated UAT cleanup"})
+            require(approved == 200 and result.get("status") == "REJECTED",
+                f"Checker rejection failed: HTTP {approved}")
         print("PASS: atomic submission, idempotent replay, recovery, payload conflict")
+        print("PASS: Maker decision denied; independent Checker rejected both UAT changes")
         print("Pending change refs:", [r.get("change_ref") for r in first["rows"]])
-        print("HOLD: independent Checker approval and rollback-on-late-failure require separate governed tests")
+        print("HOLD: Checker APPROVE and rollback-on-late-failure require separate governed tests")
         return 0
     finally:
         for session in (maker_session, checker_session):
