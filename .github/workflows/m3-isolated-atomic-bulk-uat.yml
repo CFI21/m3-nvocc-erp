@@ -6,6 +6,7 @@ on:
       - ".github/workflows/m3-isolated-atomic-bulk-uat.yml"
       - "scripts/m3_isolated_atomic_bulk_uat.py"
       - "tests/test_m3_uat_token_safety.py"
+      - "tests/test_masterdata_atomic_bulk_real_sqlite_uat.py"
   workflow_dispatch:
     inputs:
       run_mode:
@@ -38,9 +39,9 @@ jobs:
           python-version: "3.12"
       - name: Test isolated UAT runner without network credentials
         run: |
-          python -m pip install pytest
+          python -m pip install -r requirements.txt pytest
           python -m py_compile scripts/m3_isolated_atomic_bulk_uat.py
-          python -m pytest -q tests/test_m3_uat_token_safety.py
+          PYTHONPATH=. python -m pytest -q tests/test_m3_uat_token_safety.py tests/test_masterdata_atomic_bulk_real_sqlite_uat.py
   isolated-atomic-uat:
     if: github.event_name == 'workflow_dispatch' && github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/m3-dev-sprint-2'
     runs-on: ubuntu-latest
