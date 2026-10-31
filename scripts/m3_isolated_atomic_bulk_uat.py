@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import urllib.error
+import re
 import urllib.request
 import uuid
 from urllib.parse import urlparse
@@ -26,13 +27,26 @@ def call(path, *, method="GET", token=None, session=None, body=None):
     request = urllib.request.Request(API + path, data=data, method=method, headers=headers)
     try:
         with urllib.request.urlopen(request, timeout=20) as response:
-            return response.status, json.load(response)
+            try:
+                return response.status, json.load(response)
+            except (ValueError, UnicodeError):
+                return response.status, {}
     except urllib.error.HTTPError as error:
         try:
             payload = json.load(error)
         except Exception:
-            payload = {"detail": "HTTP error"}
+            payload = {}
         return error.code, payload
+
+def safe_error(status, payload):
+    # Do not echo arbitrary gateway HTML, submitted credentials, or session tokens.
+    if isinstance(payload, dict):
+        detail = payload.get("detail", "")
+        if isinstance(detail, dict):
+            code = detail.get("code", "")
+            if isinstance(code, str) and re.fullmatch(r"[A-Z0-9_]{2,80}", code):
+                return f"HTTP {status} {code}"
+    return f"HTTP {status}; non-M3 or unstructured response (check gateway/proxy)"
 
 def require(ok, message):
     if not ok:
@@ -42,7 +56,7 @@ def login(username, password, mfa, token):
     status, info = call("/api/admin/auth/login", method="POST", token=token,
         body={"username":username, "password":password, "mfa_code":mfa})
     require(status == 200 and isinstance(info.get("session_token"), str),
-            f"{username} login blocked: HTTP {status} {info.get('detail')}")
+            f"{username} login blocked: {safe_error(status, info)}")
     session = info["session_token"]
     status, who = call("/api/admin/auth/whoami", token=token, session=session)
     require(status == 200 and who.get("username") == username, "Identity check failed")
@@ -55,6 +69,8 @@ def main():
     require(urlparse(API).hostname == "m3-dev-sprint2-isolated-api.onrender.com", "Wrong target")
     token = os.getenv("M3_UAT_TOKEN")
     require(bool(token), "M3_UAT_TOKEN required")
+    require(not any(ord(ch) < 32 or ord(ch) == 127 for ch in token),
+            "M3_UAT_TOKEN contains invalid HTTP header control characters; re-enter securely")
     status, health = call("/api/v1/health")
     require(status == 200, f"Health check failed: {status}")
     require(health.get("production_promoted") is False and health.get("sandbox_only") is True,
@@ -129,6 +145,6 @@ def main():
 if __name__ == "__main__":
     try:
         sys.exit(main())
-    except (RuntimeError, KeyError) as error:
+    except (RuntimeError, KeyError, ValueError, urllib.error.URLError) as error:
         print("FAIL:",str(error),file=sys.stderr)
         sys.exit(1)
