@@ -44,13 +44,15 @@ def call(path, *, method="GET", token=None, session=None, body=None):
         return error.code, payload
 
 def normalize_uat_token(raw):
-    """Remove accidental copy/paste whitespace only; never change token alphabet."""
+    """Strip only accidental copy/paste whitespace; reject all other controls."""
     if not raw:
         raise RuntimeError("M3_UAT_TOKEN required")
-    cleaned = "".join(ch for ch in raw if ch in " \t\r\n\v\f" or ord(ch) >= 32)
-    cleaned = "".join(ch for ch in cleaned if ch not in " \t\r\n\v\f")
-    if not cleaned or any(ord(ch) < 32 or ord(ch) == 127 for ch in cleaned):
-        raise RuntimeError("M3_UAT_TOKEN invalid; cannot safely normalize")
+    allowed_whitespace = " \\t\\r\\n\\v\\f"
+    if any((ord(ch) < 33 or ord(ch) > 126) and ch not in allowed_whitespace for ch in raw):
+        raise RuntimeError("M3_UAT_TOKEN has unsafe non-ASCII or control characters")
+    cleaned = "".join(ch for ch in raw if ch not in allowed_whitespace)
+    if not cleaned:
+        raise RuntimeError("M3_UAT_TOKEN required")
     if cleaned != raw:
         print("INFO: normalized whitespace in UAT token (value not displayed)")
     return cleaned
