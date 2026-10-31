@@ -1,5 +1,11 @@
 name: M3 Isolated Atomic Bulk UAT
 on:
+  push:
+    branches: [m3-dev-sprint-2]
+    paths:
+      - ".github/workflows/m3-isolated-atomic-bulk-uat.yml"
+      - "scripts/m3_isolated_atomic_bulk_uat.py"
+      - "tests/test_m3_uat_token_safety.py"
   workflow_dispatch:
     inputs:
       run_mode:
@@ -19,8 +25,24 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  isolated-atomic-uat:
+  offline-token-and-session-safety:
     if: github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/m3-dev-sprint-2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test isolated UAT runner without network credentials
+        run: |
+          python -m pip install pytest
+          python -m py_compile scripts/m3_isolated_atomic_bulk_uat.py
+          python -m pytest -q tests/test_m3_uat_token_safety.py
+  isolated-atomic-uat:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/m3-dev-sprint-2'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     environment: m3-isolated-uat
