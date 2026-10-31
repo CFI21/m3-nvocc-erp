@@ -15,7 +15,7 @@ import uuid
 from urllib.parse import urlparse
 
 API = "https://m3-dev-sprint2-isolated-api.onrender.com"
-def call(path, *, method="GET", token=None, session=None, body=None):
+def call(path, *, method="GET", token=None, session=None, body=None, extra_headers=None):
     headers = {"Accept": "application/json"}
     if token:
         headers["X-M3-UAT-Token"] = token
@@ -23,6 +23,8 @@ def call(path, *, method="GET", token=None, session=None, body=None):
         headers["X-M3-Session"] = session
     if body is not None:
         headers["Content-Type"] = "application/json"
+    if extra_headers:
+        headers.update(extra_headers)
     data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(API + path, data=data, method=method, headers=headers)
     try:
@@ -103,6 +105,7 @@ def main():
     require(status == 200 and readiness.get("production_traffic") == "OFF" and readiness.get("live_providers") == "OFF" and readiness.get("real_money") == "OFF",
             "Isolated runtime safety flags cannot be verified")
     maker_session = checker_session = None
+    pending_own_refs = []
     try:
         maker_session, maker_roles = login("md.maker", os.environ["M3_MAKER_PASSWORD"], os.environ["M3_MAKER_MFA"], token)
         checker_session, checker_roles = login("md.checker", os.environ["M3_CHECKER_PASSWORD"], os.environ["M3_CHECKER_MFA"], token)
@@ -118,18 +121,27 @@ def main():
             {"record_key":"UAT-BULK-"+suffix+"-A","operation":"CREATE","payload":{"name":"UAT Bulk "+suffix+" A"},"reason":"Isolated disposable acceptance test"},
             {"record_key":"UAT-BULK-"+suffix+"-B","operation":"CREATE","payload":{"name":"UAT Bulk "+suffix+" B"},"reason":"Isolated disposable acceptance test"}]}
         def submit(payload):
-            headers = {"X-M3-UAT-Token":token,"X-M3-Session":maker_session,
-                       "Content-Type":"application/json","Idempotency-Key":key}
-            request=urllib.request.Request(API+"/api/masterdata/bulk/submit-atomic",
-                data=json.dumps(payload).encode(),headers=headers,method="POST")
-            try:
-                with urllib.request.urlopen(request,timeout=25) as response:
-                    return response.status,json.load(response)
-            except urllib.error.HTTPError as error:
-                return error.code,json.load(error)
+            return call("/api/masterdata/bulk/submit-atomic",
+                        method="POST", token=token, session=maker_session,
+                        body=payload, extra_headers={"Idempotency-Key": key})
         code, first = submit(body)
+        # Track only refs tied to the two unique, newly generated UAT record keys.
+        # If replay or recovery later fails, these are the only refs eligible for
+        # best-effort cleanup by the independent Checker.
+        if code == 200 and isinstance(first, dict):
+            rows = first.get("rows")
+            expected = {item["record_key"] for item in body["rows"]}
+            if isinstance(rows, list) and len(rows) == 2:
+                reported = {row.get("record_key") for row in rows if isinstance(row, dict)}
+                refs = [row.get("change_ref") for row in rows if isinstance(row, dict)]
+                if reported == expected and len(refs) == 2 and len(set(refs)) == 2 and all(
+                    isinstance(ref, str) and re.fullmatch(r"MDC-[A-Za-z0-9-]{4,80}", ref)
+                    for ref in refs
+                ):
+                    pending_own_refs.extend(refs)
         require(code == 200 and first.get("atomic") is True and first.get("pending")==2,
                 f"Atomic submit failed: {safe_error(code, first)}")
+        require(len(pending_own_refs) == 2, "Unverifiable disposable UAT refs; manual review required")
         code, replay = submit(body)
         require(code == 200 and replay == first, f"Replay failed: HTTP {code}")
         recovery_status, recovery = call("/api/masterdata/bulk/submit-atomic/recovery?idempotency_key="+key,
@@ -141,9 +153,7 @@ def main():
         require(code == 409, f"Conflicting replay should be 409, got {code}")
         # Verify Maker cannot decide its own change, then have the independent
         # Checker reject only disposable UAT changes (no active master records).
-        refs = [r.get("change_ref") for r in first["rows"]]
-        require(len(refs) == 2 and all(refs), "Missing UAT change references")
-        for ref in refs:
+        for ref in tuple(pending_own_refs):
             path = "/api/masterdata/changes/" + ref + "/decision"
             denied, _ = call(path, method="POST", token=token,
                 session=maker_session,
@@ -154,12 +164,29 @@ def main():
                 body={"decision":"REJECT","comment":"Disposable isolated UAT cleanup"})
             require(approved == 200 and result.get("status") == "REJECTED",
                 f"Checker rejection failed: HTTP {approved}")
+            pending_own_refs.remove(ref)
         print("PASS: atomic submission, idempotent replay, recovery, payload conflict")
         print("PASS: Maker decision denied; independent Checker rejected both UAT changes")
         print("Disposable UAT changes rejected: 2")
         print("HOLD: Checker APPROVE and rollback-on-late-failure require separate governed tests")
         return 0
     finally:
+        # Cleanup only the two disposable change refs from this run, never
+        # pre-existing pending changes or active Master Data.
+        if pending_own_refs:
+            for ref in tuple(pending_own_refs):
+                if checker_session:
+                    try:
+                        status, response = call("/api/masterdata/changes/" + ref + "/decision",
+                            method="POST", token=token, session=checker_session,
+                            body={"decision":"REJECT","comment":"UAT failure-path cleanup"})
+                        if status == 200 and response.get("status") == "REJECTED":
+                            pending_own_refs.remove(ref)
+                    except Exception:
+                        pass
+            if pending_own_refs:
+                print("WARNING: disposable UAT pending changes require manual review",
+                      file=sys.stderr)
         for session in (maker_session, checker_session):
             if session:
                 try:
