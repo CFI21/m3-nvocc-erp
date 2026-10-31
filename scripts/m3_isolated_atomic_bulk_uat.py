@@ -36,6 +36,11 @@ def call(path, *, method="GET", token=None, session=None, body=None):
             payload = json.load(error)
         except Exception:
             payload = {}
+        # Preserve HTTP status and a safe gateway diagnostic, without echoing
+        # response bodies, headers, credentials or session tokens.
+        if not isinstance(payload, dict):
+            payload = {}
+        payload.setdefault("_http_status", error.code)
         return error.code, payload
 
 def normalize_uat_token(raw):
