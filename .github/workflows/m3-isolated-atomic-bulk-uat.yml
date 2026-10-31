@@ -1,0 +1,54 @@
+name: M3 Isolated Atomic Bulk UAT
+on:
+  workflow_dispatch:
+    inputs:
+      run_mode:
+        description: "preflight checks (default) or disposable sandbox submit"
+        required: true
+        type: choice
+        default: preflight
+        options:
+          - preflight
+          - submit
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-isolated-atomic-bulk-uat
+  cancel-in-progress: false
+
+jobs:
+  isolated-atomic-uat:
+    if: github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/m3-dev-sprint-2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: m3-isolated-uat
+    env:
+      M3_UAT_TOKEN: ${{ secrets.M3_UAT_TOKEN }}
+      M3_MAKER_PASSWORD: ${{ secrets.M3_MAKER_PASSWORD }}
+      M3_MAKER_MFA: ${{ secrets.M3_MAKER_MFA }}
+      M3_CHECKER_PASSWORD: ${{ secrets.M3_CHECKER_PASSWORD }}
+      M3_CHECKER_MFA: ${{ secrets.M3_CHECKER_MFA }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require isolated UAT secrets without printing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in M3_UAT_TOKEN M3_MAKER_PASSWORD M3_MAKER_MFA M3_CHECKER_PASSWORD M3_CHECKER_MFA; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing environment secret: $name"
+              exit 1
+            fi
+          done
+      - name: Read-only isolated MFA preflight
+        run: python scripts/m3_isolated_atomic_bulk_uat.py
+      - name: Disposable isolated atomic bulk acceptance
+        if: inputs.run_mode == 'submit'
+        run: python scripts/m3_isolated_atomic_bulk_uat.py --submit
