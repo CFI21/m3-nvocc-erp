@@ -38,6 +38,18 @@ def call(path, *, method="GET", token=None, session=None, body=None):
             payload = {}
         return error.code, payload
 
+def normalize_uat_token(raw):
+    """Remove accidental copy/paste whitespace only; never change token alphabet."""
+    if not raw:
+        raise RuntimeError("M3_UAT_TOKEN required")
+    cleaned = "".join(ch for ch in raw if ch in " \t\r\n\v\f" or ord(ch) >= 32)
+    cleaned = "".join(ch for ch in cleaned if ch not in " \t\r\n\v\f")
+    if not cleaned or any(ord(ch) < 32 or ord(ch) == 127 for ch in cleaned):
+        raise RuntimeError("M3_UAT_TOKEN invalid; cannot safely normalize")
+    if cleaned != raw:
+        print("INFO: normalized whitespace in UAT token (value not displayed)")
+    return cleaned
+
 def safe_error(status, payload):
     # Do not echo arbitrary gateway HTML, submitted credentials, or session tokens.
     if isinstance(payload, dict):
@@ -67,10 +79,7 @@ def main():
     parser.add_argument("--submit", action="store_true", help="Create disposable pending changes in isolated UAT")
     args = parser.parse_args()
     require(urlparse(API).hostname == "m3-dev-sprint2-isolated-api.onrender.com", "Wrong target")
-    token = os.getenv("M3_UAT_TOKEN")
-    require(bool(token), "M3_UAT_TOKEN required")
-    require(not any(ord(ch) < 32 or ord(ch) == 127 for ch in token),
-            "M3_UAT_TOKEN contains invalid HTTP header control characters; re-enter securely")
+    token = normalize_uat_token(os.getenv("M3_UAT_TOKEN"))
     status, health = call("/api/v1/health")
     require(status == 200, f"Health check failed: {status}")
     require(health.get("production_promoted") is False and health.get("sandbox_only") is True,
