@@ -15,7 +15,9 @@ from urllib.parse import urlparse
 
 API = "https://m3-dev-sprint2-isolated-api.onrender.com"
 def call(path, *, method="GET", token=None, session=None, body=None):
-    headers = {"X-M3-UAT-Token": token, "Accept": "application/json"}
+    headers = {"Accept": "application/json"}
+    if token:
+        headers["X-M3-UAT-Token"] = token
     if session:
         headers["X-M3-Session"] = session
     if body is not None:
@@ -57,6 +59,9 @@ def main():
     require(status == 200, f"Health check failed: {status}")
     require(health.get("production_promoted") is False and health.get("sandbox_only") is True,
             "Cannot verify isolated non-production runtime")
+    status, readiness = call("/api/clx016/readiness")
+    require(status == 200 and readiness.get("production_traffic") == "OFF" and readiness.get("live_providers") == "OFF" and readiness.get("real_money") == "OFF",
+            "Isolated runtime safety flags cannot be verified")
     maker_session = checker_session = None
     try:
         maker_session, maker_roles = login("md.maker", os.environ["M3_MAKER_PASSWORD"], os.environ["M3_MAKER_MFA"], token)
