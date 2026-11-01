@@ -73,7 +73,17 @@ def require(ok, message):
     if not ok:
         raise RuntimeError(message)
 
+def credential_diagnostics(password):
+    """Non-reversible local checks; never log a password, hash or length."""
+    if not isinstance(password, str) or not password:
+        raise RuntimeError("Required UAT account password is empty")
+    if password != password.strip():
+        raise RuntimeError("UAT account password contains leading/trailing whitespace; verify the GitHub secret")
+    if any(ord(ch) < 32 or ord(ch) == 127 for ch in password):
+        raise RuntimeError("UAT account password contains a control character; verify the GitHub secret")
+
 def login(username, password, mfa, token):
+    credential_diagnostics(password)
     status, info = call("/api/admin/auth/login", method="POST", token=token,
         body={"username":username, "password":password, "mfa_code":mfa})
     require(status == 200 and isinstance(info.get("session_token"), str),
