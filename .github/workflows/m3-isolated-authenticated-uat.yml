@@ -11,14 +11,38 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 concurrency:
   group: m3-isolated-authenticated-uat
   cancel-in-progress: false
 
 jobs:
+  dispatch-isolated-auth-only:
+    name: Forward main launch to isolated development branch
+    if: github.ref_name == 'main' && inputs.submit_disposable == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Dispatch authentication-only UAT on isolated branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          gh workflow run m3-isolated-authenticated-uat.yml --ref m3-dev-sprint-2 -f submit_disposable=false
+          echo 'Dispatched authentication-only M3 UAT on m3-dev-sprint-2. Inspect its separate run for the actual result.'
+  reject-main-bulk:
+    name: Prevent bulk execution from main
+    if: github.ref_name == 'main' && inputs.submit_disposable == true
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo '::error::Bulk UAT must be explicitly launched on m3-dev-sprint-2, never from main.'
+          exit 1
   isolated-uat:
     name: Authenticated M3-only acceptance gate
+    if: github.ref_name == 'm3-dev-sprint-2'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment: m3-isolated-uat
