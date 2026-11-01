@@ -222,3 +222,36 @@ def test_checker_login_failure_prevents_any_bulk_submission(monkeypatch):
         module.main()
     assert operations == ["/api/v1/health", "/api/clx016/readiness",
                           "/api/admin/auth/logout"]
+
+
+@pytest.mark.parametrize("unsafe_health,unsafe_readiness", [
+    ({"sandbox_only": False, "production_promoted": False}, None),
+    ({"sandbox_only": True, "production_promoted": True}, None),
+    (None, {"production_traffic": "ON", "live_providers": "OFF", "real_money": "OFF"}),
+    (None, {"production_traffic": "OFF", "live_providers": "ON", "real_money": "OFF"}),
+    (None, {"production_traffic": "OFF", "live_providers": "OFF", "real_money": "ON"}),
+])
+def test_unsafe_runtime_flags_block_login_and_bulk(
+        monkeypatch, unsafe_health, unsafe_readiness):
+    """Fail closed before any authentication or write if runtime gates are unsafe."""
+    import sys
+
+    monkeypatch.setenv("M3_UAT_TOKEN", "synthetic")
+    monkeypatch.setattr(sys, "argv", ["m3_uat", "--submit"])
+    seen = []
+
+    def fake_call(path, **kwargs):
+        seen.append(path)
+        if path == "/api/v1/health":
+            return 200, unsafe_health or {"sandbox_only": True,
+                                           "production_promoted": False}
+        if path == "/api/clx016/readiness":
+            return 200, unsafe_readiness or {
+                "production_traffic": "OFF", "live_providers": "OFF",
+                "real_money": "OFF"}
+        raise AssertionError("Authentication or write must not occur: " + path)
+
+    monkeypatch.setattr(module, "call", fake_call)
+    with pytest.raises(RuntimeError, match="isolated|safety flags"):
+        module.main()
+    assert all("/auth/" not in item and "/bulk/" not in item for item in seen)
