@@ -1,6 +1,6 @@
 """Fail-closed maritime location classification for new M3 routing assignments.
 
-UNECE function codes use a nine-character positional flag string. Position 1
+UNECE function codes use a eight-character positional flag string. Position 1
 is the seaport function ("1"); position 8 ("8") means inland waterway, not
 a maritime seaport. Never infer maritime eligibility from a valid UN/LOCODE.
 """
@@ -8,7 +8,7 @@ def maritime_eligibility(function):
     value = str(function or "").strip()
     if not value:
         return "UNKNOWN"
-    if len(value) != 9 or any(c not in "-0123456789" for c in value):
+    if len(value) != 8 or any(c not in "-0123456789" for c in value):
         return "UNKNOWN"
     if value[0] == "1":
         return "ELIGIBLE"
