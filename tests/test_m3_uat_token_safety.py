@@ -292,7 +292,7 @@ def test_role_mismatch_blocks_bulk_and_logs_out_both(monkeypatch, bad_role_user)
     assert all("/bulk/" not in event for event in events)
 
 
-@pytest.mark.parametrize("value", ["", " leading", "trailing ", "line\\nfeed", "tab\\tchar"])
+@pytest.mark.parametrize("value", ["", " leading", "trailing ", "line" + chr(10) + "feed", "tab" + chr(9) + "char"])
 def test_malformed_uat_password_rejected(value):
     with pytest.raises(RuntimeError):
         module.credential_diagnostics(value)
