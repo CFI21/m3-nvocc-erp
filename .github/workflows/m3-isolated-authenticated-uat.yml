@@ -51,6 +51,23 @@ jobs:
         run: |
           python -m pip install --disable-pip-version-check pytest
           python -m pytest -q tests/test_m3_uat_token_safety.py
+      - name: Secret-safe Maker credential diagnostics
+        env:
+          M3_MAKER_PASSWORD: ${{ secrets.M3_MAKER_PASSWORD }}
+          M3_MAKER_MFA: ${{ secrets.M3_MAKER_MFA }}
+        run: |
+          python - <<'PY'
+          import os
+          password = os.environ.get("M3_MAKER_PASSWORD", "")
+          mfa = os.environ.get("M3_MAKER_MFA", "")
+          # Never print credentials, hashes, fingerprints or lengths.
+          assert password, "M3 Maker password secret is missing"
+          assert mfa, "M3 Maker MFA secret is missing"
+          assert not any(ord(c) < 32 or ord(c) == 127 for c in password), "Maker password has a control character"
+          assert not any(ord(c) < 32 or ord(c) == 127 for c in mfa), "Maker MFA has a control character"
+          print("PASS: Maker credential inputs present; no control characters; password and MFA kept separate")
+          print("NOTE: GitHub does not disclose which secret scope supplied a resolved secret; inspect environment and repository settings separately.")
+          PY
       - name: Authenticated isolated UAT
         env:
           M3_UAT_TOKEN: ${{ secrets.M3_UAT_TOKEN }}
