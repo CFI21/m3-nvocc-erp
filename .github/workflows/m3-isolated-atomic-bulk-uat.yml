@@ -10,6 +10,7 @@ on:
       - "tests/test_m3_uat_disposable_cleanup.py"
       - "tests/test_m3_uat_http_boundary.py"
       - "tests/test_m3_atomic_bulk_http_real_iam_uat.py"
+      - "tests/test_m3_atomic_bulk_http_checker_approval.py"
   workflow_dispatch:
     inputs:
       run_mode:
@@ -44,7 +45,7 @@ jobs:
         run: |
           python -m pip install -r requirements.txt pytest
           python -m py_compile scripts/m3_isolated_atomic_bulk_uat.py
-          PYTHONPATH=. python -m pytest -q tests/test_m3_uat_token_safety.py tests/test_masterdata_atomic_bulk_real_sqlite_uat.py tests/test_m3_uat_disposable_cleanup.py tests/test_m3_uat_http_boundary.py tests/test_m3_atomic_bulk_http_real_iam_uat.py tests/test_m3_iam_http_acceptance_isolated_uat.py
+          PYTHONPATH=. python -m pytest -q tests/test_m3_uat_token_safety.py tests/test_masterdata_atomic_bulk_real_sqlite_uat.py tests/test_m3_uat_disposable_cleanup.py tests/test_m3_uat_http_boundary.py tests/test_m3_atomic_bulk_http_real_iam_uat.py tests/test_m3_iam_http_acceptance_isolated_uat.py tests/test_m3_atomic_bulk_http_checker_approval.py
   isolated-atomic-uat:
     if: github.event_name == 'workflow_dispatch' && github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/m3-dev-sprint-2'
     runs-on: ubuntu-latest
