@@ -255,3 +255,38 @@ def test_unsafe_runtime_flags_block_login_and_bulk(
     with pytest.raises(RuntimeError, match="isolated|safety flags"):
         module.main()
     assert all("/auth/" not in item and "/bulk/" not in item for item in seen)
+
+
+@pytest.mark.parametrize("bad_role_user", ["md.maker", "md.checker"])
+def test_role_mismatch_blocks_bulk_and_logs_out_both(monkeypatch, bad_role_user):
+    """Both independent identities must have precisely the required UAT role."""
+    import sys
+    for name in ("M3_UAT_TOKEN", "M3_MAKER_PASSWORD", "M3_MAKER_MFA",
+                 "M3_CHECKER_PASSWORD", "M3_CHECKER_MFA"):
+        monkeypatch.setenv(name, "synthetic")
+    monkeypatch.setattr(sys, "argv", ["m3_uat", "--submit"])
+    events = []
+
+    def fake_login(username, password, mfa, token):
+        roles = ["MASTER_DATA"] if username == "md.maker" else ["MASTER_DATA_MANAGER"]
+        if username == bad_role_user:
+            roles = ["SUPER_ADMIN"]
+        return "session-" + username, roles
+
+    def fake_call(path, **kwargs):
+        events.append(path)
+        if path == "/api/v1/health":
+            return 200, {"sandbox_only": True, "production_promoted": False}
+        if path == "/api/clx016/readiness":
+            return 200, {"production_traffic": "OFF", "live_providers": "OFF",
+                         "real_money": "OFF"}
+        if path == "/api/admin/auth/logout":
+            return 200, {}
+        raise AssertionError("Unexpected write or auth request: " + path)
+
+    monkeypatch.setattr(module, "login", fake_login)
+    monkeypatch.setattr(module, "call", fake_call)
+    with pytest.raises(RuntimeError, match="role mismatch"):
+        module.main()
+    assert events.count("/api/admin/auth/logout") == 2
+    assert all("/bulk/" not in event for event in events)
