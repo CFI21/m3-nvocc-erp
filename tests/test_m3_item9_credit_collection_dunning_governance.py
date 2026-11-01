@@ -79,18 +79,20 @@ def test_credit_hold_blocks_new_exposure_without_override(isolated):
 
 
 def test_override_requires_authority_reason_expiry_and_blocks_duplicates(isolated):
+    # Keep the duplicate active regardless of when CI runs.
+    active_expiry = (gov.datetime.datetime.now(gov.datetime.timezone.utc) + gov.datetime.timedelta(days=30)).isoformat()
     cst=first_customer(); configure_credit(cst['id'],100)
     c=db.connect()
     c.execute("INSERT INTO iam_approval_limits(role_code,currency,amount_limit,action,status) VALUES('FINANCE','USD',500,'CREDIT_OVERRIDE','ACTIVE')")
     ctx={'user_ref':'maker-i9','roles':['FINANCE'],'office_code':'RTM'}
     with pytest.raises(HTTPException) as exc:
-        gov.validate_override_request(c,ctx,cst['id'],100,'USD','', '2026-10-10T00:00:00+00:00')
+        gov.validate_override_request(c,ctx,cst['id'],100,'USD','', active_expiry)
     assert exc.value.detail['code']=='CREDIT_OVERRIDE_REASON_REQUIRED'
-    req=gov.validate_override_request(c,ctx,cst['id'],100,'USD','Temporary approved exposure','2026-10-10T00:00:00+00:00')
+    req=gov.validate_override_request(c,ctx,cst['id'],100,'USD','Temporary approved exposure',active_expiry)
     c.execute("""INSERT INTO credit_override_events(override_ref,customer_id,currency,amount,reason,expires_at,requested_by,status,created_at)
-      VALUES('COV-I9',?,?,?,?,?,?,'PENDING',?)""",(cst['id'],'USD',100,'Temporary approved exposure','2026-10-10T00:00:00+00:00','maker-i9',gov.now()))
+      VALUES('COV-I9',?,?,?,?,?,?,'PENDING',?)""",(cst['id'],'USD',100,'Temporary approved exposure',active_expiry,'maker-i9',gov.now()))
     with pytest.raises(HTTPException) as exc:
-        gov.validate_override_request(c,ctx,cst['id'],50,'USD','Again','2026-10-10T00:00:00+00:00')
+        gov.validate_override_request(c,ctx,cst['id'],50,'USD','Again',active_expiry)
     assert exc.value.detail['code']=='DUPLICATE_ACTIVE_CREDIT_OVERRIDE'
     assert req['amount']==100
     c.close()
