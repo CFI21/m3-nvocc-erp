@@ -77,8 +77,6 @@ def credential_diagnostics(password):
     """Non-reversible local checks; never log a password, hash or length."""
     if not isinstance(password, str) or not password:
         raise RuntimeError("Required UAT account password is empty")
-    if password != password.strip():
-        raise RuntimeError("UAT account password contains leading/trailing whitespace; verify the GitHub secret")
     if any(ord(ch) < 32 or ord(ch) == 127 for ch in password):
         raise RuntimeError("UAT account password contains a control character; verify the GitHub secret")
 
