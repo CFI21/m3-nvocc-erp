@@ -308,3 +308,18 @@ def test_malformed_password_blocks_login_before_http(monkeypatch):
     monkeypatch.setattr(module, "call", should_not_call)
     with pytest.raises(RuntimeError):
         module.login("md.maker", " trailing", "000000", "synthetic")
+
+
+def test_maker_password_transmitted_unchanged(monkeypatch):
+    observed = {}
+    def fake_call(path, **kwargs):
+        observed["path"] = path
+        observed["body"] = kwargs.get("body")
+        return 401, {"detail": {"code": "INVALID_CREDENTIALS"}}
+    monkeypatch.setattr(module, "call", fake_call)
+    with pytest.raises(RuntimeError, match="INVALID_CREDENTIALS"):
+        module.login("md.maker", "Exact+MixedCase!83", "654321", "synthetic")
+    assert observed["path"] == "/api/admin/auth/login"
+    assert observed["body"]["username"] == "md.maker"
+    assert observed["body"]["password"] == "Exact+MixedCase!83"
+    assert observed["body"]["mfa_code"] == "654321"
