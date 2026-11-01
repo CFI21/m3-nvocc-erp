@@ -1,0 +1,20 @@
+Category,Type,Size,ISO Code,External Length (m),External Width (m),External Height (m),Internal Length (m),Internal Width (m),Internal Height (m),Door Width (m),Door Height (m),Capacity (CBM),Tare Weight (kg),Max Payload (kg),Max Gross Weight (kg),Notes
+Dry,General Purpose,20ft,22G0,6.058,2.438,2.591,5.898,2.352,2.393,2.340,2.280,33.2,2200,28280,30480,Standard dry container
+Dry,General Purpose,40ft,42G0,12.192,2.438,2.591,12.032,2.352,2.393,2.340,2.280,67.7,3700,28800,32500,Standard dry container
+Dry,High Cube,40ft,45G0,12.192,2.438,2.896,12.032,2.352,2.698,2.340,2.585,76.4,3890,28610,32500,Extra height for light bulky cargo
+Dry,High Cube,45ft,45G0,13.716,2.438,2.896,13.556,2.352,2.697,2.340,2.585,86.0,4650,27850,32500,Used in specific trade lanes
+Dry,High Cube,20ft,25G0,6.058,2.438,2.896,5.898,2.352,2.698,2.340,2.585,37.4,2315,28165,30480,Less common extra height
+Dry,General Purpose,10ft,10G0,2.980,2.438,2.591,2.830,2.350,2.385,2.330,2.285,16.0,1250,8910,10160,Used for small shipments or storage
+Dry,General Purpose,53ft,,16.154,2.591,2.908,16.002,2.480,2.655,2.489,2.705,121.2,4876,27624,32500,Primarily for North American domestic market
+Reefer,Refrigerated,20ft,25R1,6.058,2.438,2.896,5.456,2.288,2.263,2.290,2.264,32.2,3330,27150,30480,Temperature controlled
+Reefer,Refrigerated,40ft High Cube,45R1,12.192,2.438,2.896,11.558,2.286,2.505,,,66.1,4430,26060,30490,Temperature controlled
+Open Top,Open Top,20ft,22U1,6.058,2.438,2.591,5.898,2.352,2.348,2.340,2.280,32.6,2160,28320,30480,Loads from the top
+Open Top,Open Top,40ft,42U1,12.192,2.438,2.591,12.032,2.352,2.348,2.340,2.280,66.7,3740,28760,32500,Loads from the top
+Flat Rack,Flat Rack,20ft,22P3,6.058,2.438,2.591,5.628,2.178,2.159,,,27.9,2890,31110,34000,For over-sized/over-weight cargo
+Flat Rack,Flat Rack,40ft,42P3,12.192,2.438,2.591,11.762,2.178,1.986,,,54.8,5480,34770,40250,For over-sized/over-weight cargo
+Tank,Tank Container,20ft,22T1,6.058,2.438,2.591,,,,,,24.0,3500,27000,30500,For liquid cargo
+Bulk,Bulk Container,20ft,22B0,6.058,2.438,2.591,5.867,2.330,2.350,2.340,2.280,32.1,2200,28280,30480,For dry bulk cargo
+Bulk,Bulk Container,40ft,42B0,12.192,2.438,2.591,11.998,2.330,2.350,2.340,2.280,65.7,3730,26750,30480,For dry bulk cargo
+Platform,Platform,20ft,22P1,6.058,2.438,0.600,,,,,,,2100,30000,32100,No walls or roof
+Platform,Platform,40ft,42P1,12.192,2.438,0.600,,,,,,,3500,30000,33500,No walls or roof
+Half-Height,Half-Height,20ft,22B0,6.058,2.438,1.295,5.867,2.330,1.215,2.340,1.295,16.6,3000,21000,24000,For high-density cargo

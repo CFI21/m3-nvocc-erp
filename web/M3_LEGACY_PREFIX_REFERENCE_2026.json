@@ -1,0 +1,216 @@
+{
+  "schema": "M3_LEGACY_PREFIX_REFERENCE_V1",
+  "scope": "READ_ONLY_RECONCILIATION_NO_ACTIVE_SEQUENCE_MODIFICATION",
+  "source": "User-provided 2026 legacy prefix screenshots",
+  "fiscal_year": "2026-01-01/2026-12-31",
+  "suffix": "/26",
+  "separator": "-",
+  "start_number": 1,
+  "description": "Legacy document prefix aliases for master-data reconciliation. Existing active M3 sequences take precedence; last numbers are not authoritative production counters.",
+  "records": [
+    {
+      "prefix": "SIL",
+      "document": "Sale Invoice Lease"
+    },
+    {
+      "prefix": "SOA",
+      "document": "SOA Process"
+    },
+    {
+      "prefix": "CN",
+      "document": "Sale Invoice CN"
+    },
+    {
+      "prefix": "RP",
+      "document": "Route Planning"
+    },
+    {
+      "prefix": "SID",
+      "document": "Sale Invoice Detention"
+    },
+    {
+      "prefix": "SII",
+      "document": "Sale Invoice Import"
+    },
+    {
+      "prefix": "SI",
+      "document": "Sale Invoice"
+    },
+    {
+      "prefix": "PIST",
+      "document": "Purchase Invoice Storage"
+    },
+    {
+      "prefix": "PIS",
+      "document": "Purchase Invoice Slot"
+    },
+    {
+      "prefix": "RCP",
+      "document": "Receipt"
+    },
+    {
+      "prefix": "DN",
+      "document": "Purchase Invoice DN"
+    },
+    {
+      "prefix": "SRR",
+      "document": "Special Rate Request"
+    },
+    {
+      "prefix": "PI",
+      "document": "Purchase Invoice"
+    },
+    {
+      "prefix": "PY",
+      "document": "Payment"
+    },
+    {
+      "prefix": "SD",
+      "document": "Special Detention"
+    },
+    {
+      "prefix": "SLR",
+      "document": "Slot Rate"
+    },
+    {
+      "prefix": "PIL",
+      "document": "Purchase Invoice Lease"
+    },
+    {
+      "prefix": "MOWL",
+      "document": "MRG One Way/LT Lease"
+    },
+    {
+      "prefix": "SC",
+      "document": "Storage Cost"
+    },
+    {
+      "prefix": "MTYS",
+      "document": "MRG MTY Storage"
+    },
+    {
+      "prefix": "MRGI",
+      "document": "MRG Import"
+    },
+    {
+      "prefix": "MRGE",
+      "document": "MRG Export"
+    },
+    {
+      "prefix": "PLN",
+      "document": "Planning"
+    },
+    {
+      "prefix": "MRGD",
+      "document": "MRG Detention"
+    },
+    {
+      "prefix": "MRG",
+      "document": "MRG"
+    },
+    {
+      "prefix": "SP",
+      "document": "Storage Process"
+    },
+    {
+      "prefix": "MNR",
+      "document": "Maintenance Repair"
+    },
+    {
+      "prefix": "LRT",
+      "document": "Lease Rental Transaction"
+    },
+    {
+      "prefix": "LRC",
+      "document": "Lease Rental Contract"
+    },
+    {
+      "prefix": "ERR",
+      "document": "Exchange Rate Range"
+    },
+    {
+      "prefix": "DP",
+      "document": "Detention Process"
+    },
+    {
+      "prefix": "OWL",
+      "document": "One Way Lease"
+    },
+    {
+      "prefix": "DC",
+      "document": "Detention Collection"
+    },
+    {
+      "prefix": "DO",
+      "document": "Delivery Order"
+    },
+    {
+      "prefix": "CO",
+      "document": "Customer Opening"
+    },
+    {
+      "prefix": "CRO",
+      "document": "CRO"
+    },
+    {
+      "prefix": "MRGDE",
+      "document": "MRG Detention Export"
+    },
+    {
+      "prefix": "VO",
+      "document": "Vendor Opening"
+    },
+    {
+      "prefix": "CRTT",
+      "document": "Cost Revenue Transaction Transshipment"
+    },
+    {
+      "prefix": "CRTI",
+      "document": "Cost Revenue Transaction Import"
+    },
+    {
+      "prefix": "CRTE",
+      "document": "Cost Revenue Transaction Export"
+    },
+    {
+      "prefix": "CRT",
+      "document": "Cost Revenue Transaction"
+    },
+    {
+      "prefix": "CSC",
+      "document": "Container Sale Costing"
+    },
+    {
+      "prefix": "VL",
+      "document": "Vessel Lock"
+    },
+    {
+      "prefix": "CE",
+      "document": "Container Exchange"
+    },
+    {
+      "prefix": "B",
+      "document": "Booking Booking No"
+    },
+    {
+      "prefix": "ANC",
+      "document": "Booking Approval No"
+    },
+    {
+      "prefix": "BLE",
+      "document": "B/L Exception"
+    },
+    {
+      "prefix": "ARP",
+      "document": "Agent Receipt Payment"
+    },
+    {
+      "prefix": "OP",
+      "document": "Agent Opening"
+    },
+    {
+      "prefix": "MRGT",
+      "document": "MRG Transshipment"
+    }
+  ]
+}

@@ -1,7 +1,8 @@
-from fastapi import APIRouter,HTTPException,Header
+from fastapi import APIRouter,HTTPException,Header,Depends
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel,Field
 from typing import Optional
-import hashlib,uuid,json,datetime,secrets
+import hashlib,uuid,json,datetime,secrets,os
 from .db import connect
 
 
@@ -10,12 +11,21 @@ router=APIRouter(prefix='/api/admin',tags=['CLX-010 Identity & Administration'])
 def now(): return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def phash(p,s='m3-test-salt'): return hashlib.pbkdf2_hmac('sha256',p.encode(),s.encode(),120000).hex()
 def ih(x): return hashlib.sha256(x.encode()).hexdigest()
+
+def sandbox_mfa_allowed():
+    # The fixed MFA challenge is test-only. Never accept it when production traffic is enabled.
+    return os.getenv('M3_PRODUCTION_TRAFFIC','OFF').strip().upper() == 'OFF'
 def audit(c,actor,action,rt,rr=None,before=None,after=None,scope=None):
     ts=now(); base=json.dumps({'ts':ts,'actor':actor,'action':action,'resource':rt,'ref':rr,'before':before,'after':after,'scope':scope or {}},sort_keys=True)
     c.execute('INSERT INTO iam_audit_events(event_ref,ts,actor_user_ref,action,resource_type,resource_ref,scope_json,before_json,after_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?,?,?)',(str(uuid.uuid4()),ts,actor,action,rt,rr,json.dumps(scope or {},sort_keys=True),json.dumps(before,sort_keys=True) if before is not None else None,json.dumps(after,sort_keys=True) if after is not None else None,ih(base)))
 def policy(c,k,default):
     r=c.execute('SELECT policy_value FROM iam_security_policies WHERE policy_key=?',(k,)).fetchone(); return r['policy_value'] if r else default
-def roles_for(c,uid): return [dict(r) for r in c.execute('''SELECT r.role_code,ur.office_id,ur.country_id,ur.organization_id FROM iam_user_roles ur JOIN iam_roles r ON r.id=ur.role_id WHERE ur.user_id=? AND ur.status='ACTIVE' AND (ur.valid_to IS NULL OR ur.valid_to>=?)''',(uid,now()))]
+def roles_for(c,uid):
+    ts=now()
+    return [dict(r) for r in c.execute('''SELECT r.role_code,ur.office_id,ur.country_id,ur.organization_id
+      FROM iam_user_roles ur JOIN iam_roles r ON r.id=ur.role_id
+      WHERE ur.user_id=? AND ur.status='ACTIVE' AND r.status='ACTIVE'
+        AND ur.valid_from<=? AND (ur.valid_to IS NULL OR ur.valid_to>=?)''',(uid,ts,ts))]
 def permission(c,uid,module,action,office_code=None):
     ts=now()
     direct=c.execute('''SELECT 1 FROM iam_temporary_access t JOIN iam_permissions p ON p.permission_code=t.permission_code
@@ -74,24 +84,221 @@ class AgentUserActivate(BaseModel):
 
 ADMIN_SCREENS=['dashboard','users','user-status','roles','permission-matrix','role-assignments','organizations','countries','legal-entities','offices','branches','departments','office-membership','data-scope-rules','customer-agent-access','approval-limits','maker-checker','approval-delegations','temporary-access','access-reviews','sessions','password-policy','mfa-policy','sso-readiness','login-audit','service-accounts','api-clients','audit']
 
+def require_iam_read(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Authenticate every IAM metadata read; honor effective role and office scope."""
+    c=connect()
+    try:
+        actor=session(c,x_m3_session)
+        if not (permission(c,actor['user_id'],'identity','view',actor['office_code'])
+                or permission(c,actor['user_id'],'identity','admin',actor['office_code'])):
+            raise HTTPException(403,{'code':'IAM_READ_NOT_AUTHORIZED'})
+    finally:
+        c.close()
+
+def require_iam_admin(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Protect personal/session and security-governance data with identity:admin."""
+    c=connect()
+    try:
+        actor=session(c,x_m3_session)
+        if not permission(c,actor['user_id'],'identity','admin',actor['office_code']):
+            raise HTTPException(403,{'code':'IAM_ADMIN_READ_NOT_AUTHORIZED'})
+    finally:
+        c.close()
+
+
 @router.get('/meta')
 def meta(): return {'project':'M3 NVOCC ERP','phase':'CLX-010','screens':ADMIN_SCREENS,'screen_count':len(ADMIN_SCREENS),'deny_by_default':True,'mfa_sso_readiness':True}
-@router.get('/overview')
+@router.get('/overview',dependencies=[Depends(require_iam_read)])
 def overview():
     c=connect(); out={k:c.execute(f'SELECT COUNT(*) n FROM {t}').fetchone()['n'] for k,t in [('users','iam_users'),('roles','iam_roles'),('offices','iam_offices'),('countries','iam_countries'),('legal_entities','iam_legal_entities'),('branches','iam_branches'),('departments','iam_departments'),('scope_rules','iam_scope_rules'),('approval_limits','iam_approval_limits')]}; out['screens']=len(ADMIN_SCREENS); c.close(); return out
+@router.get('/auth/uat-diagnostic', include_in_schema=False)
+def isolated_uat_diagnostic(x_m3_uat_diagnostic_token: str = Header('', alias='X-M3-UAT-Diagnostic-Token')):
+    """Read-only UAT identity check. No password hashes, tokens or connection URLs."""
+    from . import db
+    from urllib.parse import urlparse
+    configured = os.getenv('M3_UAT_ADMIN_SETUP_TOKEN', '')
+    if (not db.using_postgres() or not db._uat_target_approved()
+            or os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper() != 'OFF'
+            or len(configured) < 32
+            or not secrets.compare_digest(configured, x_m3_uat_diagnostic_token)):
+        raise HTTPException(404, {'code':'NOT_FOUND'})
+    target = urlparse(db.DATABASE_URL)
+    c = connect()
+    try:
+        identity = c.execute("SELECT current_database() AS database_name, inet_server_addr()::text AS server_address").fetchone()
+        user = c.execute("SELECT status,mfa_required FROM iam_users WHERE username='admin'").fetchone()
+        recent = c.execute("SELECT ts,outcome,detail_json FROM iam_login_audit WHERE username=? ORDER BY id DESC LIMIT 5",('admin',)).fetchall()
+        recent_outcomes = [{'ts':r['ts'], 'outcome':r['outcome'], 'reason':json.loads(r['detail_json'] or '{}').get('reason')} for r in recent]
+        return {
+            'backend':'postgres',
+            'configured_host_matches_expected':target.hostname == 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech',
+            'database_name':identity['database_name'],
+            'admin_exists':bool(user),
+            'admin_status':user['status'] if user else None,
+            'admin_mfa_required':bool(user['mfa_required']) if user else None,
+            'admin_password_initialized':None,
+            'recent_login_outcomes':recent_outcomes,
+            'note':'Password hashes and connection secrets are never returned; password initialization is not asserted.'
+        }
+    finally:
+        c.close()
+
+class UATAdminRecovery(BaseModel):
+    new_password: str = Field(min_length=12, max_length=256)
+
+@router.post('/auth/uat-recover-password', include_in_schema=False)
+def isolated_uat_admin_recovery(
+    body: UATAdminRecovery,
+    x_m3_uat_diagnostic_token: str = Header('', alias='X-M3-UAT-Diagnostic-Token'),
+    x_m3_recovery_secret: str = Header('', alias='X-M3-Recovery-Secret')
+):
+    """Disabled-by-default single-use recovery of isolated UAT Admin credentials."""
+    from . import db
+    from urllib.parse import urlparse
+    diagnostic_secret = os.getenv('M3_UAT_ADMIN_SETUP_TOKEN', '')
+    recovery_secret = os.getenv('M3_ADMIN_RECOVERY_SECRET', '')
+    if (os.getenv('M3_ALLOW_ADMIN_RECOVERY', '').lower() != 'true'
+            or not db.using_postgres() or not db._uat_target_approved()
+            or os.getenv('M3_UAT_PRESERVE_DATA') != '1'
+            or os.getenv('M3_PRODUCTION_TRAFFIC', 'OFF').upper() != 'OFF'
+            or urlparse(db.DATABASE_URL).hostname != 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech'
+            or len(diagnostic_secret) < 32 or len(recovery_secret) < 48
+            or not secrets.compare_digest(diagnostic_secret, x_m3_uat_diagnostic_token)
+            or not secrets.compare_digest(recovery_secret, x_m3_recovery_secret)):
+        raise HTTPException(404, {'code':'NOT_FOUND'})
+    if body.new_password != body.new_password.strip():
+        raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+    c = connect()
+    try:
+        db.tx(c)
+        c.execute('SELECT pg_advisory_xact_lock(84620317)')
+        used = c.execute("SELECT 1 FROM iam_audit_events WHERE action='UAT_ADMIN_PASSWORD_RECOVERY' LIMIT 1").fetchone()
+        if used:
+            raise HTTPException(409, {'code':'RECOVERY_ALREADY_USED'})
+        u = c.execute("SELECT * FROM iam_users WHERE username='admin'").fetchone()
+        if not u or u['status'] != 'ACTIVE' or not u['mfa_required']:
+            raise HTTPException(409, {'code':'RECOVERY_ACCOUNT_STATE_INVALID'})
+        role = c.execute("SELECT 1 FROM iam_user_roles ur JOIN iam_roles r ON ur.role_id=r.id WHERE ur.user_id=? AND ur.status='ACTIVE' AND r.status='ACTIVE' AND r.role_code='SUPER_ADMIN'",(u['id'],)).fetchone()
+        office = c.execute("SELECT office_code FROM iam_offices WHERE id=?",(u['home_office_id'],)).fetchone()
+        membership = c.execute("SELECT 1 FROM iam_office_membership WHERE user_id=? AND office_id=? AND status='ACTIVE'",(u['id'],u['home_office_id'])).fetchone()
+        if not role or not office or office['office_code'] != 'RTM' or not membership:
+            raise HTTPException(409, {'code':'RECOVERY_ASSIGNMENT_INVALID'})
+        min_len = max(12,int(policy(c,'password_min_length','10')))
+        if len(body.new_password) < min_len:
+            raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+        c.execute("UPDATE iam_users SET password_hash=?,failed_attempts=0,locked_until=NULL,version=version+1 WHERE id=? AND status='ACTIVE'",(phash(body.new_password),u['id']))
+        c.execute("UPDATE iam_sessions SET status='REVOKED',revoked_at=?,last_seen_at=? WHERE user_id=? AND status='ACTIVE'",(now(),now(),u['id']))
+        audit(c,u['user_ref'],'UAT_ADMIN_PASSWORD_RECOVERY','USER',u['user_ref'],
+            before={'status':'ACTIVE','mfa_required':True},
+            after={'status':'ACTIVE','mfa_required':True,'sessions_revoked':True},
+            scope={'office':'RTM','recovery':'one_time'})
+        c.commit()
+        return {'status':'RECOVERED','username':'admin','recovery_disabled_after_first_use':True}
+    except Exception:
+        c.rollback()
+        raise
+    finally:
+        c.close()
+
+class UATAdminSetup(BaseModel):
+    setup_token: str
+    new_password: str = Field(min_length=12, max_length=256)
+
+@router.get('/auth/uat-admin-setup', response_class=HTMLResponse, include_in_schema=False)
+def uat_admin_setup_form():
+    from . import db
+    if not db.using_postgres() or not db._uat_target_approved() or os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper() != 'OFF':
+        raise HTTPException(404)
+    return """<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>M3 Isolated UAT Admin Setup</title>
+    <body style="font:16px system-ui;max-width:480px;margin:50px auto;padding:20px">
+    <h2>M3 UAT — Activate Administrator</h2><p>One-time setup for the isolated test database. Enter the private setup token and choose your Admin password. MFA remains required.</p>
+    <form id="f"><p><label>Setup token<br><input id="token" type="password" autocomplete="off" required style="width:100%;padding:10px"></label></p>
+    <p><label>New Admin password (12+ characters)<br><input id="password" type="password" autocomplete="new-password" minlength="12" required style="width:100%;padding:10px"></label></p>
+    <p><label>Confirm password<br><input id="confirm" type="password" autocomplete="new-password" minlength="12" required style="width:100%;padding:10px"></label></p>
+    <button type="submit">Activate Admin</button></form><p id="result" role="status"></p>
+    <script>
+    document.getElementById('f').addEventListener('submit',async(e)=>{
+      e.preventDefault();let p=document.getElementById('password').value,c=document.getElementById('confirm').value;
+      let status=document.getElementById('result');if(p!==c){status.textContent='Passwords do not match';return;}
+      try{let r=await fetch('/api/admin/auth/uat-admin-setup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({setup_token:document.getElementById('token').value,new_password:p})});
+      if(!r.ok){let b=await r.json();status.textContent='Setup rejected: '+(b.detail?.code||r.status)+(b.detail?.account_status?' | Admin status: '+b.detail.account_status:'');return;}
+      document.getElementById('f').reset();status.textContent='Admin activated. Sign in using username admin and your chosen password; MFA is required.';
+      }catch(_){status.textContent='Could not contact isolated UAT API';}
+    });</script></body></html>"""
+
+@router.post('/auth/uat-admin-setup')
+def uat_admin_setup(b: UATAdminSetup):
+    """One-time isolated UAT activation. Token is configured privately in Render."""
+    from . import db
+    token = os.getenv('M3_UAT_ADMIN_SETUP_TOKEN', '')
+    if (not db.using_postgres() or not db._uat_target_approved()
+            or os.getenv('M3_UAT_PRESERVE_DATA') != '1'
+            or os.getenv('M3_PRODUCTION_TRAFFIC', 'OFF').upper() != 'OFF'
+            or len(token) < 32 or not secrets.compare_digest(b.setup_token, token)):
+        raise HTTPException(403, {'code':'UAT_ADMIN_SETUP_NOT_AUTHORIZED'})
+    if len(b.new_password.strip()) < 12 or b.new_password != b.new_password.strip():
+        raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+    from urllib.parse import urlparse
+    if urlparse(db.DATABASE_URL).hostname != 'ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech':
+        raise HTTPException(409, {'code':'UAT_ADMIN_WRONG_NEON_TARGET'})
+    c = connect()
+    try:
+        db.tx(c)
+        c.execute('SELECT pg_advisory_xact_lock(84620317)')
+        user = c.execute("SELECT * FROM iam_users WHERE username='admin'").fetchone()
+        if not user:
+            raise HTTPException(409, {'code':'UAT_ADMIN_MISSING_ON_RENDER_DATABASE'})
+        if user['status'] != 'INACTIVE':
+            raise HTTPException(409, {'code':'UAT_ADMIN_NOT_INACTIVE','account_status':user['status']})
+        if not user['mfa_required']:
+            raise HTTPException(409, {'code':'UAT_ADMIN_MFA_NOT_PROVISIONED'})
+        office = c.execute('SELECT office_code FROM iam_offices WHERE id=?',(user['home_office_id'],)).fetchone()
+        assignment = c.execute("""SELECT r.id FROM iam_user_roles ur JOIN iam_roles r ON r.id=ur.role_id
+            WHERE ur.user_id=? AND ur.status='ACTIVE' AND r.status='ACTIVE' AND r.role_code='SUPER_ADMIN'""",(user['id'],)).fetchone()
+        membership = c.execute("SELECT 1 FROM iam_office_membership WHERE user_id=? AND office_id=? AND status='ACTIVE'",(user['id'],user['home_office_id'])).fetchone()
+        if not office or office['office_code'] != 'RTM' or not assignment or not membership:
+            raise HTTPException(409, {'code':'UAT_ADMIN_ASSIGNMENT_INVALID'})
+        grants = c.execute("SELECT COUNT(*) AS n FROM iam_role_permissions WHERE role_id=? AND effect='ALLOW'",(assignment['id'],)).fetchone()['n']
+        catalog = c.execute('SELECT COUNT(*) AS n FROM iam_permissions').fetchone()['n']
+        if catalog != 68 or grants != catalog:
+            raise HTTPException(409, {'code':'UAT_ADMIN_PERMISSIONS_INVALID'})
+        minimum = max(12,int(policy(c,'password_min_length','10')))
+        if len(b.new_password) < minimum:
+            raise HTTPException(422, {'code':'PASSWORD_POLICY'})
+        c.execute("UPDATE iam_users SET password_hash=?,status='ACTIVE',failed_attempts=0,locked_until=NULL,version=version+1 WHERE id=? AND status='INACTIVE'",(phash(b.new_password),user['id']))
+        audit(c,user['user_ref'],'UAT_ADMIN_ACTIVATE','USER',user['user_ref'],before={'status':'INACTIVE'},after={'status':'ACTIVE','mfa_required':True},scope={'office':'RTM','method':'one_time_token'})
+        c.commit()
+        return {'status':'ACTIVE','username':'admin','mfa_required':True}
+    except Exception:
+        c.rollback()
+        raise
+    finally:
+        c.close()
+
 @router.post('/auth/login')
 def login(b:Login):
     c=connect(); u=c.execute('SELECT u.*,o.office_code FROM iam_users u JOIN iam_offices o ON o.id=u.home_office_id WHERE username=?',(b.username,)).fetchone(); ts=now(); event=str(uuid.uuid4())
     if not u or u['status']!='ACTIVE' or u['password_hash']!=phash(b.password):
         if u:c.execute('UPDATE iam_users SET failed_attempts=failed_attempts+1 WHERE id=?',(u['id'],))
         h=ih(event+ts+b.username+'FAIL'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'] if u else None,'LOGIN','FAIL','{"reason":"INVALID_CREDENTIALS"}',h)); c.close(); raise HTTPException(401,{'code':'INVALID_CREDENTIALS'})
+    if u['mfa_required'] and not sandbox_mfa_allowed(): c.close(); raise HTTPException(503,{'code':'SANDBOX_MFA_DISABLED'})
     if u['mfa_required'] and b.mfa_code!='123456': c.close(); raise HTTPException(401,{'code':'MFA_REQUIRED','sandbox_code':'123456'})
     token=secrets.token_urlsafe(24); exp=(datetime.datetime.now(datetime.timezone.utc)+datetime.timedelta(minutes=int(policy(c,'session_minutes','60')))).isoformat(); c.execute('INSERT INTO iam_sessions(session_token,user_id,created_at,expires_at,last_seen_at,mfa_verified,status) VALUES(?,?,?,?,?,?,?)',(token,u['id'],ts,exp,ts,1,'ACTIVE')); c.execute('UPDATE iam_users SET failed_attempts=0,last_login_at=? WHERE id=?',(ts,u['id'])); h=ih(event+ts+b.username+'PASS'); c.execute('INSERT INTO iam_login_audit(event_ref,ts,username,user_id,event_type,outcome,detail_json,immutable_hash) VALUES(?,?,?,?,?,?,?,?)',(event,ts,b.username,u['id'],'LOGIN','PASS','{}',h)); out={'session_token':token,'user_ref':u['user_ref'],'username':u['username'],'office':u['office_code'],'roles':[x['role_code'] for x in roles_for(c,u['id'])],'mfa_verified':True,'expires_at':exp}; c.close(); return out
 def session(c,token):
     if not token:raise HTTPException(401,{'code':'SESSION_REQUIRED'})
-    s=c.execute('''SELECT s.*,u.user_ref,u.username,u.home_office_id,o.office_code FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id WHERE s.session_token=?''',(token,)).fetchone()
-    if not s or s['status']!='ACTIVE' or s['revoked_at'] or s['expires_at']<now():raise HTTPException(401,{'code':'SESSION_INVALID'})
+    s=c.execute('''SELECT s.*,u.user_ref,u.username,u.status AS user_status,u.home_office_id,o.office_code FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id WHERE s.session_token=?''',(token,)).fetchone()
+    if not s or s['status']!='ACTIVE' or s['user_status']!='ACTIVE' or s['revoked_at'] or s['expires_at']<now():raise HTTPException(401,{'code':'SESSION_INVALID'})
     c.execute('UPDATE iam_sessions SET last_seen_at=? WHERE id=?',(now(),s['id'])); return s
+
+@router.get('/auth/whoami')
+def whoami(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    c=connect()
+    try:
+        actor=session(c,x_m3_session)
+        return {'username':actor['username'],'user_ref':actor['user_ref'],
+                'roles':[r['role_code'] for r in roles_for(c,actor['user_id'])]}
+    finally:
+        c.close()
 
 @router.post('/auth/logout')
 def logout(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
@@ -103,7 +310,7 @@ def logout(x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     c.close()
     return {'status':'LOGGED_OUT'}
 
-@router.get('/users')
+@router.get('/users',dependencies=[Depends(require_iam_admin)])
 def users():
     c=connect(); x=[dict(r) for r in c.execute('''SELECT u.id,u.user_ref,u.username,u.display_name,u.email,u.status,o.office_code,u.mfa_required,u.last_login_at,u.version FROM iam_users u JOIN iam_offices o ON o.id=u.home_office_id ORDER BY u.id''')]; c.close(); return x
 @router.post('/users/{username}/status')
@@ -146,6 +353,9 @@ def _ensure_agent_office(c,agent_code,agent):
       (office_code,agent['display_name'],org['id'],co['id'],timezone))
     office=c.execute("SELECT * FROM iam_offices WHERE office_code=? AND status='ACTIVE'",(office_code,)).fetchone()
     if not office: raise HTTPException(409,{'code':'AGENT_OFFICE_NOT_ACTIVE'})
+    # Existing agent office identifiers cannot be silently reused across countries.
+    if office['country_id']!=co['id'] or office['organization_id']!=org['id']:
+        raise HTTPException(409,{'code':'AGENT_OFFICE_SCOPE_CONFLICT'})
     return office,co,org,port
 
 def _identity_maker(c,s):
@@ -287,7 +497,7 @@ def activate_agent_user_invite(b:AgentUserActivate):
     audit(c,u['user_ref'],'AGENT_USER_ACTIVATE','USER',u['user_ref'],before={'status':u['status']},after={'status':'ACTIVE','mfa_required':True},scope={'review_ref':match['review_ref']})
     c.close(); return {'status':'ACTIVE','user_ref':u['user_ref'],'mfa_required':True,'agent_code':scope['agent_code']}
 
-@router.get('/agents/{agent_code}/users')
+@router.get('/agents/{agent_code}/users',dependencies=[Depends(require_iam_admin)])
 def agent_users(agent_code:str):
     c=connect()
     agent=_agent_master(c,agent_code)
@@ -325,25 +535,25 @@ def agent_users(agent_code:str):
          'shared_login_allowed':False,'multiple_named_users_allowed':True}
     c.close(); return out
 
-@router.get('/roles')
+@router.get('/roles',dependencies=[Depends(require_iam_read)])
 def roles(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_roles ORDER BY id')];c.close();return x
-@router.get('/permissions')
+@router.get('/permissions',dependencies=[Depends(require_iam_read)])
 def permissions(): c=connect();x=[dict(r) for r in c.execute('''SELECT r.role_code,p.permission_code,p.module,p.action,p.sensitive,rp.effect FROM iam_role_permissions rp JOIN iam_roles r ON r.id=rp.role_id JOIN iam_permissions p ON p.id=rp.permission_id ORDER BY r.role_code,p.module,p.action''')];c.close();return x
-@router.get('/organizations')
+@router.get('/organizations',dependencies=[Depends(require_iam_read)])
 def organizations(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_organizations')];c.close();return x
-@router.get('/countries')
+@router.get('/countries',dependencies=[Depends(require_iam_read)])
 def countries(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_countries')];c.close();return x
-@router.get('/legal-entities')
+@router.get('/legal-entities',dependencies=[Depends(require_iam_read)])
 def legal_entities(): c=connect();x=[dict(r) for r in c.execute('''SELECT e.*,o.org_code,c.country_code FROM iam_legal_entities e JOIN iam_organizations o ON o.id=e.organization_id JOIN iam_countries c ON c.id=e.country_id ORDER BY e.id''')];c.close();return x
-@router.get('/offices')
+@router.get('/offices',dependencies=[Depends(require_iam_read)])
 def offices(): c=connect();x=[dict(r) for r in c.execute('''SELECT o.*,g.org_code,c.country_code FROM iam_offices o JOIN iam_organizations g ON g.id=o.organization_id JOIN iam_countries c ON c.id=o.country_id ORDER BY o.id''')];c.close();return x
-@router.get('/branches')
+@router.get('/branches',dependencies=[Depends(require_iam_read)])
 def branches(): c=connect();x=[dict(r) for r in c.execute('''SELECT b.*,o.office_code FROM iam_branches b JOIN iam_offices o ON o.id=b.office_id ORDER BY b.id''')];c.close();return x
-@router.get('/departments')
+@router.get('/departments',dependencies=[Depends(require_iam_read)])
 def departments(): c=connect();x=[dict(r) for r in c.execute('''SELECT d.*,b.branch_code FROM iam_departments d JOIN iam_branches b ON b.id=d.branch_id ORDER BY d.id''')];c.close();return x
-@router.get('/office-membership')
+@router.get('/office-membership',dependencies=[Depends(require_iam_admin)])
 def membership(): c=connect();x=[dict(r) for r in c.execute('''SELECT m.*,u.user_ref,o.office_code FROM iam_office_membership m JOIN iam_users u ON u.id=m.user_id JOIN iam_offices o ON o.id=m.office_id ORDER BY m.id''')];c.close();return x
-@router.get('/scope-rules')
+@router.get('/scope-rules',dependencies=[Depends(require_iam_read)])
 def scopes(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_scope_rules ORDER BY priority,id')];c.close();return x
 @router.get('/bulk-job-access')
 def bulk_job_access(resource:str='agent-tasks',action:str='view',x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
@@ -352,16 +562,29 @@ def bulk_job_access(resource:str='agent-tasks',action:str='view',x_m3_session:Op
     c=connect(); s=session(c,x_m3_session)
     if not permission(c,s['user_id'],'identity','view',s['office_code']) and not permission(c,s['user_id'],'identity','admin',s['office_code']):
         c.close(); raise HTTPException(403,{'code':'PERMISSION_DENIED'})
-    out=bulk_validate(c,resource,action); c.close(); return out
-@router.get('/party-access')
+    out=bulk_validate(c,resource,action)
+    if resource == 'agent-tasks' and action == 'approve':
+        expected = {'50001': True, '50002': False, '50003': False, '50004': False, '50005': True}
+        admin_rows = [r for r in out.get('results', []) if r.get('username') == 'admin'
+                      and str(r.get('job_ref')) in expected]
+        passed = (len(admin_rows) == len(expected)
+                  and len({str(r['job_ref']) for r in admin_rows}) == len(expected)
+                  and all(r.get('allowed') is expected[str(r['job_ref'])] for r in admin_rows))
+        import logging
+        logging.getLogger('uvicorn.error').info(
+            'M3_ISOLATED_ADMIN_JOB_SCOPE_UAT result=%s checks=%d/5',
+            'PASS' if passed else 'FAIL', len(admin_rows))
+    c.close()
+    return out
+@router.get('/party-access',dependencies=[Depends(require_iam_admin)])
 def party_access(): c=connect();x=[dict(r) for r in c.execute('''SELECT p.*,u.user_ref,u.username FROM iam_party_access p JOIN iam_users u ON u.id=p.user_id ORDER BY p.id''')];c.close();return x
-@router.get('/approval-limits')
+@router.get('/approval-limits',dependencies=[Depends(require_iam_read)])
 def approval_limits(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_approval_limits ORDER BY role_code,currency,action')];c.close();return x
-@router.get('/maker-checker')
+@router.get('/maker-checker',dependencies=[Depends(require_iam_read)])
 def maker_checker(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_sod_conflicts ORDER BY id')];c.close();return {'four_eyes':True,'conflicts':x}
-@router.get('/delegations')
+@router.get('/delegations',dependencies=[Depends(require_iam_admin)])
 def delegations(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_delegations ORDER BY id')];c.close();return x
-@router.get('/temporary-access')
+@router.get('/temporary-access',dependencies=[Depends(require_iam_admin)])
 def temporary_access(): c=connect();x=[dict(r) for r in c.execute('''SELECT t.*,u.user_ref,u.username FROM iam_temporary_access t JOIN iam_users u ON u.id=t.user_id ORDER BY t.id''')];c.close();return x
 @router.post('/temporary-access')
 def create_temp(b:TempAccess,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
@@ -373,21 +596,21 @@ def create_temp(b:TempAccess,x_m3_session:Optional[str]=Header(None,alias='X-M3-
     if b.valid_to<=b.valid_from or b.valid_to<=now(): c.close(); raise HTTPException(422,{'code':'INVALID_EFFECTIVE_DATES'})
     if u['id']==s['user_id'] and p['sensitive']: c.close(); raise HTTPException(409,{'code':'FOUR_EYES_SELF_TEMP_ACCESS_BLOCKED'})
     ref='TMP-'+uuid.uuid4().hex[:8].upper(); c.execute('INSERT INTO iam_temporary_access(temp_ref,user_id,permission_code,valid_from,valid_to,reason,approved_by) VALUES(?,?,?,?,?,?,?)',(ref,u['id'],b.permission_code,b.valid_from,b.valid_to,b.reason,s['user_ref'])); audit(c,s['user_ref'],'TEMP_ACCESS_CREATE','USER',u['user_ref'],after={'permission':b.permission_code,'valid_to':b.valid_to}); c.close(); return {'temp_ref':ref,'status':'ACTIVE'}
-@router.get('/access-reviews')
+@router.get('/access-reviews',dependencies=[Depends(require_iam_admin)])
 def reviews(): c=connect();x=[dict(r) for r in c.execute('''SELECT ar.*,u.user_ref,u.username FROM iam_access_reviews ar JOIN iam_users u ON u.id=ar.user_id ORDER BY ar.id''')];c.close();return x
-@router.get('/sessions')
+@router.get('/sessions',dependencies=[Depends(require_iam_admin)])
 def sessions(): c=connect();x=[dict(r) for r in c.execute('''SELECT s.id,u.user_ref,u.username,o.office_code,s.created_at,s.expires_at,s.last_seen_at,s.mfa_verified,s.status,s.revoked_at FROM iam_sessions s JOIN iam_users u ON u.id=s.user_id JOIN iam_offices o ON o.id=u.home_office_id ORDER BY s.id DESC''')];c.close();return x
-@router.get('/policies')
+@router.get('/policies',dependencies=[Depends(require_iam_read)])
 def policies(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_security_policies ORDER BY policy_key')];c.close();return x
-@router.get('/sso-readiness')
+@router.get('/sso-readiness',dependencies=[Depends(require_iam_read)])
 def sso_readiness(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_sso_readiness ORDER BY provider_key')];c.close();return x
-@router.get('/login-audit')
+@router.get('/login-audit',dependencies=[Depends(require_iam_admin)])
 def login_audit(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_login_audit ORDER BY id DESC LIMIT 100')];c.close();return x
-@router.get('/service-accounts')
+@router.get('/service-accounts',dependencies=[Depends(require_iam_admin)])
 def service_accounts(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_service_accounts ORDER BY id')];c.close();return x
-@router.get('/api-clients')
+@router.get('/api-clients',dependencies=[Depends(require_iam_admin)])
 def api_clients(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_api_clients ORDER BY id')];c.close();return x
-@router.get('/audit')
+@router.get('/audit',dependencies=[Depends(require_iam_read)])
 def iam_audit(): c=connect();x=[dict(r) for r in c.execute('SELECT * FROM iam_audit_events ORDER BY id DESC LIMIT 100')];c.close();return x
 @router.post('/role-assignments')
 def assign(b:Assign,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
@@ -407,3 +630,140 @@ def assign(b:Assign,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')
     try:c.execute('INSERT INTO iam_user_roles(user_id,role_id,office_id,valid_from,valid_to,status,assigned_by) VALUES(?,?,?,?,?,?,?)',(u['id'],r['id'],o['id'],now(),b.valid_to,'ACTIVE',s['user_ref']))
     except Exception as e:c.close();raise HTTPException(409,{'code':'ASSIGNMENT_CONFLICT','detail':str(e)})
     audit(c,s['user_ref'],'ROLE_ASSIGN','USER',u['user_ref'],after={'role':b.role_code,'office':o['office_code']});c.close();return {'status':'ASSIGNED','user':u['user_ref'],'role':b.role_code,'office':o['office_code']}
+
+def _assigned_agent_offices(c,user_id,agent_code):
+    """Resolve one agent's assigned offices from existing IAM membership only."""
+    grant=c.execute("""SELECT 1 FROM iam_party_access
+        WHERE user_id=? AND party_type='AGENT' AND party_key=?
+          AND status='ACTIVE' LIMIT 1""",(user_id,agent_code)).fetchone()
+    if not grant:
+        raise HTTPException(403,{'code':'AGENT_PARTY_ACCESS_DENIED'})
+    # Explicit office links live in existing governed configuration records.
+    # These records grant no access by themselves: IAM membership is also required.
+    from .db import table_exists
+    configured=set()
+    configurations=(c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'").fetchall()
+                    if table_exists(c,'md_records') else [])
+    for row in configurations:
+        try:
+            p=json.loads(row['payload_json'] or '{}')
+        except (TypeError,ValueError):
+            continue
+        if str(p.get('config_type') or '').upper()=='AGENT_OFFICE_ASSIGNMENT' and str(p.get('agent_code') or '')==agent_code:
+            code=str(p.get('office_code') or '').strip()
+            if code: configured.add(code)
+    allowed=configured if configured else {'AGT-'+agent_code}
+    return [dict(x) for x in c.execute("""SELECT DISTINCT o.office_code,co.country_code,
+            org.org_code organization_code
+        FROM iam_office_membership m
+        JOIN iam_offices o ON o.id=m.office_id AND o.status='ACTIVE'
+        JOIN iam_countries co ON co.id=o.country_id AND co.status='ACTIVE'
+        JOIN iam_organizations org ON org.id=o.organization_id AND org.status='ACTIVE'
+        WHERE m.user_id=? AND m.status='ACTIVE'
+        ORDER BY co.country_code,o.office_code""",(user_id,)).fetchall() if x['office_code'] in allowed]
+
+
+@router.get('/agent/{agent_code}/authorized-offices')
+def agent_authorized_offices(agent_code:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Authenticated selector source; never infer access from agent name or country."""
+    c=connect()
+    try:
+        s=session(c,x_m3_session)
+        if not _agent_master(c,agent_code):
+            raise HTTPException(404,{'code':'AGENT_MASTER_NOT_FOUND'})
+        offices=_assigned_agent_offices(c,s['user_id'],agent_code)
+        return {'agent_code':agent_code,'offices':offices,'count':len(offices)}
+    finally:
+        c.close()
+
+
+def _agent_has_explicit_office_assignments(c,agent_code):
+    from .db import table_exists
+    if not table_exists(c,'md_records'): return False
+    for row in c.execute("SELECT payload_json FROM md_records WHERE domain='configuration' AND status='ACTIVE'").fetchall():
+        try:
+            p=json.loads(row['payload_json'] or '{}')
+        except (TypeError,ValueError):
+            continue
+        if (str(p.get('config_type') or '').upper()=='AGENT_OFFICE_ASSIGNMENT'
+                and str(p.get('agent_code') or '')==agent_code
+                and str(p.get('office_code') or '').strip()):
+            return True
+    return False
+
+
+def _authorized_agent_profile(c,user_id,agent_code):
+    """Resolve existing Agent/PA Party/IAM identities without copying master fields."""
+    agent=_agent_master(c,agent_code)
+    if not agent:
+        raise HTTPException(404,{'code':'AGENT_MASTER_NOT_FOUND'})
+    offices=_assigned_agent_offices(c,user_id,agent_code)
+    payload=json.loads(agent['payload_json'] or '{}')
+    master_country=str(payload.get('country') or '').strip().upper()
+    if master_country and not _agent_has_explicit_office_assignments(c,agent_code) and any(str(o['country_code']).upper()!=master_country for o in offices):
+        raise HTTPException(409,{'code':'AGENT_OFFICE_COUNTRY_MISMATCH'})
+    key=str(payload.get('common_party_key') or '').strip()
+    if not key:
+        raise HTTPException(409,{'code':'AGENT_COMMON_PARTY_REQUIRED'})
+    party=c.execute("""SELECT record_key,display_name FROM md_records
+        WHERE domain='common-party' AND record_key=? AND status='ACTIVE'""",(key,)).fetchone()
+    if not party:
+        raise HTTPException(409,{'code':'COMMON_PARTY_NOT_ACTIVE'})
+    return {'agent_code':agent_code,'agent_name':agent['display_name'],
+            'common_party_key':party['record_key'],'common_party_name':party['display_name'],
+            'offices':offices}
+
+
+@router.get('/agent/{agent_code}/authorized-profile')
+def agent_authorized_profile(agent_code:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """Agent Setup read model built from authoritative existing records."""
+    c=connect()
+    try:
+        s=session(c,x_m3_session)
+        return _authorized_agent_profile(c,s['user_id'],agent_code)
+    finally:
+        c.close()
+
+class UATCheckerPasswordReset(BaseModel):
+    new_password: str = Field(min_length=12,max_length=256)
+
+@router.post('/auth/uat-reset-checker',include_in_schema=False)
+def isolated_uat_checker_reset(body:UATCheckerPasswordReset,
+    x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
+    """SUPER_ADMIN-only, Checker-only recovery on the host-pinned isolated UAT database."""
+    from . import db
+    from urllib.parse import urlparse
+    if (os.getenv('M3_ALLOW_CHECKER_RECOVERY','').strip().lower()!='true'
+        or os.getenv('M3_PRODUCTION_TRAFFIC','OFF').upper()!='OFF'
+        or os.getenv('M3_UAT_PRESERVE_DATA')!='1'
+        or not db.using_postgres() or not db._uat_target_approved()
+        or urlparse(db.DATABASE_URL).hostname!='ep-wild-sea-b49pzkl3-pooler.c-6.us-east-2.aws.neon.tech'):
+        raise HTTPException(404,{'code':'NOT_FOUND'})
+    if body.new_password!=body.new_password.strip():
+        raise HTTPException(422,{'code':'PASSWORD_POLICY'})
+    c=connect()
+    try:
+        from . import db as database
+        database.tx(c)
+        actor=session(c,x_m3_session)
+        if actor['username']!='admin' or not any(r['role_code']=='SUPER_ADMIN' for r in roles_for(c,actor['user_id'])):
+            raise HTTPException(403,{'code':'SUPER_ADMIN_REQUIRED'})
+        u=c.execute("SELECT * FROM iam_users WHERE username='md.checker'").fetchone()
+        if not u or u['status']!='ACTIVE' or not u['mfa_required']:
+            raise HTTPException(409,{'code':'CHECKER_ACCOUNT_STATE_INVALID'})
+        office=c.execute('SELECT office_code FROM iam_offices WHERE id=?',(u['home_office_id'],)).fetchone()
+        roles=roles_for(c,u['id'])
+        if not office or office['office_code']!='RTM' or not any(r['role_code']=='MASTER_DATA_MANAGER' for r in roles):
+            raise HTTPException(409,{'code':'CHECKER_ASSIGNMENT_INVALID'})
+        if len(body.new_password)<max(12,int(policy(c,'password_min_length','10'))):
+            raise HTTPException(422,{'code':'PASSWORD_POLICY'})
+        c.execute("UPDATE iam_users SET password_hash=?,failed_attempts=0,locked_until=NULL,version=version+1 WHERE id=? AND status='ACTIVE'",(phash(body.new_password),u['id']))
+        c.execute("UPDATE iam_sessions SET status='REVOKED',revoked_at=?,last_seen_at=? WHERE user_id=? AND status='ACTIVE'",(now(),now(),u['id']))
+        audit(c,actor['user_ref'],'UAT_CHECKER_PASSWORD_RESET','USER',u['user_ref'],before={'status':'ACTIVE','mfa_required':True},after={'status':'ACTIVE','mfa_required':True,'sessions_revoked':True},scope={'office':'RTM','isolated_uat':True})
+        c.commit()
+        return {'status':'CHECKER_RESET','username':'md.checker','sessions_revoked':True}
+    except Exception:
+        c.rollback()
+        raise
+    finally:
+        c.close()

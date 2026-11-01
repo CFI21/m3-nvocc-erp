@@ -11,6 +11,7 @@ from app.screen_integration import (
     screen_data, related, workflow, search,
 )
 from app.main import audit_list, exception_list
+from tests.iam_personas import persona_session
 
 
 @pytest.fixture()
@@ -48,47 +49,50 @@ def test_action_route_cannot_bypass_screen_role():
 
 
 def test_clx011_events_are_agent_scoped(isolated):
-    s=job_scope()
-    navigation_event("agent-tasks::booking",job_ref="50001",x_role="AGENT",x_agent_scope=s["agent_code"])
-    rows=events(100,x_role="AGENT",x_agent_scope=s["agent_code"])
+    token=persona_session(role="AGENT",agent_code=job_scope()["agent_code"],office_code="RTM")
+    navigation_event("agent-tasks::booking",job_ref="50001",x_m3_session=token)
+    rows=events(100,x_m3_session=token)
     assert rows
     assert all(r["job_ref"]=="50001" for r in rows)
-    wrong=events(100,x_role="AGENT",x_agent_scope="WRONG-AGENT")
+    other=persona_session(role="AGENT",agent_code="WRONG-AGENT",office_code="RTM")
+    wrong=events(100,x_m3_session=other)
     assert wrong==[]
 
 
 def test_navigation_event_rejects_cross_scope_job(isolated):
+    other=persona_session(role="AGENT",agent_code="WRONG-AGENT",office_code="RTM")
     with pytest.raises(HTTPException) as exc:
-        navigation_event("agent-tasks::booking",job_ref="50001",x_role="AGENT",x_agent_scope="WRONG-AGENT")
+        navigation_event("agent-tasks::booking",job_ref="50001",x_role="SUPER_ADMIN",x_m3_session=other)
     assert exc.value.status_code==404
 
 
 def test_simulated_email_rejects_cross_scope_job(isolated):
     body=EmailIntent(screen_id="agent-tasks::booking",job_ref="50001",subject="scope test")
+    other=persona_session(role="AGENT",agent_code="WRONG-AGENT",office_code="RTM")
     with pytest.raises(HTTPException) as exc:
-        simulate_email(body,x_role="AGENT",x_agent_scope="WRONG-AGENT")
+        simulate_email(body,x_role="SUPER_ADMIN",x_m3_session=other)
     assert exc.value.status_code==404
-    s=job_scope()
-    out=simulate_email(body,x_role="AGENT",x_agent_scope=s["agent_code"])
+    token=persona_session(role="AGENT",agent_code=job_scope()["agent_code"],office_code="RTM")
+    out=simulate_email(body,x_m3_session=token)
     assert out["delivery"]=="SIMULATED_ONLY"
 
 
 def test_customer_office_branch_scope_consistent_on_read_paths(isolated):
+    from app.admin import Login,login
     s=job_scope()
-    kwargs=dict(x_role="OPS",x_customer_scope=s["customer_code"],x_office_scope=s["office_code"],x_branch_scope=s["branch_code"])
+    token=login(Login(username="admin",password="Admin123!",mfa_code="123456"))["session_token"]
+    kwargs=dict(x_m3_session=token,x_customer_scope=s["customer_code"])
     assert screen_data("agent-tasks::booking",job_ref="50001",**kwargs)["rows"]
     assert related("50001",**kwargs)["identity"]["job_ref"]=="50001"
     assert workflow("50001",**kwargs)["job_ref"]=="50001"
-    assert all((not r.get("job_ref")) or r["job_ref"]=="50001" for r in search("50001",role="OPS",x_customer_scope=s["customer_code"],x_office_scope=s["office_code"],x_branch_scope=s["branch_code"])["record_hits"])
+    assert all((not r.get("job_ref")) or r["job_ref"]=="50001"
+               for r in search("50001",x_m3_session=token,x_customer_scope=s["customer_code"])["record_hits"])
     with pytest.raises(HTTPException) as exc:
-        related("50001",x_role="OPS",x_customer_scope="WRONG-CUSTOMER")
+        related("50001",x_m3_session=token,x_customer_scope="WRONG-CUSTOMER")
     assert exc.value.status_code==404
-    with pytest.raises(HTTPException) as exc:
-        workflow("50001",x_role="OPS",x_office_scope="WRONG-OFFICE")
-    assert exc.value.status_code==404
-    with pytest.raises(HTTPException) as exc:
-        screen_data("agent-tasks::booking",job_ref="50001",x_role="OPS",x_branch_scope="WRONG-BRANCH")
-    assert exc.value.status_code==404
+    # Caller office and branch headers must not override trusted IAM scope.
+    assert workflow("50001",x_m3_session=token,x_office_scope="WRONG-OFFICE")["job_ref"]=="50001"
+    assert screen_data("agent-tasks::booking",job_ref="50001",x_m3_session=token,x_branch_scope="WRONG-BRANCH")["rows"]
 
 
 def test_domain_audit_and_exception_feeds_are_agent_scoped(isolated):
@@ -103,8 +107,10 @@ def test_domain_audit_and_exception_feeds_are_agent_scoped(isolated):
 
 def test_quick_view_and_export_use_only_already_scoped_screen_rows(isolated):
     s=job_scope()
-    out=screen_data("agent-tasks::booking",x_role="AGENT",x_agent_scope=s["agent_code"])
+    token=persona_session(role="AGENT",agent_code=s["agent_code"],office_code="RTM")
+    out=screen_data("agent-tasks::booking",x_m3_session=token)
+    assert out["rows"]
     assert all(r["agent"]==s["agent_code"] for r in out["rows"])
-    # Quick View / Print / Export are client-side transforms of this scoped row set.
     for action in ("quick-view","print","export"):
         assert action_route("agent-tasks::booking",action,1,1,role="AGENT")["mode"]=="CLIENT_OR_CLX011"
+

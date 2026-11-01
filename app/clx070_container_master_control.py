@@ -37,22 +37,70 @@ def _json(v,default=None):
     except Exception:return {} if default is None else default
 
 def _roles_priority(roles):
-    order=["SUPER_ADMIN","ADMIN","EQUIPMENT_MANAGER","MANAGEMENT","FINANCE","EQUIPMENT_CONTROLLER","BRANCH_OPS","OPS","DOCS","AGENT","DEPOT","AUDITOR","VIEWER"]
+    order=["SUPER_ADMIN","ADMIN","EQUIPMENT_MANAGER","MANAGEMENT","FINANCE","TREASURY","GL_ACCOUNTANT","EQUIPMENT_CONTROLLER","BRANCH_OPS","OPS","DOCS","AGENT","DEPOT","AUDITOR","VIEWER"]
     rs=set(roles)
     return next((r for r in order if r in rs),"VIEWER")
 
 def actor(conn,x_m3_session,x_role,x_agent_scope,x_branch_scope,x_depot_scope):
     if x_m3_session:
         s=iam_session(conn,x_m3_session)
-        rs=[r["role_code"] for r in roles_for(conn,s["user_id"])]
+        if not hasattr(s, "keys") or "user_id" not in s.keys() or not s["user_id"]:
+            raise HTTPException(403, {"code": "EQUIPMENT_IAM_IDENTITY_REQUIRED"})
+        raw_roles=roles_for(conn,s["user_id"])
+        rs=[str(row["role_code"] or "").strip().upper() for row in (raw_roles or ())
+            if hasattr(row, "keys") and "role_code" in row.keys()]
         role=_roles_priority(rs)
-        branch=x_branch_scope
-        if not branch:
-            br=conn.execute("SELECT branch_code FROM iam_branches WHERE office_id=? ORDER BY id LIMIT 1",(s["home_office_id"],)).fetchone()
-            branch=br["branch_code"] if br else None
-        return {"role":role,"roles":rs,"user":s["user_ref"],"office":s["office_code"],"branch":branch,"agent":x_agent_scope,"depot":x_depot_scope}
-    role=(x_role or "VIEWER").upper()
-    return {"role":role,"roles":[role],"user":"uat-user","office":None,"branch":x_branch_scope,"agent":x_agent_scope,"depot":x_depot_scope}
+        if "user_ref" not in s.keys() or not str(s["user_ref"] or "").strip():
+            raise HTTPException(403, {"code": "EQUIPMENT_IAM_IDENTITY_REQUIRED"})
+        if role == "VIEWER" and "VIEWER" not in rs:
+            raise HTTPException(403, {"code": "EQUIPMENT_IAM_ROLE_REQUIRED"})
+        # Never treat request-supplied scope headers as IAM grants.
+        br=conn.execute(
+            "SELECT b.branch_code FROM iam_branches b "
+            "JOIN iam_offices o ON o.id=b.office_id AND o.status='ACTIVE' "
+            "JOIN iam_office_membership m ON m.office_id=o.id "
+            "AND m.user_id=? AND m.status='ACTIVE' "
+            "WHERE b.office_id=? ORDER BY b.id LIMIT 1",
+            (s["user_id"], s["home_office_id"])
+        ).fetchone()
+        branch=_trusted_scope(br["branch_code"], "EQUIPMENT_BRANCH_SCOPE_REQUIRED") if br else None
+        if role in {"AGENT", "DEPOT"} and not branch:
+            # Active office membership is mandatory for restricted equipment users.
+            raise HTTPException(403, {"code": "EQUIPMENT_ACTIVE_OFFICE_REQUIRED"})
+        if role in {"OPS", "BRANCH_OPS", "DOCS", "EQUIPMENT_CONTROLLER"} and not branch:
+            raise HTTPException(403, {"code": "EQUIPMENT_BRANCH_SCOPE_REQUIRED"})
+        agent=None
+        if role == "AGENT":
+            # Fail closed for zero or multiple memberships: no caller-selected scope.
+            grants=conn.execute(
+                "SELECT DISTINCT party_key FROM iam_party_access "
+                "WHERE user_id=? AND party_type='AGENT' AND status='ACTIVE'",
+                (s["user_id"],)
+            ).fetchall()
+            if len(grants) != 1:
+                raise HTTPException(403, {"code": "EQUIPMENT_AMBIGUOUS_AGENT_GRANTS"})
+            agent=_trusted_scope(grants[0]["party_key"], "EQUIPMENT_TRUSTED_SCOPE_REQUIRED")
+            if not agent:
+                raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
+            from .admin import _assigned_agent_offices
+            offices=_assigned_agent_offices(conn,s["user_id"],agent)
+            if not offices:
+                raise HTTPException(403, {"code": "EQUIPMENT_AGENT_OFFICE_DENIED"})
+        depot=None
+        if role == "DEPOT":
+            grants=conn.execute(
+                "SELECT DISTINCT party_key FROM iam_party_access "
+                "WHERE user_id=? AND party_type='DEPOT' AND status='ACTIVE'",
+                (s["user_id"],)
+            ).fetchall()
+            if len(grants) != 1:
+                raise HTTPException(403, {"code": "EQUIPMENT_AMBIGUOUS_DEPOT_GRANTS"})
+            depot=_trusted_scope(grants[0]["party_key"], "EQUIPMENT_TRUSTED_SCOPE_REQUIRED")
+            if not depot:
+                raise HTTPException(403, {"code": "EQUIPMENT_TRUSTED_SCOPE_REQUIRED"})
+        return {"role":role,"roles":rs,"user":s["user_ref"],"office":s["office_code"],
+                "branch":branch,"agent":agent,"depot":depot}
+    raise HTTPException(401, {"code": "EQUIPMENT_SESSION_REQUIRED"})
 
 def require_action(a,action):
     role=a["role"]
@@ -62,18 +110,27 @@ def require_action(a,action):
     if action=="approve" and role in APPROVE_ROLES:return
     raise HTTPException(403,{"code":"EQUIPMENT_POLICY_DENIED","role":role,"action":action})
 
+def _trusted_scope(value, code):
+    # Whitespace-only values must never produce a broad or unusable scope.
+    scoped = value.strip() if isinstance(value, str) else ""
+    if not scoped:
+        raise HTTPException(403, {"code": code})
+    return scoped
+
+
 def scope_clause(a,alias="c"):
-    role=a["role"]
+    # Alias is SQL syntax, never accept arbitrary caller-controlled fragments.
+    if alias not in {"c", "container", "containers"}:
+        raise HTTPException(400, {"code": "EQUIPMENT_INVALID_SQL_ALIAS"})
+    role=a.get("role")
     if role in GLOBAL_ROLES or role in {"FINANCE","EQUIPMENT_MANAGER"}: return "",[]
     if role=="AGENT":
-        if not a["agent"]:raise HTTPException(403,{"code":"AGENT_SCOPE_REQUIRED"})
-        return f" AND {alias}.agent_code=?", [a["agent"]]
+        return f" AND {alias}.agent_code=?", [_trusted_scope(a.get("agent"), "AGENT_SCOPE_REQUIRED")]
     if role=="DEPOT":
-        if not a["depot"]:raise HTTPException(403,{"code":"DEPOT_SCOPE_REQUIRED"})
-        return f" AND {alias}.depot_code=?", [a["depot"]]
-    if role in {"OPS","BRANCH_OPS","DOCS","EQUIPMENT_CONTROLLER"} and a["branch"]:
-        return f" AND ({alias}.branch_code=? OR {alias}.branch_code IS NULL)",[a["branch"]]
-    return "",[]
+        return f" AND {alias}.depot_code=?", [_trusted_scope(a.get("depot"), "DEPOT_SCOPE_REQUIRED")]
+    if role in {"OPS","BRANCH_OPS","DOCS","EQUIPMENT_CONTROLLER"}:
+        return f" AND {alias}.branch_code=?", [_trusted_scope(a.get("branch"), "EQUIPMENT_BRANCH_SCOPE_REQUIRED")]
+    raise HTTPException(403, {"code": "EQUIPMENT_ROLE_SCOPE_DENIED"})
 
 def audit(conn,a,action,container_id=None,job_id=None,before=None,after=None,meta=None):
     conn.execute("INSERT INTO audit_events(event_id,ts,actor_role,actor_scope,action,module,transaction_id,job_id,before_json,after_json,metadata_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
@@ -436,15 +493,27 @@ def booking_context(job_ref:str,x_role:str=Header("VIEWER"),x_m3_session:Optiona
         if a["role"]=="AGENT" and a["agent"]!=j["agent_code"]:raise HTTPException(404,"Job outside agent scope")
         tr=c.execute("SELECT payload_json FROM transaction_records WHERE job_id=? AND module='booking' ORDER BY id LIMIT 1",(j["id"],)).fetchone()
         fields=_json(tr["payload_json"] if tr else None,{})
-        allocations=[dict(r) for r in c.execute("SELECT * FROM containers WHERE job_id=? OR booking_ref=? ORDER BY container_no",(j["id"],j["booking_ref"])).fetchall()]
-        fin=dict(c.execute("""SELECT COALESCE(SUM(CASE WHEN entry_type='REVENUE' THEN amount ELSE 0 END),0) revenue,
-                                   COALESCE(SUM(CASE WHEN entry_type='COST' THEN amount ELSE 0 END),0) cost,
-                                   COALESCE(SUM(CASE WHEN entry_type='COMMISSION' THEN amount ELSE 0 END),0) commission,
-                                   COALESCE(SUM(CASE WHEN entry_type='SHARE' THEN amount ELSE 0 END),0) share
-                            FROM container_financial_ledger WHERE job_id=? OR booking_ref=?""",(j["id"],j["booking_ref"])).fetchone())
-        fin["margin"]=float(fin["revenue"])-float(fin["cost"])-float(fin["commission"])-float(fin["share"])
+        allocations=[dict(r) for r in c.execute("""SELECT c.* FROM containers c
+            LEFT JOIN jobs linked_job ON linked_job.id=c.job_id
+            WHERE c.job_id=? OR linked_job.booking_id=(SELECT booking_id FROM jobs WHERE id=?)
+            ORDER BY c.container_no""",(j["id"],j["id"])).fetchall()]
+        # The isolated SQLite preview may omit the optional financial ledger.
+        # Never fabricate financial amounts; preserve full checks in PostgreSQL.
+        from .db import using_postgres, table_exists
+        financial_summary_available=table_exists(c,"container_financial_ledger")
+        if financial_summary_available:
+            fin=dict(c.execute("""SELECT COALESCE(SUM(CASE WHEN entry_type='REVENUE' THEN amount ELSE 0 END),0) revenue,
+                                       COALESCE(SUM(CASE WHEN entry_type='COST' THEN amount ELSE 0 END),0) cost,
+                                       COALESCE(SUM(CASE WHEN entry_type='COMMISSION' THEN amount ELSE 0 END),0) commission,
+                                       COALESCE(SUM(CASE WHEN entry_type='SHARE' THEN amount ELSE 0 END),0) share
+                                FROM container_financial_ledger WHERE job_id=? OR booking_ref=?""",(j["id"],j["booking_ref"])).fetchone())
+            fin["margin"]=float(fin["revenue"])-float(fin["cost"])-float(fin["commission"])-float(fin["share"])
+        else:
+            if using_postgres():
+                raise RuntimeError("M3_FINANCIAL_LEDGER_MISSING")
+            fin=None
         req={"equipment":fields.get("Equipment"),"quantity":fields.get("Quantity"),"provider":fields.get("Equipment Provider"),"owner":fields.get("Container Owner"),"soc_coc":fields.get("SOC / COC")}
-        return {"actor":a,"context":dict(j),"requirement":req,"booking_fields":fields,"allocated_containers":allocations,"financial_summary":fin}
+        return {"actor":a,"context":dict(j),"requirement":req,"booking_fields":fields,"allocated_containers":allocations,"financial_summary":fin,"financial_summary_available":financial_summary_available}
     finally:c.close()
 
 @router.get("/kpis")

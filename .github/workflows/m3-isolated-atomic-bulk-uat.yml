@@ -1,0 +1,81 @@
+name: M3 Isolated Atomic Bulk UAT
+on:
+  push:
+    branches: [m3-dev-sprint-2]
+    paths:
+      - ".github/workflows/m3-isolated-atomic-bulk-uat.yml"
+      - "scripts/m3_isolated_atomic_bulk_uat.py"
+      - "tests/test_m3_uat_token_safety.py"
+      - "tests/test_masterdata_atomic_bulk_real_sqlite_uat.py"
+      - "tests/test_m3_uat_disposable_cleanup.py"
+      - "tests/test_m3_uat_http_boundary.py"
+      - "tests/test_m3_atomic_bulk_http_real_iam_uat.py"
+      - "tests/test_m3_atomic_bulk_http_checker_approval.py"
+  workflow_dispatch:
+    inputs:
+      run_mode:
+        description: "preflight checks (default) or disposable sandbox submit"
+        required: true
+        type: choice
+        default: preflight
+        options:
+          - preflight
+          - submit
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-isolated-atomic-bulk-uat
+  cancel-in-progress: false
+
+jobs:
+  offline-token-and-session-safety:
+    if: github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/m3-dev-sprint-2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Test isolated UAT runner without network credentials
+        run: |
+          python -m pip install -r requirements.txt pytest
+          python -m py_compile scripts/m3_isolated_atomic_bulk_uat.py
+          PYTHONPATH=. python -m pytest -q tests/test_m3_uat_token_safety.py tests/test_masterdata_atomic_bulk_real_sqlite_uat.py tests/test_m3_uat_disposable_cleanup.py tests/test_m3_uat_http_boundary.py tests/test_m3_atomic_bulk_http_real_iam_uat.py tests/test_m3_iam_http_acceptance_isolated_uat.py tests/test_m3_atomic_bulk_http_checker_approval.py
+  isolated-atomic-uat:
+    if: github.event_name == 'workflow_dispatch' && github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/m3-dev-sprint-2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: m3-isolated-uat
+    env:
+      M3_UAT_TOKEN: ${{ secrets.M3_UAT_TOKEN }}
+      M3_MAKER_PASSWORD: ${{ secrets.M3_MAKER_PASSWORD }}
+      M3_MAKER_MFA: ${{ secrets.M3_MAKER_MFA }}
+      M3_CHECKER_PASSWORD: ${{ secrets.M3_CHECKER_PASSWORD }}
+      M3_CHECKER_MFA: ${{ secrets.M3_CHECKER_MFA }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Require isolated UAT secrets without printing values
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in M3_UAT_TOKEN M3_MAKER_PASSWORD M3_MAKER_MFA M3_CHECKER_PASSWORD M3_CHECKER_MFA; do
+            if [[ -z "${!name:-}" ]]; then
+              echo "::error::Missing environment secret: $name"
+              exit 1
+            fi
+          done
+      - name: Read-only isolated MFA preflight
+        run: python scripts/m3_isolated_atomic_bulk_uat.py
+      - name: Disposable isolated atomic bulk acceptance
+        if: inputs.run_mode == 'submit'
+        run: python scripts/m3_isolated_atomic_bulk_uat.py --submit

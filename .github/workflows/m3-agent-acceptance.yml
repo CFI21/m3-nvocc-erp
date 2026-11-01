@@ -1,0 +1,44 @@
+name: M3 Agent Master Acceptance
+on:
+  push:
+    branches: [preview-pr124-booking-isolated]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  agent-master-tests:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      M3_PRODUCTION_TRAFFIC: "OFF"
+      M3_BULK_PERMISSION_GOVERNANCE_ENABLED: "true"
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Agent Master governance, approval and persistence
+        run: python -m pytest -q tests/test_clx048_admin_masterdata.py tests/test_m3_sandbox_mfa_boundary.py tests/test_m3_uat_iam_role_gate.py tests/test_m3_masterdata_pg_read_compat.py --junitxml=agent-governance.xml
+      - name: Agent Master six-tab UI contract
+        if: success() || failure()
+        run: python -m pytest -q tests/test_agent_master_ui_contract.py --junitxml=agent-ui.xml
+      - name: Agent Master regression coverage
+        if: success() || failure()
+        run: python -m pytest -q tests/test_final_fix_validation_cycle.py -k "agent or booking_port" --junitxml=agent-regression.xml
+      - name: Summarize B01 test evidence
+        if: always()
+        run: python tests/report_agent_b01.py
+      - name: Publish B01 test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-b01-agent-master-evidence
+          path: |
+            agent-governance.xml
+            agent-ui.xml
+            agent-regression.xml
+          if-no-files-found: warn
+          retention-days: 14

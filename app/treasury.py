@@ -205,9 +205,13 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
     if errs:raise HTTPException(422,{'code':'VALIDATION_FAILED','errors':errs})
     c=connect();tx(c)
     try:
+        request_hash=hashlib.sha256(json.dumps(b.model_dump(),sort_keys=True).encode()).hexdigest()
         if idempotency_key:
             old=c.execute('SELECT * FROM idempotency_keys WHERE actor_role=? AND idem_key=?',(role,idempotency_key,)).fetchone()
-            if old:c.execute('ROLLBACK');return json.loads(old['response_json'])
+            if old:
+                if old['request_hash']!=request_hash:
+                    raise HTTPException(409,'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_REQUEST')
+                c.execute('ROLLBACK');return json.loads(old['response_json'])
         j=jid(c,b.job_ref);ext=b.external_ref or b.fields.get(MODULES[module]['fields'][0]) or f'M3-{module[:8].upper()}-{uuid.uuid4().hex[:8].upper()}'
         if item10_enabled() and module=='multi-currency-settlement':
             validate_multicurrency_settlement(c,b.fields)
@@ -225,7 +229,7 @@ def create(module:str,b:CreateBody,idempotency_key:Optional[str]=Header(None,ali
             c.execute('''INSERT INTO treasury_allocations(treasury_record_id,source_type,source_ref,allocated_amount,currency,fx_rate,job_id)
               VALUES(?,?,?,?,?,?,?)''',(r['id'],allocation_meta['source_module'].upper(),allocation_meta['source_ref'],amt,curr,1,j))
         out=ser(r);audit(c,role,x_actor_id,'CREATE',module,r['id'],j,None,out,{'allocation_governance':allocation_meta})
-        if idempotency_key:c.execute('INSERT INTO idempotency_keys(actor_role,idem_key,request_hash,response_json,status_code,created_at) VALUES(?,?,?,?,201,?)',(role,idempotency_key,hashlib.sha256(json.dumps(b.model_dump(),sort_keys=True).encode()).hexdigest(),json.dumps(out),now()))
+        if idempotency_key:c.execute('INSERT INTO idempotency_keys(actor_role,idem_key,request_hash,response_json,status_code,created_at) VALUES(?,?,?,?,201,?)',(role,idempotency_key,request_hash,json.dumps(out),now()))
         c.execute('COMMIT');return out
     except HTTPException:c.execute('ROLLBACK');raise
     except Exception as e:c.execute('ROLLBACK');raise HTTPException(409,{'code':'DUPLICATE_OR_CONSTRAINT','detail':str(e)})

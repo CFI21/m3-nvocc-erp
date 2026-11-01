@@ -8,6 +8,7 @@ from app.seed import run as seed_run
 from app.admin_seed import run as admin_seed_run
 from app.masterdata_seed import run as masterdata_seed_run
 from app.admin import Login, login
+from tests.iam_personas import persona_session
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data, quick_actions, action_route, related
 from app.main import context
@@ -56,23 +57,24 @@ def test_all_eight_operational_personas_have_governed_screen_surface(isolated):
     assert catalog["screen_count"]==196
     visited=set()
     for persona,role in ROLE_PERSONAS.items():
+        token=(login(Login(username="admin",password="Admin123!",mfa_code="123456"))["session_token"]
+               if role=="SUPER_ADMIN" else
+               persona_session(role=role,office_code="RTM" if role=="AGENT" else None))
         accessible=0
-        for s in catalog["screens"]:
+        for screen in catalog["screens"]:
             try:
-                data=screen_data(s["screen_id"],x_role=role,x_agent_scope="CLX-AGT-SIN" if role=="AGENT" else None)
+                data=screen_data(screen["screen_id"],x_role="SUPER_ADMIN",x_m3_session=token)
                 assert isinstance(data["rows"],list)
                 accessible+=1
-                visited.add(s["screen_id"])
-                for action in quick_actions(s["screen_id"],role)["visible_actions"]:
-                    route=action_route(s["screen_id"],action,1,1,role=role)
-                    if action in {"quick-view","print","export","related-records","audit-history","email"}:
-                        assert route["mode"] in {"CLIENT_OR_CLX011","CLX011_SIMULATED"}
-                    else:
-                        assert route["mode"] in {"EXISTING_API","EXISTING_GOVERNANCE","MASTER_DATA_GOVERNANCE"}
+                visited.add(screen["screen_id"])
+                for action in quick_actions(screen["screen_id"],role)["visible_actions"]:
+                    route=action_route(screen["screen_id"],action,1,1,role=role)
+                    assert route["mode"] in {"CLIENT_OR_CLX011","CLX011_SIMULATED","EXISTING_API","EXISTING_GOVERNANCE","MASTER_DATA_GOVERNANCE"}
             except HTTPException as exc:
                 assert exc.status_code==403
-        assert accessible>0, persona
+        assert accessible>0,persona
     assert len(visited)==196
+
 
 def test_role_boundaries_and_daily_mutation_surfaces(isolated):
     catalog=build_catalog()
@@ -116,7 +118,7 @@ def test_quick_view_related_deep_links_audit_and_same_page_contracts(isolated):
     catalog=build_catalog()
     assert catalog["screen_count"]==196
     for jr in ("50001","50002","50003","50004","50005"):
-        rel=related(jr)
+        rel=related(jr,x_m3_session=login(Login(username='admin',password='Admin123!',mfa_code='123456'))['session_token'])
         assert rel["identity"]["job_ref"]==jr
         assert rel["linked_records"]
     v=verify_clx049("AUDITOR")

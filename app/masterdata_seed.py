@@ -4,15 +4,32 @@ from .masterdata import init_schema,audit,j
 
 def now():return datetime.datetime.now(datetime.timezone.utc).isoformat()
 def run():
+    from .db import using_postgres
+    if using_postgres():
+        raise RuntimeError('POSTGRES_MASTER_SEED_FORBIDDEN: governed Master Data requires explicit reviewed provisioning')
     c=connect();init_schema(c)
-    for t in ['md_audit','md_quality_issues','md_aliases','md_usage','md_versions','md_change_requests','md_records','md_sequences','md_config']:c.execute(f'DELETE FROM {t}')
+    # A partial or existing dataset must never be overwritten. In particular,
+    # audit-only and version-only databases also count as existing state.
+    protected_tables = (
+        'md_audit', 'md_quality_issues', 'md_aliases', 'md_usage',
+        'md_versions', 'md_change_requests', 'md_records', 'md_sequences',
+        'md_config',
+    )
+    if any(c.execute('SELECT 1 FROM ' + table + ' LIMIT 1').fetchone()
+           for table in protected_tables):
+        c.close()
+        return
+    # Empty schema: initial records may now be inserted without DELETE.
     ts=now(); data={}
     # Mirror canonical operational masters for reference integrity.
     data['customer']=[(r['code'],r['name'],{'name':r['name'],'effective_from':'2026-01-01'}) for r in c.execute('SELECT code,name FROM customers')]
     data['agent']=[(r['code'],r['name'],{'name':r['name'],'effective_from':'2026-01-01'}) for r in c.execute('SELECT code,name FROM agents')]
     data['carrier']=[('MAEU','Maersk',{'name':'Maersk','scac':'MAEU'}),('CMDU','CMA CGM',{'name':'CMA CGM','scac':'CMDU'}),('HLCU','Hapag-Lloyd',{'name':'Hapag-Lloyd','scac':'HLCU'}),('ONEY','ONE',{'name':'ONE','scac':'ONEY'}),('MSCU','MSC',{'name':'MSC','scac':'MSCU'})]
     ports=sorted({x for r in c.execute('SELECT pol,pod FROM jobs') for x in (r['pol'],r['pod'])})
-    data['port']=[(p,p,{'name':p,'unlocode':p}) for p in ports]
+    # Isolated-preview reference labels for the seeded UN/LOCODE ports.
+    # Preserve the authoritative five-character code as the record key.
+    preview_port_names={'SGSIN':'Singapore','NLRTM':'Rotterdam','AEJEA':'Jebel Ali','BEANR':'Antwerp','CNSHA':'Shanghai','DEHAM':'Hamburg','GBFXT':'Felixstowe'}
+    data['port']=[(p,preview_port_names.get(p,p),{'name':preview_port_names.get(p,p),'unlocode':p}) for p in ports]
     data['location']=[('LOC-RTM','Rotterdam Depot',{'name':'Rotterdam Depot','country':'NL'}),('LOC-DXB','Jebel Ali Terminal',{'name':'Jebel Ali Terminal','country':'AE'})]
     data['vessel']=[(f'VES-{r["id"]:03d}',r['name'],{'name':r['name']}) for r in c.execute('SELECT id,name FROM vessels')]
     data['voyage']=[(r['voyage_no'],r['voyage_no'],{'name':r['voyage_no'],'vessel_id':r['vessel_id']}) for r in c.execute('SELECT voyage_no,vessel_id FROM voyages')]

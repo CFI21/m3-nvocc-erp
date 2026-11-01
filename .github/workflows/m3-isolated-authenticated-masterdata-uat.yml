@@ -1,0 +1,70 @@
+name: M3 Isolated Authenticated Master Data UAT
+
+# Manually authorized, isolated data mutations only. Never automatic.
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Authorize isolated master-data UAT writes only'
+        required: true
+        type: choice
+        default: DO_NOT_RUN
+        options:
+          - DO_NOT_RUN
+          - ISOLATED_UAT_WRITE_ONLY
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-isolated-authenticated-masterdata-uat
+  cancel-in-progress: false
+
+jobs:
+  authenticated-acceptance:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/m3-dev-sprint-2' && inputs.confirmation == 'ISOLATED_UAT_WRITE_ONLY'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: m3-isolated-uat
+    steps:
+      - name: Checkout isolated development branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Configure Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Validate exact branch and opt-in
+        shell: bash
+        env:
+          M3_UAT_CONFIRM: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = 'refs/heads/m3-dev-sprint-2'
+          test "$GITHUB_EVENT_NAME" = 'workflow_dispatch'
+          test "$M3_UAT_CONFIRM" = 'ISOLATED_UAT_WRITE_ONLY'
+          python -m py_compile scripts/m3_authenticated_masterdata_uat.py
+          mkdir -p uat-evidence
+      - name: Run isolated authenticated maker/checker UAT
+        shell: bash
+        # Session credentials are exposed only to this step and never echoed.
+        env:
+          M3_UAT_CONFIRM: ${{ inputs.confirmation }}
+          M3_UAT_TOKEN: ${{ secrets.M3_UAT_TOKEN }}
+          M3_UAT_MAKER_PASSWORD: ${{ secrets.M3_UAT_MAKER_PASSWORD }}
+          M3_UAT_CHECKER_PASSWORD: ${{ secrets.M3_UAT_CHECKER_PASSWORD }}
+          M3_UAT_MAKER_MFA_CODE: ${{ secrets.M3_UAT_MAKER_MFA_CODE }}
+          M3_UAT_CHECKER_MFA_CODE: ${{ secrets.M3_UAT_CHECKER_MFA_CODE }}
+          M3_UAT_EVIDENCE_PATH: uat-evidence/masterdata-authenticated-uat.json
+        run: |
+          set -euo pipefail
+          python scripts/m3_authenticated_masterdata_uat.py
+      - name: Preserve sanitized acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3-isolated-authenticated-masterdata-${{ github.run_id }}
+          path: uat-evidence/masterdata-authenticated-uat.json
+          if-no-files-found: warn
+          retention-days: 14

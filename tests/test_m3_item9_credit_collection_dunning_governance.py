@@ -84,13 +84,13 @@ def test_override_requires_authority_reason_expiry_and_blocks_duplicates(isolate
     c.execute("INSERT INTO iam_approval_limits(role_code,currency,amount_limit,action,status) VALUES('FINANCE','USD',500,'CREDIT_OVERRIDE','ACTIVE')")
     ctx={'user_ref':'maker-i9','roles':['FINANCE'],'office_code':'RTM'}
     with pytest.raises(HTTPException) as exc:
-        gov.validate_override_request(c,ctx,cst['id'],100,'USD','', '2026-10-10T00:00:00+00:00')
+        gov.validate_override_request(c,ctx,cst['id'],100,'USD','', '2099-10-10T00:00:00+00:00')
     assert exc.value.detail['code']=='CREDIT_OVERRIDE_REASON_REQUIRED'
-    req=gov.validate_override_request(c,ctx,cst['id'],100,'USD','Temporary approved exposure','2026-10-10T00:00:00+00:00')
+    req=gov.validate_override_request(c,ctx,cst['id'],100,'USD','Temporary approved exposure','2099-10-10T00:00:00+00:00')
     c.execute("""INSERT INTO credit_override_events(override_ref,customer_id,currency,amount,reason,expires_at,requested_by,status,created_at)
-      VALUES('COV-I9',?,?,?,?,?,?,'PENDING',?)""",(cst['id'],'USD',100,'Temporary approved exposure','2026-10-10T00:00:00+00:00','maker-i9',gov.now()))
+      VALUES('COV-I9',?,?,?,?,?,?,'PENDING',?)""",(cst['id'],'USD',100,'Temporary approved exposure','2099-10-10T00:00:00+00:00','maker-i9',gov.now()))
     with pytest.raises(HTTPException) as exc:
-        gov.validate_override_request(c,ctx,cst['id'],50,'USD','Again','2026-10-10T00:00:00+00:00')
+        gov.validate_override_request(c,ctx,cst['id'],50,'USD','Again','2099-10-10T00:00:00+00:00')
     assert exc.value.detail['code']=='DUPLICATE_ACTIVE_CREDIT_OVERRIDE'
     assert req['amount']==100
     c.close()
@@ -102,10 +102,10 @@ def test_override_above_authority_and_self_approval_blocked(isolated):
     c.execute("INSERT INTO iam_approval_limits(role_code,currency,amount_limit,action,status) VALUES('FINANCE','USD',100,'CREDIT_OVERRIDE','ACTIVE')")
     maker={'user_ref':'maker','roles':['FINANCE']}
     with pytest.raises(HTTPException) as exc:
-        gov.validate_override_request(c,maker,cst['id'],101,'USD','Need room','2026-10-10T00:00:00+00:00')
+        gov.validate_override_request(c,maker,cst['id'],101,'USD','Need room','2099-10-10T00:00:00+00:00')
     assert exc.value.detail['code']=='CREDIT_OVERRIDE_ABOVE_AUTHORITY'
     oid=c.execute("""INSERT INTO credit_override_events(override_ref,customer_id,currency,amount,reason,expires_at,requested_by,status,created_at)
-      VALUES('COV-SELF',?,?,?,?,?,?,'PENDING',?)""",(cst['id'],'USD',50,'Need room','2026-10-10T00:00:00+00:00','maker',gov.now())).lastrowid
+      VALUES('COV-SELF',?,?,?,?,?,?,'PENDING',?)""",(cst['id'],'USD',50,'Need room','2099-10-10T00:00:00+00:00','maker',gov.now())).lastrowid
     with pytest.raises(HTTPException) as exc:
         gov.approve_override(c,maker,oid)
     assert exc.value.detail['code']=='MAKER_CANNOT_APPROVE_OWN_CREDIT_OVERRIDE'

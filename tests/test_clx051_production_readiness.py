@@ -27,6 +27,8 @@ def test_only_approved_m3_supabase_target_is_accepted(monkeypatch):
     assert db.APPROVED_PROJECT_REF=="ozupgknqaqgvprliewxe"
     monkeypatch.setattr(db,"DATABASE_URL","postgresql://postgres.ozupgknqaqgvprliewxe:secret@pooler.example/postgres")
     assert db.using_postgres() is True
+    assert db.approved_database_target() is False
+    monkeypatch.setattr(db,"DATABASE_URL","postgresql://postgres:secret@db.ozupgknqaqgvprliewxe.supabase.co/postgres")
     assert db.approved_database_target() is True
     monkeypatch.setattr(db,"DATABASE_URL","postgresql://postgres.wrongproject:secret@pooler.example/postgres")
     assert db.approved_database_target() is False

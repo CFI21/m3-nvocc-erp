@@ -83,6 +83,17 @@ def jdump(x): return json.dumps(x,sort_keys=True,separators=(',',':'))
 def rowdict(r): return dict(r) if r else None
 
 def init_schema(c):
+    if getattr(c, 'backend', None) == 'postgres':
+        from .db import table_exists
+        missing = [name for name in (
+            'clx012_runs', 'clx012_stage_events', 'clx012_exceptions',
+            'clx012_action_queue', 'clx012_events'
+        ) if not table_exists(c, name)]
+        if missing:
+            raise RuntimeError('CLX012_MIGRATION_REQUIRED: apply migrations/uat_clx012_postgres.sql; missing: ' + ', '.join(missing))
+        if not trigger_exists(c, 'clx012_events_no_update') or not trigger_exists(c, 'clx012_events_no_delete'):
+            raise RuntimeError('CLX012_MIGRATION_REQUIRED: immutable event triggers are missing')
+        return
     c.executescript('''
     CREATE TABLE IF NOT EXISTS clx012_runs(
       id INTEGER PRIMARY KEY AUTOINCREMENT,run_ref TEXT UNIQUE NOT NULL,idempotency_key TEXT UNIQUE,

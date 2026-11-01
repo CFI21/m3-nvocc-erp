@@ -29,7 +29,7 @@ def test_mrg_ui_preserves_existing_rate_management():
     assert "Special Rate Request" in html
     assert "agent-tasks::special-rates-request" in html
     assert "Commercial Charges" in html
-    assert "MRG import is optional." in html
+    assert "MRG import available" in html
 
 def test_mrg_backend_is_shared_and_does_not_post_finance():
     src=Path('app/mrg.py').read_text()

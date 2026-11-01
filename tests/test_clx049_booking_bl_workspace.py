@@ -69,6 +69,15 @@ def test_delivery_order_and_release_instruction_save_same_existing_do_record(iso
     assert w2['delivery_order']['fields']['Release Instruction']=='Release to approved consignee only'
 
 def test_booking_other_info_updates_same_booking_transaction(isolated):
+    # This test exercises editable Draft data; seed's legacy Open state is not editable.
+    c=db.connect()
+    try:
+        rec=c.execute("SELECT id,payload_json FROM transaction_records WHERE module='booking' AND job_id=(SELECT id FROM jobs WHERE job_ref='50002')").fetchone()
+        assert rec is not None
+        payload=json.loads(rec['payload_json']);payload['Status']='Draft'
+        c.execute("UPDATE transaction_records SET status='Draft',payload_json=? WHERE id=?",(json.dumps(payload),rec['id']))
+    finally:
+        c.close()
     w=workspace('50002','OPS',None)
     r=w['booking'];rid=r['id'];v=r['version']
     out=update_record('booking',rid,UpdateBody(version=v,fields={

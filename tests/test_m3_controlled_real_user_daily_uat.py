@@ -8,6 +8,7 @@ from app.seed import run as seed_run
 from app.admin_seed import run as admin_seed_run
 from app.masterdata_seed import run as masterdata_seed_run
 from app.admin import Login, login
+from tests.iam_personas import persona_session
 from app.screen_catalog import build_catalog
 from app.screen_integration import screen_data, related, workflow
 from app.control_tower import _job_rows, control_status as tower_control_status
@@ -58,19 +59,23 @@ def test_complete_daily_role_surface(isolated):
       ("TREASURY",["treasury::treasury-dashboard","treasury::bank-reconciliation-exception-queue"]),
     ]
     for role,screens in daily:
+        token=persona_session(role=role)
         for sid in screens:
-            out=screen_data(sid,x_role=role)
+            out=screen_data(sid,x_role=role,x_m3_session=token)
             assert isinstance(out["rows"],list),(role,sid)
 
 def test_agent_daily_access_remains_party_scoped(isolated):
-    ok=related("50001",x_role="AGENT",x_agent_scope="CLX-AGT-SIN")
+    token=persona_session(role="AGENT",agent_code="CLX-AGT-SIN",office_code="RTM")
+    ok=related("50001",x_m3_session=token)
     assert ok["identity"]["job_ref"]=="50001"
+    other=persona_session(role="AGENT",agent_code="WRONG-AGENT",office_code="RTM")
     with pytest.raises(HTTPException) as exc:
-        related("50001",x_role="AGENT",x_agent_scope="WRONG-AGENT")
+        related("50001",x_m3_session=other)
     assert exc.value.status_code==404
 
+
 def test_operational_chain_and_finance_controls(isolated):
-    wf=workflow("50001",x_role="OPS")
+    wf=workflow("50001",x_role="OPS",x_m3_session=persona_session(role="OPS"))
     present={x["module"]:x["present"] for x in wf["steps"]}
     for key in ("booking","planning","cro","bl","container-activity","delivery-order","agent-receipt-pay","soa"):
         assert present[key] is True,key

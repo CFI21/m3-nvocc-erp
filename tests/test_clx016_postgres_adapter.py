@@ -9,6 +9,13 @@ ANCLINE_URL = "postgresql://postgres.wgxbvbcttxkdqmtdngmq:secret@aws-0-eu-centra
 
 def test_m3_target_lock_accepts_only_approved_project(monkeypatch):
     monkeypatch.setattr(db, "DATABASE_URL", M3_URL)
+    assert db.approved_database_target() is False
+    with pytest.raises(RuntimeError, match="DATABASE_URL_TARGET_REJECTED"):
+        db.assert_approved_database_target()
+    # Explicitly host-pinned UAT remains possible without accepting legacy pooler targets.
+    monkeypatch.setattr(db, "M3_UAT_DB_HOST", "ep-safe.neon.tech")
+    monkeypatch.setenv("M3_UAT_PRESERVE_DATA", "1")
+    monkeypatch.setattr(db, "DATABASE_URL", "postgresql://uat:example@ep-safe.neon.tech/neondb")
     assert db.approved_database_target() is True
     db.assert_approved_database_target()
 
