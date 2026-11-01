@@ -127,6 +127,7 @@ def active_master(c,domain,key):
     return bool(c.execute("SELECT 1 FROM md_records WHERE domain=? AND record_key=? AND status='ACTIVE'",(domain,key)).fetchone())
 
 def reference_errors(c,domain,payload):
+    from .maritime_eligibility import maritime_port_error
     errs=[]
     if domain=='configuration':
         kind=str(payload.get('config_type') or '').upper()
@@ -152,8 +153,12 @@ def reference_errors(c,domain,payload):
             elif port and location['country_code']!=port[:2]: errs.append('AGENT_NETWORK_OFFICE_COUNTRY_MISMATCH')
             master=c.execute("SELECT payload_json FROM md_records WHERE domain='port' AND record_key=? AND status='ACTIVE'",(port,)).fetchone()
             if not master: errs.append('AGENT_NETWORK_PORT_NOT_ACTIVE')
-            elif str(json.loads(master['payload_json'] or '{}').get('unlocode') or port).upper()!=port:
-                errs.append('AGENT_NETWORK_PORT_CODE_MISMATCH')
+            else:
+                port_payload=json.loads(master['payload_json'] or '{}')
+                if str(port_payload.get('unlocode') or port).upper()!=port:
+                    errs.append('AGENT_NETWORK_PORT_CODE_MISMATCH')
+                classification_error=maritime_port_error(port_payload)
+                if classification_error: errs.append(classification_error)
             if not c.execute("SELECT 1 FROM iam_countries WHERE country_code=? AND status='ACTIVE'",(port[:2],)).fetchone():
                 errs.append('AGENT_NETWORK_COUNTRY_NOT_ACTIVE')
         if kind=='AGENT_EMAIL':
@@ -164,8 +169,15 @@ def reference_errors(c,domain,payload):
         if payload.get('bank') and not active_master(c,'bank',payload.get('bank')): errs.append('BANK_REFERENCE_NOT_ACTIVE')
         if payload.get('currency') and not active_master(c,'currency',payload.get('currency')): errs.append('CURRENCY_REFERENCE_NOT_ACTIVE')
     if domain=='route':
-        if payload.get('pol') and not active_master(c,'port',payload.get('pol')): errs.append('POL_REFERENCE_NOT_ACTIVE')
-        if payload.get('pod') and not active_master(c,'port',payload.get('pod')): errs.append('POD_REFERENCE_NOT_ACTIVE')
+        for field in ('pol','pod'):
+            key=payload.get(field)
+            if not key: continue
+            row=c.execute("SELECT payload_json FROM md_records WHERE domain='port' AND record_key=? AND status='ACTIVE'",(key,)).fetchone()
+            if not row:
+                errs.append(field.upper()+'_REFERENCE_NOT_ACTIVE')
+                continue
+            classification_error=maritime_port_error(json.loads(row['payload_json'] or '{}'))
+            if classification_error: errs.append(field.upper()+'_'+classification_error)
     if domain=='tax-code' and payload.get('country'):
         if not c.execute("SELECT 1 FROM iam_countries WHERE country_code=? AND status='ACTIVE'",(payload.get('country'),)).fetchone(): errs.append('COUNTRY_REFERENCE_NOT_ACTIVE')
     return errs
