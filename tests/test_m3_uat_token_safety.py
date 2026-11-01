@@ -136,3 +136,53 @@ def test_isolated_bulk_happy_path_with_independent_rejection(monkeypatch):
     assert seen["maker_denied"] == 2
     assert set(seen["rejections"]) == {"MDC-0AABBCC", "MDC-1AABBCC"}
     assert seen["logouts"] == ["session-md.maker", "session-md.checker"]
+
+
+def test_bulk_replay_failure_rejects_only_own_pending_changes(monkeypatch):
+    """A failed replay must clean up both new UAT refs, never existing records."""
+    import sys
+
+    for name in ("M3_UAT_TOKEN", "M3_MAKER_PASSWORD", "M3_MAKER_MFA",
+                 "M3_CHECKER_PASSWORD", "M3_CHECKER_MFA"):
+        monkeypatch.setenv(name, "synthetic")
+    monkeypatch.setattr(sys, "argv", ["m3_uat", "--submit"])
+    rejected = []
+    logouts = []
+    submissions = []
+
+    def fake_login(username, password, mfa, token):
+        return "session-" + username, (["MASTER_DATA"] if username == "md.maker"
+                                         else ["MASTER_DATA_MANAGER"])
+
+    def fake_call(path, *, method="GET", token=None, session=None,
+                  body=None, extra_headers=None):
+        if path == "/api/v1/health":
+            return 200, {"sandbox_only": True, "production_promoted": False}
+        if path == "/api/clx016/readiness":
+            return 200, {"production_traffic": "OFF", "live_providers": "OFF",
+                         "real_money": "OFF"}
+        if path == "/api/masterdata/bulk/submit-atomic":
+            submissions.append(path)
+            if len(submissions) == 1:
+                return 200, {"atomic": True, "pending": 2, "rows": [
+                    {"record_key": row["record_key"], "change_ref": "MDC-" + str(i) + "AABBCC"}
+                    for i, row in enumerate(body["rows"])
+                ]}
+            return 500, {"detail": {"code": "SIMULATED_FAILURE"}}
+        if path.startswith("/api/masterdata/changes/") and path.endswith("/decision"):
+            assert session == "session-md.checker"
+            assert body["decision"] == "REJECT"
+            rejected.append(path.split("/")[4])
+            return 200, {"status": "REJECTED"}
+        if path == "/api/admin/auth/logout":
+            logouts.append(session)
+            return 200, {}
+        raise AssertionError(path)
+
+    monkeypatch.setattr(module, "login", fake_login)
+    monkeypatch.setattr(module, "call", fake_call)
+    with pytest.raises(RuntimeError, match="Replay failed"):
+        module.main()
+    assert rejected == ["MDC-0AABBCC", "MDC-1AABBCC"]
+    assert logouts == ["session-md.maker", "session-md.checker"]
+    assert len(submissions) == 2
