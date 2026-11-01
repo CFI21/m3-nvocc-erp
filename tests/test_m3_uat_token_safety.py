@@ -66,3 +66,73 @@ def test_failed_login_never_attempts_whoami(monkeypatch):
     with pytest.raises(RuntimeError, match="login blocked"):
         module.login("md.maker", "fake-password", "fake-mfa", "fake-token")
     assert calls == ["/api/admin/auth/login"]
+
+
+def test_isolated_bulk_happy_path_with_independent_rejection(monkeypatch):
+    """Exercise the entire --submit orchestration without a network or real secrets."""
+    import copy
+    import sys
+
+    monkeypatch.setenv("M3_UAT_TOKEN", "fake-uat-token")
+    monkeypatch.setenv("M3_MAKER_PASSWORD", "fake")
+    monkeypatch.setenv("M3_MAKER_MFA", "000000")
+    monkeypatch.setenv("M3_CHECKER_PASSWORD", "fake")
+    monkeypatch.setenv("M3_CHECKER_MFA", "000000")
+    monkeypatch.setattr(sys, "argv", ["m3_isolated_atomic_bulk_uat.py", "--submit"])
+
+    seen = {"submit": 0, "rejections": [], "maker_denied": 0, "logouts": []}
+    original = {}
+
+    def fake_call(path, *, method="GET", token=None, session=None,
+                  body=None, extra_headers=None):
+        if path == "/api/v1/health":
+            return 200, {"sandbox_only": True, "production_promoted": False}
+        if path == "/api/clx016/readiness":
+            return 200, {"production_traffic": "OFF", "live_providers": "OFF",
+                         "real_money": "OFF"}
+        if path == "/api/admin/auth/login":
+            user = body["username"]
+            return 200, {"session_token": "session-" + user}
+        if path == "/api/admin/auth/whoami":
+            username = session.removeprefix("session-")
+            roles = ["MASTER_DATA"] if username == "md.maker" else ["MASTER_DATA_MANAGER"]
+            return 200, {"username": username, "roles": roles}
+        if path == "/api/admin/auth/logout":
+            seen["logouts"].append(session)
+            return 200, {}
+        if path == "/api/masterdata/bulk/submit-atomic":
+            assert session == "session-md.maker"
+            assert extra_headers["Idempotency-Key"].startswith("m3-uat-")
+            seen["submit"] += 1
+            if seen["submit"] == 1:
+                original["body"] = copy.deepcopy(body)
+                original["result"] = {
+                    "atomic": True, "pending": 2,
+                    "rows": [{"record_key": row["record_key"],
+                              "change_ref": "MDC-" + str(index) + "AABBCC"}
+                             for index, row in enumerate(body["rows"])]
+                }
+                return 200, copy.deepcopy(original["result"])
+            if body != original["body"]:
+                return 409, {"detail": {"code": "IDEMPOTENCY_CONFLICT"}}
+            return 200, copy.deepcopy(original["result"])
+        if path.startswith("/api/masterdata/bulk/submit-atomic/recovery?"):
+            assert session == "session-md.maker"
+            return 200, copy.deepcopy(original["result"])
+        if path.startswith("/api/masterdata/changes/") and path.endswith("/decision"):
+            assert body["decision"] == "REJECT"
+            ref = path.split("/")[4]
+            if session == "session-md.maker":
+                seen["maker_denied"] += 1
+                return 403, {"detail": {"code": "FOUR_EYES_REQUIRED"}}
+            assert session == "session-md.checker"
+            seen["rejections"].append(ref)
+            return 200, {"status": "REJECTED"}
+        raise AssertionError("Unexpected API operation: " + path)
+
+    monkeypatch.setattr(module, "call", fake_call)
+    assert module.main() == 0
+    assert seen["submit"] == 3
+    assert seen["maker_denied"] == 2
+    assert set(seen["rejections"]) == {"MDC-0AABBCC", "MDC-1AABBCC"}
+    assert seen["logouts"] == ["session-md.maker", "session-md.checker"]
