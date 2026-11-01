@@ -290,3 +290,21 @@ def test_role_mismatch_blocks_bulk_and_logs_out_both(monkeypatch, bad_role_user)
         module.main()
     assert events.count("/api/admin/auth/logout") == 2
     assert all("/bulk/" not in event for event in events)
+
+
+@pytest.mark.parametrize("value", ["", " leading", "trailing ", "line\\nfeed", "tab\\tchar"])
+def test_malformed_uat_password_rejected(value):
+    with pytest.raises(RuntimeError):
+        module.credential_diagnostics(value)
+
+
+def test_valid_uat_password_passes_preflight():
+    assert module.credential_diagnostics("Example_CaseSensitive_83!") is None
+
+
+def test_malformed_password_blocks_login_before_http(monkeypatch):
+    def should_not_call(*args, **kwargs):
+        raise AssertionError("Unexpected HTTP request")
+    monkeypatch.setattr(module, "call", should_not_call)
+    with pytest.raises(RuntimeError):
+        module.login("md.maker", " trailing", "000000", "synthetic")
