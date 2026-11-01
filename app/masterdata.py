@@ -328,7 +328,6 @@ def records(domain:str,x_m3_session:Optional[str]=Header(None,alias='X-M3-Sessio
     finally:
         c.close()
 @router.post('/changes')
-@router.post('/changes')
 def create_change(b:Change,x_m3_session:Optional[str]=Header(None,alias='X-M3-Session')):
     return _create_change_worker(b,x_m3_session)
 
