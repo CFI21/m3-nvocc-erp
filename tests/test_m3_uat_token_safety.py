@@ -324,3 +324,17 @@ def test_maker_password_transmitted_unchanged(monkeypatch):
     assert observed["body"]["username"] == "md.maker"
     assert observed["body"]["password"] == "Exact+MixedCase!83"
     assert observed["body"]["mfa_code"] == "654321"
+
+
+@pytest.mark.parametrize("password", [
+    "Leading space ", " trailing-space", "  both sides  ", "unicode-✓"
+])
+def test_password_bytes_are_not_normalized_before_auth(monkeypatch, password):
+    transmitted = {}
+    def fake_call(path, **kwargs):
+        transmitted.update(kwargs["body"])
+        return 401, {"detail": {"code": "INVALID_CREDENTIALS"}}
+    monkeypatch.setattr(module, "call", fake_call)
+    with pytest.raises(RuntimeError, match="INVALID_CREDENTIALS"):
+        module.login("md.maker", password, "654321", "synthetic")
+    assert transmitted["password"] == password
