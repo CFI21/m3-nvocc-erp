@@ -186,3 +186,39 @@ def test_bulk_replay_failure_rejects_only_own_pending_changes(monkeypatch):
     assert rejected == ["MDC-0AABBCC", "MDC-1AABBCC"]
     assert logouts == ["session-md.maker", "session-md.checker"]
     assert len(submissions) == 2
+
+
+def test_checker_login_failure_prevents_any_bulk_submission(monkeypatch):
+    """Never create pending changes when independent Checker is unavailable."""
+    import sys
+
+    for name in ("M3_UAT_TOKEN", "M3_MAKER_PASSWORD", "M3_MAKER_MFA",
+                 "M3_CHECKER_PASSWORD", "M3_CHECKER_MFA"):
+        monkeypatch.setenv(name, "synthetic")
+    monkeypatch.setattr(sys, "argv", ["m3_uat", "--submit"])
+    operations = []
+
+    def fake_login(username, password, mfa, token):
+        if username == "md.checker":
+            raise RuntimeError("simulated Checker authentication failure")
+        return "maker-session", ["MASTER_DATA"]
+
+    def fake_call(path, *, method="GET", token=None, session=None,
+                  body=None, extra_headers=None):
+        operations.append(path)
+        if path == "/api/v1/health":
+            return 200, {"sandbox_only": True, "production_promoted": False}
+        if path == "/api/clx016/readiness":
+            return 200, {"production_traffic": "OFF", "live_providers": "OFF",
+                         "real_money": "OFF"}
+        if path == "/api/admin/auth/logout":
+            assert session == "maker-session"
+            return 200, {}
+        raise AssertionError("Unexpected call before Checker authentication: " + path)
+
+    monkeypatch.setattr(module, "login", fake_login)
+    monkeypatch.setattr(module, "call", fake_call)
+    with pytest.raises(RuntimeError, match="Checker authentication failure"):
+        module.main()
+    assert operations == ["/api/v1/health", "/api/clx016/readiness",
+                          "/api/admin/auth/logout"]
