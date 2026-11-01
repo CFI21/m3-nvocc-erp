@@ -94,7 +94,7 @@ def test_reject_non_master_role(country_db, monkeypatch):
 
 def test_approved_pol_coverage_resolves_country_without_new_iam_grant(country_db):
     c=country_db()
-    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')",(json.dumps({'unlocode':'NLRTM'}),))
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')",(json.dumps({'unlocode':'NLRTM', 'function':'1-------'}),))
     coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
     c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('configuration','COV-1',?,'ACTIVE','now','now')",(json.dumps(coverage),))
     c.commit();c.close()
@@ -162,7 +162,7 @@ def test_checker_revalidates_pol_uniqueness():
 def test_pol_projection_fails_closed_if_port_unlocode_changes(country_db):
     c=country_db()
     coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
-    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')",(json.dumps({'unlocode':'DEHAM'}),))
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')",(json.dumps({'unlocode':'DEHAM', 'function':'1-------'}),))
     c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('configuration','COV-X',?,'ACTIVE','now','now')",(json.dumps(coverage),))
     c.commit();c.close()
     assert masterdata.agent_office_countries('valid') == []
@@ -171,7 +171,7 @@ def test_pol_projection_fails_closed_if_port_unlocode_changes(country_db):
 def test_pol_projection_fails_closed_if_port_inactive(country_db):
     c=country_db()
     coverage={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
-    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'INACTIVE','now','now')",(json.dumps({'unlocode':'NLRTM'}),))
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'INACTIVE','now','now')",(json.dumps({'unlocode':'NLRTM', 'function':'1-------'}),))
     c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('configuration','COV-X',?,'ACTIVE','now','now')",(json.dumps(coverage),))
     c.commit();c.close()
     assert masterdata.agent_office_countries('valid') == []
@@ -187,7 +187,7 @@ def test_removal_request_appears_in_independent_checker_queue():
 
 def test_governed_pol_create_and_remove_with_independent_checker(country_db, monkeypatch):
     c=country_db()
-    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')", (json.dumps({'unlocode':'NLRTM'}),))
+    c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port','NLRTM',?,'ACTIVE','now','now')", (json.dumps({'unlocode':'NLRTM', 'function':'1-------'}),))
     c.execute('CREATE TABLE iam_user_roles (id INTEGER PRIMARY KEY,user_id INTEGER,office_id INTEGER)')
     c.execute('INSERT INTO iam_user_roles VALUES (1,7,1)')
     c.commit()
@@ -238,7 +238,7 @@ def test_governed_pol_edit_requires_second_identity(country_db, monkeypatch):
     c=country_db()
     for code in ('NLRTM','NLAMS'):
         c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port',?,?,'ACTIVE','now','now')",
-                  (code,json.dumps({'unlocode':code})))
+                  (code,json.dumps({'unlocode':code, 'function':'1-------'})))
     old={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE',
          'scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':'NLRTM'}
     c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) VALUES ('configuration','POL-EDIT',?,'ACTIVE',1,'now','now')",
@@ -272,7 +272,7 @@ def test_governed_pol_edit_requires_second_identity(country_db, monkeypatch):
 def test_governed_pol_edit_duplicate_is_denied(country_db, monkeypatch):
     c=country_db()
     for code in ('NLRTM','NLAMS'):
-        c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port',?,?,'ACTIVE','now','now')",(code,json.dumps({'unlocode':code})))
+        c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) VALUES ('port',?,?,'ACTIVE','now','now')",(code,json.dumps({'unlocode':code, 'function':'1-------'})))
     for key,port in (('POL-ONE','NLRTM'),('POL-TWO','NLAMS')):
         data={'config_type':'AGENT_NETWORK','network_type':'PORT_COVERAGE','scope':'POL','agent_code':'UAT-AGENT-001','office_code':'RTM','port_code':port}
         c.execute("INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) VALUES ('configuration',?,?,'ACTIVE',1,'now','now')",(key,json.dumps(data)))
@@ -307,7 +307,7 @@ def test_duplicate_legacy_pol_coverage_projects_once(country_db):
     c.execute(
         "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
         "VALUES ('port','NLRTM',?,'ACTIVE','now','now')",
-        (json.dumps({"unlocode":"NLRTM"}),),
+        (json.dumps({"unlocode":"NLRTM", "function":"1-------"}),),
     )
     for key in ("POL-LEGACY-1","POL-LEGACY-2"):
         c.execute(
@@ -335,7 +335,7 @@ def test_pol_projection_dedup_keeps_distinct_ports(country_db):
         c.execute(
             "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
             "VALUES ('port',?,?, 'ACTIVE','now','now')",
-            (port,json.dumps({"unlocode":port})),
+            (port,json.dumps({"unlocode":port, "function":"1-------"})),
         )
     for key, port in (("POL-RTM-1","NLRTM"),("POL-RTM-2","NLRTM"),("POL-AMS","NLAMS")):
         coverage={
@@ -389,7 +389,7 @@ def test_checker_reactivation_rejects_duplicate_pol_coverage(country_db,monkeypa
     c.execute(
         "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
         "VALUES ('port','NLRTM',?,'ACTIVE','now','now')",
-        (json.dumps({"unlocode":"NLRTM"}),),
+        (json.dumps({"unlocode":"NLRTM", "function":"1-------"}),),
     )
     coverage={"config_type":"AGENT_NETWORK","network_type":"PORT_COVERAGE","agent_code":"UAT-AGENT-001","office_code":"RTM","scope":"POL","port_code":"NLRTM"}
     for key,status in (("POL-ACTIVE","ACTIVE"),("POL-OLD","INACTIVE")):
@@ -427,7 +427,7 @@ def test_pol_reactivation_rejects_retired_port(country_db, monkeypatch):
     c.execute(
         "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
         "VALUES ('port','NLRTM',?,'INACTIVE','now','now')",
-        (json.dumps({'unlocode':'NLRTM'}),))
+        (json.dumps({'unlocode':'NLRTM', 'function':'1-------'}),))
     c.execute(
         "INSERT INTO md_change_requests(change_ref,domain,record_key,operation,payload_json,reason,maker,created_at,base_version) "
         "VALUES ('MDC-POL-RETIRED','configuration','POL-RETIRED','REACTIVATE','{}','review','maker','now',1)")
@@ -458,7 +458,7 @@ def test_pol_reactivation_rejects_inactive_iam_country(country_db, monkeypatch):
     c.execute(
         "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
         "VALUES ('port','NLRTM',?,'ACTIVE','now','now')",
-        (json.dumps({"unlocode":"NLRTM"}),),
+        (json.dumps({"unlocode":"NLRTM", "function":"1-------"}),),
     )
     c.execute(
         "INSERT INTO md_records(domain,record_key,payload_json,status,version,created_at,updated_at) "
@@ -501,7 +501,7 @@ def test_maker_cannot_queue_duplicate_pol_activation(country_db, monkeypatch, op
     c.execute(
         "INSERT INTO md_records(domain,record_key,payload_json,status,created_at,updated_at) "
         "VALUES ('port','NLRTM',?,'ACTIVE','now','now')",
-        (json.dumps({"unlocode": "NLRTM"}),),
+        (json.dumps({"unlocode": "NLRTM", "function":"1-------"}),),
     )
     for key, status in (("POL-EXISTING", "ACTIVE"), ("POL-REACTIVATE", "INACTIVE")):
         c.execute(
