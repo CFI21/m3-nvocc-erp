@@ -17,7 +17,6 @@ jobs:
     timeout-minutes: 12
     environment: m3-batomic-disposable
     env:
-      DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
       M3_UAT_DB_HOST: ep-quiet-breeze-b43xue0h.c-6.us-east-2.aws.neon.tech
       M3_PINNED_REPO: m3-pinned
       M3_UAT_PRESERVE_DATA: '1'
@@ -39,6 +38,8 @@ jobs:
         with:
           python-version: '3.11'
       - name: Verify secret configured without displaying
+        env:
+          DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
         shell: bash
         run: |
           if [ -z "${DATABASE_URL:-}" ]; then
@@ -50,8 +51,12 @@ jobs:
       - name: Check test harness syntax
         run: python -m py_compile scripts/m3_batomic_startup_gate.py
       - name: Verify pinned application permits exactly the isolated UAT target
+        env:
+          DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
         run: |
           cd m3-pinned
           python -c "from app.db import assert_approved_database_target; assert_approved_database_target(); print('APP_DATABASE_TARGET_GUARD_PASS')"
       - name: Verify zero-write startup; never login or submit
+        env:
+          DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
         run: python scripts/m3_batomic_startup_gate.py
