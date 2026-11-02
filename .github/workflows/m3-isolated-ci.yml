@@ -93,19 +93,61 @@ jobs:
           OUT="${RUNNER_TEMP}/m3-isolated-http"
           mkdir -p "$OUT"
           # No UAT token or IAM session is supplied. Only GET calls are allowed.
+          # DNS is diagnostic only: failed resolution is reported, not bypassed.
+          python3 - <<'PYDNS'
+          import socket
+          for host in ("m3-dev-sprint2-isolated-api.onrender.com",
+                       "m3-dev-sprint2-isolated-ui.onrender.com"):
+              try:
+                  addresses = sorted({x[4][0] for x in socket.getaddrinfo(
+                      host, 443, type=socket.SOCK_STREAM)})
+                  print(f"DNS_DIAG host={host} status=PASS addresses={','.join(addresses)}")
+              except OSError as exc:
+                  print(f"DNS_DIAG host={host} status=FAIL reason={type(exc).__name__}")
+          PYDNS
+          # Preserve the original 9 attempts, 4-second spacing and 40-second
+          # per-attempt limit, but log each attempt instead of only the last.
           fetch() {
-            curl --fail --silent --show-error \
-              --retry 8 --retry-delay 4 --retry-all-errors \
-              --connect-timeout 12 --max-time 40 \
-              --output "$2" "$1"
+            local url="$1" target="$2" label="$3"
+            local first_ms attempt done_ms rc metrics
+            local http remote_ip dns_s tcp_s tls_s first_byte_s total_s
+            first_ms="$(date +%s%3N)"
+            for attempt in {1..9}; do
+              rc=0
+              metrics="$(curl --request GET --fail --silent --show-error \
+                --connect-timeout 12 --max-time 40 \
+                --write-out '%{http_code}|%{remote_ip}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}' \
+                --output "$target" "$url")" || rc=$?
+              done_ms="$(date +%s%3N)"
+              IFS='|' read -r http remote_ip dns_s tcp_s tls_s first_byte_s total_s <<< "$metrics"
+              printf 'HTTP_DIAG target=%s attempt=%s curl_exit=%s http=%s remote_ip=%s dns_s=%s tcp_s=%s tls_s=%s first_byte_s=%s total_s=%s elapsed_since_first_get_ms=%s\n' \
+                "$label" "$attempt" "$rc" "$http" "$remote_ip" "$dns_s" "$tcp_s" "$tls_s" "$first_byte_s" "$total_s" "$((done_ms - first_ms))"
+              if [ "$rc" -eq 0 ]; then
+                if [ "$label" = "health" ]; then
+                  printf 'COLD_START_DIAG health_first_success_elapsed_ms=%s\n' "$((done_ms - first_ms))"
+                fi
+                return 0
+              fi
+              if [ "$attempt" -lt 9 ]; then sleep 4; fi
+            done
+            if [ "$label" = "health" ]; then
+              printf 'COLD_START_DIAG health_no_success_elapsed_ms=%s\n' "$((done_ms - first_ms))"
+            fi
+            return "$rc"
           }
-          fetch "$API/api/v1/health" "$OUT/health.json"
-          fetch "$API/api/clx016/readiness" "$OUT/readiness.json"
-          fetch "$API/api/admin/auth/uat-masterdata-approval-page" "$OUT/uat.html"
-          fetch "$UI/" "$OUT/frontend.html"
+          fetch "$API/api/v1/health" "$OUT/health.json" health
+          fetch "$API/api/clx016/readiness" "$OUT/readiness.json" readiness
+          fetch "$API/api/admin/auth/uat-masterdata-approval-page" "$OUT/uat.html" uat_page
+          fetch "$UI/" "$OUT/frontend.html" frontend
           # Unauthenticated root must stay locked; do not disable traffic controls.
-          root_status="$(curl --silent --show-error --output "$OUT/root.json" \
-            --write-out '%{http_code}' --connect-timeout 12 --max-time 40 "$API/")"
+          root_rc=0
+          root_metrics="$(curl --request GET --silent --show-error --output "$OUT/root.json" \
+            --write-out '%{http_code}|%{remote_ip}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}' \
+            --connect-timeout 12 --max-time 40 "$API/")" || root_rc=$?
+          IFS='|' read -r root_status root_ip root_dns root_tcp root_tls root_first root_total <<< "$root_metrics"
+          printf 'HTTP_DIAG target=locked_root curl_exit=%s http=%s remote_ip=%s dns_s=%s tcp_s=%s tls_s=%s first_byte_s=%s total_s=%s\n' \
+            "$root_rc" "$root_status" "$root_ip" "$root_dns" "$root_tcp" "$root_tls" "$root_first" "$root_total"
+          test "$root_rc" -eq 0
           test "$root_status" = "503"
           python - <<'PY'
           import json, os
