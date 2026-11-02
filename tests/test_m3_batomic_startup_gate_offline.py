@@ -36,7 +36,7 @@ def test_host_guard_mismatch(monkeypatch):
 
 def test_revision_guard(monkeypatch,tmp_path):
     def fake_run(*args,**kwargs):
-        return SimpleNamespace(stdout=gate.EXPECTED_SHA+"\\n")
+        return SimpleNamespace(stdout=gate.EXPECTED_SHA)
     monkeypatch.setattr(gate.subprocess,"run",fake_run)
     gate.validate_checkout(tmp_path)
     monkeypatch.setattr(gate.subprocess,"run",lambda *a,**kw: SimpleNamespace(stdout="0"*40))
