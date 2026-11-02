@@ -101,13 +101,13 @@ jobs:
           # No credentials, writes, deployment or external side effects: GET only.
           for attempt in 1 2 3; do
             rc=0
-            timings="$(curl --request GET --silent --show-error --fail \\
-              --connect-timeout 12 --max-time 40 \\
-              --output "${RUNNER_TEMP}/m3-availability-health.json" \\
-              --write-out '%{http_code}|%{remote_ip}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}' \\
+            timings="$(curl --request GET --silent --show-error --fail \
+              --connect-timeout 12 --max-time 40 \
+              --output "${RUNNER_TEMP}/m3-availability-health.json" \
+              --write-out '%{http_code}|%{remote_ip}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}' \
               "$API/api/v1/health")" || rc=$?
             IFS='|' read -r http ip dns tcp tls first_byte total <<< "$timings"
-            printf 'AVAILABILITY_DIAG attempt=%s curl_exit=%s http=%s ip=%s dns_s=%s tcp_s=%s tls_s=%s first_byte_s=%s total_s=%s\\n' \\
+            printf 'AVAILABILITY_DIAG attempt=%s curl_exit=%s http=%s ip=%s dns_s=%s tcp_s=%s tls_s=%s first_byte_s=%s total_s=%s\n' \
               "$attempt" "$rc" "$http" "$ip" "$dns" "$tcp" "$tls" "$first_byte" "$total"
             if [ "$rc" -eq 0 ] && [ "$http" = 200 ]; then
               python3 - <<'PYHEALTH'
