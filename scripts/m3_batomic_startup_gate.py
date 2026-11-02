@@ -11,7 +11,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, parse_qs
 
 import psycopg
 
@@ -33,8 +33,11 @@ def validate_target():
         raise RuntimeError("Direct Neon hostname guard failed")
     if "-pooler" in parsed.hostname or "pgbouncer" in parsed.query.lower():
         raise RuntimeError("Pooled connections prohibited")
-    if "sslmode=require" not in parsed.query.split("&"):
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    if params.get("sslmode") != ["require"]:
         raise RuntimeError("TLS requirement absent")
+    if not parsed.username or parsed.path != "/neondb":
+        raise RuntimeError("Unexpected database credentials or database name")
     print("DIRECT_HOST_GUARD_PASS (credentials redacted)", flush=True)
 
 
@@ -103,13 +106,21 @@ def main():
         if not started:
             raise RuntimeError("Application startup timed out")
         print("APPLICATION_LISTENING", flush=True)
-        # A listening socket alone does not prove FastAPI startup completed.
+        # Health must be from this child process, not merely an open TCP port.
         from urllib.request import urlopen
-        import json
-        with urlopen('http://127.0.0.1:18080/api/v1/health', timeout=8) as response:
-            if response.status != 200:
-                raise RuntimeError('Health endpoint not ready')
-            health = json.load(response)
+        health = None
+        for _ in range(12):
+            if proc.poll() is not None:
+                raise RuntimeError("Application exited before healthy")
+            try:
+                with urlopen("http://127.0.0.1:18080/api/v1/health", timeout=3) as response:
+                    if response.status == 200:
+                        health = json.load(response)
+                        break
+            except Exception:
+                time.sleep(1)
+        if health is None:
+            raise RuntimeError("Application failed health check")
         if health.get('project') != 'M3 NVOCC ERP' or health.get('sandbox_only') is not True or health.get('production_promoted') is not False:
             raise RuntimeError('Unsafe or unexpected application health state')
         print('APPLICATION_HEALTH_PASS', flush=True)
