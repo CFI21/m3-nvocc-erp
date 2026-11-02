@@ -1,0 +1,77 @@
+name: M3 B-Atomic Manual Startup Gate
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-batomic-manual-startup-only
+  cancel-in-progress: false
+
+jobs:
+  isolated-startup:
+    if: github.repository == 'CFI21/m3-nvocc-erp' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: m3-batomic-disposable
+    env:
+      M3_UAT_DB_HOST: ep-quiet-breeze-b43xue0h.c-6.us-east-2.aws.neon.tech
+      M3_PINNED_REPO: m3-pinned
+      M3_UAT_PRESERVE_DATA: '1'
+      M3_PRODUCTION_TRAFFIC: 'OFF'
+      M3_LIVE_PROVIDERS: 'OFF'
+      M3_REAL_MONEY: 'OFF'
+    steps:
+      - name: Checkout immutable reviewed startup harness
+        uses: actions/checkout@v4
+        with:
+          ref: f9957319fcbe6e244d166dd063dcd931987cf0e7
+          persist-credentials: false
+      - name: Checkout approved B-Atomic source
+        uses: actions/checkout@v4
+        with:
+          ref: 79968230bd5601142d9239c739853b64ed9d2f82
+          path: m3-pinned
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned dependencies without database secret
+        run: python -m pip install -r m3-pinned/requirements.txt
+      - name: Offline syntax verification
+        run: python -m py_compile scripts/m3_batomic_startup_gate.py
+      - name: Verify direct UAT URL without printing credentials
+        env:
+          DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
+        shell: bash
+        run: |
+          set +x
+          python - <<'PY'
+          import os,sys
+          from urllib.parse import urlsplit,parse_qs
+          url=os.environ.get('DATABASE_URL','')
+          if not url: sys.exit('DIRECT_DATABASE_SECRET_MISSING')
+          try:
+              u=urlsplit(url)
+              valid=(u.scheme in ('postgres','postgresql') and
+                     u.hostname == os.environ['M3_UAT_DB_HOST'] and
+                     u.path == '/neondb' and
+                     parse_qs(u.query).get('sslmode') == ['require'] and
+                     '-pooler' not in (u.hostname or '') and
+                     'pgbouncer' not in u.query.lower())
+          except ValueError:
+              valid=False
+          if not valid: sys.exit('DIRECT_DATABASE_TARGET_GUARD_FAIL')
+          print('DIRECT_DATABASE_TARGET_PASS')
+          PY
+      - name: Verify application's own UAT target guard
+        env:
+          DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
+        run: |
+          cd m3-pinned
+          python -c "from app.db import assert_approved_database_target; assert_approved_database_target(); print('APP_TARGET_GUARD_PASS')"
+      - name: Verify zero-write application startup (NO LOGIN / NO SUBMISSION)
+        env:
+          DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
+        run: python scripts/m3_batomic_startup_gate.py
