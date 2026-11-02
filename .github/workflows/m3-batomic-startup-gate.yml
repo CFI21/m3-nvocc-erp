@@ -37,15 +37,33 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: Verify secret configured without displaying
+      - name: Verify secret presence and direct hostname without leaking credentials
         env:
           DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
         shell: bash
         run: |
-          if [ -z "${DATABASE_URL:-}" ]; then
-            echo "::error::M3_BATOMIC_DIRECT_DATABASE_URL not configured"
-            exit 1
-          fi
+          set +x
+          python - <<'PY'
+          import os, sys
+          from urllib.parse import urlsplit, parse_qs
+          url = os.getenv('DATABASE_URL', '')
+          if not url:
+              sys.exit('DIRECT_DATABASE_SECRET_MISSING')
+          try:
+              target = urlsplit(url)
+              ok = (target.scheme in ('postgres', 'postgresql') and
+                    target.hostname == os.environ['M3_UAT_DB_HOST'] and
+                    target.hostname == 'ep-quiet-breeze-b43xue0h.c-6.us-east-2.aws.neon.tech' and
+                    target.path == '/neondb' and
+                    parse_qs(target.query).get('sslmode') == ['require'] and
+                    'pgbouncer' not in target.query.lower() and
+                    '-pooler' not in (target.hostname or ''))
+          except (ValueError, KeyError):
+              ok = False
+          if not ok:
+              sys.exit('DIRECT_DATABASE_TARGET_GUARD_FAIL')
+          print('DIRECT_DATABASE_SECRET_AND_HOST_PASS')
+          PY
       - name: Install pinned application's dependencies
         run: python -m pip install -r m3-pinned/requirements.txt
       - name: Check test harness syntax
