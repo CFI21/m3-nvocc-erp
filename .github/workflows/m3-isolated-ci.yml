@@ -77,7 +77,56 @@ jobs:
           path: ci-proof/
           if-no-files-found: error
           retention-days: 7
+  isolated-api-availability:
+    # Free-tier availability is a separate gate, not an application assertion.
+    if: github.head_ref == 'm3-dev-sprint-2' || github.ref_name == 'm3-dev-sprint-2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Diagnose isolated API DNS, TCP, TLS and first HTTP response
+        shell: bash
+        env:
+          API: https://m3-dev-sprint2-isolated-api.onrender.com
+        run: |
+          set -euo pipefail
+          python3 - <<'PYDNS'
+          import socket
+          host = 'm3-dev-sprint2-isolated-api.onrender.com'
+          try:
+              addresses = sorted({entry[4][0] for entry in socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)})
+              print(f'DNS_DIAG host={host} status=PASS addresses={",".join(addresses)}')
+          except OSError as exc:
+              print(f'DNS_DIAG host={host} status=FAIL reason={type(exc).__name__}')
+          PYDNS
+          # No credentials, writes, deployment or external side effects: GET only.
+          for attempt in 1 2 3; do
+            rc=0
+            timings="$(curl --request GET --silent --show-error --fail \\
+              --connect-timeout 12 --max-time 40 \\
+              --output "${RUNNER_TEMP}/m3-availability-health.json" \\
+              --write-out '%{http_code}|%{remote_ip}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}' \\
+              "$API/api/v1/health")" || rc=$?
+            IFS='|' read -r http ip dns tcp tls first_byte total <<< "$timings"
+            printf 'AVAILABILITY_DIAG attempt=%s curl_exit=%s http=%s ip=%s dns_s=%s tcp_s=%s tls_s=%s first_byte_s=%s total_s=%s\\n' \\
+              "$attempt" "$rc" "$http" "$ip" "$dns" "$tcp" "$tls" "$first_byte" "$total"
+            if [ "$rc" -eq 0 ] && [ "$http" = 200 ]; then
+              python3 - <<'PYHEALTH'
+          import json, os
+          from pathlib import Path
+          health = json.loads((Path(os.environ['RUNNER_TEMP']) / 'm3-availability-health.json').read_text())
+          assert health.get('project') == 'M3 NVOCC ERP'
+          assert health.get('sandbox_only') is True
+          assert health.get('production_promoted') is False
+          print('ISOLATED_AVAILABILITY_PASS')
+          PYHEALTH
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 5; fi
+          done
+          echo 'ISOLATED_AVAILABILITY_FAIL: HTTP health unavailable; application smoke not run' >&2
+          exit 1
   isolated-public-smoke:
+    needs: isolated-api-availability
     # Never execute against preview-pr124 or production.
     if: github.head_ref == 'm3-dev-sprint-2' || github.ref_name == 'm3-dev-sprint-2'
     runs-on: ubuntu-latest
