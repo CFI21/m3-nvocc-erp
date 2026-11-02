@@ -39,7 +39,9 @@ def test_health_path_other_methods_do_not_touch_database(monkeypatch):
     with TestClient(main.app) as client:
         response = client.post("/api/v1/health")
 
-    assert response.status_code == 405, response.text
+    # POST is parsed by the existing /api/v1/{module} route and rejected (422).
+    # No database access is permitted even for this non-GET health path.
+    assert response.status_code == 422, response.text
 
 
 def test_readiness_still_uses_database_and_fails_closed(monkeypatch):
