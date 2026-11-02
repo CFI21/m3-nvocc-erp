@@ -20,6 +20,10 @@ jobs:
       DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
       M3_UAT_DB_HOST: ep-quiet-breeze-b43xue0h.c-6.us-east-2.aws.neon.tech
       M3_PINNED_REPO: m3-pinned
+      M3_UAT_PRESERVE_DATA: '1'
+      M3_PRODUCTION_TRAFFIC: 'OFF'
+      M3_LIVE_PROVIDERS: 'OFF'
+      M3_REAL_MONEY: 'OFF'
     steps:
       - name: Checkout test harness branch
         uses: actions/checkout@v4
@@ -45,5 +49,9 @@ jobs:
         run: python -m pip install -r m3-pinned/requirements.txt
       - name: Check test harness syntax
         run: python -m py_compile scripts/m3_batomic_startup_gate.py
+      - name: Verify pinned application permits exactly the isolated UAT target
+        run: |
+          cd m3-pinned
+          python -c "from app.db import assert_approved_database_target; assert_approved_database_target(); print('APP_DATABASE_TARGET_GUARD_PASS')"
       - name: Verify zero-write startup; never login or submit
         run: python scripts/m3_batomic_startup_gate.py
