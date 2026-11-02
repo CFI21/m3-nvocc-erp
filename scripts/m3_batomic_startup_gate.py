@@ -72,6 +72,10 @@ def main():
     repo = Path(os.environ.get("M3_PINNED_REPO", "m3-pinned")).resolve()
     validate_target()
     validate_checkout(repo)
+    if os.environ.get('M3_UAT_PRESERVE_DATA') != '1':
+        raise RuntimeError('UAT preservation flag missing')
+    if os.environ.get('M3_PRODUCTION_TRAFFIC', '').upper() != 'OFF':
+        raise RuntimeError('Production traffic must be OFF')
     before = snapshot()
     print("PRE_START_SNAPSHOT_CAPTURED", flush=True)
     env = os.environ.copy()
@@ -99,6 +103,16 @@ def main():
         if not started:
             raise RuntimeError("Application startup timed out")
         print("APPLICATION_LISTENING", flush=True)
+        # A listening socket alone does not prove FastAPI startup completed.
+        from urllib.request import urlopen
+        import json
+        with urlopen('http://127.0.0.1:18080/api/v1/health', timeout=8) as response:
+            if response.status != 200:
+                raise RuntimeError('Health endpoint not ready')
+            health = json.load(response)
+        if health.get('project') != 'M3 NVOCC ERP' or health.get('sandbox_only') is not True or health.get('production_promoted') is not False:
+            raise RuntimeError('Unsafe or unexpected application health state')
+        print('APPLICATION_HEALTH_PASS', flush=True)
         after = snapshot()
         changes = [table for table in TABLES if before[table] != after[table]]
         if changes:
