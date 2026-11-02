@@ -6,6 +6,12 @@ on:
       - "scripts/m3_b_atomic_offline_preflight.py"
       - "tests/test_m3_b_atomic_offline_preflight.py"
       - ".github/workflows/m3-offline-b-atomic-preflight.yml"
+  pull_request:
+    branches: [m3-dev-sprint-2]
+    paths:
+      - "scripts/m3_b_atomic_offline_preflight.py"
+      - "tests/test_m3_b_atomic_offline_preflight.py"
+      - ".github/workflows/m3-offline-b-atomic-preflight.yml"
   workflow_dispatch:
 permissions:
   contents: read
