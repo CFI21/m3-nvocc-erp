@@ -492,7 +492,10 @@ async def security_headers(request, call_next):
     request_id=request.headers.get('X-Request-Id') or str(uuid.uuid4())
     correlation_id=request.headers.get('X-Correlation-Id') or request_id
     error_class=None
-    runtime_mode=get_runtime_mode_value()
+    # Public health must work without database connectivity or schema writes.
+    # Keep database-backed runtime-mode enforcement for every other path.
+    public_health_path=request.url.path=='/api/v1/health'
+    runtime_mode='NORMAL' if public_health_path else get_runtime_mode_value()
     health_exempt=request.method.upper()=='OPTIONS' or request.url.path in {'/api/v1/health','/api/clx013/runtime-mode','/api/clx013/health','/api/clx013/readiness','/api/clx016/readiness'}
     # One-time Admin setup is independently protected by a private 32+ character token,
     # host-pinned Neon UAT target, and an INACTIVE-only administrator check.
@@ -519,7 +522,9 @@ async def security_headers(request, call_next):
         error_class=exc.__class__.__name__
         raise
     finally:
-        if 'response' in locals():
+        # Public health must not invoke request logging: its schema initializer
+        # opens PostgreSQL and may INSERT records even for a GET request.
+        if 'response' in locals() and not public_health_path:
             job_match=re.search(r'(?<!\d)(5000[1-5])(?!\d)',request.url.path)
             log_request(request_id,correlation_id,request.method,request.url.path,response.status_code,round((time.perf_counter()-started)*1000,3),request.headers.get('X-Role'),request.headers.get('X-Office'),job_match.group(1) if job_match else None,error_class)
     response.headers['X-Request-Id']=request_id
