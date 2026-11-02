@@ -1,0 +1,49 @@
+name: M3 B-Atomic Pinned Startup Gate
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-batomic-startup-gate
+  cancel-in-progress: false
+
+jobs:
+  startup-only:
+    # This is a separate test from the governed B-Atomic write submission.
+    if: github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/m3-batomic-startup-ci-20261103'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: m3-batomic-disposable
+    env:
+      DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
+      M3_UAT_DB_HOST: ep-quiet-breeze-b43xue0h.c-6.us-east-2.aws.neon.tech
+      M3_PINNED_REPO: m3-pinned
+    steps:
+      - name: Checkout test harness branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout approved B-Atomic revision separately
+        uses: actions/checkout@v4
+        with:
+          ref: 79968230bd5601142d9239c739853b64ed9d2f82
+          path: m3-pinned
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Verify secret configured without displaying
+        shell: bash
+        run: |
+          if [ -z "${DATABASE_URL:-}" ]; then
+            echo "::error::M3_BATOMIC_DIRECT_DATABASE_URL not configured"
+            exit 1
+          fi
+      - name: Install pinned application's dependencies
+        run: python -m pip install -r m3-pinned/requirements.txt
+      - name: Check test harness syntax
+        run: python -m py_compile scripts/m3_batomic_startup_gate.py
+      - name: Verify zero-write startup; never login or submit
+        run: python scripts/m3_batomic_startup_gate.py
