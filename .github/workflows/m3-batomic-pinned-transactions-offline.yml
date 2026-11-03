@@ -1,7 +1,7 @@
 name: M3 B-Atomic Pinned Transaction Offline Tests
 on:
   push:
-    branches: [m3-batomic-rollback-offline-20261103]
+    branches: [m3-batomic-pg-controlflow-offline-20261103]
     paths:
       - "tests/test_m3_batomic_real_endpoint_transactions_offline.py"
       - ".github/workflows/m3-batomic-pinned-transactions-offline.yml"
