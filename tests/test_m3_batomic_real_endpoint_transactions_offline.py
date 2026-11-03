@@ -52,14 +52,18 @@ def harness(monkeypatch, tmp_path):
       id INTEGER PRIMARY KEY, record_key TEXT, change_ref TEXT
     );
     """)
-    monkeypatch.setattr(md, "connect", lambda: conn)
+    def fresh_connection():
+        connection = sqlite3.connect(str(dbfile), isolation_level=None)
+        connection.row_factory = sqlite3.Row
+        return connection
+    monkeypatch.setattr(md, "connect", fresh_connection)
     monkeypatch.setattr(md, "using_postgres", lambda: False)
     monkeypatch.setattr(db_module, "using_postgres", lambda: False)
     monkeypatch.setattr(md, "authenticated_actor", lambda *_: (ACTOR, {"MASTER_DATA"}))
     state = {"calls": 0, "fail_on": None}
 
     def worker(b, token, c=None, owns_transaction=True):
-        assert c is conn and owns_transaction is False
+        assert c is not None and c is not conn and owns_transaction is False
         assert token == "offline-session-placeholder"
         state["calls"] += 1
         if state["calls"] == state["fail_on"]:
