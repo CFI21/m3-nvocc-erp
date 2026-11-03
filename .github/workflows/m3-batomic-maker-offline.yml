@@ -1,0 +1,37 @@
+name: M3 B-Atomic Maker Gate Offline Tests
+on:
+  push:
+    branches: [m3-batomic-maker-auth-only-20261103]
+    paths:
+      - "scripts/m3_batomic_maker_auth_only.py"
+      - "tests/test_m3_batomic_maker_auth_offline.py"
+      - ".github/workflows/m3-batomic-maker-offline.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/m3_batomic_maker_auth_only.py"
+      - "tests/test_m3_batomic_maker_auth_offline.py"
+      - ".github/workflows/m3-batomic-maker-offline.yml"
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      DATABASE_URL: ""
+      M3_MAKER_PASSWORD: ""
+      M3_MAKER_MFA: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install offline test dependencies
+        run: python -m pip install pytest 'psycopg[binary]>=3.2,<4'
+      - name: Syntax check
+        run: python -m py_compile scripts/m3_batomic_maker_auth_only.py tests/test_m3_batomic_maker_auth_offline.py
+      - name: Run offline-only safety tests
+        run: python -m pytest -q tests/test_m3_batomic_maker_auth_offline.py
