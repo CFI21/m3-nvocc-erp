@@ -25,7 +25,7 @@ def test_exact_database_host(monkeypatch,url,good):
     monkeypatch.setenv("M3_UAT_PRESERVE_DATA","1")
     monkeypatch.setenv("M3_PRODUCTION_TRAFFIC","OFF")
     monkeypatch.setenv("M3_MAKER_PASSWORD","dummy")
-    monkeypatch.setenv("M3_MAKER_MFA","dummy")
+    monkeypatch.setenv("M3_MAKER_MFA","123456")
     if good: gate.assert_target()
     else:
         with pytest.raises(RuntimeError): gate.assert_target()
@@ -36,7 +36,7 @@ def test_missing_preservation_flag(monkeypatch):
     monkeypatch.setenv("M3_UAT_PRESERVE_DATA","0")
     monkeypatch.setenv("M3_PRODUCTION_TRAFFIC","OFF")
     monkeypatch.setenv("M3_MAKER_PASSWORD","dummy")
-    monkeypatch.setenv("M3_MAKER_MFA","dummy")
+    monkeypatch.setenv("M3_MAKER_MFA","123456")
     with pytest.raises(RuntimeError,match="M3_UAT_ISOLATION_FLAGS_INVALID"):
         gate.assert_target()
 
