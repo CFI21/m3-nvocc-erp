@@ -147,3 +147,55 @@ def test_bad_idempotency_key_fails_before_opening_transaction(harness, bad):
     assert err.value.status_code == 422
     assert counts(conn) == (0, 0, 0)
     assert state["calls"] == 0
+
+
+def test_postgres_advisory_lock_controlflow_simulated_offline(harness, monkeypatch):
+    """Tests PG-specific *branch selection*, not PostgreSQL database semantics.
+
+    SQLite delegates BEGIN/COMMIT/ROLLBACK; its fake advisory-lock result
+    merely records that the pinned endpoint requests a transaction lock.
+    """
+    inspector, state = harness
+    dbpath = inspector.execute("PRAGMA database_list").fetchone()[2]
+    advisory_calls = []
+
+    class SimulatedPgCompat:
+        def __init__(self):
+            self._conn = sqlite3.connect(dbpath, isolation_level=None)
+            self._conn.row_factory = sqlite3.Row
+
+        def execute(self, sql, params=None):
+            if "pg_advisory_xact_lock" in sql:
+                advisory_calls.append((sql, tuple(params or ())))
+                return self._conn.execute("SELECT 1")
+            return self._conn.execute(sql, tuple(params or ()))
+
+        def close(self):
+            self._conn.close()
+
+    monkeypatch.setattr(md, "connect", SimulatedPgCompat)
+    monkeypatch.setattr(md, "using_postgres", lambda: True)
+    monkeypatch.setattr(db_module, "using_postgres", lambda: True)
+    monkeypatch.setattr(db_module, "table_exists", lambda *_: True)
+
+    state["fail_on"] = 2
+    with pytest.raises(HTTPException) as err:
+        submit(request())
+    assert err.value.status_code == 422
+    assert counts(inspector) == (0, 0, 0)
+    assert len(advisory_calls) == 1
+    assert advisory_calls[0][1] == (
+        "M3_BULK_ATOMIC", "UAT-B01-MAKER|RTM|" + KEY
+    )
+
+    state["fail_on"] = None
+    success = submit(request())
+    assert success["atomic"] is True
+    assert counts(inspector) == (2, 2, 1)
+    assert submit(request()) == success
+    assert counts(inspector) == (2, 2, 1)
+    with pytest.raises(HTTPException) as conflict:
+        submit(request("Changed after replay"))
+    assert conflict.value.status_code == 409
+    assert counts(inspector) == (2, 2, 1)
+    assert len(advisory_calls) == 4
