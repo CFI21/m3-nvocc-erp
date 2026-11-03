@@ -1,0 +1,43 @@
+name: M3 B-Atomic Pinned Transaction Offline Tests
+on:
+  push:
+    branches: [m3-batomic-rollback-offline-20261103]
+    paths:
+      - "tests/test_m3_batomic_real_endpoint_transactions_offline.py"
+      - ".github/workflows/m3-batomic-pinned-transactions-offline.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "tests/test_m3_batomic_real_endpoint_transactions_offline.py"
+      - ".github/workflows/m3-batomic-pinned-transactions-offline.yml"
+permissions:
+  contents: read
+jobs:
+  offline-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      DATABASE_URL: ""
+      M3_PRODUCTION_TRAFFIC: "OFF"
+      M3_LIVE_PROVIDERS: "OFF"
+      M3_REAL_MONEY: "OFF"
+    steps:
+      - name: Checkout offline tests
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout pinned approved application
+        uses: actions/checkout@v4
+        with:
+          ref: 79968230bd5601142d9239c739853b64ed9d2f82
+          path: m3-pinned
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install offline dependencies only
+        run: python -m pip install pytest fastapi "pydantic>=2,<3" psycopg[binary] openpyxl
+      - name: Syntax check
+        run: python -m py_compile tests/test_m3_batomic_real_endpoint_transactions_offline.py
+      - name: Execute pinned endpoint against local temporary SQLite fixture
+        run: python -m pytest -q tests/test_m3_batomic_real_endpoint_transactions_offline.py
