@@ -1,7 +1,7 @@
 name: M3 B-Atomic Maker Gate Offline Tests
 on:
   push:
-    branches: [m3-batomic-maker-auth-only-20261103]
+    branches: [m3-batomic-maker-credential-preflight-20261103]
     paths:
       - "scripts/m3_batomic_maker_auth_only.py"
       - "tests/test_m3_batomic_maker_auth_offline.py"
