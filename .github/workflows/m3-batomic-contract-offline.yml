@@ -1,0 +1,35 @@
+name: M3 B-Atomic Request Contract Offline Tests
+on:
+  push:
+    branches: [m3-batomic-atomic-contract-offline-20261103]
+    paths:
+      - "scripts/m3_batomic_atomic_contract_offline.py"
+      - "tests/test_m3_batomic_atomic_contract_offline.py"
+      - ".github/workflows/m3-batomic-contract-offline.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "scripts/m3_batomic_atomic_contract_offline.py"
+      - "tests/test_m3_batomic_atomic_contract_offline.py"
+      - ".github/workflows/m3-batomic-contract-offline.yml"
+permissions:
+  contents: read
+jobs:
+  offline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      DATABASE_URL: ""
+      M3_MAKER_PASSWORD: ""
+      M3_MAKER_MFA: ""
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: python -m pip install pytest
+      - run: python -m py_compile scripts/m3_batomic_atomic_contract_offline.py tests/test_m3_batomic_atomic_contract_offline.py
+      - name: Verify no-transport atomic fixture contract
+        run: python -m pytest -q tests/test_m3_batomic_atomic_contract_offline.py
