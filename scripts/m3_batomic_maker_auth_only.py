@@ -4,10 +4,8 @@
 Requires approved direct Neon URL and protected M3_MAKER_PASSWORD/M3_MAKER_MFA.
 One login attempt maximum, then validates expected database effects.
 """
-import hashlib
 import json
 import os
-import socket
 import subprocess
 import sys
 import time
@@ -71,6 +69,20 @@ def capture():
             if not maker or maker[2] != "ACTIVE" or not maker[3] or maker[4] != 0 or maker[6] is not None:
                 raise RuntimeError("MAKER_ACCOUNT_PRECONDITION_FAILED")
             output["maker"] = maker
+            # Permit only md.maker.last_login_at to vary in iam_users.
+            cur.execute("""
+                SELECT COALESCE(md5(string_agg(
+                    md5((to_jsonb(x) - CASE WHEN username=%s
+                                          THEN 'last_login_at'
+                                          ELSE '__no_field__' END)::text),
+                    '' ORDER BY id)), md5(''))
+                FROM public.iam_users AS x
+            """, (MAKER,))
+            output["iam_users_immutable"] = cur.fetchone()[0]
+            cur.execute("SELECT COALESCE(MAX(id),0) FROM iam_sessions")
+            output["max_session_id"] = cur.fetchone()[0]
+            cur.execute("SELECT COALESCE(MAX(id),0) FROM iam_login_audit")
+            output["max_login_audit_id"] = cur.fetchone()[0]
         conn.rollback()
     return output
 
@@ -144,6 +156,26 @@ def main():
             raise RuntimeError("LOGIN_AUDIT_COUNT_DELTA_INVALID")
         if post["iam_users"][0] != startup["iam_users"][0]:
             raise RuntimeError("IAM_USER_COUNT_CHANGED")
+        if startup["iam_users_immutable"] != post["iam_users_immutable"]:
+            raise RuntimeError("UNAUTHORIZED_IAM_USER_FIELD_CHANGE")
+        with psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=12) as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT s.user_id,u.username,s.status,s.mfa_verified
+                    FROM iam_sessions s
+                    JOIN iam_users u ON u.id=s.user_id
+                    WHERE s.id > %s
+                """, (startup["max_session_id"],))
+                sessions = cur.fetchall()
+                cur.execute("""
+                    SELECT a.username,a.user_id,a.event_type,a.outcome
+                    FROM iam_login_audit a WHERE a.id > %s
+                """, (startup["max_login_audit_id"],))
+                audit_rows = cur.fetchall()
+        if len(sessions) != 1 or sessions[0] != (startup["maker"][0], MAKER, "ACTIVE", 1):
+            raise RuntimeError("NEW_SESSION_NOT_MAKER")
+        if len(audit_rows) != 1 or audit_rows[0] != (MAKER, startup["maker"][0], "LOGIN", "PASS"):
+            raise RuntimeError("NEW_LOGIN_AUDIT_NOT_MAKER_PASS")
         before_user, after_user = startup["maker"], post["maker"]
         if not (before_user[:5] == after_user[:5]
                 and after_user[5] is not None
