@@ -25,7 +25,7 @@ jobs:
       - name: Checkout reviewed Maker-login-only gate
         uses: actions/checkout@v4
         with:
-          ref: 94b3fed09f0ee3fdc02b97a09888b4302f72faa7
+          ref: 8bfcd24954f520f93e42f9e9c2606f7a1822f7e8
           path: harness
           persist-credentials: false
       - name: Checkout approved immutable application revision
