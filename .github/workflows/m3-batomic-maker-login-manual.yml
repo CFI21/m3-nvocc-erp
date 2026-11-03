@@ -1,0 +1,49 @@
+name: M3 B-Atomic Maker Login-Only Gate
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: m3-batomic-disposable-maker-login
+  cancel-in-progress: false
+
+jobs:
+  maker-auth-only:
+    if: github.repository == 'CFI21/m3-nvocc-erp' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    environment: m3-batomic-disposable
+    env:
+      M3_UAT_DB_HOST: ep-quiet-breeze-b43xue0h.c-6.us-east-2.aws.neon.tech
+      M3_UAT_PRESERVE_DATA: '1'
+      M3_PRODUCTION_TRAFFIC: 'OFF'
+      M3_LIVE_PROVIDERS: 'OFF'
+      M3_REAL_MONEY: 'OFF'
+    steps:
+      - name: Checkout reviewed Maker-login-only gate
+        uses: actions/checkout@v4
+        with:
+          ref: 94b3fed09f0ee3fdc02b97a09888b4302f72faa7
+          path: harness
+          persist-credentials: false
+      - name: Checkout approved immutable application revision
+        uses: actions/checkout@v4
+        with:
+          ref: 79968230bd5601142d9239c739853b64ed9d2f82
+          path: m3-pinned
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies without credentials
+        run: python -m pip install -r m3-pinned/requirements.txt
+      - name: Validate login-only harness syntax
+        run: python -m py_compile harness/scripts/m3_batomic_maker_auth_only.py
+      - name: Run one Maker login and assert permitted auth-only effects
+        env:
+          DATABASE_URL: ${{ secrets.M3_BATOMIC_DIRECT_DATABASE_URL }}
+          M3_MAKER_PASSWORD: ${{ secrets.M3_MAKER_PASSWORD }}
+          M3_MAKER_MFA: ${{ secrets.M3_MAKER_MFA }}
+        run: python harness/scripts/m3_batomic_maker_auth_only.py
