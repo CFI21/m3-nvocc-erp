@@ -92,6 +92,8 @@ def main():
     pre = capture()
     print("PRE_STARTUP_SNAPSHOT_CAPTURED", flush=True)
     env = os.environ.copy()
+    env.pop('M3_MAKER_PASSWORD', None)
+    env.pop('M3_MAKER_MFA', None)
     env["PYTHONPATH"] = str(repo)
     env["PORT"] = "18081"
     proc = subprocess.Popen(
