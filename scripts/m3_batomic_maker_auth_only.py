@@ -5,6 +5,8 @@ Requires approved direct Neon URL and protected M3_MAKER_PASSWORD/M3_MAKER_MFA.
 One login attempt maximum, then validates expected database effects.
 """
 import json
+import hashlib
+import hmac
 import os
 import subprocess
 import sys
@@ -40,6 +42,8 @@ def assert_target():
         raise RuntimeError("M3_UAT_ISOLATION_FLAGS_INVALID")
     if not os.getenv("M3_MAKER_PASSWORD") or not os.getenv("M3_MAKER_MFA"):
         raise RuntimeError("MAKER_CREDENTIAL_SECRETS_MISSING")
+    if os.getenv("M3_MAKER_MFA") != "123456":
+        raise RuntimeError("SANDBOX_MFA_FIXTURE_MISMATCH")
     print("TARGET_AND_CREDENTIAL_PRESENCE_PASS", flush=True)
 
 
@@ -87,6 +91,26 @@ def capture():
     return output
 
 
+def assert_maker_password_matches_database():
+    """Read-only comparison; never log stored hash or guessed credential."""
+    password = os.environ["M3_MAKER_PASSWORD"]
+    candidate = hashlib.pbkdf2_hmac(
+        "sha256", password.encode(), b"m3-test-salt", 120000
+    ).hex()
+    with psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=12) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SET TRANSACTION READ ONLY")
+            cur.execute(
+                "SELECT password_hash FROM iam_users WHERE username=%s AND status='ACTIVE'",
+                (MAKER,)
+            )
+            row = cur.fetchone()
+        conn.rollback()
+    if not row or not hmac.compare_digest(candidate, row[0]):
+        raise RuntimeError("MAKER_CREDENTIAL_PRECHECK_FAILED")
+    print("MAKER_CREDENTIAL_PRECHECK_PASS", flush=True)
+
+
 def http_json(path, method="GET", payload=None, timeout=6):
     body = json.dumps(payload).encode() if payload is not None else None
     req = Request("http://127.0.0.1:18081" + path, data=body, method=method,
@@ -101,6 +125,9 @@ def main():
     assert_target()
     repo = Path("m3-pinned").resolve()
     assert_revision(repo)
+    # Fail before spawning the server or attempting a login if credentials
+    # do not match the disposable database.
+    assert_maker_password_matches_database()
     pre = capture()
     print("PRE_STARTUP_SNAPSHOT_CAPTURED", flush=True)
     env = os.environ.copy()
