@@ -38,7 +38,10 @@ def assert_target():
             and "pgbouncer" not in u.query.lower()
             and u.username and u.password):
         raise RuntimeError("DATABASE_TARGET_GUARD_FAILED")
-    if (os.getenv("M3_UAT_PRESERVE_DATA") != "1"\n            or os.getenv("M3_PRODUCTION_TRAFFIC") != "OFF"\n            or os.getenv("M3_LIVE_PROVIDERS") != "OFF"\n            or os.getenv("M3_REAL_MONEY") != "OFF"):
+    if (os.getenv("M3_UAT_PRESERVE_DATA") != "1"
+            or os.getenv("M3_PRODUCTION_TRAFFIC") != "OFF"
+            or os.getenv("M3_LIVE_PROVIDERS") != "OFF"
+            or os.getenv("M3_REAL_MONEY") != "OFF"):
         raise RuntimeError("M3_UAT_ISOLATION_FLAGS_INVALID")
     if not os.getenv("M3_MAKER_PASSWORD") or not os.getenv("M3_MAKER_MFA"):
         raise RuntimeError("MAKER_CREDENTIAL_SECRETS_MISSING")
