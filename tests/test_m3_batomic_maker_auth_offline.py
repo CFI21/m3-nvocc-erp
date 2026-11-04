@@ -24,6 +24,8 @@ def test_exact_database_host(monkeypatch,url,good):
     monkeypatch.setenv("M3_UAT_DB_HOST",HOST)
     monkeypatch.setenv("M3_UAT_PRESERVE_DATA","1")
     monkeypatch.setenv("M3_PRODUCTION_TRAFFIC","OFF")
+    monkeypatch.setenv("M3_LIVE_PROVIDERS","OFF")
+    monkeypatch.setenv("M3_REAL_MONEY","OFF")
     monkeypatch.setenv("M3_MAKER_PASSWORD","dummy")
     monkeypatch.setenv("M3_MAKER_MFA","123456")
     if good: gate.assert_target()
@@ -35,6 +37,8 @@ def test_missing_preservation_flag(monkeypatch):
     monkeypatch.setenv("M3_UAT_DB_HOST",HOST)
     monkeypatch.setenv("M3_UAT_PRESERVE_DATA","0")
     monkeypatch.setenv("M3_PRODUCTION_TRAFFIC","OFF")
+    monkeypatch.setenv("M3_LIVE_PROVIDERS","OFF")
+    monkeypatch.setenv("M3_REAL_MONEY","OFF")
     monkeypatch.setenv("M3_MAKER_PASSWORD","dummy")
     monkeypatch.setenv("M3_MAKER_MFA","123456")
     with pytest.raises(RuntimeError,match="M3_UAT_ISOLATION_FLAGS_INVALID"):
@@ -89,3 +93,25 @@ def test_credential_preflight_accepts_matching_hash(monkeypatch):
     monkeypatch.setenv("DATABASE_URL","postgresql://placeholder")
     monkeypatch.setattr(gate.psycopg,"connect",lambda *args,**kwargs: FakeConn())
     gate.assert_maker_password_matches_database()
+
+def test_full_master_and_iam_snapshot_coverage():
+    assert {"md_records", "md_versions", "md_aliases", "md_change_requests",
+            "md_audit", "md_bulk_idempotency"} <= set(gate.MD_TABLES)
+    assert "iam_audit_events" in gate.OTHER_TABLES
+    source = path.read_text()
+    assert "for t in MD_TABLES + OTHER_TABLES" in source
+    assert "for table in MD_TABLES + AUTH_TABLES + OTHER_TABLES" in source
+
+@pytest.mark.parametrize("unsafe_variable", ["M3_LIVE_PROVIDERS", "M3_REAL_MONEY"])
+def test_provider_or_real_money_switch_fail_closed(monkeypatch, unsafe_variable):
+    monkeypatch.setenv("DATABASE_URL", f"postgresql://tester:fake@{HOST}/neondb?sslmode=require")
+    monkeypatch.setenv("M3_UAT_DB_HOST", HOST)
+    monkeypatch.setenv("M3_UAT_PRESERVE_DATA", "1")
+    monkeypatch.setenv("M3_PRODUCTION_TRAFFIC", "OFF")
+    monkeypatch.setenv("M3_LIVE_PROVIDERS", "OFF")
+    monkeypatch.setenv("M3_REAL_MONEY", "OFF")
+    monkeypatch.setenv("M3_MAKER_PASSWORD", "dummy")
+    monkeypatch.setenv("M3_MAKER_MFA", "123456")
+    monkeypatch.setenv(unsafe_variable, "ON")
+    with pytest.raises(RuntimeError, match="M3_UAT_ISOLATION_FLAGS_INVALID"):
+        gate.assert_target()
