@@ -115,3 +115,43 @@ def test_provider_or_real_money_switch_fail_closed(monkeypatch, unsafe_variable)
     monkeypatch.setenv(unsafe_variable, "ON")
     with pytest.raises(RuntimeError, match="M3_UAT_ISOLATION_FLAGS_INVALID"):
         gate.assert_target()
+
+def test_transient_maker_session_revoked_without_exposing_token(monkeypatch):
+    token = "private-in-memory-test-token"
+    invoked = []
+    class Cursor:
+        def __enter__(self): return self
+        def __exit__(self, *_): return False
+        def execute(self, sql, args=None):
+            if args: invoked.append(args[0])
+        def fetchone(self): return ("REVOKED", "2026-11-04T11:00:00Z")
+    class Conn:
+        def __enter__(self): return self
+        def __exit__(self, *_): return False
+        def cursor(self): return Cursor()
+        def rollback(self): pass
+    monkeypatch.setenv("DATABASE_URL", "postgresql://fake")
+    monkeypatch.setattr(gate.psycopg, "connect", lambda *args, **kwargs: Conn())
+    monkeypatch.setattr(gate, "http_json", lambda *args, **kwargs:
+                        {"status": "LOGGED_OUT"} if kwargs.get("session_token") == token else {})
+    before = {table: (0, "original") for table in gate.MD_TABLES}
+    monkeypatch.setattr(gate, "capture", lambda: dict(before))
+    gate.revoke_test_session(token, before)
+    assert invoked == [token]
+
+
+def test_logout_failure_is_fail_closed_without_exception_details(monkeypatch):
+    def fail(*args, **kwargs):
+        raise RuntimeError("sensitive-session-value-that-must-not-leak")
+    monkeypatch.setattr(gate, "http_json", fail)
+    with pytest.raises(RuntimeError, match="^MAKER_TEST_SESSION_CLEANUP_NOT_VERIFIED$") as exc:
+        gate.revoke_test_session("private-token", {})
+    assert "sensitive" not in str(exc.value)
+
+
+def test_logout_runs_in_finally_and_does_not_change_master_records():
+    source = path.read_text()
+    assert "if session_token is not None:" in source
+    assert "revoke_test_session(session_token, startup)" in source
+    assert "if any(after[t] != baseline[t] for t in MD_TABLES):" in source
+    assert "proc.terminate()" in source
