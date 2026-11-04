@@ -114,14 +114,45 @@ def assert_maker_password_matches_database():
     print("MAKER_CREDENTIAL_PRECHECK_PASS", flush=True)
 
 
-def http_json(path, method="GET", payload=None, timeout=6):
+def http_json(path, method="GET", payload=None, timeout=6, session_token=None):
     body = json.dumps(payload).encode() if payload is not None else None
+    headers = {"Content-Type": "application/json"} if body else {}
+    if session_token is not None:
+        headers["X-M3-Session"] = session_token
     req = Request("http://127.0.0.1:18081" + path, data=body, method=method,
-                  headers={"Content-Type": "application/json"} if body else {})
+                  headers=headers)
     with urlopen(req, timeout=timeout) as result:
         if result.status != 200:
             raise RuntimeError("API_HTTP_NON_200")
         return json.load(result)
+
+
+
+def revoke_test_session(token, baseline):
+    """Best-effort cleanup with fail-closed proof; never echo the token."""
+    try:
+        response = http_json("/api/admin/auth/logout", method="POST",
+                             timeout=15, session_token=token)
+        if response.get("status") != "LOGGED_OUT":
+            raise RuntimeError("LOGOUT_RESPONSE_INVALID")
+        with psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=12) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET TRANSACTION READ ONLY")
+                cur.execute(
+                    "SELECT status,revoked_at FROM iam_sessions WHERE session_token=%s",
+                    (token,))
+                row = cur.fetchone()
+            conn.rollback()
+        if not row or row[0] != "REVOKED" or row[1] is None:
+            raise RuntimeError("LOGOUT_SESSION_NOT_REVOKED")
+        after = capture()
+        if any(after[t] != baseline[t] for t in MD_TABLES):
+            raise RuntimeError("LOGOUT_MASTER_DATA_CHANGED")
+        print("MAKER_TEST_SESSION_REVOKED_PASS", flush=True)
+        print("MASTER_DATA_UNCHANGED_AFTER_LOGOUT_PASS", flush=True)
+    except Exception:
+        # Keep secrets, response bodies and exception messages out of CI logs.
+        raise RuntimeError("MAKER_TEST_SESSION_CLEANUP_NOT_VERIFIED") from None
 
 
 def main():
@@ -142,6 +173,7 @@ def main():
         [sys.executable, "-m", "uvicorn", "app.main:app",
          "--host", "127.0.0.1", "--port", "18081"],
         cwd=str(repo), env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    session_token = None
     try:
         healthy = False
         for _ in range(35):
@@ -175,7 +207,8 @@ def main():
                 and isinstance(result.get("session_token"), str)
                 and len(result["session_token"]) >= 24):
             raise RuntimeError("MAKER_LOGIN_RESPONSE_INVALID")
-        # Never print, save or forward the session token.
+        # Token stays in memory only for required verification and revocation.
+        session_token = result["session_token"]
         result["session_token"] = None
         post = capture()
         if any(startup[t] != post[t] for t in MD_TABLES + OTHER_TABLES):
@@ -217,12 +250,16 @@ def main():
         print("NON_AUTH_DATA_UNCHANGED_PASS master_records_versions_aliases_audits_unchanged", flush=True)
         return 0
     finally:
-        proc.terminate()
         try:
-            proc.wait(timeout=8)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.wait(timeout=5)
+            if session_token is not None:
+                revoke_test_session(session_token, startup)
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=8)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
 
 
 if __name__ == "__main__":
