@@ -21,9 +21,9 @@ import psycopg
 HOST = "ep-quiet-breeze-b43xue0h.c-6.us-east-2.aws.neon.tech"
 PINNED_SHA = "79968230bd5601142d9239c739853b64ed9d2f82"
 MAKER = "md.maker"
-MD_TABLES = ("md_change_requests", "md_audit", "md_bulk_idempotency")
+MD_TABLES = ("md_records", "md_versions", "md_aliases", "md_change_requests", "md_audit", "md_bulk_idempotency")
 AUTH_TABLES = ("iam_sessions", "iam_login_audit", "iam_users")
-OTHER_TABLES = ("iam_user_roles", "iam_roles", "iam_permissions", "iam_role_permissions")
+OTHER_TABLES = ("iam_audit_events", "iam_user_roles", "iam_roles", "iam_permissions", "iam_role_permissions")
 
 
 def assert_target():
@@ -38,7 +38,7 @@ def assert_target():
             and "pgbouncer" not in u.query.lower()
             and u.username and u.password):
         raise RuntimeError("DATABASE_TARGET_GUARD_FAILED")
-    if os.getenv("M3_UAT_PRESERVE_DATA") != "1" or os.getenv("M3_PRODUCTION_TRAFFIC") != "OFF":
+    if (os.getenv("M3_UAT_PRESERVE_DATA") != "1"\n            or os.getenv("M3_PRODUCTION_TRAFFIC") != "OFF"\n            or os.getenv("M3_LIVE_PROVIDERS") != "OFF"\n            or os.getenv("M3_REAL_MONEY") != "OFF"):
         raise RuntimeError("M3_UAT_ISOLATION_FLAGS_INVALID")
     if not os.getenv("M3_MAKER_PASSWORD") or not os.getenv("M3_MAKER_MFA"):
         raise RuntimeError("MAKER_CREDENTIAL_SECRETS_MISSING")
@@ -211,7 +211,7 @@ def main():
             raise RuntimeError("MAKER_LAST_LOGIN_DELTA_INVALID")
         print("MAKER_LOGIN_PASS", flush=True)
         print("AUTH_EFFECTS_PASS sessions_plus_1 audit_plus_1 user_login_updated", flush=True)
-        print("NON_AUTH_DATA_UNCHANGED_PASS", flush=True)
+        print("NON_AUTH_DATA_UNCHANGED_PASS master_records_versions_aliases_audits_unchanged", flush=True)
         return 0
     finally:
         proc.terminate()
